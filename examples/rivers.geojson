@@ -1,0 +1,41 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "river-001",
+      "properties": {
+        "name": "North Fork",
+        "level": 1,
+        "length_km": 14.3
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [106.62, 26.54],
+          [106.66, 26.57],
+          [106.71, 26.58],
+          [106.76, 26.61]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "river-002",
+      "properties": {
+        "name": "East Channel",
+        "level": 2,
+        "length_km": 10.1
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [106.68, 26.5],
+          [106.7, 26.53],
+          [106.73, 26.56],
+          [106.8, 26.57]
+        ]
+      }
+    }
+  ]
+}

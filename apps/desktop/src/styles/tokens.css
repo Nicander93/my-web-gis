@@ -1,0 +1,20 @@
+:root {
+  --color-app-bg: #f6f6f3;
+  --color-panel: #fbfbf9;
+  --color-surface: #ffffff;
+  --color-text-primary: #252522;
+  --color-text-secondary: #74736d;
+  --color-text-muted: #a19f98;
+  --color-border: #e2e1db;
+  --color-border-strong: #cfcec7;
+  --color-hover: #f0efea;
+  --color-selected: #e8ece8;
+  --color-active: #dde6dc;
+  --color-accent: #586b5d;
+  --color-accent-soft: #dfe8de;
+  --color-danger: #a64c47;
+  --color-warning: #9a742f;
+  --color-success: #56835b;
+  --font-ui: Inter, system-ui, "Noto Sans SC", sans-serif;
+  --font-mono: "Maple Mono", "JetBrains Mono", Consolas, monospace;
+}

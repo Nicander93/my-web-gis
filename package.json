@@ -1,0 +1,19 @@
+{
+  "name": "desktop-webgis",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @desktop-webgis/desktop dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "tauri": "pnpm --filter @desktop-webgis/desktop tauri"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.1",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.1",
+    "vitest": "^3.2.4",
+    "vue-tsc": "^3.0.5"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "station-001",
+      "properties": {
+        "name": "Gauge A",
+        "status": "active",
+        "water_level": 3.2
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.66, 26.57]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "station-002",
+      "properties": {
+        "name": "Gauge B",
+        "status": "watch",
+        "water_level": 2.8
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.73, 26.56]
+      }
+    }
+  ]
+}

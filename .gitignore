@@ -1,0 +1,11 @@
+node_modules/
+.pnpm-store/
+dist/
+target/
+.vite/
+.vite-temp/
+*.log
+
+apps/desktop/dist/
+apps/desktop/src-tauri/target/
+packages/*/dist/

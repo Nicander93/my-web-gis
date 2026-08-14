@@ -1,0 +1,30 @@
+{
+  "name": "@desktop-webgis/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@desktop-webgis/gis-core": "workspace:*",
+    "@desktop-webgis/ol-runtime": "workspace:*",
+    "@tauri-apps/api": "^2.7.0",
+    "@tauri-apps/plugin-dialog": "^2.3.3",
+    "@vueuse/core": "^13.6.0",
+    "nanoid": "^5.1.5",
+    "ol": "^10.6.1",
+    "pinia": "^3.0.3",
+    "vue": "^3.5.18"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.7.1",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.1",
+    "vue-tsc": "^3.0.5"
+  }
+}
