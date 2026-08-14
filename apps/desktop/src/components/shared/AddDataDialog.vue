@@ -1,16 +1,46 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import { pickTextFile, type PickedTextFile } from '@/services/file.service'
 import { useProjectStore } from '@/stores/project.store'
 import { useUiStore } from '@/stores/ui.store'
 
 const projectStore = useProjectStore()
 const uiStore = useUiStore()
 const importing = ref(false)
+const picked = ref<PickedTextFile | null>(null)
+const layerName = ref('')
+
+watch(
+  () => uiStore.addDataDialogOpen,
+  (open) => {
+    if (!open) {
+      picked.value = null
+      layerName.value = ''
+      importing.value = false
+    }
+  }
+)
+
+async function browse(): Promise<void> {
+  const file = await pickTextFile(['geojson', 'json'])
+  if (!file) return
+  picked.value = file
+  layerName.value = file.name.replace(/\.(geojson|json)$/i, '')
+}
 
 async function importData(): Promise<void> {
+  if (!picked.value) {
+    await browse()
+    if (!picked.value) return
+  }
   importing.value = true
   try {
-    const layer = await projectStore.importGeoJson()
+    const layer = projectStore.importGeoJsonText(
+      picked.value.name,
+      picked.value.content,
+      picked.value.path,
+      layerName.value
+    )
     if (layer) {
       uiStore.setStatus(`已导入 ${layer.name}`)
       uiStore.addDataDialogOpen = false
@@ -35,30 +65,30 @@ async function importData(): Promise<void> {
         <span>数据源类型</span>
         <div class="data-type-row" aria-label="数据源类型">
           <button class="active" type="button">GeoJSON</button>
-          <button type="button" disabled>Shapefile</button>
-          <button type="button" disabled>CSV</button>
-          <button type="button" disabled>GeoPackage</button>
+          <button type="button" disabled title="后续版本">Shapefile</button>
+          <button type="button" disabled title="后续版本">CSV</button>
+          <button type="button" disabled title="后续版本">GeoPackage</button>
         </div>
-        <small>V0.1 当前仅支持 GeoJSON 文件导入。</small>
+        <small>当前仅支持 GeoJSON 文件导入。</small>
       </div>
 
       <label class="dialog-field">
         <span>文件路径</span>
         <div class="file-picker-proxy">
-          <span>点击“导入”后选择 .geojson 或 .json 文件</span>
-          <button type="button" @click="importData">浏览...</button>
+          <span>{{ picked?.path || '选择 .geojson 或 .json 文件' }}</span>
+          <button type="button" @click="browse">浏览...</button>
         </div>
       </label>
 
       <label class="dialog-field">
         <span>图层名称</span>
-        <input value="自动使用文件名" disabled />
+        <input v-model="layerName" :disabled="!picked" placeholder="选择文件后可修改" />
       </label>
 
       <div class="dialog-options">
         <label><input type="checkbox" checked disabled /> 自动检测字段类型</label>
         <label><input type="checkbox" checked disabled /> 导入默认样式</label>
-        <label><input type="checkbox" disabled /> 合并到现有图层</label>
+        <label><input type="checkbox" disabled title="后续版本" /> 合并到现有图层</label>
       </div>
 
       <footer>

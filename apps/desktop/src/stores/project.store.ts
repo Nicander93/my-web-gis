@@ -23,6 +23,7 @@ import {
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { pickTextFile, readTextFromPath, saveTextFile, writeTextToPath, type PickedTextFile } from '@/services/file.service'
+import { useUiStore } from '@/stores/ui.store'
 
 interface RecentProject {
   name: string
@@ -40,6 +41,7 @@ export const useProjectStore = defineStore('project', () => {
   const selection = ref<SelectionState>({ layerId: null, featureIds: [] })
   const activeTool = ref<EditTool>('select')
   const dirty = ref(false)
+  const pendingFitToLayers = ref(false)
   const recentProjects = ref<RecentProject[]>(loadRecentProjects())
 
   const layers = computed(() => project.value?.layers ?? [])
@@ -64,8 +66,7 @@ export const useProjectStore = defineStore('project', () => {
     return Array.from(keys).slice(0, 12)
   })
 
-  function newProject(name = '未命名项目'): void {
-    project.value = createProject(name)
+  function clearSession(): void {
     projectPath.value = null
     featureStore.value = new MemoryFeatureStore()
     editHistory.value = new EditHistory()
@@ -74,15 +75,38 @@ export const useProjectStore = defineStore('project', () => {
     selection.value = { layerId: null, featureIds: [] }
     activeTool.value = 'select'
     dirty.value = false
+    pendingFitToLayers.value = false
+  }
+
+  async function confirmDiscard(): Promise<boolean> {
+    if (!dirty.value || !project.value) return true
+    const choice = await useUiStore().requestUnsaved(project.value.name)
+    if (choice === 'cancel') return false
+    if (choice === 'save') return Boolean(await saveProject())
+    return true
+  }
+
+  async function newProject(name = '未命名项目'): Promise<void> {
+    if (!(await confirmDiscard())) return
+    clearSession()
+    project.value = createProject(name)
+  }
+
+  async function closeProject(): Promise<void> {
+    if (!(await confirmDiscard())) return
+    clearSession()
+    project.value = null
   }
 
   async function openProjectFromDialog(): Promise<void> {
+    if (!(await confirmDiscard())) return
     const file = await pickTextFile(['dwgis', 'json'])
     if (!file) return
     openProjectFile(file)
   }
 
   async function openRecentProject(path: string): Promise<void> {
+    if (!(await confirmDiscard())) return
     openProjectFile(await readTextFromPath(path))
   }
 
@@ -100,6 +124,7 @@ export const useProjectStore = defineStore('project', () => {
     selectedLayerId.value = activeLayerId.value
     selection.value = { layerId: activeLayerId.value, featureIds: [] }
     dirty.value = false
+    pendingFitToLayers.value = false
     addRecentProject(nextProject.name, file.path)
   }
 
@@ -129,11 +154,17 @@ export const useProjectStore = defineStore('project', () => {
   async function importGeoJson(): Promise<Layer | null> {
     ensureProject()
     const file = await pickTextFile(['geojson', 'json'])
-    if (!file || !project.value) return null
-    const features = parseGeoJsonFeatures(file.content)
+    if (!file) return null
+    return importGeoJsonText(file.name, file.content, file.path)
+  }
+
+  function importGeoJsonText(fileName: string, content: string, path: string, displayName?: string): Layer | null {
+    ensureProject()
+    if (!project.value) return null
+    const features = parseGeoJsonFeatures(content)
     const datasetId = createId('dataset')
     const layerId = createId('layer')
-    const layerName = file.name.replace(/\.(geojson|json)$/i, '')
+    const layerName = (displayName?.trim() || fileName).replace(/\.(geojson|json)$/i, '')
     const styleKind = inferLayerStyleKind(features)
 
     project.value.datasets.push({
@@ -142,7 +173,7 @@ export const useProjectStore = defineStore('project', () => {
       kind: 'vector',
       source: {
         type: 'geojson-file',
-        path: file.path
+        path
       }
     })
     const layer: Layer = {
@@ -159,8 +190,26 @@ export const useProjectStore = defineStore('project', () => {
     activeLayerId.value = layerId
     selectedLayerId.value = layerId
     selection.value = { layerId, featureIds: [] }
+    pendingFitToLayers.value = true
     markDirty()
     return layer
+  }
+
+  async function importGeoJsonFiles(files: File[]): Promise<number> {
+    const geojsonFiles = files.filter((file) => /\.(geojson|json)$/i.test(file.name))
+    if (geojsonFiles.length === 0) {
+      throw new Error('请拖入 .geojson 或 .json 文件。')
+    }
+    for (const file of geojsonFiles) {
+      importGeoJsonText(file.name, await file.text(), file.name)
+    }
+    return geojsonFiles.length
+  }
+
+  function consumePendingFitToLayers(): boolean {
+    if (!pendingFitToLayers.value) return false
+    pendingFitToLayers.value = false
+    return true
   }
 
   async function exportActiveLayer(selectedOnly = false): Promise<string | null> {
@@ -222,10 +271,17 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   function moveLayer(layerId: string, direction: -1 | 1): void {
+    const index = layers.value.findIndex((layer) => layer.id === layerId)
+    if (index < 0) return
+    moveLayerTo(layerId, index + direction)
+  }
+
+  function moveLayerTo(layerId: string, targetIndex: number): void {
     if (!project.value) return
     const index = project.value.layers.findIndex((layer) => layer.id === layerId)
-    const nextIndex = index + direction
-    if (index < 0 || nextIndex < 0 || nextIndex >= project.value.layers.length) return
+    if (index < 0) return
+    const nextIndex = Math.max(0, Math.min(targetIndex, project.value.layers.length - 1))
+    if (nextIndex === index) return
     const [layer] = project.value.layers.splice(index, 1)
     project.value.layers.splice(nextIndex, 0, layer)
     markDirty()
@@ -313,7 +369,9 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   function ensureProject(): void {
-    if (!project.value) newProject()
+    if (project.value) return
+    clearSession()
+    project.value = createProject('未命名项目')
   }
 
   function createSnapshotText(): string {
@@ -355,11 +413,15 @@ export const useProjectStore = defineStore('project', () => {
     selectedFeatures,
     attributeColumns,
     newProject,
+    closeProject,
     openProjectFromDialog,
     openRecentProject,
     saveProject,
     saveProjectAs,
     importGeoJson,
+    importGeoJsonText,
+    importGeoJsonFiles,
+    consumePendingFitToLayers,
     exportActiveLayer,
     selectLayer,
     setLayerVisible,
@@ -368,6 +430,7 @@ export const useProjectStore = defineStore('project', () => {
     renameLayer,
     removeLayer,
     moveLayer,
+    moveLayerTo,
     setSelection,
     selectFeature,
     clearSelection,

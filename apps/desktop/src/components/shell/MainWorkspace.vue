@@ -25,7 +25,7 @@ async function handleShortcut(event: KeyboardEvent): Promise<void> {
   const mod = event.ctrlKey || event.metaKey
   if (mod && event.key.toLowerCase() === 'n') {
     event.preventDefault()
-    projectStore.newProject()
+    await projectStore.newProject()
   } else if (mod && event.key.toLowerCase() === 'o') {
     event.preventDefault()
     await projectStore.openProjectFromDialog()
@@ -66,9 +66,9 @@ function handleBeforeUnload(event: BeforeUnloadEvent): void {
     <AppMenuBar />
     <PrimaryToolbar />
     <div class="workspace-main">
-      <WorkspaceSidebar />
+      <WorkspaceSidebar v-if="uiStore.sidebarOpen" />
       <MapCanvas />
-      <WorkspaceInspector />
+      <WorkspaceInspector v-if="uiStore.inspectorOpen" />
     </div>
     <BottomPanel />
     <StatusBar />

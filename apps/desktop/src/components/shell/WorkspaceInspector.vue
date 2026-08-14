@@ -57,10 +57,6 @@ function zoomToLayer(layerId: string): void {
             <span>图层名称</span>
             <input :value="inspectedLayer.name" @change="projectStore.renameLayer(inspectedLayer.id, ($event.target as HTMLInputElement).value)" />
           </label>
-          <label class="field-row">
-            <span>显示名称</span>
-            <input :value="inspectedLayer.name" @change="projectStore.renameLayer(inspectedLayer.id, ($event.target as HTMLInputElement).value)" />
-          </label>
           <div class="readonly-row"><span>数据源</span><strong>{{ inspectedDataset?.source.type ?? '-' }}</strong></div>
           <div class="readonly-row"><span>几何类型</span><strong>{{ inspectedLayer.style.kind }}</strong></div>
           <div class="readonly-row"><span>要素数量</span><strong>{{ featureCount }}</strong></div>

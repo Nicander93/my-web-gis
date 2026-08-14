@@ -24,6 +24,8 @@ const toolLabel = computed(() => {
 <template>
   <footer class="status-bar">
     <span>坐标参考系：{{ projectStore.project?.crs ?? 'EPSG:3857' }}</span>
+    <span>{{ uiStore.coordinateText }}</span>
+    <span>{{ uiStore.scaleText }}</span>
     <span>所选要素：{{ projectStore.selection.featureIds.length }}</span>
     <span>{{ projectStore.dirty ? '已修改' : '已保存' }}</span>
     <span>工具：{{ toolLabel }}</span>
