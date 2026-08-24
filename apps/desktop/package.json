@@ -12,6 +12,11 @@
   "dependencies": {
     "@desktop-webgis/gis-core": "workspace:*",
     "@desktop-webgis/ol-runtime": "workspace:*",
+    "@desktop-webgis/scene-codegen": "workspace:*",
+    "@desktop-webgis/scene-core": "workspace:*",
+    "@desktop-webgis/scene-schema": "workspace:*",
+    "@desktop-webgis/style-assistant": "workspace:*",
+    "@desktop-webgis/vector-io": "workspace:*",
     "@tauri-apps/api": "^2.7.0",
     "@tauri-apps/plugin-dialog": "^2.3.3",
     "@vueuse/core": "^13.6.0",

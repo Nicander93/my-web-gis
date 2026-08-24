@@ -1,0 +1,96 @@
+{
+  "$schema": "https://desktop-webgis.dev/schemas/map-scene-v1.json",
+  "version": 1,
+  "id": "viewer-demo",
+  "title": "二维场景 Viewer",
+  "description": "由 SceneManifest JSON 描述、由独立 OpenLayers Runtime 渲染的发布示例。",
+  "view": {
+    "projection": "EPSG:3857",
+    "center": [12957620, 4852580],
+    "zoom": 10,
+    "rotation": 0
+  },
+  "sources": {
+    "osm": {
+      "type": "xyz",
+      "url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      "attribution": "© OpenStreetMap contributors"
+    },
+    "places": {
+      "type": "geojson",
+      "dataProjection": "EPSG:4326",
+      "data": {
+        "type": "FeatureCollection",
+        "features": [
+          {
+            "type": "Feature",
+            "id": "demo-place",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [116.3974, 39.9093]
+            },
+            "properties": {
+              "name": "示例项目",
+              "status": "进行中",
+              "description": "点击要素查看由 JSON 配置的安全 Popup。"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "layers": [
+    {
+      "id": "osm",
+      "type": "tile",
+      "name": "OpenStreetMap",
+      "source": "osm",
+      "role": "basemap",
+      "visible": true
+    },
+    {
+      "id": "places",
+      "type": "vector",
+      "name": "示例项目",
+      "source": "places",
+      "visible": true,
+      "style": {
+        "type": "point",
+        "radius": 8,
+        "fill": "#2563eb",
+        "stroke": "#ffffff",
+        "strokeWidth": 3
+      },
+      "label": {
+        "field": "name",
+        "color": "#172033",
+        "haloColor": "#ffffff",
+        "haloWidth": 3,
+        "offset": [0, -18]
+      },
+      "interaction": {
+        "selectable": true,
+        "popup": {
+          "titleField": "name",
+          "fields": [
+            { "field": "status", "label": "状态", "format": "text" },
+            { "field": "description", "label": "说明", "format": "text" }
+          ]
+        }
+      }
+    }
+  ],
+  "widgets": {
+    "layerSwitcher": true,
+    "legend": true,
+    "scaleLine": true,
+    "fullscreen": true,
+    "zoom": true
+  },
+  "theme": {
+    "preset": "report-light",
+    "colorScheme": "light",
+    "accent": "#2563eb",
+    "surface": "glass"
+  }
+}

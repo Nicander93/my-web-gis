@@ -8,6 +8,17 @@ const uiStore = useUiStore()
 const renamingLayerId = ref<string | null>(null)
 const renameValue = ref('')
 const layerQuery = ref('')
+const basemapPreset = computed(() => {
+  const basemap = projectStore.project?.basemap
+  if (!basemap) return 'osm'
+  if (basemap.type === 'tianditu') return `tianditu-${basemap.mapType}`
+  if (basemap.type === 'google-map-tiles') return `google-${basemap.mapType}`
+  return basemap.type
+})
+const credentialId = computed(() => {
+  const basemap = projectStore.project?.basemap
+  return basemap?.type === 'tianditu' || basemap?.type === 'google-map-tiles' ? basemap.credential : null
+})
 
 const filteredLayers = computed(() => {
   const needle = layerQuery.value.trim().toLowerCase()
@@ -29,6 +40,27 @@ function zoomToLayer(layerId: string): void {
   window.dispatchEvent(new CustomEvent('desktop-webgis:zoom-to-layer', { detail: layerId }))
   uiStore.setStatus('已缩放到图层')
 }
+
+function selectBasemap(value: string): void {
+  if (value === 'osm') projectStore.setBasemap({ type: 'osm' })
+  else if (value.startsWith('tianditu-')) {
+    projectStore.setBasemap({
+      type: 'tianditu',
+      mapType: value.slice('tianditu-'.length) as 'vector' | 'imagery' | 'terrain',
+      projection: 'EPSG:3857',
+      withLabels: true,
+      credential: 'tianditu'
+    })
+  } else if (value.startsWith('google-')) {
+    projectStore.setBasemap({
+      type: 'google-map-tiles',
+      mapType: value.slice('google-'.length) as 'roadmap' | 'satellite' | 'terrain',
+      language: 'zh-CN',
+      region: 'CN',
+      credential: 'google-map-tiles'
+    })
+  }
+}
 </script>
 
 <template>
@@ -41,6 +73,31 @@ function zoomToLayer(layerId: string): void {
         <button title="添加数据" @click="uiStore.addDataDialogOpen = true">+</button>
       </div>
     </header>
+
+    <section class="basemap-settings">
+      <label>
+        <span>在线底图</span>
+        <select :value="basemapPreset" @change="selectBasemap(($event.target as HTMLSelectElement).value)">
+          <option value="osm">OpenStreetMap</option>
+          <option value="tianditu-vector">天地图·矢量</option>
+          <option value="tianditu-imagery">天地图·影像</option>
+          <option value="tianditu-terrain">天地图·地形</option>
+          <option value="google-roadmap">Google·道路</option>
+          <option value="google-satellite">Google·卫星</option>
+          <option value="google-terrain">Google·地形</option>
+        </select>
+      </label>
+      <label v-if="credentialId">
+        <span>运行时密钥</span>
+        <input
+          type="password"
+          autocomplete="off"
+          placeholder="仅保存在当前会话"
+          :value="projectStore.runtimeCredentials[credentialId] ?? ''"
+          @change="projectStore.setRuntimeCredential(credentialId, ($event.target as HTMLInputElement).value)"
+        />
+      </label>
+    </section>
 
     <div v-if="projectStore.layers.length === 0" class="panel-empty">
       <div class="mini-map-mark" aria-hidden="true"></div>

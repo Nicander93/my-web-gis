@@ -57,6 +57,14 @@ export type DataSource =
       type: 'memory'
       label: string
     }
+  | {
+      type: 'shapefile-file'
+      path: string
+    }
+  | {
+      type: 'dxf-file'
+      path: string
+    }
 
 export interface Dataset {
   id: string
@@ -91,6 +99,24 @@ export interface MapState {
   rotation: number
 }
 
+export type BasemapConfig =
+  | { type: 'osm' }
+  | { type: 'xyz'; url: string; attribution?: string; maxZoom?: number }
+  | {
+      type: 'tianditu'
+      mapType: 'vector' | 'imagery' | 'terrain'
+      projection?: 'EPSG:3857' | 'EPSG:4326'
+      withLabels?: boolean
+      credential: string
+    }
+  | {
+      type: 'google-map-tiles'
+      mapType: 'roadmap' | 'satellite' | 'terrain'
+      language: string
+      region: string
+      credential: string
+    }
+
 export interface Project {
   id: string
   version: number
@@ -99,6 +125,7 @@ export interface Project {
   datasets: Dataset[]
   layers: Layer[]
   mapState: MapState
+  basemap: BasemapConfig
   settings: Record<string, unknown>
 }
 

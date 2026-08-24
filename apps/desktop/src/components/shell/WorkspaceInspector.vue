@@ -39,6 +39,15 @@ function zoomToLayer(layerId: string): void {
   window.dispatchEvent(new CustomEvent('desktop-webgis:zoom-to-layer', { detail: layerId }))
   uiStore.setStatus('已缩放到图层')
 }
+
+async function smartStyle(): Promise<void> {
+  try {
+    const message = await projectStore.applySmartStyle()
+    if (message) uiStore.setStatus(message)
+  } catch (error) {
+    uiStore.showError('智能配图失败', '模型输出未通过样式校验。', String(error))
+  }
+}
 </script>
 
 <template>
@@ -68,6 +77,9 @@ function zoomToLayer(layerId: string): void {
 
         <details open>
           <summary>样式</summary>
+          <div class="button-grid">
+            <button class="ghost-button" @click="smartStyle">智能配图</button>
+          </div>
           <label class="field-row">
             <span>线颜色</span>
             <input
@@ -95,6 +107,17 @@ function zoomToLayer(layerId: string): void {
               @input="projectStore.updateLayerStyle(inspectedLayer.id, { width: Number(($event.target as HTMLInputElement).value) })"
             />
           </label>
+          <label v-if="inspectedLayer.style.kind === 'point' || inspectedLayer.style.kind === 'mixed'" class="field-row">
+            <span>点半径</span>
+            <input
+              type="number"
+              min="1"
+              max="32"
+              step="1"
+              :value="inspectedLayer.style.pointRadius"
+              @input="projectStore.updateLayerStyle(inspectedLayer.id, { pointRadius: Number(($event.target as HTMLInputElement).value) })"
+            />
+          </label>
           <label class="field-row">
             <span>透明度</span>
             <input
@@ -112,7 +135,8 @@ function zoomToLayer(layerId: string): void {
           <summary>图层操作</summary>
           <div class="button-grid">
             <button class="ghost-button" @click="zoomToLayer(inspectedLayer.id)">缩放到图层</button>
-            <button class="ghost-button" @click="projectStore.exportActiveLayer(false)">导出图层</button>
+            <button class="ghost-button" @click="projectStore.exportActiveLayer(false)">导出 GeoJSON</button>
+            <button class="ghost-button" @click="projectStore.exportActiveLayerAsShapefile(false)">导出 Shapefile</button>
           </div>
         </details>
       </template>

@@ -1,7 +1,10 @@
-import type { GisFeature, Layer, MapState } from '@desktop-webgis/gis-core'
+import type { BasemapConfig, GisFeature, Layer, MapState } from '@desktop-webgis/gis-core'
+import { createOlSceneLayer, updateGoogleMapTilesAttribution } from '@desktop-webgis/ol-scene-runtime'
+import type { SceneSource } from '@desktop-webgis/scene-schema'
 import Map from 'ol/Map'
 import View from 'ol/View'
 import TileLayer from 'ol/layer/Tile'
+import type BaseLayer from 'ol/layer/Base'
 import VectorLayer from 'ol/layer/Vector'
 import OSM from 'ol/source/OSM'
 import VectorSource from 'ol/source/Vector'
@@ -21,16 +24,15 @@ export interface PointerInfo {
 export class OlMapRuntime {
   readonly registry = new OlLayerRegistry()
   private map: Map | null = null
+  private basemapLayer: BaseLayer | null = null
+  private basemapRevision = 0
+  private fetcher: typeof globalThis.fetch | undefined = globalThis.fetch
   private pointerMove?: (info: PointerInfo) => void
 
   mount(target: HTMLElement, mapState: MapState): Map {
     this.map = new Map({
       target,
-      layers: [
-        new TileLayer({
-          source: new OSM()
-        })
-      ],
+      layers: [],
       view: new View({
         center: mapState.center,
         zoom: mapState.zoom,
@@ -40,6 +42,9 @@ export class OlMapRuntime {
       interactions: defaultInteractions()
     })
 
+    this.basemapLayer = new TileLayer({ source: new OSM() })
+    this.map.addLayer(this.basemapLayer)
+
     this.map.on('pointermove', (event) => {
       const view = this.map?.getView()
       if (!view || !this.pointerMove) return
@@ -47,6 +52,16 @@ export class OlMapRuntime {
         coordinate: event.coordinate,
         scaleText: estimateScale(view.getZoom() ?? 2)
       })
+    })
+
+    this.map.on('moveend', () => {
+      if (!this.basemapLayer || !this.map) return
+      void updateGoogleMapTilesAttribution(
+        this.basemapLayer,
+        this.map.getView(),
+        this.map.getSize(),
+        this.fetcher
+      )
     })
 
     return this.map
@@ -65,6 +80,28 @@ export class OlMapRuntime {
 
   onPointerMove(callback: (info: PointerInfo) => void): void {
     this.pointerMove = callback
+  }
+
+  async syncBasemap(
+    config: BasemapConfig,
+    credentials: Record<string, string> = {},
+    fetcher: typeof globalThis.fetch | undefined = globalThis.fetch
+  ): Promise<void> {
+    const map = this.getMap()
+    const revision = ++this.basemapRevision
+    this.fetcher = fetcher
+    const source = toSceneSource(config)
+    const layer = await createOlSceneLayer(
+      { id: '__basemap', type: 'tile', name: 'Basemap', source: '__basemap', role: 'basemap' },
+      { __basemap: source },
+      map.getView(),
+      { credentials, fetch: fetcher }
+    )
+    if (revision !== this.basemapRevision) return
+    if (this.basemapLayer) map.removeLayer(this.basemapLayer)
+    this.basemapLayer = layer
+    map.getLayers().insertAt(0, layer)
+    await updateGoogleMapTilesAttribution(layer, map.getView(), map.getSize(), fetcher)
   }
 
   getMapState(): MapState {
@@ -139,6 +176,43 @@ export class OlMapRuntime {
       duration: 120,
       maxZoom: 18
     })
+  }
+}
+
+function toSceneSource(config: BasemapConfig): SceneSource {
+  if (config.type === 'osm') {
+    return {
+      type: 'xyz',
+      url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      maxZoom: 19,
+      attribution: '© OpenStreetMap contributors'
+    }
+  }
+  if (config.type === 'xyz') {
+    return {
+      type: 'xyz',
+      url: config.url,
+      attribution: config.attribution,
+      maxZoom: config.maxZoom
+    }
+  }
+  if (config.type === 'tianditu') {
+    return {
+      type: 'provider',
+      provider: 'tianditu',
+      mapType: config.mapType,
+      projection: config.projection,
+      withLabels: config.withLabels,
+      credential: config.credential
+    }
+  }
+  return {
+    type: 'provider',
+    provider: 'google-map-tiles',
+    mapType: config.mapType,
+    language: config.language,
+    region: config.region,
+    credential: config.credential
   }
 }
 

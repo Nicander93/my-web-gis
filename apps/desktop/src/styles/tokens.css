@@ -18,3 +18,39 @@
   --font-ui: Inter, system-ui, "Noto Sans SC", sans-serif;
   --font-mono: "Maple Mono", "JetBrains Mono", Consolas, monospace;
 }
+
+:root[data-theme="dark"] {
+  --color-app-bg: #171a18;
+  --color-panel: #1d211e;
+  --color-surface: #242925;
+  --color-text-primary: #edf0ec;
+  --color-text-secondary: #adb5ae;
+  --color-text-muted: #788079;
+  --color-border: #353c37;
+  --color-border-strong: #485149;
+  --color-hover: #292f2a;
+  --color-selected: #303a32;
+  --color-active: #364438;
+  --color-accent: #93b39a;
+  --color-accent-soft: #29382c;
+  --color-danger: #ef8b83;
+  --color-warning: #d9b76a;
+  --color-success: #8dc696;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    --color-app-bg: #171a18;
+    --color-panel: #1d211e;
+    --color-surface: #242925;
+    --color-text-primary: #edf0ec;
+    --color-text-secondary: #adb5ae;
+    --color-text-muted: #788079;
+    --color-border: #353c37;
+    --color-border-strong: #485149;
+    --color-hover: #292f2a;
+    --color-selected: #303a32;
+    --color-active: #364438;
+    --color-accent: #93b39a;
+  }
+}

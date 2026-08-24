@@ -1,0 +1,30 @@
+{
+  "name": "@desktop-webgis/vector-io",
+  "version": "0.1.0",
+  "description": "Browser-friendly GeoJSON, Shapefile and DXF import/export utilities.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@desktop-webgis/scene-schema": "workspace:*",
+    "@mapbox/shp-write": "0.4.3",
+    "dxf-parser": "1.1.2",
+    "shpjs": "6.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

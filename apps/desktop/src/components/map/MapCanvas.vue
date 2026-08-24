@@ -36,7 +36,7 @@ onMounted(async () => {
     const state = mapRuntime.getMapState()
     projectStore.updateMapState(state.center, state.zoom, state.rotation)
   })
-  syncMap()
+  await syncMap()
   window.addEventListener('desktop-webgis:zoom-to-layer', handleZoomToLayer)
   window.addEventListener('desktop-webgis:zoom-to-all', handleZoomToAll)
 })
@@ -56,6 +56,12 @@ watch(
 )
 
 watch(
+  () => [projectStore.project?.basemap, projectStore.runtimeCredentials],
+  () => void syncBasemap(),
+  { deep: true }
+)
+
+watch(
   () => projectStore.activeTool,
   () => syncTool()
 )
@@ -71,10 +77,28 @@ watch(
   () => syncTool()
 )
 
-function syncMap(): void {
+async function syncMap(): Promise<void> {
+  await syncBasemap()
   syncLayers()
   selectionRuntime.activate(projectStore.activeLayerId, projectStore.setSelection)
   syncTool()
+}
+
+async function syncBasemap(): Promise<void> {
+  if (!projectStore.project) return
+  const basemap = projectStore.project.basemap
+  if (
+    (basemap.type === 'tianditu' || basemap.type === 'google-map-tiles') &&
+    !projectStore.runtimeCredentials[basemap.credential]
+  ) {
+    uiStore.setStatus(`请输入底图运行时密钥：${basemap.credential}`)
+    return
+  }
+  try {
+    await mapRuntime.syncBasemap(basemap, projectStore.runtimeCredentials)
+  } catch (error) {
+    uiStore.showError('底图加载失败', '请检查 Provider 配置和运行时密钥。', String(error))
+  }
 }
 
 function syncLayers(): void {

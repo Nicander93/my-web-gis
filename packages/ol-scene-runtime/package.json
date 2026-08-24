@@ -1,0 +1,28 @@
+{
+  "name": "@desktop-webgis/ol-scene-runtime",
+  "version": "0.1.0",
+  "description": "Render declarative SceneManifest documents with OpenLayers.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@desktop-webgis/scene-schema": "workspace:*",
+    "ol": "^10.6.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

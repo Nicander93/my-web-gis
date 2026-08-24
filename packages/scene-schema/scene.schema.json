@@ -1,0 +1,324 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://desktop-webgis.dev/schemas/map-scene-v1.json",
+  "title": "SceneManifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "id", "title", "view", "sources", "layers"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "id": { "$ref": "#/$defs/nonEmptyString" },
+    "title": { "$ref": "#/$defs/nonEmptyString" },
+    "description": { "type": "string" },
+    "view": { "$ref": "#/$defs/view" },
+    "credentials": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/credentialReference" }
+    },
+    "sources": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/source" }
+    },
+    "layers": {
+      "type": "array",
+      "items": { "oneOf": [{ "$ref": "#/$defs/tileLayer" }, { "$ref": "#/$defs/vectorLayer" }] }
+    },
+    "widgets": { "$ref": "#/$defs/widgets" },
+    "theme": { "$ref": "#/$defs/theme" },
+    "presentation": { "$ref": "#/$defs/presentation" },
+    "metadata": { "type": "object" }
+  },
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "finiteNumber": {
+      "type": "number"
+    },
+    "numberPair": {
+      "type": "array",
+      "prefixItems": [{ "$ref": "#/$defs/finiteNumber" }, { "$ref": "#/$defs/finiteNumber" }],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "extent": {
+      "type": "array",
+      "prefixItems": [
+        { "$ref": "#/$defs/finiteNumber" },
+        { "$ref": "#/$defs/finiteNumber" },
+        { "$ref": "#/$defs/finiteNumber" },
+        { "$ref": "#/$defs/finiteNumber" }
+      ],
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "view": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projection", "center", "zoom"],
+      "properties": {
+        "projection": { "$ref": "#/$defs/nonEmptyString" },
+        "center": { "$ref": "#/$defs/numberPair" },
+        "zoom": { "$ref": "#/$defs/finiteNumber" },
+        "rotation": { "$ref": "#/$defs/finiteNumber" },
+        "minZoom": { "$ref": "#/$defs/finiteNumber" },
+        "maxZoom": { "$ref": "#/$defs/finiteNumber" },
+        "extent": { "$ref": "#/$defs/extent" }
+      }
+    },
+    "geoJsonFeatureCollection": {
+      "type": "object",
+      "required": ["type", "features"],
+      "properties": {
+        "type": { "const": "FeatureCollection" },
+        "features": { "type": "array" }
+      }
+    },
+    "credentialReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "key"],
+      "properties": {
+        "type": { "const": "runtime-reference" },
+        "key": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "source": {
+      "oneOf": [
+        { "$ref": "#/$defs/geoJsonSource" },
+        { "$ref": "#/$defs/xyzSource" },
+        { "$ref": "#/$defs/tiandituSource" },
+        { "$ref": "#/$defs/googleMapTilesSource" }
+      ]
+    },
+    "geoJsonSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "geojson" },
+        "data": { "$ref": "#/$defs/geoJsonFeatureCollection" },
+        "url": { "$ref": "#/$defs/nonEmptyString" },
+        "dataProjection": { "type": "string" },
+        "idField": { "type": "string" }
+      },
+      "oneOf": [{ "required": ["data"], "not": { "required": ["url"] } }, { "required": ["url"], "not": { "required": ["data"] } }]
+    },
+    "xyzSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "url"],
+      "properties": {
+        "type": { "const": "xyz" },
+        "url": { "$ref": "#/$defs/nonEmptyString" },
+        "crossOrigin": { "enum": ["anonymous", "use-credentials"] },
+        "maxZoom": { "type": "number", "minimum": 0 },
+        "attribution": { "type": "string" }
+      }
+    },
+    "tiandituSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "provider", "mapType", "credential"],
+      "properties": {
+        "type": { "const": "provider" },
+        "provider": { "const": "tianditu" },
+        "mapType": { "enum": ["vector", "imagery", "terrain"] },
+        "projection": { "enum": ["EPSG:3857", "EPSG:4326"] },
+        "withLabels": { "type": "boolean" },
+        "credential": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "googleMapTilesSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "provider", "mapType", "language", "region", "credential"],
+      "properties": {
+        "type": { "const": "provider" },
+        "provider": { "const": "google-map-tiles" },
+        "mapType": { "enum": ["roadmap", "satellite", "terrain"] },
+        "language": { "$ref": "#/$defs/nonEmptyString" },
+        "region": { "type": "string", "pattern": "^[A-Za-z]{2}$" },
+        "credential": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "tileLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "type", "source"],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "type": { "const": "tile" },
+        "source": { "$ref": "#/$defs/nonEmptyString" },
+        "visible": { "type": "boolean" },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "minZoom": { "$ref": "#/$defs/finiteNumber" },
+        "maxZoom": { "$ref": "#/$defs/finiteNumber" },
+        "role": { "enum": ["basemap", "overlay"] }
+      }
+    },
+    "vectorLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "type", "source", "style"],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "type": { "const": "vector" },
+        "source": { "$ref": "#/$defs/nonEmptyString" },
+        "style": { "$ref": "#/$defs/style" },
+        "label": { "$ref": "#/$defs/label" },
+        "interaction": { "$ref": "#/$defs/interaction" },
+        "visible": { "type": "boolean" },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "minZoom": { "$ref": "#/$defs/finiteNumber" },
+        "maxZoom": { "$ref": "#/$defs/finiteNumber" },
+        "role": { "enum": ["basemap", "overlay"] }
+      }
+    },
+    "style": {
+      "oneOf": [{ "$ref": "#/$defs/pointStyle" }, { "$ref": "#/$defs/lineStyle" }, { "$ref": "#/$defs/polygonStyle" }]
+    },
+    "pointStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "radius", "fill"],
+      "properties": {
+        "type": { "const": "point" },
+        "radius": { "type": "number", "exclusiveMinimum": 0 },
+        "fill": { "$ref": "#/$defs/nonEmptyString" },
+        "stroke": { "type": "string" },
+        "strokeWidth": { "type": "number", "minimum": 0 }
+      }
+    },
+    "lineStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "color", "width"],
+      "properties": {
+        "type": { "const": "line" },
+        "color": { "$ref": "#/$defs/nonEmptyString" },
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "lineDash": { "$ref": "#/$defs/lineDash" }
+      }
+    },
+    "polygonStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "fill", "stroke", "strokeWidth"],
+      "properties": {
+        "type": { "const": "polygon" },
+        "fill": { "$ref": "#/$defs/nonEmptyString" },
+        "stroke": { "$ref": "#/$defs/nonEmptyString" },
+        "strokeWidth": { "type": "number", "minimum": 0 },
+        "lineDash": { "$ref": "#/$defs/lineDash" }
+      }
+    },
+    "lineDash": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "number", "minimum": 0 }
+    },
+    "label": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field"],
+      "properties": {
+        "field": { "$ref": "#/$defs/nonEmptyString" },
+        "color": { "type": "string" },
+        "font": { "type": "string" },
+        "haloColor": { "type": "string" },
+        "haloWidth": { "type": "number", "minimum": 0 },
+        "offset": { "$ref": "#/$defs/numberPair" },
+        "minZoom": { "$ref": "#/$defs/finiteNumber" },
+        "maxZoom": { "$ref": "#/$defs/finiteNumber" }
+      }
+    },
+    "interaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "selectable": { "type": "boolean" },
+        "popup": { "$ref": "#/$defs/popup" }
+      }
+    },
+    "popup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fields"],
+      "properties": {
+        "titleField": { "type": "string" },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/popupField" }
+        }
+      }
+    },
+    "popupField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field"],
+      "properties": {
+        "field": { "$ref": "#/$defs/nonEmptyString" },
+        "label": { "type": "string" },
+        "format": { "enum": ["text", "number", "date", "url"] }
+      }
+    },
+    "widgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "layerSwitcher": { "type": "boolean" },
+        "legend": { "type": "boolean" },
+        "scaleLine": { "type": "boolean" },
+        "fullscreen": { "type": "boolean" },
+        "zoom": { "type": "boolean" },
+        "mousePosition": { "type": "boolean" }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "preset": { "type": "string" },
+        "colorScheme": { "enum": ["light", "dark", "system"] },
+        "accent": { "type": "string" },
+        "surface": { "enum": ["solid", "glass"] },
+        "fontFamily": { "type": "string" },
+        "logo": { "type": "string" }
+      }
+    },
+    "presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "chapters": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/chapter" }
+        }
+      }
+    },
+    "chapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "view"],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "description": { "type": "string" },
+        "view": { "$ref": "#/$defs/view" },
+        "visibleLayers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        },
+        "highlightedFeatureIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        }
+      }
+    }
+  }
+}

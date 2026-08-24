@@ -31,6 +31,7 @@ export function createProject(name = 'Untitled Project'): Project {
       zoom: 2,
       rotation: 0
     },
+    basemap: { type: 'osm' },
     settings: {}
   }
 }
@@ -57,6 +58,7 @@ export function parseProjectSnapshot(json: string): ProjectSnapshot {
   if (!project || project.version !== PROJECT_VERSION || !Array.isArray(project.layers)) {
     throw new Error('Unsupported or invalid project file.')
   }
+  project.basemap ??= { type: 'osm' }
   return {
     project,
     featuresByDataset: 'featuresByDataset' in parsed ? parsed.featuresByDataset : {}
