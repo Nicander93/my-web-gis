@@ -49,9 +49,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((state) => ({
           bottom: { ...state.bottom, height: clamp(height, 140, getBottomMaxHeight()) }
         })),
-      restoreLeft: () => set((state) => ({ left: { ...state.left, open: true, width: 260 } })),
-      restoreRight: () => set((state) => ({ right: { ...state.right, open: true, width: 300 } })),
-      restoreBottom: () => set((state) => ({ bottom: { ...state.bottom, open: true, height: 240 } })),
+      restoreLeft: () => set((state) => ({ left: { ...state.left, open: true } })),
+      restoreRight: () => set((state) => ({ right: { ...state.right, open: true } })),
+      restoreBottom: () => set((state) => ({ bottom: { ...state.bottom, open: true } })),
       resetLayout: () =>
         set({
           left: { open: true, width: 260 },

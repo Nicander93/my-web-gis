@@ -10,10 +10,8 @@
     "tauri": "pnpm --filter @desktop-webgis/desktop tauri"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^6.0.1",
     "typescript": "^5.9.2",
     "vite": "^7.1.1",
-    "vitest": "^3.2.4",
-    "vue-tsc": "^3.0.5"
+    "vitest": "^3.2.4"
   }
 }

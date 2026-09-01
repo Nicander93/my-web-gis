@@ -5,18 +5,21 @@ import { emitCommandStatus } from './status'
 export const viewCommands = {
   toggleLayers(): void {
     const state = useWorkspaceStore.getState()
-    state.setLeftOpen(!state.left.open)
-    emitCommandStatus(state.left.open ? '图层面板已打开' : '图层面板已收起')
+    const open = !state.left.open
+    state.setLeftOpen(open)
+    emitCommandStatus(open ? '图层面板已打开' : '图层面板已收起')
   },
   toggleInspector(): void {
     const state = useWorkspaceStore.getState()
-    state.setRightOpen(!state.right.open)
-    emitCommandStatus(state.right.open ? '检查器已打开' : '检查器已收起')
+    const open = !state.right.open
+    state.setRightOpen(open)
+    emitCommandStatus(open ? '检查器已打开' : '检查器已收起')
   },
   toggleAttributeTable(): void {
     const state = useWorkspaceStore.getState()
-    state.setBottomOpen(!state.bottom.open)
-    emitCommandStatus(state.bottom.open ? '属性表已打开' : '属性表已收起')
+    const open = !state.bottom.open
+    state.setBottomOpen(open)
+    emitCommandStatus(open ? '属性表已打开' : '属性表已收起')
   },
   openAttributeTable(): void {
     useWorkspaceStore.getState().setBottomOpen(true)

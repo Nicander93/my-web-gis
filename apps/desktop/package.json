@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --configLoader runner",
     "build": "tsc --noEmit && vite build --configLoader runner",
+    "test": "vitest run",
     "preview": "vite preview",
     "tauri": "tauri"
   },
@@ -19,14 +20,11 @@
     "@desktop-webgis/vector-io": "workspace:*",
     "@tauri-apps/api": "^2.7.0",
     "@tauri-apps/plugin-dialog": "^2.3.3",
-    "@vueuse/core": "^13.6.0",
     "lucide-react": "^1.38.0",
     "nanoid": "^5.1.5",
     "ol": "^10.6.1",
-    "pinia": "^3.0.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "vue": "^3.5.18",
     "zustand": "^5.0.15"
   },
   "devDependencies": {
@@ -35,10 +33,8 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
     "@vitejs/plugin-react": "^5.2.0",
-    "@vitejs/plugin-vue": "^6.0.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.2",
-    "vite": "^7.1.1",
-    "vue-tsc": "^3.0.5"
+    "vite": "^7.1.1"
   }
 }

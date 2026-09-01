@@ -1,4 +1,4 @@
-import { Layers2, PanelBottom, PanelRight, RotateCcw } from 'lucide-react'
+import { Layers2, PanelBottom, PanelRight } from 'lucide-react'
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/Button'
 import { BottomPanel } from './BottomPanel'
@@ -67,9 +67,6 @@ export function Workspace() {
           <PanelBottom size={15} />
         </Button>
       )}
-      <Button className="layout-reset-float" variant="icon" title="重置布局" aria-label="重置布局" onClick={() => useWorkspaceStore.getState().resetLayout()}>
-        <RotateCcw size={14} />
-      </Button>
     </main>
   )
 }
