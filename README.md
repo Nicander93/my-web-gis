@@ -1,6 +1,6 @@
-# Desktop WebGIS V0.1
+# Desktop WebGIS
 
-Lightweight 2D desktop GIS workspace based on Tauri 2, Vue 3, TypeScript and OpenLayers.
+Lightweight 2D desktop GIS workspace based on Tauri 2, React, TypeScript and OpenLayers.
 
 ## What is included
 
@@ -12,7 +12,7 @@ Lightweight 2D desktop GIS workspace based on Tauri 2, Vue 3, TypeScript and Ope
 - `packages/vector-io`: SHP ZIP and ASCII DXF import plus Shapefile export.
 - `packages/scene-codegen`: OpenLayers ESM code generation without embedded provider secrets.
 - `packages/style-assistant`: deterministic smart styling and a validated, provider-neutral AI adapter.
-- `apps/desktop`: Vue workspace UI with start page, toolbar, layer panel, map canvas, attribute table, feature inspector, command palette and status bar.
+- `apps/desktop`: React Desktop shell with a map-first workspace, overlay panels, Ribbon-style header and lightweight commands; GIS capabilities are being reconnected incrementally.
 - `apps/viewer`: framework-independent static Scene Viewer for URL publishing.
 - `examples`: sample GeoJSON files for manual import testing.
 
@@ -39,9 +39,9 @@ pnpm install
 pnpm dev
 ```
 
-Then open the local Vite URL. For desktop packaging, install Tauri CLI and run the Tauri command from `apps/desktop`.
+Then open the local Vite URL. For desktop mode, run `pnpm tauri dev` from the repository root.
 
-The desktop shell is already scaffolded in `apps/desktop/src-tauri`. In desktop mode, the Vue app uses the Tauri dialog plugin for file selection and small Rust commands for reading and writing selected text or binary project/data files.
+The native shell is scaffolded in `apps/desktop/src-tauri`. Existing GIS packages remain framework-agnostic so the React shell can reconnect them in stages.
 
 ## Sample data
 
@@ -50,13 +50,12 @@ Use:
 - `examples/rivers.geojson`
 - `examples/stations.geojson`
 
-## Product and architecture documents
+## Project documents
 
-- `01-PRD-V0.1.md`: current two-dimensional editor product requirements.
-- `02-Technical-Architecture-V0.1.md`: current application and package boundaries.
-- `03-UI-UX-Design-Guidelines-V0.1.md`: interaction and visual direction.
-- `04-UI-Implementation-Design-Spec-V0.1.md`: desktop UI implementation guidance.
-- `05-Scene-Manifest-and-Publishing-V0.1.md`: declarative scene protocol, reusable package boundaries, P0/P1 roadmap and static publishing contract.
+- [`docs/README.md`](docs/README.md): project document index and progressive reading order.
+- [`docs/specs/`](docs/specs/): product, architecture, UI and scene specifications.
+- [`docs/engineering/code-preferences.md`](docs/engineering/code-preferences.md): code and maintenance conventions.
+- [`docs/assets/`](docs/assets/): UI reference images.
 
 ## Current verification note
 
@@ -64,7 +63,8 @@ Verified locally:
 
 - all 30 Vitest tests across 12 test files;
 - strict TypeScript builds for all packages;
-- Vue type-check and production desktop build;
+- TypeScript and production React desktop build;
+- Tauri debug build;
 - production static Viewer build;
 - real `scene-publish` artifact with file hashes and a public URL;
 - native ESM imports and `npm pack --dry-run` for all seven public packages;
