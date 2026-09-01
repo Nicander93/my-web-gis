@@ -8,22 +8,35 @@ import {
   createDefaultLayerStyle,
   createId,
   createProject,
+  featuresToGeoJson,
   inferLayerStyleKind,
   parseGeoJsonFeatures,
   parseProjectSnapshot,
   serializeProjectSnapshot,
   stringifyGeoJson,
   type EditTool,
+  type BasemapConfig,
+  type DataSource,
   type GisFeature,
   type Layer,
   type LayerStyle,
   type Project,
   type SelectionState
 } from '@desktop-webgis/gis-core'
+import type { GeoJsonFeatureCollection } from '@desktop-webgis/scene-schema'
+import type { StyleModelAdapter } from '@desktop-webgis/style-assistant'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { pickTextFile, readTextFromPath, saveTextFile, writeTextToPath, type PickedTextFile } from '@/services/file.service'
-import { useUiStore } from '@/stores/ui.store'
+import {
+  pickBinaryFile,
+  pickTextFile,
+  readTextFromPath,
+  saveBinaryFile,
+  saveTextFile,
+  writeTextToPath,
+  type PickedTextFile
+} from '@/services/file.service'
+import { projectToScene, sceneToProjectSnapshot, serializeProjectScene } from '@/services/scene.service'
 
 interface RecentProject {
   name: string
@@ -41,7 +54,8 @@ export const useProjectStore = defineStore('project', () => {
   const selection = ref<SelectionState>({ layerId: null, featureIds: [] })
   const activeTool = ref<EditTool>('select')
   const dirty = ref(false)
-  const pendingFitToLayers = ref(false)
+  const runtimeCredentials = ref<Record<string, string>>({})
+  const lastImportWarnings = ref<string[]>([])
   const recentProjects = ref<RecentProject[]>(loadRecentProjects())
 
   const layers = computed(() => project.value?.layers ?? [])
@@ -66,7 +80,8 @@ export const useProjectStore = defineStore('project', () => {
     return Array.from(keys).slice(0, 12)
   })
 
-  function clearSession(): void {
+  function newProject(name = '未命名项目'): void {
+    project.value = createProject(name)
     projectPath.value = null
     featureStore.value = new MemoryFeatureStore()
     editHistory.value = new EditHistory()
@@ -75,46 +90,35 @@ export const useProjectStore = defineStore('project', () => {
     selection.value = { layerId: null, featureIds: [] }
     activeTool.value = 'select'
     dirty.value = false
-    pendingFitToLayers.value = false
-  }
-
-  async function confirmDiscard(): Promise<boolean> {
-    if (!dirty.value || !project.value) return true
-    const choice = await useUiStore().requestUnsaved(project.value.name)
-    if (choice === 'cancel') return false
-    if (choice === 'save') return Boolean(await saveProject())
-    return true
-  }
-
-  async function newProject(name = '未命名项目'): Promise<void> {
-    if (!(await confirmDiscard())) return
-    clearSession()
-    project.value = createProject(name)
-  }
-
-  async function closeProject(): Promise<void> {
-    if (!(await confirmDiscard())) return
-    clearSession()
-    project.value = null
   }
 
   async function openProjectFromDialog(): Promise<void> {
-    if (!(await confirmDiscard())) return
     const file = await pickTextFile(['dwgis', 'json'])
     if (!file) return
     openProjectFile(file)
   }
 
   async function openRecentProject(path: string): Promise<void> {
-    if (!(await confirmDiscard())) return
     openProjectFile(await readTextFromPath(path))
+  }
+
+  async function openSceneFromDialog(): Promise<void> {
+    const file = await pickTextFile(['scene.json', 'json'])
+    if (!file) return
+    const snapshot = await sceneToProjectSnapshot(file.content)
+    applySnapshot(snapshot, null)
   }
 
   function openProjectFile(file: PickedTextFile): void {
     const snapshot = parseProjectSnapshot(file.content)
+    applySnapshot(snapshot, file.path)
+    addRecentProject(snapshot.project.name, file.path)
+  }
+
+  function applySnapshot(snapshot: ReturnType<typeof parseProjectSnapshot>, path: string | null): void {
     const nextProject = snapshot.project
     project.value = nextProject
-    projectPath.value = file.path
+    projectPath.value = path
     featureStore.value = new MemoryFeatureStore()
     for (const [datasetId, features] of Object.entries(snapshot.featuresByDataset)) {
       featureStore.value.setAll(datasetId, features)
@@ -124,8 +128,6 @@ export const useProjectStore = defineStore('project', () => {
     selectedLayerId.value = activeLayerId.value
     selection.value = { layerId: activeLayerId.value, featureIds: [] }
     dirty.value = false
-    pendingFitToLayers.value = false
-    addRecentProject(nextProject.name, file.path)
   }
 
   async function saveProject(): Promise<string | null> {
@@ -153,18 +155,13 @@ export const useProjectStore = defineStore('project', () => {
 
   async function importGeoJson(): Promise<Layer | null> {
     ensureProject()
+    lastImportWarnings.value = []
     const file = await pickTextFile(['geojson', 'json'])
-    if (!file) return null
-    return importGeoJsonText(file.name, file.content, file.path)
-  }
-
-  function importGeoJsonText(fileName: string, content: string, path: string, displayName?: string): Layer | null {
-    ensureProject()
-    if (!project.value) return null
-    const features = parseGeoJsonFeatures(content)
+    if (!file || !project.value) return null
+    const features = parseGeoJsonFeatures(file.content)
     const datasetId = createId('dataset')
     const layerId = createId('layer')
-    const layerName = (displayName?.trim() || fileName).replace(/\.(geojson|json)$/i, '')
+    const layerName = file.name.replace(/\.(geojson|json)$/i, '')
     const styleKind = inferLayerStyleKind(features)
 
     project.value.datasets.push({
@@ -173,7 +170,7 @@ export const useProjectStore = defineStore('project', () => {
       kind: 'vector',
       source: {
         type: 'geojson-file',
-        path
+        path: file.path
       }
     })
     const layer: Layer = {
@@ -190,26 +187,181 @@ export const useProjectStore = defineStore('project', () => {
     activeLayerId.value = layerId
     selectedLayerId.value = layerId
     selection.value = { layerId, featureIds: [] }
-    pendingFitToLayers.value = true
+    markDirty()
+    return layer
+  }
+
+  async function importShapefile(): Promise<Layer | null> {
+    ensureProject()
+    const file = await pickBinaryFile(['zip'])
+    if (!file) return null
+    const { importShapefile: readShapefile } = await import('@desktop-webgis/vector-io')
+    const result = await readShapefile(file.content)
+    lastImportWarnings.value = result.warnings.map((warning) =>
+      warning.count ? `${warning.message}（${warning.count}）` : warning.message
+    )
+    return addImportedVectorLayer(
+      file.name.replace(/\.zip$/i, ''),
+      parseGeoJsonFeatures(result.featureCollection),
+      { type: 'shapefile-file', path: file.path }
+    )
+  }
+
+  function importGeoJsonText(fileName: string, content: string, path: string, displayName?: string): Layer | null {
+    ensureProject()
+    if (!project.value) return null
+    const features = parseGeoJsonFeatures(content)
+    const datasetId = createId('dataset')
+    const layerId = createId('layer')
+    const layerName = (displayName?.trim() || fileName).replace(/\.(geojson|json)$/i, '')
+    project.value.datasets.push({
+      id: datasetId,
+      name: layerName,
+      kind: 'vector',
+      source: { type: 'geojson-file', path }
+    })
+    const layer: Layer = {
+      id: layerId,
+      datasetId,
+      name: layerName,
+      visible: true,
+      opacity: 1,
+      editable: true,
+      style: createDefaultLayerStyle(inferLayerStyleKind(features))
+    }
+    project.value.layers.push(layer)
+    featureStore.value.setAll(datasetId, features)
+    activeLayerId.value = layerId
+    selectedLayerId.value = layerId
+    selection.value = { layerId, featureIds: [] }
     markDirty()
     return layer
   }
 
   async function importGeoJsonFiles(files: File[]): Promise<number> {
-    const geojsonFiles = files.filter((file) => /\.(geojson|json)$/i.test(file.name))
-    if (geojsonFiles.length === 0) {
-      throw new Error('请拖入 .geojson 或 .json 文件。')
-    }
-    for (const file of geojsonFiles) {
+    const geoJsonFiles = files.filter((file) => /\.(geojson|json)$/i.test(file.name))
+    if (geoJsonFiles.length === 0) throw new Error('请拖入 .geojson 或 .json 文件。')
+    for (const file of geoJsonFiles) {
       importGeoJsonText(file.name, await file.text(), file.name)
     }
-    return geojsonFiles.length
+    return geoJsonFiles.length
   }
 
-  function consumePendingFitToLayers(): boolean {
-    if (!pendingFitToLayers.value) return false
-    pendingFitToLayers.value = false
-    return true
+  async function importDxf(): Promise<Layer | null> {
+    ensureProject()
+    const file = await pickTextFile(['dxf'])
+    if (!file) return null
+    const { importDxf: readDxf } = await import('@desktop-webgis/vector-io')
+    const result = readDxf(file.content)
+    lastImportWarnings.value = result.warnings.map((warning) =>
+      warning.count ? `${warning.message}（${warning.count}）` : warning.message
+    )
+    return addImportedVectorLayer(
+      file.name.replace(/\.dxf$/i, ''),
+      parseGeoJsonFeatures(result.featureCollection),
+      { type: 'dxf-file', path: file.path }
+    )
+  }
+
+  function addImportedVectorLayer(name: string, features: GisFeature[], source: DataSource): Layer {
+    if (!project.value) throw new Error('项目未打开。')
+    const datasetId = createId('dataset')
+    const layerId = createId('layer')
+    project.value.datasets.push({ id: datasetId, name, kind: 'vector', source })
+    const layer: Layer = {
+      id: layerId,
+      datasetId,
+      name,
+      visible: true,
+      opacity: 1,
+      editable: true,
+      style: createDefaultLayerStyle(inferLayerStyleKind(features))
+    }
+    project.value.layers.push(layer)
+    featureStore.value.setAll(datasetId, features)
+    activeLayerId.value = layerId
+    selectedLayerId.value = layerId
+    selection.value = { layerId, featureIds: [] }
+    markDirty()
+    return layer
+  }
+
+  function createDrawingLayer(kind: LayerStyle['kind'] = 'polygon', name?: string): Layer {
+    ensureProject()
+    lastImportWarnings.value = []
+    if (!project.value) throw new Error('项目未打开。')
+    const datasetId = createId('dataset')
+    const layerId = createId('layer')
+    const layerName = name?.trim() || `新建${kind === 'point' ? '点' : kind === 'line' ? '线' : '面'}图层`
+    project.value.datasets.push({
+      id: datasetId,
+      name: layerName,
+      kind: 'vector',
+      source: { type: 'memory', label: layerName }
+    })
+    const layer: Layer = {
+      id: layerId,
+      datasetId,
+      name: layerName,
+      visible: true,
+      opacity: 1,
+      editable: true,
+      style: createDefaultLayerStyle(kind)
+    }
+    project.value.layers.push(layer)
+    featureStore.value.setAll(datasetId, [])
+    activeLayerId.value = layerId
+    selectedLayerId.value = layerId
+    selection.value = { layerId, featureIds: [] }
+    activeTool.value = kind === 'point' ? 'draw-point' : kind === 'line' ? 'draw-line' : 'draw-polygon'
+    markDirty()
+    return layer
+  }
+
+  function setBasemap(config: BasemapConfig): void {
+    ensureProject()
+    if (!project.value) return
+    project.value.basemap = config
+    markDirty()
+  }
+
+  function setRuntimeCredential(id: string, value: string): void {
+    runtimeCredentials.value = { ...runtimeCredentials.value, [id]: value }
+  }
+
+  async function exportScene(colorScheme: 'light' | 'dark' | 'system' = 'system'): Promise<string | null> {
+    if (!project.value) return null
+    const content = serializeProjectScene(project.value, featureStore.value.snapshot(), colorScheme)
+    return saveTextFile(content, `${project.value.name}.scene.json`, ['scene.json', 'json'])
+  }
+
+  async function exportOpenLayersCode(
+    colorScheme: 'light' | 'dark' | 'system' = 'system'
+  ): Promise<string | null> {
+    if (!project.value) return null
+    const { generateOpenLayersModule } = await import('@desktop-webgis/scene-codegen')
+    const scene = projectToScene(project.value, featureStore.value.snapshot(), colorScheme)
+    const content = generateOpenLayersModule(scene)
+    return saveTextFile(content, `${project.value.name}.openlayers.mjs`, ['mjs', 'js'])
+  }
+
+  async function applySmartStyle(): Promise<string | null> {
+    const layer = activeLayer.value
+    if (!layer) return null
+    const { suggestLayerStyle } = await import('@desktop-webgis/style-assistant')
+    const adapter = (
+      globalThis as typeof globalThis & { __DESKTOP_WEBGIS_STYLE_MODEL__?: StyleModelAdapter }
+    ).__DESKTOP_WEBGIS_STYLE_MODEL__
+    const suggestion = await suggestLayerStyle(
+      {
+        layerName: layer.name,
+        geometry: layer.style.kind,
+        featureCount: featureStore.value.getAll(layer.datasetId).length
+      },
+      adapter
+    )
+    updateLayerStyle(layer.id, suggestion.style)
+    return `${suggestion.source === 'model' ? 'AI' : '本地规则'}：${suggestion.rationale}`
   }
 
   async function exportActiveLayer(selectedOnly = false): Promise<string | null> {
@@ -222,10 +374,37 @@ export const useProjectStore = defineStore('project', () => {
     return saveTextFile(stringifyGeoJson(features), `${layer.name}.geojson`, ['geojson', 'json'])
   }
 
+  async function exportActiveLayerAsShapefile(selectedOnly = false): Promise<string | null> {
+    const layer = activeLayer.value
+    if (!layer) return null
+    const ids = new Set(selection.value.featureIds)
+    const features = featureStore.value
+      .getAll(layer.datasetId)
+      .filter((feature) => !selectedOnly || ids.has(feature.id))
+    const { exportShapefile: writeShapefile } = await import('@desktop-webgis/vector-io')
+    const bytes = await writeShapefile(
+      featuresToGeoJson(features) as unknown as GeoJsonFeatureCollection,
+      { folder: layer.name, filename: layer.name }
+    )
+    return saveBinaryFile(bytes, `${layer.name}.shp.zip`, ['zip'])
+  }
+
   function selectLayer(layerId: string): void {
     selectedLayerId.value = layerId
     activeLayerId.value = layerId
     selection.value = { layerId, featureIds: [] }
+  }
+
+  function closeProject(): void {
+    project.value = null
+    projectPath.value = null
+    featureStore.value = new MemoryFeatureStore()
+    editHistory.value = new EditHistory()
+    activeLayerId.value = null
+    selectedLayerId.value = null
+    selection.value = { layerId: null, featureIds: [] }
+    activeTool.value = 'select'
+    dirty.value = false
   }
 
   function setLayerVisible(layerId: string, visible: boolean): void {
@@ -271,17 +450,10 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   function moveLayer(layerId: string, direction: -1 | 1): void {
-    const index = layers.value.findIndex((layer) => layer.id === layerId)
-    if (index < 0) return
-    moveLayerTo(layerId, index + direction)
-  }
-
-  function moveLayerTo(layerId: string, targetIndex: number): void {
     if (!project.value) return
     const index = project.value.layers.findIndex((layer) => layer.id === layerId)
-    if (index < 0) return
-    const nextIndex = Math.max(0, Math.min(targetIndex, project.value.layers.length - 1))
-    if (nextIndex === index) return
+    const nextIndex = index + direction
+    if (index < 0 || nextIndex < 0 || nextIndex >= project.value.layers.length) return
     const [layer] = project.value.layers.splice(index, 1)
     project.value.layers.splice(nextIndex, 0, layer)
     markDirty()
@@ -369,9 +541,7 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   function ensureProject(): void {
-    if (project.value) return
-    clearSession()
-    project.value = createProject('未命名项目')
+    if (!project.value) newProject()
   }
 
   function createSnapshotText(): string {
@@ -402,6 +572,8 @@ export const useProjectStore = defineStore('project', () => {
     selection,
     activeTool,
     dirty,
+    runtimeCredentials,
+    lastImportWarnings,
     recentProjects,
     layers,
     datasets,
@@ -413,16 +585,25 @@ export const useProjectStore = defineStore('project', () => {
     selectedFeatures,
     attributeColumns,
     newProject,
-    closeProject,
     openProjectFromDialog,
+    openSceneFromDialog,
     openRecentProject,
     saveProject,
     saveProjectAs,
     importGeoJson,
     importGeoJsonText,
     importGeoJsonFiles,
-    consumePendingFitToLayers,
+    importShapefile,
+    importDxf,
+    createDrawingLayer,
+    setBasemap,
+    setRuntimeCredential,
+    exportScene,
+    exportOpenLayersCode,
+    applySmartStyle,
     exportActiveLayer,
+    exportActiveLayerAsShapefile,
+    closeProject,
     selectLayer,
     setLayerVisible,
     setLayerOpacity,
@@ -430,7 +611,6 @@ export const useProjectStore = defineStore('project', () => {
     renameLayer,
     removeLayer,
     moveLayer,
-    moveLayerTo,
     setSelection,
     selectFeature,
     clearSelection,

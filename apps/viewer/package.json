@@ -1,0 +1,19 @@
+{
+  "name": "@desktop-webgis/viewer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build --config vite.config.mjs --configLoader runner",
+    "dev": "vite"
+  },
+  "dependencies": {
+    "@desktop-webgis/ol-scene-runtime": "workspace:*",
+    "@desktop-webgis/scene-schema": "workspace:*",
+    "ol": "^10.6.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vite": "^7.1.1"
+  }
+}

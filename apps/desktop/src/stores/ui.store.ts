@@ -1,18 +1,13 @@
 import { defineStore } from 'pinia'
 
-export type UnsavedChoice = 'cancel' | 'discard' | 'save'
-
-let unsavedResolve: ((choice: UnsavedChoice) => void) | null = null
-
 export type SidebarTab = 'project' | 'layers' | 'data'
 export type BottomPanelTab = 'table' | 'feature'
+export type ThemeMode = 'light' | 'dark' | 'system'
 
 export const useUiStore = defineStore('ui', {
   state: () => ({
     activeSidebarTab: 'layers' as SidebarTab,
-    sidebarOpen: true,
     sidebarWidth: 240,
-    inspectorOpen: true,
     bottomPanelOpen: true,
     bottomPanelHeight: 220,
     bottomPanelTab: 'table' as BottomPanelTab,
@@ -22,7 +17,10 @@ export const useUiStore = defineStore('ui', {
     unsavedPrompt: null as null | { name: string },
     statusMessage: '就绪',
     coordinateText: '0.0000, 0.0000',
-    scaleText: '1:0'
+    scaleText: '1:0',
+    sidebarOpen: true,
+    inspectorOpen: true,
+    theme: (localStorage.getItem('desktop-webgis.theme') ?? 'system') as ThemeMode
   }),
   actions: {
     setStatus(message: string): void {
@@ -45,23 +43,21 @@ export const useUiStore = defineStore('ui', {
     toggleInspector(): void {
       this.inspectorOpen = !this.inspectorOpen
     },
+    answerUnsaved(answer: 'save' | 'discard' | 'cancel'): void {
+      this.unsavedPrompt = null
+      window.dispatchEvent(new CustomEvent('desktop-webgis:unsaved-answer', { detail: answer }))
+    },
+    setTheme(theme: ThemeMode): void {
+      this.theme = theme
+      localStorage.setItem('desktop-webgis.theme', theme)
+      document.documentElement.dataset.theme = theme
+    },
     showError(title: string, message: string, details?: string): void {
       this.dialog = { title, message, details }
       this.statusMessage = message
     },
     closeDialog(): void {
       this.dialog = null
-    },
-    requestUnsaved(name: string): Promise<UnsavedChoice> {
-      this.unsavedPrompt = { name }
-      return new Promise((resolve) => {
-        unsavedResolve = resolve
-      })
-    },
-    answerUnsaved(choice: UnsavedChoice): void {
-      this.unsavedPrompt = null
-      unsavedResolve?.(choice)
-      unsavedResolve = null
     }
   }
 })

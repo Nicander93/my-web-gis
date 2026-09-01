@@ -7,6 +7,12 @@ export interface PickedTextFile {
   content: string
 }
 
+export interface PickedBinaryFile {
+  path: string
+  name: string
+  content: Uint8Array
+}
+
 export async function pickTextFile(extensions: string[]): Promise<PickedTextFile | null> {
   if (isTauri()) {
     const path = await open({
@@ -36,6 +42,46 @@ export async function saveTextFile(content: string, defaultPath: string, extensi
   }
 
   downloadTextFile(content, basename(defaultPath))
+  return defaultPath
+}
+
+export async function pickBinaryFile(extensions: string[]): Promise<PickedBinaryFile | null> {
+  if (isTauri()) {
+    const path = await open({
+      multiple: false,
+      filters: [{ name: 'Supported files', extensions }]
+    })
+    if (!path || Array.isArray(path)) return null
+    return {
+      path,
+      name: basename(path),
+      content: new Uint8Array(await invoke<number[]>('read_binary_path', { path }))
+    }
+  }
+  const picked = await pickBrowserFile(extensions)
+  if (!picked) return null
+  return {
+    path: picked.name,
+    name: picked.name,
+    content: new Uint8Array(await picked.arrayBuffer())
+  }
+}
+
+export async function saveBinaryFile(
+  content: Uint8Array,
+  defaultPath: string,
+  extensions: string[]
+): Promise<string | null> {
+  if (isTauri()) {
+    const path = await save({
+      defaultPath,
+      filters: [{ name: 'Supported files', extensions }]
+    })
+    if (!path) return null
+    await invoke('write_binary_path', { path, content: Array.from(content) })
+    return path
+  }
+  downloadBlob(new Blob([content as BlobPart], { type: 'application/octet-stream' }), basename(defaultPath))
   return defaultPath
 }
 
@@ -91,8 +137,21 @@ function pickTextFileInBrowser(extensions: string[]): Promise<PickedTextFile | n
   })
 }
 
+function pickBrowserFile(extensions: string[]): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = extensions.map((extension) => `.${extension}`).join(',')
+    input.onchange = () => resolve(input.files?.[0] ?? null)
+    input.click()
+  })
+}
+
 function downloadTextFile(content: string, fileName: string): void {
-  const blob = new Blob([content], { type: 'application/json;charset=utf-8' })
+  downloadBlob(new Blob([content], { type: 'application/json;charset=utf-8' }), fileName)
+}
+
+function downloadBlob(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url

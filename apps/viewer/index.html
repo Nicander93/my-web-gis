@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>二维场景</title>
+  </head>
+  <body>
+    <div id="app">
+      <main id="map" aria-label="二维地图场景"></main>
+      <header class="scene-header">
+        <div>
+          <p class="scene-kicker">MAP SCENE</p>
+          <h1 id="scene-title">正在加载场景</h1>
+          <p id="scene-description" class="scene-description"></p>
+        </div>
+      </header>
+      <aside id="layer-panel" class="scene-panel layer-panel" hidden>
+        <h2>图层</h2>
+        <div id="layer-list"></div>
+      </aside>
+      <aside id="legend-panel" class="scene-panel legend-panel" hidden>
+        <h2>图例</h2>
+        <div id="legend-list"></div>
+      </aside>
+      <section id="popup" class="feature-popup" hidden aria-live="polite">
+        <button id="popup-close" class="popup-close" type="button" aria-label="关闭">×</button>
+        <h2 id="popup-title"></h2>
+        <dl id="popup-fields"></dl>
+      </section>
+      <div id="scene-status" class="scene-status" role="status">正在读取 scene.json…</div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -7,8 +7,8 @@ import { useUiStore } from '@/stores/ui.store'
 const projectStore = useProjectStore()
 const uiStore = useUiStore()
 const mapEl = ref<HTMLElement | null>(null)
-const dropping = ref(false)
-let dragCount = 0
+const coordinateText = ref('0.0000, 0.0000')
+const scaleText = ref('1:0')
 const mapRuntime = new OlMapRuntime()
 const selectionRuntime = new OlSelectionRuntime(mapRuntime)
 const toolRuntime = new OlToolRuntime(mapRuntime)
@@ -29,14 +29,14 @@ onMounted(async () => {
   if (!mapEl.value || !projectStore.project) return
   mapRuntime.mount(mapEl.value, projectStore.project.mapState)
   mapRuntime.onPointerMove((info) => {
-    uiStore.setPointerInfo(`${info.coordinate[0].toFixed(4)}, ${info.coordinate[1].toFixed(4)}`, info.scaleText)
+    coordinateText.value = `${info.coordinate[0].toFixed(4)}, ${info.coordinate[1].toFixed(4)}`
+    scaleText.value = info.scaleText
   })
   mapRuntime.getMap().on('moveend', () => {
     const state = mapRuntime.getMapState()
     projectStore.updateMapState(state.center, state.zoom, state.rotation)
   })
-  syncMap()
-  fitPendingLayers()
+  await syncMap()
   window.addEventListener('desktop-webgis:zoom-to-layer', handleZoomToLayer)
   window.addEventListener('desktop-webgis:zoom-to-all', handleZoomToAll)
 })
@@ -51,10 +51,13 @@ onBeforeUnmount(() => {
 
 watch(
   () => [projectStore.layers, projectStore.featuresByDataset],
-  () => {
-    syncLayers()
-    fitPendingLayers()
-  },
+  () => syncLayers(),
+  { deep: true }
+)
+
+watch(
+  () => [projectStore.project?.basemap, projectStore.runtimeCredentials],
+  () => void syncBasemap(),
   { deep: true }
 )
 
@@ -74,20 +77,33 @@ watch(
   () => syncTool()
 )
 
-function syncMap(): void {
+async function syncMap(): Promise<void> {
+  await syncBasemap()
   syncLayers()
   selectionRuntime.activate(projectStore.activeLayerId, projectStore.setSelection)
   syncTool()
 }
 
+async function syncBasemap(): Promise<void> {
+  if (!projectStore.project) return
+  const basemap = projectStore.project.basemap
+  if (
+    (basemap.type === 'tianditu' || basemap.type === 'google-map-tiles') &&
+    !projectStore.runtimeCredentials[basemap.credential]
+  ) {
+    uiStore.setStatus(`请输入底图运行时密钥：${basemap.credential}`)
+    return
+  }
+  try {
+    await mapRuntime.syncBasemap(basemap, projectStore.runtimeCredentials)
+  } catch (error) {
+    uiStore.showError('底图加载失败', '请检查 Provider 配置和运行时密钥。', String(error))
+  }
+}
+
 function syncLayers(): void {
   if (!projectStore.project) return
   mapRuntime.syncLayers(projectStore.layers, projectStore.featuresByDataset)
-}
-
-function fitPendingLayers(): void {
-  if (!projectStore.consumePendingFitToLayers()) return
-  mapRuntime.zoomToAll()
 }
 
 function syncTool(): void {
@@ -114,55 +130,18 @@ function handleZoomToAll(): void {
   mapRuntime.zoomToAll()
 }
 
-async function importDropped(event: DragEvent): Promise<void> {
-  event.preventDefault()
-  dragCount = 0
-  dropping.value = false
-  const files = Array.from(event.dataTransfer?.files ?? [])
-  if (files.length === 0) return
-  try {
-    const count = await projectStore.importGeoJsonFiles(files)
-    uiStore.setStatus(`已导入 ${count} 个文件`)
-  } catch (error) {
-    uiStore.showError('导入失败', '请拖入有效的 GeoJSON 文件。', String(error))
-  }
-}
-
-function onDragEnter(event: DragEvent): void {
-  event.preventDefault()
-  dragCount += 1
-  dropping.value = true
-}
-
-function onDragLeave(): void {
-  dragCount -= 1
-  if (dragCount <= 0) {
-    dragCount = 0
-    dropping.value = false
-  }
-}
-
 defineExpose({
   zoomToLayer: (layerId: string) => mapRuntime.zoomToLayer(layerId),
-  zoomToAll: () => mapRuntime.zoomToAll()
+  zoomToAll: () => mapRuntime.zoomToAll(),
+  coordinateText,
+  scaleText
 })
 </script>
 
 <template>
-  <section
-    class="map-shell"
-    :class="{ 'drop-active': dropping }"
-    @dragenter="onDragEnter"
-    @dragover.prevent
-    @dragleave="onDragLeave"
-    @drop="importDropped"
-  >
+  <section class="map-shell">
     <div ref="mapEl" class="map-canvas"></div>
-    <div v-if="projectStore.layers.length === 0" class="map-empty">
-      <strong>暂无图层</strong>
-      <span>拖入 GeoJSON，或添加数据开始编辑</span>
-      <button class="small-button" type="button" @click="uiStore.addDataDialogOpen = true">添加数据</button>
-    </div>
-    <div v-else class="map-tool-hint">{{ hint }}</div>
+    <div class="map-tool-hint">{{ hint }}</div>
+    <div class="map-readout">{{ coordinateText }} - {{ scaleText }}</div>
   </section>
 </template>

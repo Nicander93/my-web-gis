@@ -1,0 +1,29 @@
+{
+  "name": "@desktop-webgis/scene-schema",
+  "version": "0.1.0",
+  "description": "Framework-independent schema and validation for declarative two-dimensional map scenes.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./scene.schema.json": "./scene.schema.json"
+  },
+  "files": [
+    "dist",
+    "scene.schema.json",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
