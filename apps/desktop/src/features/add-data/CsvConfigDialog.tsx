@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { X, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { previewCsv } from '@desktop-webgis/vector-io'
 import type { CsvPreviewResult, CrsInfo } from '@desktop-webgis/vector-io'
@@ -27,9 +27,14 @@ export function CsvConfigDialog({
   onConfirm,
   onCancel
 }: CsvConfigDialogProps) {
-  const initialPreview = previewCsv(csvContent)
-  const [xField, setXField] = useState(findCoordinateField(initialPreview.fields, ['x', 'lon', 'longitude', 'lng', 'jd', '经度']))
-  const [yField, setYField] = useState(findCoordinateField(initialPreview.fields, ['y', 'lat', 'latitude', 'wd', '纬度']))
+  const initialPreview = useMemo(() => previewCsv(csvContent), [csvContent])
+  
+  const [xField, setXField] = useState(() => 
+    findCoordinateField(initialPreview.fields, ['x', 'lon', 'longitude', 'lng', 'jd', '经度'])
+  )
+  const [yField, setYField] = useState(() => 
+    findCoordinateField(initialPreview.fields, ['y', 'lat', 'latitude', 'wd', '纬度'])
+  )
   const [crsCode, setCrsCode] = useState('EPSG:4326')
   const [preview, setPreview] = useState<CsvPreviewResult>(initialPreview)
 
@@ -42,9 +47,10 @@ export function CsvConfigDialog({
       })
       setPreview(newPreview)
     } else {
-      setPreview(initialPreview)
+      const basePreview = previewCsv(csvContent)
+      setPreview(basePreview)
     }
-  }, [xField, yField, crsCode, csvContent, initialPreview])
+  }, [xField, yField, crsCode, csvContent])
 
   if (!open) return null
 

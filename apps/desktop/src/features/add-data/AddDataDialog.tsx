@@ -311,7 +311,7 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
                     {loading ? '解析中...' : '选择文件'}
                   </button>
                   <p className="file-drop-formats">
-                    支持格式: GeoJSON (.geojson, .json), Shapefile (.zip), DXF (.dxf)
+                    支持格式: GeoJSON (.geojson, .json), Shapefile (.zip), DXF (.dxf), CSV (.csv)
                   </p>
                 </div>
               )}
