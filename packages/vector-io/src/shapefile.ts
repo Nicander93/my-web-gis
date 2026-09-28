@@ -1,11 +1,60 @@
 import { zip } from '@mapbox/shp-write'
 import type { GeoJsonFeatureCollection } from '@desktop-webgis/scene-schema'
 import shp from 'shpjs'
-import type { CrsInfo, ShapefileExportOptions, VectorImportResult } from './types.js'
+import type { CrsInfo, ShapefileExportOptions, VectorImportResult, ShapefileImportResult, ShapefileLayerResult } from './types.js'
 
 type ShpResult = GeoJsonFeatureCollection & { fileName?: string; crs?: { type?: string; properties?: { name?: string } } }
 
 /** 
+ * Parses a ZIP containing one or more Shapefiles, returning each as a separate layer.
+ * 
+ * shpjs already converts coordinates to EPSG:4326 (WGS84).
+ * We preserve the original CRS info (from .prj) as sourceCrs metadata.
+ * 
+ * Encoding: shpjs reads .cpg files automatically. Manual encoding override is not currently supported.
+ * 
+ * This is the NEW API that preserves multiple shapefiles as separate layers.
+ * For backward compatibility, the old importShapefile is kept below.
+ */
+export async function importShapefileZipLayers(
+  input: ArrayBuffer | ArrayBufferView
+): Promise<ShapefileImportResult> {
+  const parsed = (await shp(input)) as ShpResult | ShpResult[]
+  const collections = Array.isArray(parsed) ? parsed : [parsed]
+  
+  const layers: ShapefileLayerResult[] = collections.map((collection, index) => {
+    const crsInfo = extractCrsInfo(collection)
+    const warnings: ShapefileLayerResult['warnings'] = []
+    
+    const hasPrj = collection.crs !== undefined
+    const fileName = collection.fileName ?? `layer-${index + 1}`
+    
+    if (!hasPrj) {
+      warnings.push({
+        code: 'shapefile.missingPrj',
+        message: '缺少 .prj 文件，假定为 WGS84 (EPSG:4326)'
+      })
+    }
+    
+    return {
+      name: fileName,
+      featureCollection: {
+        type: 'FeatureCollection',
+        features: collection.features
+      },
+      crs: crsInfo.output,
+      sourceCrs: crsInfo.original,
+      hasPrj,
+      warnings
+    }
+  })
+  
+  return { layers }
+}
+
+/** 
+ * @deprecated Use importShapefileZipLayers for new code. This function merges all layers.
+ * 
  * Parses a ZIP (or shpjs-compatible binary) and normalizes multiple SHP layers into one collection.
  * 
  * shpjs already converts coordinates to EPSG:4326 (WGS84).

@@ -11,7 +11,7 @@ interface AddDataDialogProps {
   onImport: (result: ImportResult) => void
 }
 
-type DialogStep = 'select' | 'confirm' | 'select-crs'
+type DialogStep = 'select' | 'confirm' | 'select-crs' | 'select-shapefile-layers'
 
 // 仅列出已在 proj4 注册的 CRS (EPSG:4326 和 EPSG:3857)
 // 更多中国常用投影 (CGCS2000, Beijing 1954 等) 留待后续 PR
@@ -27,7 +27,13 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
   const [error, setError] = useState<string | null>(null)
   const [parseResult, setParseResult] = useState<ImportResult | null>(null)
   const [pendingDxf, setPendingDxf] = useState<{ source: string | File; fileName: string } | null>(null)
+  const [pendingShapefile, setPendingShapefile] = useState<{ 
+    source: string | File; 
+    fileName: string; 
+    availableLayers: string[];
+  } | null>(null)
   const [selectedCrs, setSelectedCrs] = useState<string>('EPSG:4326')
+  const [selectedShapefileLayers, setSelectedShapefileLayers] = useState<Set<string>>(new Set())
 
   if (!open) return null
 
@@ -35,6 +41,8 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
     setStep('select')
     setParseResult(null)
     setPendingDxf(null)
+    setPendingShapefile(null)
+    setSelectedShapefileLayers(new Set())
     setError(null)
     onClose()
   }
@@ -43,6 +51,8 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
     setStep('select')
     setParseResult(null)
     setPendingDxf(null)
+    setPendingShapefile(null)
+    setSelectedShapefileLayers(new Set())
     setError(null)
   }
 
@@ -53,7 +63,13 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
     }
   }
 
-  async function parseFile(source: string | File, fileType: string, fileName: string, crs?: CrsInfo) {
+  async function parseFile(
+    source: string | File, 
+    fileType: string, 
+    fileName: string, 
+    crs?: CrsInfo,
+    shapefileOptions?: { selectedLayers?: string[] }
+  ) {
     setError(null)
     setLoading(true)
 
@@ -64,9 +80,31 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
         case 'geojson':
           result = await importGeoJson(source)
           break
-        case 'shapefile':
-          result = await importShapefileZip(source)
+        case 'shapefile': {
+          const preResult = await importShapefileZip(source, shapefileOptions)
+          
+          if (preResult.errors.length > 0) {
+            setError(preResult.errors.join('; '))
+            setLoading(false)
+            return
+          }
+          
+          if (!shapefileOptions?.selectedLayers && preResult.layers.length > 1) {
+            setPendingShapefile({
+              source,
+              fileName,
+              availableLayers: preResult.layers.map(l => l.name)
+            })
+            const allLayers = new Set(preResult.layers.map(l => l.name))
+            setSelectedShapefileLayers(allLayers)
+            setStep('select-shapefile-layers')
+            setLoading(false)
+            return
+          }
+          
+          result = preResult
           break
+        }
         case 'dxf':
           result = await importDxfFile(source, crs)
           break
@@ -105,6 +143,46 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
     const crs: CrsInfo = { code: selectedCrs }
     await parseFile(pendingDxf.source, 'dxf', pendingDxf.fileName, crs)
     setPendingDxf(null)
+  }
+  
+  async function handleShapefileLayersConfirm() {
+    if (!pendingShapefile) return
+    
+    const selectedLayers = Array.from(selectedShapefileLayers)
+    if (selectedLayers.length === 0) {
+      setError('请至少选择一个图层')
+      return
+    }
+    
+    await parseFile(
+      pendingShapefile.source, 
+      'shapefile', 
+      pendingShapefile.fileName, 
+      undefined,
+      { selectedLayers }
+    )
+    setPendingShapefile(null)
+  }
+  
+  function toggleShapefileLayer(layerName: string) {
+    setSelectedShapefileLayers(prev => {
+      const next = new Set(prev)
+      if (next.has(layerName)) {
+        next.delete(layerName)
+      } else {
+        next.add(layerName)
+      }
+      return next
+    })
+  }
+  
+  function selectAllShapefileLayers() {
+    if (!pendingShapefile) return
+    setSelectedShapefileLayers(new Set(pendingShapefile.availableLayers))
+  }
+  
+  function deselectAllShapefileLayers() {
+    setSelectedShapefileLayers(new Set())
   }
 
   async function handlePickFile() {
@@ -245,6 +323,62 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
                 disabled={loading}
               >
                 {loading ? '转换中...' : '确认'}
+              </button>
+            </div>
+          </>
+        )}
+
+        {step === 'select-shapefile-layers' && pendingShapefile && (
+          <>
+            <div className="dialog-body">
+              <div className="shapefile-layer-selector">
+                <div className="selector-header">
+                  <FileText size={24} className="selector-icon" />
+                  <h3>选择要导入的图层</h3>
+                </div>
+                <p className="selector-hint">
+                  此 ZIP 文件包含 {pendingShapefile.availableLayers.length} 个 Shapefile，请选择要导入的图层:
+                </p>
+                
+                <div className="selector-actions">
+                  <button 
+                    className="button-link" 
+                    onClick={selectAllShapefileLayers}
+                  >
+                    全选
+                  </button>
+                  <button 
+                    className="button-link" 
+                    onClick={deselectAllShapefileLayers}
+                  >
+                    取消全选
+                  </button>
+                </div>
+                
+                <div className="layer-list">
+                  {pendingShapefile.availableLayers.map((layerName) => (
+                    <label key={layerName} className="layer-checkbox-item">
+                      <input
+                        type="checkbox"
+                        checked={selectedShapefileLayers.has(layerName)}
+                        onChange={() => toggleShapefileLayer(layerName)}
+                      />
+                      <span>{layerName}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="dialog-footer">
+              <button className="button-secondary" onClick={handleCancel}>
+                取消
+              </button>
+              <button 
+                className="button-primary" 
+                onClick={handleShapefileLayersConfirm}
+                disabled={loading || selectedShapefileLayers.size === 0}
+              >
+                {loading ? '导入中...' : `导入 ${selectedShapefileLayers.size} 个图层`}
               </button>
             </div>
           </>
