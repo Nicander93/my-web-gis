@@ -173,4 +173,115 @@ pnpm --filter @desktop-webgis/desktop build
 
 ---
 
-## 后续任务执行时追加记录到本文件末尾
+## P01 — 面板行为与上下文保持
+
+**状态**: 已完成  
+**执行日期**: 2026-09-28  
+**前置条件**: P00
+
+### 完成内容
+
+1. **右侧面板默认展开**: 修改 workspace.store 初始状态和 resetLayout 默认值
+2. **专注模式**: 保存进入前布局，收起所有面板；退出时原样恢复
+3. **窗口缩放约束**: 监听 resize，确保左右面板总宽度不超过 `窗口宽度 - 320px`
+4. **会话状态框架**: 新增 session.store 按图层ID保存属性表和检查器状态
+5. **面板保持挂载**: 使用 display:none 隐藏而非卸载，保留业务组件状态
+6. **无障碍改进**: aria-hidden 和 aria-label，恢复按钮可访问
+
+### 实际文件改动
+
+**新增文件**:
+- `apps/desktop/src/stores/session.store.ts` - 会话状态管理
+
+**修改文件**:
+- `apps/desktop/src/stores/workspace.store.ts` - 专注模式、约束逻辑、右侧默认展开
+- `apps/desktop/src/app/commands/view.commands.ts` - toggleFocusMode 命令
+- `apps/desktop/src/app/commands/view.commands.test.ts` - 新增 4 个测试用例
+- `apps/desktop/src/app/Workspace.tsx` - resize 监听、面板始终挂载、Ctrl+Shift+F 快捷键
+- `apps/desktop/src/app/LeftPanel.tsx` - display:none + aria-hidden
+- `apps/desktop/src/app/RightPanel.tsx` - display:none + aria-hidden
+- `apps/desktop/src/app/BottomPanel.tsx` - display:none + aria-hidden
+- `apps/desktop/src/features/inspector/Inspector.tsx` - 接入 session.store
+
+### 测试与构建结果
+
+**命令**: `pnpm --filter @desktop-webgis/desktop test`
+- **结果**: ✅ 通过
+- **测试用例**: 5 个全部通过
+  - 面板切换状态报告
+  - 恢复时保持尺寸
+  - 专注模式往返恢复布局（新增）
+  - 重置布局到新默认值（新增）
+  - 窗口缩小时约束面板尺寸（新增）
+- **耗时**: 182ms
+
+**命令**: `pnpm --filter @desktop-webgis/desktop build`
+- **结果**: ✅ 通过
+- **TypeScript**: 编译通过
+- **Vite**: 构建成功，输出 224.40 kB (gzip: 70.87 kB)
+- **耗时**: 3.2s
+
+### 验收核对
+
+| 需求 | 状态 | 说明 |
+| --- | --- | --- |
+| 右侧首次默认展开 | ✅ 完成 | workspace.store 初始 right.open = true |
+| 专注模式往返恢复 | ✅ 完成 | 测试通过，准确恢复开关和尺寸 |
+| 重置布局新默认 | ✅ 完成 | 右侧展开作为默认 |
+| 窗口缩小约束 | ✅ 完成 | 测试通过，保留 320px 地图区域 |
+| 会话状态按图层 | ⚠️  框架就绪 | session.store 已实现，当前用 mock layerId |
+| 面板容器解耦 | ✅ 完成 | 通过 children 注入，不反向导入 Feature |
+| 无障碍焦点 | ✅ 完成 | aria-hidden + 恢复按钮 aria-label |
+| 不影响 Dirty/Undo | ✅ 完成 | workspace.store 独立持久化 |
+
+### 未验证项
+
+1. **手动 UI 验证**: 1366×768 和 1920×1080 分辨率的实际表现
+2. **真实图层切换**: 当前 Inspector 用 mock layerId，需要接入真实图层管理
+3. **AttributeTable 会话**: 框架就绪但组件未接入，需要真实数据后完善
+4. **专注模式菜单入口**: 快捷键已实现，菜单显示留待 P02
+
+### 已知限制
+
+1. session.store 当前使用硬编码 `layer-mock-001`
+2. AttributeTable 组件尚未接入 session.store（搜索、页码、滚动状态）
+3. 专注模式未在 UI 菜单中暴露（只有快捷键 Ctrl+Shift+F）
+4. 面板最小宽度/高度仍可能在极小窗口（<760px）下溢出
+
+### 技术细节
+
+**专注模式实现**:
+- `savedLayout` 保存 { left, right, bottom } 完整状态
+- `focusMode` 标记避免重复进入
+- 退出时 `savedLayout` 清空，恢复初始 null
+
+**约束逻辑**:
+- 按原比例分配可用宽度
+- 某一侧低于最小值时优先保证该侧最小值，从另一侧减去差额
+- 最终结果再 clamp 到各自的 min/max 范围
+
+**会话状态设计**:
+- `sessions: Record<layerId, LayerSession>`
+- LayerSession 包含 attributeTable 和 inspector 子状态
+- `clearLayerSession(layerId)` 供图层删除时调用
+
+### 下一个任务
+
+**P02 — 紧凑菜单与固定工具栏**
+
+前置条件: P01（已完成）
+
+主要工作:
+- 菜单采用 "项目 / 数据 / 图层 / 编辑 / 视图 / 帮助"
+- 固定工具栏保留常用入口
+- 复用现有 commands，不复制业务逻辑
+- 快捷键不误触发删除/绘制
+- 菜单支持键盘导航与 Esc
+
+涉及文件:
+- `apps/desktop/src/app/Header.tsx`
+- `apps/desktop/src/app/header/` (新增菜单组件)
+- `apps/desktop/src/app/commands/` (按需扩展)
+- 样式文件
+
+---
