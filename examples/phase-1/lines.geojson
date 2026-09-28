@@ -1,0 +1,40 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "line-1",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [116.3975, 39.9085],
+          [117.0, 40.0],
+          [117.5, 40.2]
+        ]
+      },
+      "properties": {
+        "id": "line-1",
+        "name": "路线A",
+        "length": 120.5
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "line-2",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [121.4737, 31.2304],
+          [121.5, 31.3],
+          [121.6, 31.4],
+          [121.7, 31.5]
+        ]
+      },
+      "properties": {
+        "id": "line-2",
+        "name": "路线B",
+        "length": 85.3
+      }
+    }
+  ]
+}

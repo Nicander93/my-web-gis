@@ -370,7 +370,7 @@ rtk proxy pnpm --filter @desktop-webgis/desktop build
 
 | 任务 | 状态 | 备注 |
 | --- | --- | --- |
-| P00 | 待执行 | 基线与样本 |
+| P00 | 已完成 | 基线与样本。详见 phase-1-progress.md |
 | P01 | 待执行 | 面板行为 |
 | P02 | 待执行 | 菜单工具栏 |
 | P03 | 待执行 | 导入通道 |

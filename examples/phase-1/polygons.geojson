@@ -1,0 +1,45 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "polygon-1",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [116.3, 39.8],
+          [116.5, 39.8],
+          [116.5, 40.0],
+          [116.3, 40.0],
+          [116.3, 39.8]
+        ]]
+      },
+      "properties": {
+        "id": "polygon-1",
+        "name": "区域A",
+        "area": 2450.5,
+        "category": "residential"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "polygon-2",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [121.4, 31.2],
+          [121.6, 31.2],
+          [121.6, 31.3],
+          [121.4, 31.3],
+          [121.4, 31.2]
+        ]]
+      },
+      "properties": {
+        "id": "polygon-2",
+        "name": "区域B",
+        "area": 1800.0,
+        "category": "commercial"
+      }
+    }
+  ]
+}
