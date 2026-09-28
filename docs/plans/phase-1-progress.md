@@ -1093,3 +1093,253 @@ async function importShapefileZip(
 
 ---
 
+## P07 — 二维 DXF only
+
+**状态**: 已完成  
+**执行日期**: 2026-09-28  
+**前置条件**: P04, P06  
+**验收标准**: `docs/plans/phase-1-gis-workbench.md` § P07
+
+### 完成内容
+
+按照 phase-1-gis-workbench.md P07 要求实现 (基于包含 P06 的 main `4b562c2`):
+
+1. **按 CAD 图层分组**: DXF 实体按原始图层名称分组，用户可选择要导入的图层
+2. **新 API 设计**: 
+   - 新增 `importDxfLayers` 返回多图层结果
+   - 保留 `importDxf` 旧 API 用于单层导入
+3. **实体支持审核**:
+   - 支持: POINT, LINE, LWPOLYLINE/POLYLINE (无 bulge), CIRCLE, ARC, TEXT/MTEXT
+   - 跳过: SPLINE (不再用控制点连线伪装精确曲线)
+   - 跳过: 带 bulge 的 POLYLINE (不支持圆弧插值)
+   - 跳过: HATCH, BLOCK/INSERT, DWG, 二进制 DXF
+4. **曲线近似精度警告**: CIRCLE/ARC 实体添加分段警告，明确提示精度损失
+5. **CRS 与图层配置**: 新增 select-dxf-config 步骤，用户同时选择坐标系和要导入的图层
+6. **警告机制**: 每个图层分别报告跳过的实体类型+数量，圆弧实体数量+分段数
+7. **源属性保留**: 保存 entityType, layer, handle, text 等属性
+8. **不回退 P06**: 完整保留 CSV 功能 (CsvConfigDialog, select-csv-config, importCsvFile)
+
+### 实际文件改动
+
+**修改文件**:
+- `packages/vector-io/src/types.ts` - 新增 DxfLayerResult, DxfImportResult, selectedLayers 选项
+- `packages/vector-io/src/dxf.ts` - 新增 importDxfLayers, dxfDocumentToLayers, 曲线警告, 跳过 SPLINE/bulge
+- `packages/vector-io/src/dxf.test.ts` - 新增 6 个测试用例 (图层分组、bulge/SPLINE 跳过、TEXT、警告)
+- `apps/desktop/src/services/import.ts` - 更新 importDxfFile 支持图层选择
+- `apps/desktop/src/features/add-data/AddDataDialog.tsx` - 新增 select-dxf-config 步骤
+- `apps/desktop/src/styles/app.css` - 新增 DXF 配置 UI 样式
+- `docs/plans/phase-1-gis-workbench.md` - 更新 P07 状态
+
+**无新增文件** (测试样本已在 P00 创建)
+
+### 测试与构建结果
+
+**命令**: `pnpm --filter @desktop-webgis/vector-io test`
+- **结果**: ✅ 通过
+- **测试用例**: 29/29 通过
+  - CSV: 10 个 (P06)
+  - DXF: 7 个 (新增 6 个)
+  - Shapefile: 4 个
+  - Coordinate Transform: 8 个
+- **耗时**: 390ms
+
+**命令**: `pnpm --filter @desktop-webgis/desktop test`
+- **结果**: ✅ 通过
+- **测试用例**: 13/13 通过
+  - view.commands: 5 个
+  - import: 3 个
+  - csv-import: 5 个 (P06)
+- **耗时**: 354ms
+
+**命令**: `pnpm --filter @desktop-webgis/desktop build`
+- **结果**: ✅ 通过
+- **TypeScript**: 编译通过
+- **Vite**: 构建成功
+- **输出大小**: 556.83 kB (gzip: 178.67 kB)
+- **耗时**: 1.86s
+
+### 验收核对（phase-1-gis-workbench.md § P07）
+
+| 验收项 | 验收证据 | 结果 |
+|--------|---------|------|
+| 修改现有 DXF 代码，不新建解析器 | dxf.ts 扩展，复用 DxfParser | ✅ PASS |
+| ASCII DXF 按 CAD 图层分组 | dxfDocumentToLayers 函数 | ✅ PASS |
+| 用户可选择要导入的图层 | select-dxf-config 步骤 + selectedLayers | ✅ PASS |
+| 保留源属性 (handle, layer, text) | entityProperties 函数 | ✅ PASS |
+| 要求明确源 CRS | select-dxf-config 步骤必选 CRS | ✅ PASS |
+| 支持 POINT, LINE, LWPOLYLINE, CIRCLE, ARC | entityToGeometry 已支持 | ✅ PASS |
+| 支持 TEXT/MTEXT 作为锚点 + 文本属性 | 转为 Point + text 属性 | ✅ PASS |
+| 曲线近似有精度警告 | curveApproximation 警告，报告数量+分段数 | ✅ PASS |
+| 跳过 SPLINE (不用控制点连线) | 返回 null，计入 unsupported | ✅ PASS |
+| 跳过带 bulge 的 POLYLINE | hasBulges 检查，返回 null | ✅ PASS |
+| 不支持实体 WARN + SKIP | 每个图层分别报告类型和数量 | ✅ PASS |
+| 不支持 DWG, 二进制 DXF | 仅 importDxf 接收文本输入 | ✅ PASS |
+| 不支持 BLOCK/INSERT, HATCH | 未处理，计入 unsupported | ✅ PASS |
+| 原始文件不修改 | 只读解析，无写回操作 | ✅ PASS |
+| 非 4326 CRS 走 createCoordinateTransform | import.ts 调用转换 | ✅ PASS |
+| 不回退 P04/P05/P06 | 所有现有测试通过 (13/13) | ✅ PASS |
+
+**说明**:
+- ✅ PASS: 已实现且有测试/代码证据
+- 测试从上次 8 个增加到 13 个，证明 P06 CSV 功能完整保留
+
+### 与上次 REQUEST_CHANGES 对照
+
+**问题修复**:
+1. ✅ base 从 c3a843f (P05) 改为 4b562c2 (P06)
+2. ✅ 未回退 P06 CSV 完整流程 (select-csv-config, CsvConfigDialog, importCsvFile, detectFileType csv, 文件选择器/拖放 CSV 支持)
+3. ✅ desktop 测试从 8 增到 13，包含 CSV 5 个测试
+4. ✅ CIRCLE/ARC 圆弧实体添加精度/分段警告 (curveApproximation 警告)
+5. ✅ 进度文档未写 P06 未完成
+6. ✅ PR 已 undraft
+
+### 未验证项
+
+1. **Tauri 环境文件读取**: 
+   - DXF 文本文件读取路径需要在 Tauri 环境验证
+   - 文件选择和拖放功能需要在桌面应用中测试
+
+2. **大型 DXF 文件**: 
+   - 当前测试使用小型样本 (数个实体)
+   - 实际大型 DXF (数千实体) 性能未验证
+
+3. **复杂坐标系**: 
+   - 当前只测试 EPSG:4326 和 EPSG:3857
+   - 其他投影坐标系需要真实 proj4 环境验证
+
+### 已知限制与待补项
+
+1. **SPLINE 曲线**: 
+   - 当前直接跳过，不做任何近似
+   - 如需支持，需要真实 NURBS 插值算法
+   - 控制点连线不是精确转换，已移除
+
+2. **Bulge 圆弧**: 
+   - LWPOLYLINE/POLYLINE 的 bulge 参数表示圆弧插值
+   - 当前跳过所有带 bulge 的顶点
+   - 如需支持，需要实现 bulge 转圆弧算法
+
+3. **BLOCK/INSERT**: 
+   - 块引用需要递归展开和变换矩阵计算
+   - 当前跳过，不在本阶段范围
+
+4. **HATCH 填充**: 
+   - 填充模式转换复杂，不在本阶段范围
+   - 当前跳过
+
+5. **二进制 DXF 和 DWG**: 
+   - dxf-parser 只支持 ASCII DXF
+   - 二进制格式需要其他解析库
+
+6. **图层名称**: 
+   - layer 为 undefined 时使用默认图层 "0"
+   - 与 CAD 软件约定一致
+
+7. **多图层命名**: 
+   - 单图层 DXF: 使用文件名 (如 "drawing")
+   - 多图层 DXF: 使用 "文件名_图层名" (如 "drawing_Points")
+
+### 技术细节
+
+**新 API 设计**:
+```typescript
+interface DxfLayerResult {
+  name: string
+  featureCollection: GeoJsonFeatureCollection
+  warnings: VectorImportWarning[]
+}
+
+interface DxfImportResult {
+  layers: DxfLayerResult[]
+  crs?: CrsInfo
+}
+
+function importDxfLayers(
+  text: string,
+  options?: DxfImportOptions
+): DxfImportResult
+```
+
+**曲线近似警告**:
+```typescript
+{
+  code: 'dxf.curveApproximation',
+  message: `图层 "Points": 3 个圆弧实体已近似为 64 段折线，可能存在精度损失。`,
+  count: 3
+}
+```
+
+**实体支持审核**:
+- `hasBulges(entity)`: 检查 vertices 是否有非零 bulge
+- `entityToGeometry`: SPLINE 和带 bulge 的 POLYLINE 返回 null
+- 跳过的实体按类型统计，每个图层分别报告
+
+**import.ts 适配**:
+```typescript
+async function importDxfFile(
+  source: string | File,
+  options?: { crs?: CrsInfo; selectedLayers?: string[] }
+): Promise<ImportResult>
+```
+- 先检测是否提供 crs，未提供则调用 importDxfLayers 获取图层列表
+- 进入 select-dxf-config 步骤，用户选择 CRS 和图层
+- 确认后调用 importDxfFile，传入 crs 和 selectedLayers
+
+**UI 流程**:
+1. 用户选择/拖入 .dxf 文件
+2. parseFile 检测到 DXF 且无 crs → 调用 importDxfLayers 获取图层列表
+3. setPendingDxf + 进入 select-dxf-config 步骤
+4. 用户选择坐标系、勾选图层
+5. handleDxfConfigConfirm 重新调用 parseFile，传入 crs 和 selectedLayers
+6. 进入 confirm 步骤，展示选中图层预览和警告 (含曲线近似警告)
+7. 用户确认导入 → onImport → addLayer
+
+**样式要点**:
+- `.dxf-config-container`: 两个 config-section (CRS 和图层)
+- `.config-section`: 每个配置区块独立
+- `.config-note`: 提示 "CAD 米制坐标不等同于经纬度"
+- `.layer-list`: 复用 Shapefile 的图层复选列表样式
+
+### 与计划对照
+
+**计划要求 P07**:
+1. ✅ 修改现有 vector-io DXF 代码，不新建解析器
+2. ✅ ASCII DXF 按 CAD 图层分组，用户可选择
+3. ✅ 保留源属性 (handle, layer, text 等)
+4. ✅ 要求明确源 CRS 和单位说明
+5. ✅ 支持 POINT, LINE, LWPOLYLINE/POLYLINE (无 bulge), CIRCLE, ARC
+6. ✅ TEXT/MTEXT 作为锚点 + 文本属性
+7. ✅ 曲线近似，精度可配置 (curveSegments)，添加警告
+8. ✅ 审核 SPLINE: 跳过，不用控制点连线
+9. ✅ 审核 bulge polyline: 跳过，不做错误几何
+10. ✅ 不支持实体 WARN + SKIP，列明类型和数量
+11. ✅ 不支持 DWG, 二进制 DXF, BLOCK/INSERT, HATCH
+12. ✅ 验收: 位置/单位/图层归属正确，不支持实体有明确列表
+13. ✅ 原始文件不修改
+14. ✅ 非 4326 CRS 走 createCoordinateTransform
+15. ✅ 不回退 P04/P05/P06
+
+### 开放债务
+
+无新增开放债务。所有计划功能已实现，限制项均为明确的不支持范围。
+
+### 下一个任务
+
+**P08 — 样式包基础与分类算法**
+
+前置条件: P07（已完成）
+
+主要工作:
+- 新增 `packages/ol-style` 包
+- 定义 JSON 可序列化样式契约
+- 提供不依赖 OL 的 `./classification` 入口
+- 实现等间距、分位数分类算法
+- 明确区间规则和边界归类
+
+涉及文件:
+- 新增 `packages/ol-style/` 完整包
+- `packages/ol-style/src/classification/` - 分类算法
+- `packages/ol-style/src/types.ts` - 样式契约
+
+---
+
