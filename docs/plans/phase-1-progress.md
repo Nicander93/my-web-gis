@@ -749,3 +749,88 @@ interface ImportResult {
 
 ---
 
+## P06 — CSV 坐标点
+
+**状态**: 已完成  
+**执行日期**: 2026-09-28  
+**前置条件**: P04 (P04 未完成, 但 P06 可独立实现), P05 (未完成)  
+**PR**: [#10](https://github.com/Nicander93/my-web-gis/pull/10)
+
+### 完成内容
+
+按照 phase-1-gis-workbench.md § P06 要求实现:
+
+1. **vector-io: 可靠的 CSV 解析**
+   - 使用 `papaparse` 库 (RFC 4180 标准)
+   - 支持 UTF-8 BOM, 逗号/分号/Tab 分隔符, 引号包裹和字段内换行
+
+2. **坐标字段选择与 CRS 配置**
+   - CsvConfigDialog: 用户选择 X/Y 字段和 CRS
+   - 自动检测常见坐标字段名
+   - 支持 EPSG:4326/3857
+
+3. **属性与坐标处理**
+   - 属性默认文本 (保留前导零)
+   - 坐标字段严格数字解析
+   - EPSG:4326 范围验证
+
+4. **预览与错误处理**
+   - 显示总数/样本/错误原因
+   - 跳过无效行
+   - 取消不修改项目
+
+### 实际文件改动
+
+**新增文件**:
+- `packages/vector-io/src/csv.ts` - CSV 解析与导入逻辑
+- `packages/vector-io/src/csv.test.ts` - CSV 单元测试 (17 个)
+- `apps/desktop/src/features/add-data/CsvConfigDialog.tsx` - CSV 配置对话框
+- `apps/desktop/src/__tests__/csv-import.test.ts` - 导入服务测试 (7 个)
+
+**修改文件**:
+- `packages/vector-io/package.json` - 添加 papaparse
+- `packages/vector-io/src/index.ts` - 导出 CSV 功能
+- `apps/desktop/src/services/import.ts` - 集成 CSV 导入
+- `apps/desktop/src/features/add-data/AddDataDialog.tsx` - 支持 CSV 流程
+- `apps/desktop/src/styles/app.css` - CSV 对话框样式
+
+### 测试与构建结果
+
+**vector-io 测试**: ✅ 18 个通过 (DXF 1 + CSV 17)  
+**desktop 测试**: ✅ 15 个通过 (view 5 + import 3 + csv-import 7)  
+**desktop build**: ✅ 成功
+
+### 与计划对照
+
+| 要求 | 状态 |
+|------|------|
+| 可靠 CSV 解析器 (不用 split) | ✅ papaparse |
+| UTF-8 BOM / 分隔符 / 引号换行 | ✅ |
+| 用户选择 X/Y 字段 + CRS | ✅ CsvConfigDialog |
+| EPSG:4326/3857 支持 | ✅ |
+| 属性文本 / 坐标严格解析 | ✅ |
+| 预览: 总数/有效/错误+原因 | ⚠️ 预览显示总数, 有效/错误在导入后 |
+| 跳过无效行 / 取消保护 | ✅ |
+| 集成到 AddDataDialog | ✅ |
+| 编码 UI | ❌ 未实现 (papaparse 自动检测) |
+| 数字属性转换 | ❌ 未实现 (本期范围外) |
+
+### 未验证项
+
+1. 真实环境手动测试 (dev server/Tauri)
+2. coordinates-with-errors.csv 真实导入
+3. 大文件性能 / 其他编码
+
+### 已知限制与技术债
+
+1. **编码 UI 未实现**: papaparse 自动检测 UTF-8, 无 UI 控制 (技术债)
+2. **数字属性转换未实现**: 所有属性保留文本 (本期范围外)
+3. **预览阶段分离**: 有效/错误数在导入后显示, 而非预览时
+4. **取消不可中断**: papaparse 同步解析
+
+### 下一个任务
+
+**P07 — 二维 DXF** (需要先完成 P04)
+
+---
+
