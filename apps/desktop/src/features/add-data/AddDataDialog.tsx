@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { FileText, Upload, X, CheckCircle2, AlertCircle } from 'lucide-react'
-import { pickFile } from '@/services/files'
-import { importGeoJson, importShapefileZip, importDxfFile, detectFileType } from '@/services/import'
+import { pickFile, readFile } from '@/services/files'
+import { importGeoJson, importShapefileZip, importDxfFile, importCsvFile, detectFileType } from '@/services/import'
 import type { ImportResult } from '@/services/import'
 import type { CrsInfo } from '@desktop-webgis/vector-io'
+import { CsvConfigDialog } from './CsvConfigDialog'
+import type { CsvConfig } from './CsvConfigDialog'
 
 interface AddDataDialogProps {
   open: boolean
@@ -11,7 +13,7 @@ interface AddDataDialogProps {
   onImport: (result: ImportResult) => void
 }
 
-type DialogStep = 'select' | 'confirm' | 'select-crs' | 'select-shapefile-layers'
+type DialogStep = 'select' | 'confirm' | 'select-crs' | 'select-shapefile-layers' | 'select-csv-config'
 
 // 仅列出已在 proj4 注册的 CRS (EPSG:4326 和 EPSG:3857)
 // 更多中国常用投影 (CGCS2000, Beijing 1954 等) 留待后续 PR
@@ -32,6 +34,7 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
     fileName: string; 
     availableLayers: string[];
   } | null>(null)
+  const [pendingCsv, setPendingCsv] = useState<{ source: string | File; fileName: string; content: string } | null>(null)
   const [selectedCrs, setSelectedCrs] = useState<string>('EPSG:4326')
   const [selectedShapefileLayers, setSelectedShapefileLayers] = useState<Set<string>>(new Set())
 
@@ -42,6 +45,7 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
     setParseResult(null)
     setPendingDxf(null)
     setPendingShapefile(null)
+    setPendingCsv(null)
     setSelectedShapefileLayers(new Set())
     setError(null)
     onClose()
@@ -52,6 +56,7 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
     setParseResult(null)
     setPendingDxf(null)
     setPendingShapefile(null)
+    setPendingCsv(null)
     setSelectedShapefileLayers(new Set())
     setError(null)
   }
@@ -68,12 +73,24 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
     fileType: string, 
     fileName: string, 
     crs?: CrsInfo,
-    shapefileOptions?: { selectedLayers?: string[] }
+    shapefileOptions?: { selectedLayers?: string[] },
+    csvConfig?: CsvConfig
   ) {
     setError(null)
     setLoading(true)
 
     try {
+      if (fileType === 'csv' && !csvConfig) {
+        const content = typeof source === 'string' 
+          ? await readFile(source, false) as string
+          : await source.text()
+        
+        setPendingCsv({ source, fileName, content })
+        setStep('select-csv-config')
+        setLoading(false)
+        return
+      }
+
       let result: ImportResult
 
       switch (fileType) {
@@ -107,6 +124,14 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
         }
         case 'dxf':
           result = await importDxfFile(source, crs)
+          break
+        case 'csv':
+          if (!csvConfig) {
+            setError('CSV 配置缺失')
+            setLoading(false)
+            return
+          }
+          result = await importCsvFile(source, csvConfig)
           break
         default:
           setError(`不支持的文件类型: ${fileName}`)
@@ -184,12 +209,32 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
   function deselectAllShapefileLayers() {
     setSelectedShapefileLayers(new Set())
   }
+  
+  async function handleCsvConfigConfirm(config: CsvConfig) {
+    if (!pendingCsv) return
+    
+    await parseFile(
+      pendingCsv.source,
+      'csv',
+      pendingCsv.fileName,
+      undefined,
+      undefined,
+      config
+    )
+    setPendingCsv(null)
+  }
+  
+  function handleCsvConfigCancel() {
+    setPendingCsv(null)
+    setStep('select')
+  }
 
   async function handlePickFile() {
     const path = await pickFile([
       { name: 'GeoJSON', extensions: ['geojson', 'json'] },
       { name: 'Shapefile', extensions: ['zip'] },
       { name: 'DXF', extensions: ['dxf'] },
+      { name: 'CSV', extensions: ['csv'] },
       { name: 'All Files', extensions: ['*'] }
     ])
 
@@ -382,6 +427,15 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
               </button>
             </div>
           </>
+        )}
+
+        {step === 'select-csv-config' && pendingCsv && (
+          <CsvConfigDialog
+            open={true}
+            csvContent={pendingCsv.content}
+            onConfirm={handleCsvConfigConfirm}
+            onCancel={handleCsvConfigCancel}
+          />
         )}
 
         {step === 'confirm' && parseResult && (
