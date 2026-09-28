@@ -1343,3 +1343,111 @@ async function importDxfFile(
 
 ---
 
+## P08 — 样式包基础与分类算法
+
+**状态**: 已完成  
+**执行日期**: 2026-09-28  
+**前置条件**: P07  
+**PR**: [#13](https://github.com/Nicander93/my-web-gis/pull/13)
+
+### 完成内容
+
+1. **新建独立包** `@desktop-webgis/ol-style`
+   - 不依赖 Desktop/gis-core/scene-schema/React/Zustand/Tauri
+   - OpenLayers 作为 peerDependency (^10.10.0)
+   - 双入口: `./index` (完整) 和 `./classification` (纯算法)
+
+2. **JSON 可序列化样式契约** (types.ts)
+   - 三种模式: single/categorized/graduated
+   - 符号: PointSymbol/LineSymbol/PolygonSymbol/MixedSymbol
+   - 配置: 字段、分类项/断点、fallback、可选标注
+
+3. **分类算法** (classification/index.ts)
+   - 等间距 (classifyEqualInterval): 平均分割数值范围
+   - 分位数 (classifyQuantile): 按数量平均,线性插值
+   - 值分类 (classifyValue): 区间归属判断
+   - 验证规则: 只接受有限 number,空字符串不转 0,类别区分数字/字符串
+   - 区间规则: 首段含最小值,上界包含/下界不含,自动去重
+
+4. **工具函数**
+   - colors.ts: rgb/rgba/hex 转换、插值、色带生成
+   - symbols.ts: 符号创建和克隆
+   - style-factory.ts: 样式工厂函数
+
+### 实际文件改动
+
+**新增文件**:
+- `packages/ol-style/package.json`
+- `packages/ol-style/tsconfig.json`
+- `packages/ol-style/README.md` (完整 API 文档)
+- `packages/ol-style/src/index.ts`
+- `packages/ol-style/src/types.ts`
+- `packages/ol-style/src/colors.ts`
+- `packages/ol-style/src/symbols.ts`
+- `packages/ol-style/src/style-factory.ts`
+- `packages/ol-style/src/classification/index.ts`
+- `packages/ol-style/src/classification/index.test.ts`
+
+**修改文件**:
+- `docs/plans/phase-1-gis-workbench.md` (P08 状态)
+- `pnpm-lock.yaml` (新增包依赖)
+
+### 测试与构建结果
+
+**测试**: `pnpm --filter @desktop-webgis/ol-style test`
+- ✅ 21 个用例全部通过 (耗时 229ms)
+- 等间距分类: 6 个 (正确断点、常量、无效值、去重等)
+- 分位数分类: 5 个 (正确断点、重复值、插值规则)
+- 值分类: 7 个 (边界归属、超出范围、无效值)
+- 一致性: 3 个 (颜色数与分段一致)
+
+**构建**: `pnpm --filter @desktop-webgis/ol-style build`
+- ✅ TypeScript 编译通过 (耗时 1.16s)
+- 产物: dist/index.js + classification/index.js (含类型定义)
+
+### 验收核对
+
+| 验收项 | 结果 |
+|--------|------|
+| 不依赖 Desktop/gis-core/scene-schema/React/Zustand/Tauri | ✅ |
+| OL 作为 peerDependency,只声明已验证版本 | ✅ ^10.10.0 |
+| JSON 可序列化契约 | ✅ types.ts 纯数据类型 |
+| single/categorized/graduated | ✅ 三种模式完整 |
+| 点/线/面基础符号,混合几何按类型渲染 | ✅ 四种符号类型 |
+| ./classification 无 OL 依赖 | ✅ 纯算法 |
+| 等间距/分位数算法 | ✅ 实现+测试 |
+| 数值验证规则 | ✅ 有限 number,不转空字符串 |
+| 区间规则 | ✅ 首段含最小值,上界含/下界不含 |
+| 固定数组精确断点断言 | ✅ 测试覆盖 |
+| 重复值去重,不生成空图例 | ✅ 测试覆盖 |
+| 颜色数与有效分段一致 | ✅ 测试覆盖 |
+
+### 未验证项
+
+- OpenLayers StyleFunction 编译器 (P09)
+- Desktop 样式编辑 UI (P10)
+- Scene 协议集成 (P11)
+- npm 发布准备 (P20)
+
+### 已知限制
+
+- OpenLayers 版本: 当前 ^10.10.0 (OL 11 尚未发布)
+- 符号类型: 第一版只支持 circle/solid 基础符号
+- 分类方法: 支持 equal-interval/quantile/manual,未实现 natural-breaks
+
+### 下一个任务
+
+**P09 — OL 样式编译与桌面接入**
+
+前置条件: P08 (已完成)
+
+主要工作:
+- 实现 OpenLayers StyleFunction 编译器
+- gis-core 样式契约迁移
+- ol-runtime 样式编译接入
+- 符号缓存优化
+- 标签渲染
+- 旧项目迁移
+
+---
+
