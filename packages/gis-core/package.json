@@ -9,6 +9,9 @@
     "build": "tsc -p tsconfig.json",
     "test": "vitest run"
   },
+  "dependencies": {
+    "@desktop-webgis/ol-style": "workspace:*"
+  },
   "devDependencies": {
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"

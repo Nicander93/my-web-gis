@@ -130,7 +130,7 @@ export class OlMapRuntime {
       if (existing) {
         existing.setVisible(layer.visible)
         existing.setOpacity(layer.opacity)
-        existing.setStyle(createLayerStyle(layer.style))
+        existing.setStyle(createLayerStyle(layer))
         existing.setZIndex(index + 10)
         const source = existing.getSource()
         source?.clear()
@@ -145,7 +145,7 @@ export class OlMapRuntime {
         source,
         visible: layer.visible,
         opacity: layer.opacity,
-        style: createLayerStyle(layer.style),
+        style: createLayerStyle(layer),
         zIndex: index + 10
       })
       map.addLayer(vectorLayer)

@@ -2,6 +2,16 @@ import { Eye, EyeOff, Folder, GripVertical, Layers3, Search } from 'lucide-react
 import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { useProjectStore } from '@/stores/project.store'
+import { isLegacyStyle } from '@desktop-webgis/gis-core'
+
+function getSymbolClass(style: any): 'point' | 'line' | 'polygon' {
+  if (isLegacyStyle(style)) {
+    if (style.kind === 'polygon') return 'polygon'
+    if (style.kind === 'line') return 'line'
+    return 'point'
+  }
+  return 'point'
+}
 
 export function LayerPanel() {
   const [query, setQuery] = useState('')
@@ -38,8 +48,7 @@ export function LayerPanel() {
         {filteredLayers.map((layer) => {
           const isVisible = visible[layer.id] ?? layer.visible
           const isActive = selectedLayerId === layer.id
-          const symbolClass = layer.style.kind === 'polygon' ? 'polygon' : 
-                             layer.style.kind === 'line' ? 'line' : 'point'
+          const symbolClass = getSymbolClass(layer.style)
           
           return (
             <div key={layer.id} className={`layer-item ${isActive ? 'is-active' : ''}`}>
