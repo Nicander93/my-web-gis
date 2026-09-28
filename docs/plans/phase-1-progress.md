@@ -826,9 +826,9 @@ interface ImportResult {
 | 用户可选一个或多个导入 | selectedShapefileLayers Set + 全选/取消全选 | ✅ PASS |
 | 不强制合并新流程 | importShapefileZipLayers 返回独立图层数组 | ✅ PASS |
 | 保留旧 API 兼容 | importShapefile 保留，标记 @deprecated | ✅ PASS |
-| 识别 .prj / .cpg | hasPrj 字段 + encoding 选项 | ✅ PASS |
-| 编码覆盖入口 | encoding 选择器（UTF-8/GBK/Big5/Shift_JIS） | ✅ PASS |
-| 编码设置有效 | 添加说明：shpjs 自动处理，手动覆盖仅在失败时使用 | ⚠️ 说明已添加 |
+| 识别 .prj / .cpg | hasPrj 字段，.cpg 由 shpjs 自动读取 | ✅ PASS |
+| 编码覆盖入口 | ❌ 已移除无效控件（改为说明） | N/A |
+| 编码设置有效 | N/A 未实现，记录为开放问题 | N/A |
 | 中文字段正常 | ⚠️ 需要 .cpg 文件或正确 DBF 编码 | ⚠️ 待真实环境 |
 | 两 SHP 可选一或全 | multi-shapefile.zip 测试通过 | ✅ PASS |
 | 缺失必要文件 → 明确结果 | shpjs 解析错误会返回错误消息 | ✅ PASS |
@@ -837,10 +837,16 @@ interface ImportResult {
 | 保存重开数据仍在 | 需要完整项目持久化（P03-P19） | ⚠️ 待后续任务 |
 
 **说明**:
-- ✅ PASS: 已实现且有测试/代码证据，commit `fb5090f`
-- ⚠️ 说明已添加: 功能实现，但受 shpjs 库限制
+- ✅ PASS: 已实现且有测试/代码证据
+- ❌: 原计划功能，经评审后移除（无效实现）
+- N/A: 不适用或未实现，已记录为开放问题
 - ⚠️ 待真实环境: 需要 Tauri 环境和真实中文 .cpg 文件测试
 - ⚠️ 待后续任务: 依赖完整项目持久化功能
+
+**评审修正（PR#9 review）**:
+- 移除了无效的编码选择器（encoding 参数未传递给 shpjs）
+- 改为说明文字，提示用户 shpjs 自动读取 .cpg 文件
+- 将手动编码覆盖记录为开放问题（需要预处理 DBF 或更换解析库）
 
 ### 未验证项
 
@@ -863,10 +869,13 @@ interface ImportResult {
 
 ### 已知限制与待补项
 
-1. **编码处理**: 
-   - shpjs 库的编码主要依赖 .cpg 文件
-   - 手动 encoding 参数传递给 shpjs，但库可能不支持运行时覆盖
-   - 如需更好的编码控制，可能需要在 shpjs 之前预处理 DBF
+1. **编码处理** (开放问题):
+   - shpjs 库自动读取 .cpg 文件处理编码
+   - 当前不支持手动编码覆盖（UI 已移除无效控件）
+   - 如需手动指定编码，需要实现：
+     - 在 shpjs 之前预处理 DBF 文件
+     - 或使用支持运行时编码参数的 DBF 解析库
+     - 或在导入前提示用户手动创建 .cpg 文件
 
 2. **中文支持**: 
    - @mapbox/shp-write 生成的 shapefile 不包含 .cpg 文件

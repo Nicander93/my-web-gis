@@ -1246,40 +1246,21 @@ button:disabled {
   font-size: 13px;
 }
 
-.encoding-selector {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.encoding-note-box {
   padding: 12px;
-  background: var(--color-app-bg);
+  background: #fffbeb;
+  border: 1px solid #fde68a;
   border-radius: 6px;
 }
 
-.encoding-selector label {
-  color: var(--color-text-primary);
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.encoding-select {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background: white;
-  font-size: 12px;
-  color: var(--color-text-primary);
-}
-
-.encoding-select:focus {
-  outline: none;
-  border-color: var(--color-primary);
-}
-
 .encoding-note {
-  color: var(--color-text-secondary);
+  color: #92400e;
   font-size: 11px;
   line-height: 1.4;
-  margin: 4px 0 0 0;
+  margin: 0;
+}
+
+.encoding-note strong {
+  font-weight: 600;
 }
 

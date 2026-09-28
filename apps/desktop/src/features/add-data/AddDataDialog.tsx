@@ -33,7 +33,6 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
     availableLayers: string[];
   } | null>(null)
   const [selectedCrs, setSelectedCrs] = useState<string>('EPSG:4326')
-  const [selectedEncoding, setSelectedEncoding] = useState<string>('UTF-8')
   const [selectedShapefileLayers, setSelectedShapefileLayers] = useState<Set<string>>(new Set())
 
   if (!open) return null
@@ -69,7 +68,7 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
     fileType: string, 
     fileName: string, 
     crs?: CrsInfo,
-    shapefileOptions?: { encoding?: string; selectedLayers?: string[] }
+    shapefileOptions?: { selectedLayers?: string[] }
   ) {
     setError(null)
     setLoading(true)
@@ -160,10 +159,7 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
       'shapefile', 
       pendingShapefile.fileName, 
       undefined,
-      { 
-        encoding: selectedEncoding !== 'UTF-8' ? selectedEncoding : undefined,
-        selectedLayers 
-      }
+      { selectedLayers }
     )
     setPendingShapefile(null)
   }
@@ -372,21 +368,9 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
                   ))}
                 </div>
                 
-                <div className="encoding-selector">
-                  <label htmlFor="encoding-select">字符编码:</label>
-                  <select 
-                    id="encoding-select"
-                    value={selectedEncoding} 
-                    onChange={(e) => setSelectedEncoding(e.target.value)}
-                    className="encoding-select"
-                  >
-                    <option value="UTF-8">UTF-8 (默认)</option>
-                    <option value="GBK">GBK (简体中文)</option>
-                    <option value="Big5">Big5 (繁体中文)</option>
-                    <option value="Shift_JIS">Shift_JIS (日文)</option>
-                  </select>
+                <div className="encoding-note-box">
                   <p className="encoding-note">
-                    注意: shpjs 库会自动处理编码（通过 .cpg 文件），手动覆盖仅在自动识别失败时使用。
+                    <strong>编码说明:</strong> shpjs 库会自动读取 .cpg 文件处理字符编码。如需手动指定编码，请参考项目文档中的开放问题列表。
                   </p>
                 </div>
               </div>

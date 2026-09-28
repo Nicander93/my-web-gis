@@ -58,7 +58,7 @@ export async function importGeoJson(source: string | File): Promise<ImportResult
 
 export async function importShapefileZip(
   source: string | File, 
-  options?: { encoding?: string; selectedLayers?: string[] }
+  options?: { selectedLayers?: string[] }
 ): Promise<ImportResult> {
   try {
     let buffer: ArrayBuffer | ArrayBufferView
@@ -72,7 +72,7 @@ export async function importShapefileZip(
       fileName = source.name
     }
 
-    const result = await importShapefileZipLayers(buffer, options)
+    const result = await importShapefileZipLayers(buffer)
     
     const selectedLayers = options?.selectedLayers 
       ? result.layers.filter(layer => options.selectedLayers!.includes(layer.name))
@@ -109,10 +109,6 @@ export async function importShapefileZip(
         ...layer.warnings.map(w => w.message),
         ...parseResult.warnings.map(w => w.message)
       ]
-      
-      if (!layer.hasPrj) {
-        allWarnings.push('缺少 .prj 文件，假定为 WGS84 (EPSG:4326)')
-      }
       
       const styleKind = inferLayerStyleKind(parseResult.features)
 

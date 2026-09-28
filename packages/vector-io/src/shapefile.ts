@@ -11,12 +11,13 @@ type ShpResult = GeoJsonFeatureCollection & { fileName?: string; crs?: { type?: 
  * shpjs already converts coordinates to EPSG:4326 (WGS84).
  * We preserve the original CRS info (from .prj) as sourceCrs metadata.
  * 
+ * Encoding: shpjs reads .cpg files automatically. Manual encoding override is not currently supported.
+ * 
  * This is the NEW API that preserves multiple shapefiles as separate layers.
  * For backward compatibility, the old importShapefile is kept below.
  */
 export async function importShapefileZipLayers(
-  input: ArrayBuffer | ArrayBufferView,
-  options?: { encoding?: string }
+  input: ArrayBuffer | ArrayBufferView
 ): Promise<ShapefileImportResult> {
   const parsed = (await shp(input)) as ShpResult | ShpResult[]
   const collections = Array.isArray(parsed) ? parsed : [parsed]
@@ -32,13 +33,6 @@ export async function importShapefileZipLayers(
       warnings.push({
         code: 'shapefile.missingPrj',
         message: '缺少 .prj 文件，假定为 WGS84 (EPSG:4326)'
-      })
-    }
-    
-    if (options?.encoding) {
-      warnings.push({
-        code: 'shapefile.encodingOverride',
-        message: `已指定编码: ${options.encoding}（注意：shpjs 库会自动处理编码，手动覆盖可能无效）`
       })
     }
     
