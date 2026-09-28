@@ -1,7 +1,7 @@
 import { parseGeoJsonFeatures, inferLayerStyleKind, createId } from '@desktop-webgis/gis-core'
 import type { GisFeature } from '@desktop-webgis/gis-core'
-import { importShapefileZipLayers, importDxf, createCoordinateTransform } from '@desktop-webgis/vector-io'
-import type { CrsInfo } from '@desktop-webgis/vector-io'
+import { importShapefileZipLayers, importDxf, importCsv, createCoordinateTransform } from '@desktop-webgis/vector-io'
+import type { CrsInfo, CsvImportOptions } from '@desktop-webgis/vector-io'
 import { readFile, readBinaryFile } from './files'
 
 const STORE_CRS = 'EPSG:4326'
@@ -204,10 +204,71 @@ export function getFileExtension(fileName: string): string {
   return match ? match[1].toLowerCase() : ''
 }
 
-export function detectFileType(fileName: string): 'geojson' | 'shapefile' | 'dxf' | 'unknown' {
+export function detectFileType(fileName: string): 'geojson' | 'shapefile' | 'dxf' | 'csv' | 'unknown' {
   const ext = getFileExtension(fileName)
   if (ext === 'geojson' || ext === 'json') return 'geojson'
   if (ext === 'zip') return 'shapefile'
   if (ext === 'dxf') return 'dxf'
+  if (ext === 'csv') return 'csv'
   return 'unknown'
+}
+
+export async function importCsvFile(
+  source: string | File,
+  options: CsvImportOptions
+): Promise<ImportResult> {
+  try {
+    let content: string
+    let fileName: string
+
+    if (typeof source === 'string') {
+      content = await readFile(source, false) as string
+      fileName = source.split('/').pop() || source.split('\\').pop() || 'imported'
+    } else {
+      content = await source.text()
+      fileName = source.name
+    }
+
+    const result = importCsv(content, options)
+    
+    const transformResult = options.crs.code === STORE_CRS
+      ? { success: true, transform: (c: number[]) => c }
+      : createCoordinateTransform(options.crs, STORE_CRS)
+    
+    if (!transformResult.success) {
+      return {
+        layers: [],
+        errors: [`坐标转换失败: ${transformResult.error}`]
+      }
+    }
+    
+    const parseResult = parseGeoJsonFeatures(result.featureCollection, {
+      importId: createId('import'),
+      sourceCrs: options.crs.code,
+      transform: transformResult.transform
+    })
+    
+    const allWarnings = [
+      ...result.warnings.map(w => w.message),
+      ...parseResult.warnings.map(w => w.message)
+    ]
+    
+    const styleKind = inferLayerStyleKind(parseResult.features)
+    const baseName = fileName.replace(/\.csv$/i, '')
+
+    return {
+      layers: [{ 
+        name: baseName, 
+        features: parseResult.features, 
+        styleKind,
+        warnings: allWarnings
+      }],
+      errors: []
+    }
+  } catch (error) {
+    return {
+      layers: [],
+      errors: [error instanceof Error ? error.message : String(error)]
+    }
+  }
 }

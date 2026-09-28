@@ -375,8 +375,8 @@ rtk proxy pnpm --filter @desktop-webgis/desktop build
 | P02 | 已完成 | 菜单工具栏。commit 37e74f8 |
 | P03 | 已完成 | 导入通道。commit 5972d5d |
 | P04 | 已完成 | 坐标与属性。commit e5c325f |
-| P05 | 已完成 | Shapefile。commit fb5090f |
-| P06 | 待执行 | CSV |
+| P05 | 已完成 | Shapefile。PR#9 |
+| P06 | 已完成 | CSV。PR#11 |
 | P07 | 待执行 | DXF |
 | P08 | 待执行 | 样式算法 |
 | P09 | 待执行 | 样式 runtime |
