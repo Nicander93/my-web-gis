@@ -986,3 +986,110 @@ async function importShapefileZip(
 
 ---
 
+## P06 — CSV 坐标点 (Fix: 基于 P04/P05)
+
+**状态**: 已完成  
+**执行日期**: 2026-09-28  
+**前置条件**: P04, P05 (已在 main)  
+**PR**: [#11](https://github.com/Nicander93/my-web-gis/pull/11)  
+**Base**: main c3a843f (包含 P04/P05)
+
+### 完成内容 (修正版)
+
+基于最新 main 增量实现, 修正前次 PR#10 的问题:
+
+1. **确认前预览: 总数/有效数/错误数+原因**
+   - previewCsv 正确计算 validRows/invalidRows
+   - CsvConfigDialog 实时显示统计和错误列表
+   - validRows = 0 时禁用确认按钮
+
+2. **非 4326 CRS 走 createCoordinateTransform**
+   - importCsvFile 调用 createCoordinateTransform (与 SHP/DXF 一致)
+   - 转换到存储 CRS (EPSG:4326)
+
+3. **增量集成到现有 AddDataDialog**
+   - 保留 SHP 'select-shapefile-layers' 步骤
+   - 保留 DXF 'select-crs' 步骤
+   - 添加 CSV 'select-csv-config' 步骤
+
+4. **无假 UI 控件**
+   - 编码 UI 未实现 (记为开放债务)
+   - 数字属性转换未实现 (记为开放债务)
+
+### 实际文件改动
+
+**新增文件**:
+- `packages/vector-io/src/csv.ts` - CSV 解析与导入
+- `packages/vector-io/src/csv.test.ts` - CSV 测试 (10 个)
+- `apps/desktop/src/features/add-data/CsvConfigDialog.tsx` - CSV 配置对话框
+- `apps/desktop/src/__tests__/csv-import.test.ts` - 导入服务测试 (5 个)
+
+**修改文件** (增量):
+- `packages/vector-io/package.json` - 添加 papaparse
+- `packages/vector-io/src/index.ts` - 导出 CSV 功能 (1 行)
+- `apps/desktop/src/services/import.ts` - 增量添加 importCsvFile (63 行) + 'csv' 检测 (1 行)
+- `apps/desktop/src/features/add-data/AddDataDialog.tsx` - 增量添加 CSV 步骤 (27 行)
+- `apps/desktop/src/styles/app.css` - CSV 样式 (229 行)
+
+### 测试与构建结果
+
+**vector-io 测试**: ✅ 23 个通过 (CSV 10 + 其他 13)
+- 基础解析 / 前导零 / 中文 / 无效坐标 / 越界 / BOM
+- 预览: 基础信息 / 有效无效计数 / 最多 5 行样本
+
+**desktop 测试**: ✅ 13 个通过 (CSV 5 + 其他 8)
+- 中文导入 / 错误坐标 / 前导零 / 点图层推断
+- EPSG:3857 转换为 4326
+
+**desktop build**: ✅ 成功
+
+### 与计划对照 (phase-1-gis-workbench.md § P06)
+
+| 要求 | 状态 |
+|------|------|
+| 可靠 CSV 解析 (不用 split) | ✅ papaparse |
+| 确认前预览: 总数/有效数/错误数+原因 | ✅ 实时计算并显示 |
+| 非 4326 CRS 走 createCoordinateTransform | ✅ 转换为存储 CRS |
+| 集成到 AddDataDialog | ✅ 增量 (保留 SHP/DXF 流程) |
+| 编码 UI (真实可用) | ❌ 未实现 (无假 UI, 记为债务) |
+| 数字属性转换 (显式选择) | ❌ 未实现 (无假 UI, 记为债务) |
+
+### 确认未破坏现有功能
+
+✅ **SHP 多图层选择步骤仍在**:
+- 'select-shapefile-layers' 步骤保留
+- handleShapefileLayersConfirm 逻辑未修改
+
+✅ **DXF CRS 步骤仍在**:
+- 'select-crs' 步骤保留
+- handleCrsConfirm 逻辑未修改
+
+### 未验证项
+
+1. 真实环境手动测试 (dev server/Tauri)
+2. coordinates-with-errors.csv 真实导入
+3. 大文件性能
+
+### 开放债务
+
+1. **编码 UI**: papaparse 自动检测 UTF-8, 无 UI 控制
+2. **数字属性转换**: 所有属性保留文本
+
+### 与前次 PR#10 的差异
+
+**问题修复**:
+1. ✅ base 从 f51f5f6 (P03) 改为 c3a843f (P04+P05)
+2. ✅ 未回退 P04/P05 的 select-crs / select-shapefile-layers / createCoordinateTransform / createId
+3. ✅ previewCsv validRows/invalidRows 不再恒 0 (支持 options 参数)
+4. ✅ CSV 非 4326 走 createCoordinateTransform (转换到存储 4326)
+5. ✅ 移除假 UI 控件 (编码 UI / 数字属性转换)
+6. ✅ 进度文档未写 "P04/P05 未完成"
+
+### 下一个任务
+
+**P07 — 二维 DXF** (依赖 P04, P06)
+
+前置条件: P04 (已完成), P06 (已完成)
+
+---
+
