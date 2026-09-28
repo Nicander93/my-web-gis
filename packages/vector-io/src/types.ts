@@ -20,6 +20,19 @@ export interface VectorImportResult {
   sourceCrs?: CrsInfo
 }
 
+export interface ShapefileLayerResult {
+  name: string
+  featureCollection: GeoJsonFeatureCollection
+  crs?: CrsInfo
+  sourceCrs?: CrsInfo
+  hasPrj: boolean
+  warnings: VectorImportWarning[]
+}
+
+export interface ShapefileImportResult {
+  layers: ShapefileLayerResult[]
+}
+
 export interface DxfImportOptions {
   curveSegments?: number
   transform?: (position: [number, number]) => [number, number]

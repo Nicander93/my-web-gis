@@ -1159,3 +1159,127 @@ button:disabled {
   border-radius: 4px;
 }
 
+.shapefile-layer-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.selector-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.selector-header h3 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.selector-icon {
+  color: var(--color-primary);
+}
+
+.selector-hint {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.selector-actions {
+  display: flex;
+  gap: 16px;
+}
+
+.button-link {
+  padding: 0;
+  color: var(--color-primary);
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.button-link:hover {
+  text-decoration: underline;
+}
+
+.layer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 12px;
+  background: var(--color-app-bg);
+  border-radius: 6px;
+}
+
+.layer-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.layer-checkbox-item:hover {
+  background: var(--color-hover);
+}
+
+.layer-checkbox-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.layer-checkbox-item span {
+  flex: 1;
+  color: var(--color-text-primary);
+  font-size: 13px;
+}
+
+.encoding-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--color-app-bg);
+  border-radius: 6px;
+}
+
+.encoding-selector label {
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.encoding-select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: white;
+  font-size: 12px;
+  color: var(--color-text-primary);
+}
+
+.encoding-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.encoding-note {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+  margin: 4px 0 0 0;
+}
+

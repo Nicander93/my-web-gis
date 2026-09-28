@@ -1,6 +1,6 @@
 import { parseGeoJsonFeatures, inferLayerStyleKind, createId } from '@desktop-webgis/gis-core'
 import type { GisFeature } from '@desktop-webgis/gis-core'
-import { importShapefile, importDxf, createCoordinateTransform } from '@desktop-webgis/vector-io'
+import { importShapefileZipLayers, importDxf, createCoordinateTransform } from '@desktop-webgis/vector-io'
 import type { CrsInfo } from '@desktop-webgis/vector-io'
 import { readFile, readBinaryFile } from './files'
 
@@ -56,7 +56,10 @@ export async function importGeoJson(source: string | File): Promise<ImportResult
   }
 }
 
-export async function importShapefileZip(source: string | File): Promise<ImportResult> {
+export async function importShapefileZip(
+  source: string | File, 
+  options?: { encoding?: string; selectedLayers?: string[] }
+): Promise<ImportResult> {
   try {
     let buffer: ArrayBuffer | ArrayBufferView
     let fileName: string
@@ -69,40 +72,60 @@ export async function importShapefileZip(source: string | File): Promise<ImportR
       fileName = source.name
     }
 
-    const result = await importShapefile(buffer)
+    const result = await importShapefileZipLayers(buffer, options)
     
-    const transformResult = result.crs?.code === STORE_CRS 
-      ? { success: true, transform: (c: number[]) => c }
-      : createCoordinateTransform(result.crs, STORE_CRS)
+    const selectedLayers = options?.selectedLayers 
+      ? result.layers.filter(layer => options.selectedLayers!.includes(layer.name))
+      : result.layers
     
-    if (!transformResult.success) {
+    if (selectedLayers.length === 0) {
       return {
         layers: [],
-        errors: [`坐标转换失败: ${transformResult.error}`]
+        errors: ['未选择任何图层']
       }
     }
     
-    const parseResult = parseGeoJsonFeatures(result.featureCollection, {
-      importId: createId('import'),
-      sourceCrs: result.sourceCrs?.code || result.crs?.code,
-      transform: transformResult.transform
-    })
+    const importLayers: ImportLayerResult[] = []
     
-    const allWarnings = [
-      ...result.warnings.map(w => w.message),
-      ...parseResult.warnings.map(w => w.message)
-    ]
-    
-    const styleKind = inferLayerStyleKind(parseResult.features)
-    const baseName = fileName.replace(/\.zip$/i, '')
+    for (const layer of selectedLayers) {
+      const transformResult = layer.crs?.code === STORE_CRS 
+        ? { success: true, transform: (c: number[]) => c }
+        : createCoordinateTransform(layer.crs, STORE_CRS)
+      
+      if (!transformResult.success) {
+        return {
+          layers: [],
+          errors: [`坐标转换失败 (${layer.name}): ${transformResult.error}`]
+        }
+      }
+      
+      const parseResult = parseGeoJsonFeatures(layer.featureCollection, {
+        importId: createId('import'),
+        sourceCrs: layer.sourceCrs?.code || layer.crs?.code,
+        transform: transformResult.transform
+      })
+      
+      const allWarnings = [
+        ...layer.warnings.map(w => w.message),
+        ...parseResult.warnings.map(w => w.message)
+      ]
+      
+      if (!layer.hasPrj) {
+        allWarnings.push('缺少 .prj 文件，假定为 WGS84 (EPSG:4326)')
+      }
+      
+      const styleKind = inferLayerStyleKind(parseResult.features)
 
-    return {
-      layers: [{ 
-        name: baseName, 
+      importLayers.push({ 
+        name: layer.name, 
         features: parseResult.features, 
         styleKind,
         warnings: allWarnings
-      }],
+      })
+    }
+
+    return {
+      layers: importLayers,
       errors: []
     }
   } catch (error) {
