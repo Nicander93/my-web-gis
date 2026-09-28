@@ -1,12 +1,9 @@
 import { AppWindow } from 'lucide-react'
-import { useState } from 'react'
-import { HeaderContent } from './header/HeaderContent'
-import { HeaderTabs, type HeaderTabId } from './header/HeaderTabs'
+import { MenuBar } from './header/MenuBar'
+import { Toolbar } from './header/Toolbar'
 
-/** Desktop 应用顶部 Header，采用紧凑 Ribbon 交互而非厚重 Office Ribbon。 */
+/** Desktop 应用顶部 Header，采用紧凑菜单栏与固定工具栏。 */
 export function Header() {
-  const [activeTab, setActiveTab] = useState<HeaderTabId>('start')
-
   return (
     <header className="app-header">
       <div className="window-bar">
@@ -18,8 +15,8 @@ export function Header() {
         </div>
         <span className="window-context">Map first · 2D workspace</span>
       </div>
-      <HeaderTabs activeTab={activeTab} onChange={setActiveTab} />
-      <HeaderContent activeTab={activeTab} />
+      <MenuBar />
+      <Toolbar />
     </header>
   )
 }
