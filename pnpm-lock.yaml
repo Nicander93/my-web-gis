@@ -111,6 +111,10 @@ importers:
         version: 7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)
 
   packages/gis-core:
+    dependencies:
+      '@desktop-webgis/ol-style':
+        specifier: workspace:*
+        version: link:../ol-style
     devDependencies:
       typescript:
         specifier: ^5.9.2
@@ -127,6 +131,9 @@ importers:
       '@desktop-webgis/ol-scene-runtime':
         specifier: workspace:*
         version: link:../ol-scene-runtime
+      '@desktop-webgis/ol-style':
+        specifier: workspace:*
+        version: link:../ol-style
       '@desktop-webgis/scene-schema':
         specifier: workspace:*
         version: link:../scene-schema

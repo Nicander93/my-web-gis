@@ -80,7 +80,10 @@ export interface Dataset {
 
 export type LayerStyleKind = 'point' | 'line' | 'polygon' | 'mixed'
 
-export interface LayerStyle {
+/**
+ * @deprecated 旧的简单样式定义,仅用于迁移
+ */
+export interface LegacyLayerStyle {
   kind: LayerStyleKind
   stroke: string
   fill: string
@@ -95,7 +98,7 @@ export interface Layer {
   visible: boolean
   opacity: number
   editable: boolean
-  style: LayerStyle
+  style: LegacyLayerStyle | import('@desktop-webgis/ol-style').LayerStyle
 }
 
 export interface MapState {

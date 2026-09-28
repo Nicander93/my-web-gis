@@ -1,31 +1,20 @@
-import type { LayerStyle } from '@desktop-webgis/gis-core'
+import type { Layer } from '@desktop-webgis/gis-core'
+import { isLegacyStyle, migrateLegacyStyle } from '@desktop-webgis/gis-core'
+import { compileStyle } from '@desktop-webgis/ol-style'
 import type { FeatureLike } from 'ol/Feature'
 import CircleStyle from 'ol/style/Circle'
 import Fill from 'ol/style/Fill'
 import Stroke from 'ol/style/Stroke'
 import Style from 'ol/style/Style'
 
-export function createLayerStyle(layerStyle: LayerStyle): (feature: FeatureLike) => Style {
-  return () =>
-    new Style({
-      stroke: new Stroke({
-        color: layerStyle.stroke,
-        width: layerStyle.width
-      }),
-      fill: new Fill({
-        color: layerStyle.fill
-      }),
-      image: new CircleStyle({
-        radius: layerStyle.pointRadius,
-        stroke: new Stroke({
-          color: layerStyle.stroke,
-          width: 1.5
-        }),
-        fill: new Fill({
-          color: layerStyle.fill
-        })
-      })
-    })
+export function createLayerStyle(layer: Layer): (feature: FeatureLike) => Style {
+  let style = layer.style
+  
+  if (isLegacyStyle(style)) {
+    style = migrateLegacyStyle(style)
+  }
+
+  return compileStyle(style)
 }
 
 export function createSelectionStyle(): Style {

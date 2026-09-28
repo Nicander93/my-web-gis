@@ -1,8 +1,19 @@
 import { Button } from '@/components/ui/Button'
 import { useSessionStore } from '@/stores/session.store'
 import { useProjectStore } from '@/stores/project.store'
+import { isLegacyStyle } from '@desktop-webgis/gis-core'
 
 type InspectorTab = 'layer' | 'feature'
+
+function getGeometryTypeName(style: any): string {
+  if (isLegacyStyle(style)) {
+    if (style.kind === 'point') return 'Point'
+    if (style.kind === 'line') return 'LineString'
+    if (style.kind === 'polygon') return 'Polygon'
+    return 'Mixed'
+  }
+  return 'Mixed'
+}
 
 export function Inspector() {
   const selectedLayerId = useProjectStore((state) => state.selectedLayerId)
@@ -22,9 +33,7 @@ export function Inspector() {
     ? (featuresByDataset[selectedLayer.datasetId]?.length ?? 0)
     : 0
   
-  const geometryType = selectedLayer?.style.kind === 'point' ? 'Point' :
-                       selectedLayer?.style.kind === 'line' ? 'LineString' :
-                       selectedLayer?.style.kind === 'polygon' ? 'Polygon' : 'Mixed'
+  const geometryType = selectedLayer ? getGeometryTypeName(selectedLayer.style) : 'Mixed'
 
   return (
     <div className="feature-panel inspector-content">
