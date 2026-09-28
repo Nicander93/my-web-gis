@@ -15,7 +15,12 @@ export function RightPanel({ children }: RightPanelProps) {
   const setWidth = useWorkspaceStore((state) => state.setRightWidth)
 
   return (
-    <aside className="workspace-panel panel-right" style={{ width: right.width }} aria-label="检查器面板">
+    <aside
+      className="workspace-panel panel-right"
+      style={{ width: right.width, display: right.open ? undefined : 'none' }}
+      aria-label="检查器面板"
+      aria-hidden={!right.open}
+    >
       <header className="panel-titlebar">
         <div>
           <span className="panel-kicker">PANEL / RIGHT</span>

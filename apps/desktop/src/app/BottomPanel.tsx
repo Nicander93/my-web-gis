@@ -19,8 +19,14 @@ export function BottomPanel({ leftOffset, rightOffset, children }: BottomPanelPr
   return (
     <aside
       className="workspace-panel panel-bottom"
-      style={{ left: leftOffset, right: rightOffset, height: bottom.height }}
+      style={{
+        left: leftOffset,
+        right: rightOffset,
+        height: bottom.height,
+        display: bottom.open ? undefined : 'none'
+      }}
       aria-label="属性表面板"
+      aria-hidden={!bottom.open}
     >
       <ResizeHandle
         orientation="vertical"

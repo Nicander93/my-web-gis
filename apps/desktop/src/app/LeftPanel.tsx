@@ -15,7 +15,12 @@ export function LeftPanel({ children }: LeftPanelProps) {
   const setWidth = useWorkspaceStore((state) => state.setLeftWidth)
 
   return (
-    <aside className="workspace-panel panel-left" style={{ width: left.width }} aria-label="图层面板">
+    <aside
+      className="workspace-panel panel-left"
+      style={{ width: left.width, display: left.open ? undefined : 'none' }}
+      aria-label="图层面板"
+      aria-hidden={!left.open}
+    >
       <header className="panel-titlebar">
         <div>
           <span className="panel-kicker">PANEL / LEFT</span>
