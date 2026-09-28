@@ -412,6 +412,80 @@ describe('compileStyle', () => {
       const style25 = styleFunction(feature25)
       expect(style25.getImage()).toBeDefined()
     })
+
+    it('精确上界应使用对应断点符号', () => {
+      const style: GraduatedStyle = {
+        mode: 'graduated',
+        field: 'value',
+        method: 'manual',
+        breaks: [
+          {
+            value: 10,
+            symbol: {
+              type: 'circle',
+              radius: 3,
+              fill: { r: 255, g: 0, b: 0, a: 1 }
+            }
+          },
+          {
+            value: 20,
+            symbol: {
+              type: 'circle',
+              radius: 5,
+              fill: { r: 0, g: 255, b: 0, a: 1 }
+            }
+          }
+        ],
+        fallback: {
+          type: 'circle',
+          radius: 2,
+          fill: { r: 128, g: 128, b: 128, a: 1 }
+        }
+      }
+
+      const styleFunction = compileStyle(style)
+
+      const atFirst = styleFunction(new Feature({ geometry: new Point([0, 0]), value: 10 }))
+      expect((atFirst.getImage() as any).getRadius()).toBe(3)
+
+      const atSecond = styleFunction(new Feature({ geometry: new Point([0, 0]), value: 20 }))
+      expect((atSecond.getImage() as any).getRadius()).toBe(5)
+    })
+
+    it('高于最大断点的有限数值应使用最后断点符号而非 fallback', () => {
+      const style: GraduatedStyle = {
+        mode: 'graduated',
+        field: 'value',
+        method: 'manual',
+        breaks: [
+          {
+            value: 10,
+            symbol: {
+              type: 'circle',
+              radius: 3,
+              fill: { r: 255, g: 0, b: 0, a: 1 }
+            }
+          },
+          {
+            value: 20,
+            symbol: {
+              type: 'circle',
+              radius: 5,
+              fill: { r: 0, g: 255, b: 0, a: 1 }
+            }
+          }
+        ],
+        fallback: {
+          type: 'circle',
+          radius: 2,
+          fill: { r: 128, g: 128, b: 128, a: 1 }
+        }
+      }
+
+      const styleFunction = compileStyle(style)
+      const aboveMax = styleFunction(new Feature({ geometry: new Point([0, 0]), value: 25 }))
+      expect((aboveMax.getImage() as any).getRadius()).toBe(5)
+    })
   })
 
   describe('符号缓存', () => {

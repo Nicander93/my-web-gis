@@ -261,13 +261,19 @@ function compileGraduatedStyle(
   return (feature: FeatureLike) => {
     const fieldValue = feature.get(style.field)
 
+    // Match classifyValue: finite numbers at/above the last break use the last symbol.
     let symbol = style.fallback
-    if (typeof fieldValue === 'number' && isFinite(fieldValue)) {
+    if (typeof fieldValue === 'number' && Number.isFinite(fieldValue) && sortedBreaks.length > 0) {
+      let matched = false
       for (const breakItem of sortedBreaks) {
         if (fieldValue <= breakItem.value) {
           symbol = breakItem.symbol
+          matched = true
           break
         }
+      }
+      if (!matched) {
+        symbol = sortedBreaks[sortedBreaks.length - 1].symbol
       }
     }
 
