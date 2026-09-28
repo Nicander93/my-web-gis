@@ -11,7 +11,10 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "sideEffects": false,
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -21,6 +24,7 @@
     "@desktop-webgis/scene-schema": "workspace:*",
     "@mapbox/shp-write": "0.4.3",
     "dxf-parser": "1.1.2",
+    "proj4": "^2.22.0",
     "shpjs": "6.2.0"
   },
   "devDependencies": {

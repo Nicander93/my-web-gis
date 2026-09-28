@@ -6,15 +6,24 @@ export interface VectorImportWarning {
   count?: number
 }
 
+export interface CrsInfo {
+  code?: string
+  wkt?: string
+  proj4?: string
+}
+
 export interface VectorImportResult {
   featureCollection: GeoJsonFeatureCollection
   warnings: VectorImportWarning[]
   sourceLayers?: string[]
+  crs?: CrsInfo
+  sourceCrs?: CrsInfo
 }
 
 export interface DxfImportOptions {
   curveSegments?: number
   transform?: (position: [number, number]) => [number, number]
+  crs?: CrsInfo
 }
 
 export interface ShapefileExportOptions {

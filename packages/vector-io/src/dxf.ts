@@ -39,13 +39,25 @@ export function dxfDocumentToGeoJson(
       properties: entityProperties(entity)
     })
   })
+  
+  const warnings = Array.from(unsupported, ([type, count]) => ({
+    code: 'dxf.unsupportedEntity',
+    message: `暂未转换 DXF 实体 ${type}。`,
+    count
+  }))
+  
+  if (!options.crs) {
+    warnings.push({
+      code: 'dxf.unknownCrs',
+      message: 'DXF 文件未包含坐标系信息,需要用户指定。',
+      count: 1
+    })
+  }
+  
   return {
     featureCollection: { type: 'FeatureCollection', features },
-    warnings: Array.from(unsupported, ([type, count]) => ({
-      code: 'dxf.unsupportedEntity',
-      message: `暂未转换 DXF 实体 ${type}。`,
-      count
-    }))
+    crs: options.crs,
+    warnings
   }
 }
 
