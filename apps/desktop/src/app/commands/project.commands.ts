@@ -1,6 +1,15 @@
 import { emitCommandStatus } from './status'
 
-/** 项目相关的应用级操作占位，后续接入现有 GIS Project Service。 */
+export interface AddDataCallback {
+  openDialog: () => void
+}
+
+let addDataCallback: AddDataCallback | null = null
+
+export function registerAddDataCallback(callback: AddDataCallback): void {
+  addDataCallback = callback
+}
+
 export const projectCommands = {
   newProject(): void {
     emitCommandStatus('新建项目（项目服务待接入）')
@@ -15,7 +24,11 @@ export const projectCommands = {
     emitCommandStatus('另存项目（项目服务待接入）')
   },
   addData(): void {
-    emitCommandStatus('添加数据（数据服务待接入）')
+    if (addDataCallback) {
+      addDataCallback.openDialog()
+    } else {
+      emitCommandStatus('添加数据（对话框未注册）')
+    }
   },
   exportData(): void {
     emitCommandStatus('导出（数据服务待接入）')
