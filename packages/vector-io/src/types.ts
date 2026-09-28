@@ -37,6 +37,18 @@ export interface DxfImportOptions {
   curveSegments?: number
   transform?: (position: [number, number]) => [number, number]
   crs?: CrsInfo
+  selectedLayers?: string[]
+}
+
+export interface DxfLayerResult {
+  name: string
+  featureCollection: GeoJsonFeatureCollection
+  warnings: VectorImportWarning[]
+}
+
+export interface DxfImportResult {
+  layers: DxfLayerResult[]
+  crs?: CrsInfo
 }
 
 export interface ShapefileExportOptions {
