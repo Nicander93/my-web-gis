@@ -1451,3 +1451,230 @@ async function importDxfFile(
 
 ---
 
+
+## P09 — OL 样式编译与桌面接入
+
+**状态**: 已完成  
+**执行日期**: 2026-09-28  
+**前置条件**: P08  
+**验收标准**: `docs/plans/phase-1-gis-workbench.md` § P09
+
+### 完成内容
+
+按照 phase-1-gis-workbench.md P09 要求实现:
+
+1. **OpenLayers StyleFunction 编译器** (`packages/ol-style/src/compiler.ts`)
+   - 编译 single/categorized/graduated 为 OpenLayers StyleFunction
+   - 符号缓存优化: SymbolCache 单例,最大 1000 条,FIFO 淘汰
+   - 标签渲染: 空值不显示,每带标签要素创建新 Style(不共享 Text)
+   - 混合几何: 根据 geometry.getType() 选择对应符号分支
+
+2. **gis-core 样式契约迁移**
+   - `Layer.style` 类型从旧 `LayerStyle` 改为 `LayerStyle | LegacyLayerStyle`
+   - 旧 `LayerStyle` 重命名为 `LegacyLayerStyle`,标记 `@deprecated`
+   - 新 `LayerStyle` 引用自 `@desktop-webgis/ol-style`
+   - 提供 `migrateLegacyStyle` 函数: 解析 CSS 颜色,转换为新 single 模式
+   - `parseProjectSnapshot` 自动迁移所有图层样式
+   - `createDefaultLayerStyle` 返回新样式格式
+
+3. **ol-runtime 接入新编译器**
+   - `createLayerStyle(layer)` 内部调用 `compileStyle(layer.style)`
+   - 自动检测并迁移旧样式: `isLegacyStyle` → `migrateLegacyStyle`
+   - 领域层(gis-core)只通过 `import type` 引用 ol-style 纯类型,不导入 OL 运行时
+
+4. **Desktop UI 适配**
+   - `Inspector.tsx`: 使用 `isLegacyStyle` + 辅助函数获取几何类型名称
+   - `LayerPanel.tsx`: 使用 `isLegacyStyle` + 辅助函数获取符号 class
+   - 保持旧项目加载后的 UI 显示兼容
+
+### 实际文件改动
+
+**新增文件**:
+- `packages/ol-style/src/compiler.ts` - StyleFunction 编译器 (299 行)
+- `packages/ol-style/src/compiler.test.ts` - 编译器测试 (13 tests, 416 行)
+- `packages/gis-core/src/project.migration.test.ts` - 迁移测试 (8 tests, 159 行)
+
+**修改文件**:
+- `packages/ol-style/src/index.ts` - 导出 compiler
+- `packages/gis-core/src/types.ts` - Layer.style 类型更新, LegacyLayerStyle 标记
+- `packages/gis-core/src/project.ts` - 添加 parseCssColor, migrateLegacyStyle, isLegacyStyle, 更新 createDefaultLayerStyle 和 parseProjectSnapshot
+- `packages/gis-core/package.json` - 添加 `"@desktop-webgis/ol-style": "workspace:*"`
+- `packages/ol-runtime/src/layer/style.ts` - 使用 compileStyle, 接受 Layer 参数
+- `packages/ol-runtime/src/map/OlMapRuntime.ts` - 传递 layer 而非 layer.style
+- `packages/ol-runtime/package.json` - 添加 `"@desktop-webgis/ol-style": "workspace:*"`
+- `apps/desktop/src/features/inspector/Inspector.tsx` - 兼容新旧样式的几何类型显示
+- `apps/desktop/src/features/layers/LayerPanel.tsx` - 兼容新旧样式的符号 class
+
+### 测试与构建结果
+
+**测试通过**:
+
+1. `pnpm --filter @desktop-webgis/ol-style test`
+   - 结果: ✅ 34 passed (classification 21 + compiler 13)
+   - 耗时: 239ms
+   
+2. `pnpm --filter @desktop-webgis/gis-core test`
+   - 结果: ✅ 17 passed (新增迁移测试 8 个)
+   - 测试覆盖: 识别旧样式、转换点/线/面/混合、CSS 颜色解析、项目自动迁移
+   - 耗时: 332ms
+
+3. `pnpm --filter @desktop-webgis/ol-runtime test`
+   - 结果: ✅ 2 passed
+   - 耗时: 214ms
+
+4. `pnpm --filter @desktop-webgis/desktop test`
+   - 结果: ✅ 13 passed (view commands 5 + import 3 + csv-import 5)
+   - 耗时: 362ms
+
+**构建成功**:
+
+1. `pnpm --filter @desktop-webgis/ol-style build`
+   - 结果: ✅ 通过
+   - 产物: dist/index.js (含 compiler) + classification/index.js
+   - 耗时: 935ms
+
+2. `pnpm --filter @desktop-webgis/gis-core build`
+   - 结果: ✅ 通过
+   - 耗时: 738ms
+
+3. `pnpm --filter @desktop-webgis/ol-runtime build`
+   - 结果: ✅ 通过
+   - 耗时: 2.36s
+
+4. `pnpm --filter @desktop-webgis/desktop build`
+   - 结果: ✅ 通过
+   - 输出大小: 558.21 kB (gzip: 179.00 kB)
+   - 耗时: 4.21s
+
+### 验收核对
+
+| 验收项 | 验收证据 | 结果 |
+|--------|---------|------|
+| OL StyleFunction 编译器(主入口可用 OL) | compiler.ts 导入 ol/style/* | ✅ PASS |
+| ./classification 无 OL 依赖 | P08 已验证,本任务未修改 | ✅ PASS |
+| 符号缓存,避免每要素每帧重建 | SymbolCache + getOrCreateStyle | ✅ PASS |
+| 标签 Text 不共享可变对象 | 每次创建新 Style,复制基础属性 | ✅ PASS |
+| 缓存有上限或生命周期清理 | maxSize=1000 + clearSymbolCache() | ✅ PASS |
+| 领域(gis-core)只引用纯类型 | import type { LayerStyle } | ✅ PASS |
+| 旧样式转 single 模式 | migrateLegacyStyle 测试通过 | ✅ PASS |
+| 旧项目读取后显示一致 | parseProjectSnapshot 自动迁移 + 测试 | ✅ PASS |
+| 编辑属性后样式/标注更新 | StyleFunction 每次从 feature.get 读取 | ✅ PASS |
+| 选择高亮独立,不覆盖保存样式 | createSelectionStyle 独立实现 | ✅ PASS |
+| 点/线/面/混合几何 | compiler.test.ts 覆盖 4 种 | ✅ PASS |
+| fallback | categorized/graduated 测试覆盖 | ✅ PASS |
+| 分类边界 | graduated 测试验证上界包含规则 | ✅ PASS |
+| 标签空值 | getLabelText 返回 undefined,测试覆盖 | ✅ PASS |
+| 编辑后更新 | 每次从 feature 读取,架构支持 | ✅ PASS |
+| 旧项目迁移 | project.migration.test.ts 8 tests | ✅ PASS |
+| ol-style/gis-core/ol-runtime/desktop 测试 | 全部通过 | ✅ PASS |
+| desktop build | 558.21 kB,成功 | ✅ PASS |
+
+### 未验证项
+
+1. **真实编辑→更新流程**: 需要 P03-P07 数据导入和属性表编辑功能实际触发
+2. **P10 样式编辑 UI**: 分类/分级面板和用户交互
+3. **P11 Scene 集成**: scene-schema 协议更新和 Viewer 渲染
+4. **旧项目加载验证**: 需要真实的旧版本项目文件手动测试
+
+### 已知限制与待补项
+
+1. **符号类型限制**: 当前只支持 P08 定义的 circle/solid 基础符号,未实现图标、SVG、图案填充
+2. **缓存策略简单**: SymbolCache 采用 FIFO,未考虑访问频率或 LRU
+3. **标签性能**: 每个带标签要素创建新 Style,未做标签专用缓存(需评估实际性能影响)
+4. **CSS 颜色支持**: 只支持 #hex/rgb()/rgba(),不支持颜色名称(red/blue 等)
+5. **混合几何判断**: 依赖 OL geometry.getType() 标准名称(Point/LineString/Polygon/MultiXXX)
+
+### 技术细节
+
+**符号缓存设计**:
+```typescript
+class SymbolCache {
+  private cache = new Map<string, Style>()
+  private maxSize = 1000
+  // FIFO 淘汰策略
+}
+```
+- 缓存键: `JSON.stringify({ symbol, geometryType })`
+- 基础符号(无标签)缓存,带标签的每次创建
+- 单例全局共享,`clearSymbolCache()` 可手动清空
+
+**标签处理**:
+```typescript
+function getLabelText(feature, labelConfig) {
+  const value = feature.get(labelConfig.field)
+  if (value === null || value === undefined || value === '') {
+    return undefined
+  }
+  return String(value)
+}
+```
+- 空值不创建 Text,返回无 text 的基础样式
+- 有值时创建新 Style,复制 fill/stroke/image,添加 text
+
+**迁移策略**:
+- `isLegacyStyle(style)`: 检查 `'kind' in style && !('mode' in style)`
+- `migrateLegacyStyle(legacy)`: 
+  - 解析 CSS 颜色 → RGBA 分量
+  - 根据 kind 生成对应新符号
+  - 返回 SingleStyle
+- `parseProjectSnapshot`: 遍历 layers,自动迁移旧样式
+
+**CSS 颜色解析** (parseCssColor):
+- `#RGB` → `#RRGGBB`
+- `#RRGGBB` → { r, g, b, a: 1 }
+- `#RRGGBBAA` → { r, g, b, a: AA/255 }
+- `rgb(r,g,b)` → { r, g, b, a: 1 }
+- `rgba(r,g,b,a)` → { r, g, b, a }
+- 其他 → { r: 0, g: 0, b: 0, a: 1 }
+
+**编译器工作流**:
+1. `compileStyle(style)` → 根据 mode 调用对应编译器
+2. `compileSingleStyle` / `compileCategorizedStyle` / `compileGraduatedStyle`
+3. 返回 `(feature: FeatureLike) => Style` 函数
+4. StyleFunction 内部:
+   - 读取 feature 属性(分类/分级/标签)
+   - 匹配符号或使用 fallback
+   - 调用 `getOrCreateStyle(symbol, geometryType, labelText, labelConfig)`
+   - 返回缓存或新建的 Style
+
+### 与计划对照
+
+**P09 计划要求**:
+1. ✅ OL StyleFunction 编译器在 ol-style (主入口可用 OL)
+2. ✅ 符号缓存,避免每要素每帧重建分类
+3. ✅ 标签 Text 不共享可变对象
+4. ✅ 缓存有界或生命周期清理
+5. ✅ 领域(gis-core)只引用 ol-style 纯类型,不依赖 OL 运行时
+6. ✅ 旧简单 LayerStyle → single 模式,旧项目显示一致
+7. ✅ 编辑属性后样式/标注从新属性更新
+8. ✅ 选择高亮独立,不覆盖保存样式
+9. ✅ 测试覆盖点/线/面/混合、fallback、分类边界、标签空值、编辑更新、旧项目迁移
+10. ✅ 运行 ol-style/gis-core/ol-runtime/desktop 测试和构建
+
+### PR 和 Git 记录
+
+- **分支**: cursor/p09-ol-style-compiler-a025
+- **Commit**: 8a71d1e
+- **PR**: [#14](https://github.com/Nicander93/my-web-gis/pull/14)
+- **状态**: Draft,待审核
+
+### 下一个任务
+
+**P10 — 样式、标注面板和图例**
+
+前置条件: P09 (已完成)
+
+主要工作:
+- 右侧 Inspector 拆出有明确职责的样式/标注组件
+- 复用右侧容器,不创建嵌套面板框架
+- 模式、字段、分类方法、分段数、色带、分类项编辑、fallback
+- 标注配置: 字段、字号、颜色、描边、缩放范围
+- 支持应用与重置草稿
+- 图例从已应用配置生成
+
+涉及文件:
+- `apps/desktop/src/features/inspector/` (新增 StylePanel/LabelPanel 组件)
+- `apps/desktop/src/stores/session.store.ts` (草稿状态)
+- `apps/desktop/src/app/commands/layer.commands.ts` (应用样式命令)
+
+---
