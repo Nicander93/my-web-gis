@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { FileText, Upload, X, CheckCircle2, AlertCircle } from 'lucide-react'
 import { pickFile } from '@/services/files'
-import { importGeoJson, importShapefileZip, importDxfFile, detectFileType } from '@/services/import'
+import { importGeoJson, importShapefileZip, importDxfFile, importCsvFile, previewCsvFile, detectFileType } from '@/services/import'
 import type { ImportResult } from '@/services/import'
+import type { CsvPreviewResult } from '@desktop-webgis/vector-io'
+import { CsvConfigDialog } from './CsvConfigDialog'
+import type { CsvConfig } from './CsvConfigDialog'
 
 interface AddDataDialogProps {
   open: boolean
@@ -10,7 +13,7 @@ interface AddDataDialogProps {
   onImport: (result: ImportResult) => void
 }
 
-type DialogStep = 'select' | 'confirm'
+type DialogStep = 'select' | 'csv-config' | 'confirm'
 
 export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
   const [activeTab, setActiveTab] = useState<'file' | 'service'>('file')
@@ -18,12 +21,16 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [parseResult, setParseResult] = useState<ImportResult | null>(null)
+  const [csvPreview, setCsvPreview] = useState<CsvPreviewResult | null>(null)
+  const [csvSource, setCsvSource] = useState<string | File | null>(null)
 
   if (!open) return null
 
   function handleClose() {
     setStep('select')
     setParseResult(null)
+    setCsvPreview(null)
+    setCsvSource(null)
     setError(null)
     onClose()
   }
@@ -31,6 +38,8 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
   function handleCancel() {
     setStep('select')
     setParseResult(null)
+    setCsvPreview(null)
+    setCsvSource(null)
     setError(null)
   }
 
@@ -46,6 +55,15 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
     setLoading(true)
 
     try {
+      if (fileType === 'csv') {
+        const preview = await previewCsvFile(source)
+        setCsvPreview(preview)
+        setCsvSource(source)
+        setStep('csv-config')
+        setLoading(false)
+        return
+      }
+
       let result: ImportResult
 
       switch (fileType) {
@@ -79,11 +97,42 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
     }
   }
 
+  async function handleCsvConfig(config: CsvConfig) {
+    if (!csvSource) return
+
+    setError(null)
+    setLoading(true)
+
+    try {
+      const result = await importCsvFile(csvSource, config)
+
+      if (result.errors.length > 0) {
+        setError(result.errors.join('; '))
+        setLoading(false)
+        return
+      }
+
+      setParseResult(result)
+      setStep('confirm')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function handleCsvCancel() {
+    setCsvPreview(null)
+    setCsvSource(null)
+    setStep('select')
+  }
+
   async function handlePickFile() {
     const path = await pickFile([
       { name: 'GeoJSON', extensions: ['geojson', 'json'] },
       { name: 'Shapefile', extensions: ['zip'] },
       { name: 'DXF', extensions: ['dxf'] },
+      { name: 'CSV', extensions: ['csv'] },
       { name: 'All Files', extensions: ['*'] }
     ])
 
@@ -160,7 +209,7 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
                     {loading ? '解析中...' : '选择文件'}
                   </button>
                   <p className="file-drop-formats">
-                    支持格式: GeoJSON (.geojson, .json), Shapefile (.zip), DXF (.dxf)
+                    支持格式: GeoJSON (.geojson, .json), Shapefile (.zip), DXF (.dxf), CSV (.csv)
                   </p>
                 </div>
               )}
@@ -178,6 +227,16 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
               )}
             </div>
           </>
+        )}
+
+        {step === 'csv-config' && csvPreview && (
+          <CsvConfigDialog
+            open={true}
+            fields={csvPreview.fields}
+            sampleRows={csvPreview.sampleRows}
+            onConfirm={handleCsvConfig}
+            onCancel={handleCsvCancel}
+          />
         )}
 
         {step === 'confirm' && parseResult && (

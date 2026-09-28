@@ -1,6 +1,7 @@
 import { parseGeoJsonFeatures, inferLayerStyleKind } from '@desktop-webgis/gis-core'
 import type { GisFeature } from '@desktop-webgis/gis-core'
-import { importShapefile, importDxf } from '@desktop-webgis/vector-io'
+import { importShapefile, importDxf, importCsv, previewCsv } from '@desktop-webgis/vector-io'
+import type { CsvImportOptions, CsvPreviewResult } from '@desktop-webgis/vector-io'
 import { readFile, readBinaryFile } from './files'
 
 export interface ImportLayerResult {
@@ -119,10 +120,61 @@ export function getFileExtension(fileName: string): string {
   return match ? match[1].toLowerCase() : ''
 }
 
-export function detectFileType(fileName: string): 'geojson' | 'shapefile' | 'dxf' | 'unknown' {
+export function detectFileType(fileName: string): 'geojson' | 'shapefile' | 'dxf' | 'csv' | 'unknown' {
   const ext = getFileExtension(fileName)
   if (ext === 'geojson' || ext === 'json') return 'geojson'
   if (ext === 'zip') return 'shapefile'
   if (ext === 'dxf') return 'dxf'
+  if (ext === 'csv') return 'csv'
   return 'unknown'
+}
+
+export async function previewCsvFile(source: string | File): Promise<CsvPreviewResult> {
+  let content: string
+
+  if (typeof source === 'string') {
+    content = await readFile(source, false) as string
+  } else {
+    content = await source.text()
+  }
+
+  return previewCsv(content)
+}
+
+export async function importCsvFile(
+  source: string | File,
+  options: CsvImportOptions
+): Promise<ImportResult> {
+  try {
+    let content: string
+    let fileName: string
+
+    if (typeof source === 'string') {
+      content = await readFile(source, false) as string
+      fileName = source.split('/').pop() || source.split('\\').pop() || 'imported'
+    } else {
+      content = await source.text()
+      fileName = source.name
+    }
+
+    const result = importCsv(content, options)
+    const features = parseGeoJsonFeatures(result.featureCollection)
+    const styleKind = inferLayerStyleKind(features)
+    const baseName = fileName.replace(/\.csv$/i, '')
+
+    return {
+      layers: [{ 
+        name: baseName, 
+        features, 
+        styleKind,
+        warnings: result.warnings.map(w => w.message)
+      }],
+      errors: []
+    }
+  } catch (error) {
+    return {
+      layers: [],
+      errors: [error instanceof Error ? error.message : String(error)]
+    }
+  }
 }

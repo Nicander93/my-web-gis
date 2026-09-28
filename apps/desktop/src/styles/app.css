@@ -1102,3 +1102,138 @@ button:disabled {
   font-size: 11px;
 }
 
+/* CSV Config Dialog */
+.csv-config-dialog {
+  max-width: 700px;
+  width: 90vw;
+}
+
+.csv-config-section {
+  margin-bottom: 24px;
+}
+
+.csv-config-section h3 {
+  margin: 0 0 8px 0;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.csv-config-hint {
+  margin: 0 0 16px 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.csv-config-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.csv-config-row label {
+  flex: 0 0 120px;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.csv-config-row select {
+  flex: 1;
+  padding: 8px 12px;
+  color: var(--color-text-primary);
+  background: var(--color-app-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.csv-config-row select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.csv-config-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-top: 12px;
+  color: #d97706;
+  background: #fffbeb;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.csv-config-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  color: #dc2626;
+  background: #fef2f2;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.csv-config-success {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  color: var(--color-success);
+  background: #f0fdf4;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.csv-preview-table-container {
+  overflow-x: auto;
+  margin-top: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+
+.csv-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.csv-preview-table th,
+.csv-preview-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.csv-preview-table th {
+  color: var(--color-text-primary);
+  background: var(--color-app-bg);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.csv-preview-table td {
+  color: var(--color-text-secondary);
+}
+
+.csv-preview-table tr:last-child td {
+  border-bottom: none;
+}
+
+.csv-preview-table th.highlight-x,
+.csv-preview-table td.highlight-x {
+  background: #dbeafe;
+  color: #1e40af;
+  font-weight: 500;
+}
+
+.csv-preview-table th.highlight-y,
+.csv-preview-table td.highlight-y {
+  background: #fce7f3;
+  color: #9f1239;
+  font-weight: 500;
+}
+
