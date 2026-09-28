@@ -13,11 +13,11 @@ interface AddDataDialogProps {
 
 type DialogStep = 'select' | 'confirm' | 'select-crs'
 
+// 仅列出已在 proj4 注册的 CRS (EPSG:4326 和 EPSG:3857)
+// 更多中国常用投影 (CGCS2000, Beijing 1954 等) 留待后续 PR
 const COMMON_CRS = [
   { code: 'EPSG:4326', name: 'WGS84 (经纬度)' },
-  { code: 'EPSG:3857', name: 'Web Mercator' },
-  { code: 'EPSG:4490', name: 'CGCS2000 (国家2000)' },
-  { code: 'EPSG:2385', name: 'Beijing 1954 / 3-degree Gauss-Kruger zone 39' }
+  { code: 'EPSG:3857', name: 'Web Mercator' }
 ]
 
 export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {

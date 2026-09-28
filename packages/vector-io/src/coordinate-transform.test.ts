@@ -11,8 +11,9 @@ describe('Coordinate transformation', () => {
     if (result.transform) {
       const [lon, lat] = result.transform([12958224.1, 4865942.3])
       
-      expect(lon).toBeCloseTo(116.4, 0)
-      expect(lat).toBeCloseTo(40.0, 0)
+      // proj4 实测: (116.40571, 40.00000), 容差 1e-4° (~10m)
+      expect(lon).toBeCloseTo(116.40571, 4)
+      expect(lat).toBeCloseTo(40.00000, 4)
     }
   })
   
@@ -34,8 +35,8 @@ describe('Coordinate transformation', () => {
     if (result.transform) {
       const [lon, lat, z] = result.transform([12958224.1, 4865942.3, 100])
       
-      expect(lon).toBeCloseTo(116.4, 0)
-      expect(lat).toBeCloseTo(40.0, 0)
+      expect(lon).toBeCloseTo(116.40571, 4)
+      expect(lat).toBeCloseTo(40.00000, 4)
       expect(z).toBe(100)
     }
   })
@@ -51,8 +52,8 @@ describe('Coordinate transformation', () => {
       
       const transformed = transformGeometry(geometry, result.transform)
       
-      expect(transformed.coordinates[0]).toBeCloseTo(116.4, 0)
-      expect(transformed.coordinates[1]).toBeCloseTo(40.0, 0)
+      expect(transformed.coordinates[0]).toBeCloseTo(116.40571, 4)
+      expect(transformed.coordinates[1]).toBeCloseTo(40.00000, 4)
     }
   })
   
@@ -70,8 +71,8 @@ describe('Coordinate transformation', () => {
       
       const transformed = transformGeometry(geometry, result.transform)
       
-      expect(transformed.coordinates[0][0]).toBeCloseTo(116.4, 0)
-      expect(transformed.coordinates[0][1]).toBeCloseTo(40.0, 0)
+      expect(transformed.coordinates[0][0]).toBeCloseTo(116.40571, 4)
+      expect(transformed.coordinates[0][1]).toBeCloseTo(40.00000, 4)
     }
   })
   
@@ -92,8 +93,8 @@ describe('Coordinate transformation', () => {
       
       const transformed = transformGeometry(geometry, result.transform)
       
-      expect(transformed.coordinates[0][0][0]).toBeCloseTo(116.4, 0)
-      expect(transformed.coordinates[0][0][1]).toBeCloseTo(40.0, 0)
+      expect(transformed.coordinates[0][0][0]).toBeCloseTo(116.40571, 4)
+      expect(transformed.coordinates[0][0][1]).toBeCloseTo(40.00000, 4)
     }
   })
   
