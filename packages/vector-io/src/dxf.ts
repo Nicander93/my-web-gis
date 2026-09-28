@@ -9,8 +9,11 @@ import type {
   DxfDocumentLike,
   DxfEntity,
   DxfImportOptions,
+  DxfImportResult,
+  DxfLayerResult,
   DxfPoint,
-  VectorImportResult
+  VectorImportResult,
+  VectorImportWarning
 } from './types.js'
 
 /** Parses ASCII DXF. Binary DXF and DWG are deliberately outside this adapter's boundary. */
@@ -20,13 +23,26 @@ export function importDxf(text: string, options: DxfImportOptions = {}): VectorI
   return dxfDocumentToGeoJson(document, options)
 }
 
+/** Parses ASCII DXF and groups by CAD layers. */
+export function importDxfLayers(text: string, options: DxfImportOptions = {}): DxfImportResult {
+  const document = new DxfParser().parseSync(text) as DxfDocumentLike | null
+  if (!document) throw new Error('DXF 内容为空或无法解析。')
+  return dxfDocumentToLayers(document, options)
+}
+
 export function dxfDocumentToGeoJson(
   document: DxfDocumentLike,
   options: DxfImportOptions = {}
 ): VectorImportResult {
   const features: GeoJsonFeature[] = []
   const unsupported = new Map<string, number>()
+  let curveCount = 0
+  
   document.entities.forEach((entity, index) => {
+    if (entity.type === 'CIRCLE' || entity.type === 'ARC') {
+      curveCount++
+    }
+    
     const geometry = entityToGeometry(entity, options)
     if (!geometry) {
       unsupported.set(entity.type, (unsupported.get(entity.type) ?? 0) + 1)
@@ -46,6 +62,15 @@ export function dxfDocumentToGeoJson(
     count
   }))
   
+  if (curveCount > 0) {
+    const segmentCount = options.curveSegments ?? 64
+    warnings.push({
+      code: 'dxf.curveApproximation',
+      message: `${curveCount} 个圆弧实体已近似为 ${segmentCount} 段折线，可能存在精度损失。`,
+      count: curveCount
+    })
+  }
+  
   if (!options.crs) {
     warnings.push({
       code: 'dxf.unknownCrs',
@@ -61,6 +86,83 @@ export function dxfDocumentToGeoJson(
   }
 }
 
+export function dxfDocumentToLayers(
+  document: DxfDocumentLike,
+  options: DxfImportOptions = {}
+): DxfImportResult {
+  const layerEntities = new Map<string, DxfEntity[]>()
+  const unsupportedByLayer = new Map<string, Map<string, number>>()
+  const curveCountByLayer = new Map<string, number>()
+  
+  document.entities.forEach((entity) => {
+    const layerName = entity.layer || '0'
+    if (!layerEntities.has(layerName)) {
+      layerEntities.set(layerName, [])
+      unsupportedByLayer.set(layerName, new Map())
+      curveCountByLayer.set(layerName, 0)
+    }
+    layerEntities.get(layerName)!.push(entity)
+  })
+  
+  const allLayers = Array.from(layerEntities.keys()).sort()
+  const selectedLayers = options.selectedLayers || allLayers
+  
+  const layers: DxfLayerResult[] = []
+  
+  for (const layerName of selectedLayers) {
+    const entities = layerEntities.get(layerName)
+    if (!entities) continue
+    
+    const features: GeoJsonFeature[] = []
+    const unsupported = unsupportedByLayer.get(layerName)!
+    let curveCount = 0
+    
+    entities.forEach((entity, index) => {
+      if (entity.type === 'CIRCLE' || entity.type === 'ARC') {
+        curveCount++
+      }
+      
+      const geometry = entityToGeometry(entity, options)
+      if (!geometry) {
+        unsupported.set(entity.type, (unsupported.get(entity.type) ?? 0) + 1)
+        return
+      }
+      features.push({
+        type: 'Feature',
+        id: entity.handle ?? `${layerName}-${index + 1}`,
+        geometry,
+        properties: entityProperties(entity)
+      })
+    })
+    
+    const warnings: VectorImportWarning[] = Array.from(unsupported, ([type, count]) => ({
+      code: 'dxf.unsupportedEntity',
+      message: `图层 "${layerName}": 跳过了 ${count} 个不支持的 ${type} 实体。`,
+      count
+    }))
+    
+    if (curveCount > 0) {
+      const segmentCount = options.curveSegments ?? 64
+      warnings.push({
+        code: 'dxf.curveApproximation',
+        message: `图层 "${layerName}": ${curveCount} 个圆弧实体已近似为 ${segmentCount} 段折线，可能存在精度损失。`,
+        count: curveCount
+      })
+    }
+    
+    layers.push({
+      name: layerName,
+      featureCollection: { type: 'FeatureCollection', features },
+      warnings
+    })
+  }
+  
+  return {
+    layers,
+    crs: options.crs
+  }
+}
+
 function entityToGeometry(entity: DxfEntity, options: DxfImportOptions): GeoJsonGeometry | null {
   if (entity.type === 'POINT' && entity.position) {
     return { type: 'Point', coordinates: position(entity.position, options) }
@@ -71,9 +173,14 @@ function entityToGeometry(entity: DxfEntity, options: DxfImportOptions): GeoJson
   }
   if (entity.type === 'LINE') return lineFromPoints(entity.vertices, options)
   if (entity.type === 'LWPOLYLINE' || entity.type === 'POLYLINE') {
+    if (hasBulges(entity)) {
+      return null
+    }
     return polylineGeometry(entity, options)
   }
-  if (entity.type === 'SPLINE') return lineFromPoints(entity.controlPoints, options)
+  if (entity.type === 'SPLINE') {
+    return null
+  }
   if (entity.type === 'CIRCLE' && entity.center && positive(entity.radius)) {
     return curveGeometry(entity.center, entity.radius, 0, Math.PI * 2, true, options)
   }
@@ -154,4 +261,9 @@ function finite(value: unknown): value is number {
 
 function positive(value: unknown): value is number {
   return finite(value) && value > 0
+}
+
+function hasBulges(entity: DxfEntity): boolean {
+  if (!entity.vertices) return false
+  return entity.vertices.some((v: any) => v.bulge !== undefined && v.bulge !== 0)
 }

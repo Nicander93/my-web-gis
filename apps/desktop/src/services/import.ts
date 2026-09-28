@@ -1,6 +1,6 @@
 import { parseGeoJsonFeatures, inferLayerStyleKind, createId } from '@desktop-webgis/gis-core'
 import type { GisFeature } from '@desktop-webgis/gis-core'
-import { importShapefileZipLayers, importDxf, importCsv, createCoordinateTransform } from '@desktop-webgis/vector-io'
+import { importShapefileZipLayers, importDxf, importDxfLayers, importCsv, createCoordinateTransform } from '@desktop-webgis/vector-io'
 import type { CrsInfo, CsvImportOptions } from '@desktop-webgis/vector-io'
 import { readFile, readBinaryFile } from './files'
 
@@ -134,7 +134,7 @@ export async function importShapefileZip(
 
 export async function importDxfFile(
   source: string | File, 
-  crs?: CrsInfo
+  options?: { crs?: CrsInfo; selectedLayers?: string[] }
 ): Promise<ImportResult> {
   try {
     let content: string
@@ -148,7 +148,7 @@ export async function importDxfFile(
       fileName = source.name
     }
 
-    const result = await importDxf(content, { crs })
+    const crs = options?.crs
     
     if (!crs) {
       return {
@@ -168,27 +168,50 @@ export async function importDxfFile(
       }
     }
     
-    const parseResult = parseGeoJsonFeatures(result.featureCollection, {
-      importId: createId('import'),
-      sourceCrs: crs.code,
-      transform: transformResult.transform
+    const result = importDxfLayers(content, { 
+      crs,
+      selectedLayers: options?.selectedLayers 
     })
     
-    const allWarnings = [
-      ...result.warnings.filter(w => w.code !== 'dxf.unknownCrs').map(w => w.message),
-      ...parseResult.warnings.map(w => w.message)
-    ]
+    const selectedLayers = options?.selectedLayers 
+      ? result.layers.filter(layer => options.selectedLayers!.includes(layer.name))
+      : result.layers
     
-    const styleKind = inferLayerStyleKind(parseResult.features)
-    const baseName = fileName.replace(/\.dxf$/i, '')
+    if (selectedLayers.length === 0) {
+      return {
+        layers: [],
+        errors: ['未选择任何图层']
+      }
+    }
+    
+    const importLayers: ImportLayerResult[] = []
+    
+    for (const layer of selectedLayers) {
+      const parseResult = parseGeoJsonFeatures(layer.featureCollection, {
+        importId: createId('import'),
+        sourceCrs: crs.code,
+        transform: transformResult.transform
+      })
+      
+      const allWarnings = [
+        ...layer.warnings.map(w => w.message),
+        ...parseResult.warnings.map(w => w.message)
+      ]
+      
+      const styleKind = inferLayerStyleKind(parseResult.features)
+      const baseName = fileName.replace(/\.dxf$/i, '')
+      const layerName = result.layers.length === 1 ? baseName : `${baseName}_${layer.name}`
 
-    return {
-      layers: [{ 
-        name: baseName, 
+      importLayers.push({ 
+        name: layerName, 
         features: parseResult.features, 
         styleKind,
         warnings: allWarnings
-      }],
+      })
+    }
+
+    return {
+      layers: importLayers,
       errors: []
     }
   } catch (error) {

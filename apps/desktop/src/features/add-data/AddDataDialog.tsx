@@ -13,7 +13,7 @@ interface AddDataDialogProps {
   onImport: (result: ImportResult) => void
 }
 
-type DialogStep = 'select' | 'confirm' | 'select-crs' | 'select-shapefile-layers' | 'select-csv-config'
+type DialogStep = 'select' | 'confirm' | 'select-crs' | 'select-shapefile-layers' | 'select-csv-config' | 'select-dxf-config'
 
 // 仅列出已在 proj4 注册的 CRS (EPSG:4326 和 EPSG:3857)
 // 更多中国常用投影 (CGCS2000, Beijing 1954 等) 留待后续 PR
@@ -28,7 +28,11 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [parseResult, setParseResult] = useState<ImportResult | null>(null)
-  const [pendingDxf, setPendingDxf] = useState<{ source: string | File; fileName: string } | null>(null)
+  const [pendingDxf, setPendingDxf] = useState<{ 
+    source: string | File; 
+    fileName: string;
+    availableLayers: string[];
+  } | null>(null)
   const [pendingShapefile, setPendingShapefile] = useState<{ 
     source: string | File; 
     fileName: string; 
@@ -37,6 +41,7 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
   const [pendingCsv, setPendingCsv] = useState<{ source: string | File; fileName: string; content: string } | null>(null)
   const [selectedCrs, setSelectedCrs] = useState<string>('EPSG:4326')
   const [selectedShapefileLayers, setSelectedShapefileLayers] = useState<Set<string>>(new Set())
+  const [selectedDxfLayers, setSelectedDxfLayers] = useState<Set<string>>(new Set())
 
   if (!open) return null
 
@@ -47,6 +52,8 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
     setPendingShapefile(null)
     setPendingCsv(null)
     setSelectedShapefileLayers(new Set())
+    setSelectedDxfLayers(new Set())
+    setSelectedCrs('EPSG:4326')
     setError(null)
     onClose()
   }
@@ -58,6 +65,8 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
     setPendingShapefile(null)
     setPendingCsv(null)
     setSelectedShapefileLayers(new Set())
+    setSelectedDxfLayers(new Set())
+    setSelectedCrs('EPSG:4326')
     setError(null)
   }
 
@@ -72,7 +81,7 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
     source: string | File, 
     fileType: string, 
     fileName: string, 
-    crs?: CrsInfo,
+    dxfOptions?: { crs?: CrsInfo; selectedLayers?: string[] },
     shapefileOptions?: { selectedLayers?: string[] },
     csvConfig?: CsvConfig
   ) {
@@ -122,9 +131,34 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
           result = preResult
           break
         }
-        case 'dxf':
-          result = await importDxfFile(source, crs)
+        case 'dxf': {
+          if (!dxfOptions?.crs) {
+            const { importDxfLayers } = await import('@desktop-webgis/vector-io')
+            let content: string
+            if (typeof source === 'string') {
+              content = await readFile(source, false) as string
+            } else {
+              content = await source.text()
+            }
+            
+            const layersResult = importDxfLayers(content, {})
+            const availableLayers = layersResult.layers.map(l => l.name)
+            
+            setPendingDxf({
+              source,
+              fileName,
+              availableLayers
+            })
+            const allLayers = new Set(availableLayers)
+            setSelectedDxfLayers(allLayers)
+            setStep('select-dxf-config')
+            setLoading(false)
+            return
+          }
+          
+          result = await importDxfFile(source, dxfOptions)
           break
+        }
         case 'csv':
           if (!csvConfig) {
             setError('CSV 配置缺失')
@@ -140,14 +174,6 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
       }
 
       if (result.errors.length > 0) {
-        const needsCrs = result.errors[0]?.includes('坐标系')
-        if (needsCrs && fileType === 'dxf') {
-          setPendingDxf({ source, fileName })
-          setStep('select-crs')
-          setLoading(false)
-          return
-        }
-        
         setError(result.errors.join('; '))
         setLoading(false)
         return
@@ -162,11 +188,22 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
     }
   }
   
-  async function handleCrsConfirm() {
+  async function handleDxfConfigConfirm() {
     if (!pendingDxf) return
     
+    const selectedLayers = Array.from(selectedDxfLayers)
+    if (selectedLayers.length === 0) {
+      setError('请至少选择一个图层')
+      return
+    }
+    
     const crs: CrsInfo = { code: selectedCrs }
-    await parseFile(pendingDxf.source, 'dxf', pendingDxf.fileName, crs)
+    await parseFile(
+      pendingDxf.source, 
+      'dxf', 
+      pendingDxf.fileName,
+      { crs, selectedLayers }
+    )
     setPendingDxf(null)
   }
   
@@ -182,7 +219,7 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
     await parseFile(
       pendingShapefile.source, 
       'shapefile', 
-      pendingShapefile.fileName, 
+      pendingShapefile.fileName,
       undefined,
       { selectedLayers }
     )
@@ -208,6 +245,27 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
   
   function deselectAllShapefileLayers() {
     setSelectedShapefileLayers(new Set())
+  }
+  
+  function toggleDxfLayer(layerName: string) {
+    setSelectedDxfLayers(prev => {
+      const next = new Set(prev)
+      if (next.has(layerName)) {
+        next.delete(layerName)
+      } else {
+        next.add(layerName)
+      }
+      return next
+    })
+  }
+  
+  function selectAllDxfLayers() {
+    if (!pendingDxf) return
+    setSelectedDxfLayers(new Set(pendingDxf.availableLayers))
+  }
+  
+  function deselectAllDxfLayers() {
+    setSelectedDxfLayers(new Set())
   }
   
   async function handleCsvConfigConfirm(config: CsvConfig) {
@@ -331,31 +389,70 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
           </>
         )}
 
-        {step === 'select-crs' && (
+        {step === 'select-dxf-config' && pendingDxf && (
           <>
             <div className="dialog-body">
-              <div className="crs-selector-container">
-                <div className="crs-header">
-                  <AlertCircle size={24} className="crs-icon-warning" />
-                  <h3>选择坐标系</h3>
+              <div className="dxf-config-container">
+                <div className="config-header">
+                  <AlertCircle size={24} className="config-icon-warning" />
+                  <h3>配置 DXF 导入</h3>
                 </div>
-                <p className="crs-hint">
-                  此 DXF 文件未包含坐标系信息,请选择正确的坐标系以进行坐标转换:
-                </p>
-                <select 
-                  value={selectedCrs} 
-                  onChange={(e) => setSelectedCrs(e.target.value)}
-                  className="crs-select"
-                >
-                  {COMMON_CRS.map(({ code, name }) => (
-                    <option key={code} value={code}>
-                      {name} ({code})
-                    </option>
-                  ))}
-                </select>
-                <p className="crs-note">
-                  选择的坐标系将用于将 DXF 坐标转换到 WGS84 (EPSG:4326)。
-                </p>
+                
+                <div className="config-section">
+                  <h4>选择坐标系</h4>
+                  <p className="config-hint">
+                    DXF 文件未包含坐标系信息,请选择正确的坐标系 (CAD 单位):
+                  </p>
+                  <select 
+                    value={selectedCrs} 
+                    onChange={(e) => setSelectedCrs(e.target.value)}
+                    className="crs-select"
+                  >
+                    {COMMON_CRS.map(({ code, name }) => (
+                      <option key={code} value={code}>
+                        {name} ({code})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="config-note">
+                    选择的坐标系将用于坐标转换。注意: CAD 米制坐标不等同于经纬度。
+                  </p>
+                </div>
+                
+                <div className="config-section">
+                  <h4>选择要导入的图层</h4>
+                  <p className="config-hint">
+                    此文件包含 {pendingDxf.availableLayers.length} 个 CAD 图层，请选择要导入的图层:
+                  </p>
+                  
+                  <div className="selector-actions">
+                    <button 
+                      className="button-link" 
+                      onClick={selectAllDxfLayers}
+                    >
+                      全选
+                    </button>
+                    <button 
+                      className="button-link" 
+                      onClick={deselectAllDxfLayers}
+                    >
+                      取消全选
+                    </button>
+                  </div>
+                  
+                  <div className="layer-list">
+                    {pendingDxf.availableLayers.map((layerName) => (
+                      <label key={layerName} className="layer-checkbox-item">
+                        <input
+                          type="checkbox"
+                          checked={selectedDxfLayers.has(layerName)}
+                          onChange={() => toggleDxfLayer(layerName)}
+                        />
+                        <span>{layerName}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
             <div className="dialog-footer">
@@ -364,10 +461,10 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
               </button>
               <button 
                 className="button-primary" 
-                onClick={handleCrsConfirm}
-                disabled={loading}
+                onClick={handleDxfConfigConfirm}
+                disabled={loading || selectedDxfLayers.size === 0}
               >
-                {loading ? '转换中...' : '确认'}
+                {loading ? '导入中...' : `导入 ${selectedDxfLayers.size} 个图层`}
               </button>
             </div>
           </>
