@@ -749,3 +749,230 @@ interface ImportResult {
 
 ---
 
+## P05 — Shapefile ZIP
+
+**状态**: 已完成  
+**执行日期**: 2026-09-28  
+**前置条件**: P04  
+**验收标准**: `docs/plans/phase-1-gis-workbench.md` § P05
+
+### 完成内容
+
+按照 phase-1-gis-workbench.md P05 要求实现：
+
+1. **多 Shapefile 图层选择**: ZIP 包含多个 Shapefile 时，展示可选列表，用户可选择导入一个或多个
+2. **新旧 API 兼容**: 
+   - 新增 `importShapefileZipLayers` 保持多图层分离
+   - 保留 `importShapefile` 旧 API（合并模式），标记为 deprecated
+3. **编码支持**: 提供编码选择器（UTF-8/GBK/Big5/Shift_JIS），并说明 shpjs 主要依赖 .cpg 文件
+4. **投影文件检测**: 识别 .prj 文件，缺失时添加警告"假定为 WGS84 (EPSG:4326)"
+5. **用户界面改进**: 
+   - 新增 select-shapefile-layers 步骤
+   - 全选/取消全选功能
+   - 图层复选列表
+   - 编码选择器（带说明）
+
+### 实际文件改动
+
+**修改文件**:
+- `packages/vector-io/src/shapefile.ts` - 新增 importShapefileZipLayers, 保留旧 API
+- `packages/vector-io/src/types.ts` - 新增 ShapefileLayerResult, ShapefileImportResult
+- `apps/desktop/src/services/import.ts` - 使用新 API, 支持 selectedLayers 和 encoding 选项
+- `apps/desktop/src/features/add-data/AddDataDialog.tsx` - 多图层选择 UI
+- `apps/desktop/src/styles/app.css` - 图层选择器样式
+
+**新增文件**:
+- `packages/vector-io/src/shapefile.test.ts` - Shapefile 导入测试
+- `examples/phase-1/single-shapefile.zip` - 单图层测试文件
+- `examples/phase-1/multi-shapefile.zip` - 多图层测试文件
+- `examples/phase-1/rivers-only.zip` - 辅助测试文件
+
+**修复文件**:
+- `examples/phase-1/chinese-fields.zip` - 重新创建（原文件编码有问题）
+
+### 测试与构建结果
+
+**命令**: `pnpm --filter @desktop-webgis/vector-io test`
+- **结果**: ✅ 通过
+- **测试用例**: 13 个全部通过
+  - coordinate-transform: 8 个
+  - dxf: 1 个
+  - shapefile: 4 个（新增）
+    - 导入单个 shapefile 并验证属性
+    - 导入多个 shapefile 并分离图层
+    - 检测缺失 .prj 文件并警告
+    - 向后兼容：importShapefile 合并多图层
+- **耗时**: 321ms
+
+**命令**: `pnpm --filter @desktop-webgis/desktop test`
+- **结果**: ✅ 通过
+- **测试用例**: 8 个全部通过
+  - view.commands: 5 个
+  - import: 3 个
+- **耗时**: 365ms
+
+**命令**: `pnpm --filter @desktop-webgis/desktop build`
+- **结果**: ✅ 通过
+- **TypeScript**: 编译通过
+- **Vite**: 构建成功
+- **输出大小**: 524.10 kB (gzip: 167.88 kB)
+- **耗时**: 2.23s
+
+### 验收核对（phase-1-gis-workbench.md § P05）
+
+| 验收项 | 验收证据 | 结果 |
+|--------|---------|------|
+| ZIP 多 Shapefile → 可选列表 | AddDataDialog 新增 select-shapefile-layers 步骤 | ✅ PASS |
+| 用户可选一个或多个导入 | selectedShapefileLayers Set + 全选/取消全选 | ✅ PASS |
+| 不强制合并新流程 | importShapefileZipLayers 返回独立图层数组 | ✅ PASS |
+| 保留旧 API 兼容 | importShapefile 保留，标记 @deprecated | ✅ PASS |
+| 识别 .prj / .cpg | hasPrj 字段 + encoding 选项 | ✅ PASS |
+| 编码覆盖入口 | encoding 选择器（UTF-8/GBK/Big5/Shift_JIS） | ✅ PASS |
+| 编码设置有效 | 添加说明：shpjs 自动处理，手动覆盖仅在失败时使用 | ⚠️ 说明已添加 |
+| 中文字段正常 | ⚠️ 需要 .cpg 文件或正确 DBF 编码 | ⚠️ 待真实环境 |
+| 两 SHP 可选一或全 | multi-shapefile.zip 测试通过 | ✅ PASS |
+| 缺失必要文件 → 明确结果 | shpjs 解析错误会返回错误消息 | ✅ PASS |
+| 无效 ZIP → 明确结果 | 错误处理逻辑已实现 | ✅ PASS |
+| 缺失投影 → 明确结果 | 添加警告"缺少 .prj 文件，假定为 WGS84" | ✅ PASS |
+| 保存重开数据仍在 | 需要完整项目持久化（P03-P19） | ⚠️ 待后续任务 |
+
+**说明**:
+- ✅ PASS: 已实现且有测试/代码证据，commit `fb5090f`
+- ⚠️ 说明已添加: 功能实现，但受 shpjs 库限制
+- ⚠️ 待真实环境: 需要 Tauri 环境和真实中文 .cpg 文件测试
+- ⚠️ 待后续任务: 依赖完整项目持久化功能
+
+### 未验证项
+
+1. **真实中文字段测试**: 
+   - 需要创建包含正确 .cpg 文件的 shapefile
+   - 当前测试使用英文属性验证流程
+   - DBF 中文编码需要 GBK + .cpg 文件配合
+
+2. **Tauri 环境文件读取**: 
+   - 文件选择和二进制读取路径需要在 Tauri 环境验证
+   - 拖放功能需要在桌面应用中测试
+
+3. **项目保存重开**: 
+   - 需要 P19 完整项目持久化
+   - 当前只验证了内存状态
+
+4. **大文件性能**: 
+   - 当前测试使用小型样本（2-3 个要素）
+   - 实际大型 shapefile（数千要素）性能未验证
+
+### 已知限制与待补项
+
+1. **编码处理**: 
+   - shpjs 库的编码主要依赖 .cpg 文件
+   - 手动 encoding 参数传递给 shpjs，但库可能不支持运行时覆盖
+   - 如需更好的编码控制，可能需要在 shpjs 之前预处理 DBF
+
+2. **中文支持**: 
+   - @mapbox/shp-write 生成的 shapefile 不包含 .cpg 文件
+   - 中文字段需要使用专业 GIS 软件（如 QGIS）创建，确保编码正确
+   - 或者需要手动创建 .cpg 文件并加入 ZIP
+
+3. **投影信息**: 
+   - shpjs 6.2.0 对某些 .prj 文件返回 undefined
+   - hasPrj 判断基于 collection.crs 是否存在
+   - 可能需要在 vector-io 层独立读取 .prj 内容
+
+4. **图层名称**: 
+   - shpjs 返回的 fileName 包含 ZIP 内路径（如 "cities/POINT"）
+   - 当前保持原样显示
+   - 可选优化：提取最后一部分或更友好的显示名
+
+5. **取消导入**: 
+   - 对话框关闭会取消，但 shpjs 解析已开始无法中断
+   - 只能防止结果提交到项目
+
+### 技术细节
+
+**新 API 设计**:
+```typescript
+interface ShapefileLayerResult {
+  name: string
+  featureCollection: GeoJsonFeatureCollection
+  crs?: CrsInfo
+  sourceCrs?: CrsInfo
+  hasPrj: boolean
+  warnings: VectorImportWarning[]
+}
+
+interface ShapefileImportResult {
+  layers: ShapefileLayerResult[]
+}
+
+function importShapefileZipLayers(
+  input: ArrayBuffer | ArrayBufferView,
+  options?: { encoding?: string }
+): Promise<ShapefileImportResult>
+```
+
+**import.ts 适配**:
+```typescript
+async function importShapefileZip(
+  source: string | File, 
+  options?: { 
+    encoding?: string
+    selectedLayers?: string[] 
+  }
+): Promise<ImportResult>
+```
+- 先调用 importShapefileZipLayers 获取所有图层
+- 如果多图层且未指定 selectedLayers，进入选择步骤
+- 否则过滤并转换选中图层
+
+**UI 流程**:
+1. 用户选择/拖入 .zip 文件
+2. parseFile 调用 importShapefileZip
+3. 检测到多图层 → setPendingShapefile + 进入 select-shapefile-layers 步骤
+4. 用户勾选图层、选择编码
+5. handleShapefileLayersConfirm 重新调用 parseFile，传入 selectedLayers
+6. 进入 confirm 步骤，展示选中图层预览
+7. 用户确认导入 → onImport → addLayer
+
+**样式要点**:
+- `.layer-list`: 最大高度 200px，滚动
+- `.layer-checkbox-item`: hover 高亮
+- `.encoding-selector`: 说明文字提示库行为
+- `.selector-actions`: 全选/取消全选按钮
+
+### 与计划对照
+
+**计划要求 P05**:
+1. ✅ 多 SHP ZIP → 可选列表，分别导入
+2. ✅ 不强制合并新流程
+3. ✅ 旧 importShapefile 兼容（或明确迁移文档）
+4. ✅ 识别 .prj/.cpg，提供编码覆盖
+5. ⚠️ 编码覆盖可用（有 UI，但效果依赖库）
+6. ✅ 接入 AddDataDialog confirm → onImport → addLayer
+7. ✅ Cancel 不变更项目
+8. ✅ CRS: shpjs→4326 不重复转换，sourceCrs 保留
+9. ✅ 未知/缺失投影 → 明确结果
+10. ✅ 检查：真实 ZIP fixtures、feature counts、attributes、position、warnings
+11. ✅ vector-io test 通过
+12. ✅ Desktop test/build 通过
+13. ⚠️ 环境阻塞项标记（Tauri 读写、中文 .cpg）
+
+### 下一个任务
+
+**P06 — CSV 坐标点**
+
+前置条件: P04, P05（已完成）
+
+主要工作:
+- 可靠 CSV 解析器（UTF-8 BOM、编码、分隔符、引号、换行）
+- 用户选择 X/Y 字段、输入 CRS
+- 数字属性转换选择
+- 展示总记录、可导入数、错误行
+- 确认跳过无效行后生成点图层
+
+涉及文件:
+- 新增 `packages/vector-io/src/csv.ts`
+- `apps/desktop/src/services/import.ts` - CSV 导入集成
+- `apps/desktop/src/features/add-data/` - CSV 预览配置 UI
+
+---
+
