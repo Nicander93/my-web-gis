@@ -1,0 +1,69 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "duplicate-1",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [116.0, 40.0]
+      },
+      "properties": {
+        "id": "duplicate-1",
+        "name": "第一个重复ID",
+        "notes": "这是第一个使用此ID的特征"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "duplicate-1",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [116.1, 40.1]
+      },
+      "properties": {
+        "id": "duplicate-1",
+        "name": "第二个重复ID",
+        "notes": "这也使用了相同的ID"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "missing-name",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[116.2, 40.2], [116.3, 40.3]]
+      },
+      "properties": {
+        "id": "missing-name",
+        "notes": "此特征缺少name属性"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "empty-notes",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[116.4, 40.4], [116.5, 40.4], [116.5, 40.5], [116.4, 40.5], [116.4, 40.4]]]
+      },
+      "properties": {
+        "id": "empty-notes",
+        "name": "空备注特征",
+        "notes": ""
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "null-name",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [116.6, 40.6]
+      },
+      "properties": {
+        "id": "null-name",
+        "name": null,
+        "notes": "name属性为null"
+      }
+    }
+  ]
+}

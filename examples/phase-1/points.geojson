@@ -1,0 +1,47 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "point-1",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [116.3975, 39.9085]
+      },
+      "properties": {
+        "id": "point-1",
+        "name": "北京市中心",
+        "type": "landmark",
+        "value": 100
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "point-2",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [121.4737, 31.2304]
+      },
+      "properties": {
+        "id": "point-2",
+        "name": "上海市中心",
+        "type": "landmark",
+        "value": 200
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "point-3",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [113.2644, 23.1291]
+      },
+      "properties": {
+        "id": "point-3",
+        "name": "广州市中心",
+        "type": "landmark",
+        "value": 150
+      }
+    }
+  ]
+}
