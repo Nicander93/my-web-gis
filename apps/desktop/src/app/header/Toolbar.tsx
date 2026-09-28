@@ -5,7 +5,9 @@ import {
   Pencil,
   Plus,
   Redo2,
+  RotateCcw,
   Save,
+  Scan,
   Trash2,
   Undo2,
   ZoomIn,
@@ -47,6 +49,11 @@ export function Toolbar() {
         onClick={mapCommands.zoomOut}
       />
       <ToolbarButton
+        icon={Scan}
+        label="全图"
+        onClick={mapCommands.zoomToAll}
+      />
+      <ToolbarButton
         icon={LocateFixed}
         label="定位"
         onClick={mapCommands.locate}
@@ -56,6 +63,11 @@ export function Toolbar() {
         icon={MousePointer2}
         label="选择"
         onClick={mapCommands.select}
+      />
+      <ToolbarButton
+        icon={RotateCcw}
+        label="清除选择"
+        onClick={mapCommands.clearSelection}
       />
       <ToolbarSeparator />
       <ToolbarButton
