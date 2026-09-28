@@ -372,7 +372,7 @@ rtk proxy pnpm --filter @desktop-webgis/desktop build
 | --- | --- | --- |
 | P00 | 已完成 | 基线与样本。详见 phase-1-progress.md |
 | P01 | 已完成 | 面板行为。PR#5 |
-| P02 | 待执行 | 菜单工具栏 |
+| P02 | 已完成 | 菜单工具栏。commit 37e74f8 |
 | P03 | 待执行 | 导入通道 |
 | P04 | 待执行 | 坐标与属性 |
 | P05 | 待执行 | Shapefile |
