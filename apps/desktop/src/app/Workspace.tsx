@@ -36,6 +36,9 @@ export function Workspace() {
       } else if (key === '0') {
         event.preventDefault()
         viewCommands.resetLayout()
+      } else if (key === 'f') {
+        event.preventDefault()
+        viewCommands.toggleFocusMode()
       }
     }
 
@@ -43,27 +46,57 @@ export function Workspace() {
     return () => window.removeEventListener('keydown', handleShortcut)
   }, [])
 
+  useEffect(() => {
+    function handleResize(): void {
+      useWorkspaceStore.getState().constrainPanelSizes()
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   return (
     <main className="workspace" aria-label="GIS Workspace">
       <MapCanvas />
-      {left.open ? (
-        <LeftPanel><LayerPanel /></LeftPanel>
-      ) : (
-        <Button className="restore-trigger restore-left" variant="icon" title="恢复图层面板" aria-label="恢复图层面板" onClick={() => useWorkspaceStore.getState().restoreLeft()}>
+      <LeftPanel>
+        <LayerPanel />
+      </LeftPanel>
+      {!left.open && (
+        <Button
+          className="restore-trigger restore-left"
+          variant="icon"
+          title="恢复图层面板"
+          aria-label="恢复图层面板"
+          onClick={() => useWorkspaceStore.getState().restoreLeft()}
+        >
           <Layers2 size={15} />
         </Button>
       )}
-      {right.open ? (
-        <RightPanel><Inspector /></RightPanel>
-      ) : (
-        <Button className="restore-trigger restore-right" variant="icon" title="恢复检查器" aria-label="恢复检查器" onClick={() => useWorkspaceStore.getState().restoreRight()}>
+      <RightPanel>
+        <Inspector />
+      </RightPanel>
+      {!right.open && (
+        <Button
+          className="restore-trigger restore-right"
+          variant="icon"
+          title="恢复检查器"
+          aria-label="恢复检查器"
+          onClick={() => useWorkspaceStore.getState().restoreRight()}
+        >
           <PanelRight size={15} />
         </Button>
       )}
-      {bottom.open ? (
-        <BottomPanel leftOffset={leftOffset} rightOffset={rightOffset}><AttributeTable /></BottomPanel>
-      ) : (
-        <Button className="restore-trigger restore-bottom" variant="icon" title="恢复属性表" aria-label="恢复属性表" onClick={() => useWorkspaceStore.getState().restoreBottom()}>
+      <BottomPanel leftOffset={leftOffset} rightOffset={rightOffset}>
+        <AttributeTable />
+      </BottomPanel>
+      {!bottom.open && (
+        <Button
+          className="restore-trigger restore-bottom"
+          variant="icon"
+          title="恢复属性表"
+          aria-label="恢复属性表"
+          onClick={() => useWorkspaceStore.getState().restoreBottom()}
+        >
           <PanelBottom size={15} />
         </Button>
       )}

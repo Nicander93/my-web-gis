@@ -28,5 +28,15 @@ export const viewCommands = {
   resetLayout(): void {
     useWorkspaceStore.getState().resetLayout()
     emitCommandStatus('Workspace 布局已重置')
+  },
+  toggleFocusMode(): void {
+    const state = useWorkspaceStore.getState()
+    if (state.focusMode) {
+      state.exitFocusMode()
+      emitCommandStatus('已退出专注模式')
+    } else {
+      state.enterFocusMode()
+      emitCommandStatus('已进入专注模式')
+    }
   }
 }
