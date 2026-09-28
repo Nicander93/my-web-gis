@@ -367,12 +367,6 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
                     </label>
                   ))}
                 </div>
-                
-                <div className="encoding-note-box">
-                  <p className="encoding-note">
-                    <strong>编码说明:</strong> shpjs 库会自动读取 .cpg 文件处理字符编码。如需手动指定编码，请参考项目文档中的开放问题列表。
-                  </p>
-                </div>
               </div>
             </div>
             <div className="dialog-footer">
