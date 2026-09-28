@@ -1,27 +1,69 @@
 import { zip } from '@mapbox/shp-write'
 import type { GeoJsonFeatureCollection } from '@desktop-webgis/scene-schema'
 import shp from 'shpjs'
-import type { ShapefileExportOptions, VectorImportResult } from './types.js'
+import type { CrsInfo, ShapefileExportOptions, VectorImportResult } from './types.js'
 
-type ShpResult = GeoJsonFeatureCollection & { fileName?: string }
+type ShpResult = GeoJsonFeatureCollection & { fileName?: string; crs?: { type?: string; properties?: { name?: string } } }
 
-/** Parses a ZIP (or shpjs-compatible binary) and normalizes multiple SHP layers into one collection. */
+/** 
+ * Parses a ZIP (or shpjs-compatible binary) and normalizes multiple SHP layers into one collection.
+ * 
+ * shpjs already converts coordinates to EPSG:4326 (WGS84).
+ * We preserve the original CRS info (from .prj) as sourceCrs metadata.
+ */
 export async function importShapefile(
   input: ArrayBuffer | ArrayBufferView
 ): Promise<VectorImportResult> {
   const parsed = (await shp(input)) as ShpResult | ShpResult[]
   const collections = Array.isArray(parsed) ? parsed : [parsed]
   const sourceLayers = collections.map((collection, index) => collection.fileName ?? `layer-${index + 1}`)
+  
+  const crsInfo = extractCrsInfo(collections[0])
+  const warnings: VectorImportResult['warnings'] = []
+  
+  if (collections.length > 1) {
+    warnings.push({ 
+      code: 'shapefile.multipleLayers', 
+      message: 'ZIP 中包含多个 Shapefile，已合并为一个要素集合。',
+      count: collections.length
+    })
+  }
+  
   return {
     featureCollection: {
       type: 'FeatureCollection',
       features: collections.flatMap((collection) => collection.features)
     },
     sourceLayers,
-    warnings:
-      collections.length > 1
-        ? [{ code: 'shapefile.multipleLayers', message: 'ZIP 中包含多个 Shapefile，已合并为一个要素集合。' }]
-        : []
+    crs: crsInfo.output,
+    sourceCrs: crsInfo.original,
+    warnings
+  }
+}
+
+function extractCrsInfo(collection: ShpResult | undefined): { 
+  output?: CrsInfo; 
+  original?: CrsInfo 
+} {
+  if (!collection?.crs) {
+    return { output: { code: 'EPSG:4326' } }
+  }
+  
+  const crsName = collection.crs.properties?.name
+  if (typeof crsName === 'string') {
+    const epsgMatch = crsName.match(/EPSG[:/](\d+)/i)
+    if (epsgMatch) {
+      const code = `EPSG:${epsgMatch[1]}`
+      return {
+        output: { code: 'EPSG:4326' },
+        original: { code }
+      }
+    }
+  }
+  
+  return { 
+    output: { code: 'EPSG:4326' },
+    original: crsName ? { wkt: crsName } : undefined
   }
 }
 

@@ -3,6 +3,7 @@ import { FileText, Upload, X, CheckCircle2, AlertCircle } from 'lucide-react'
 import { pickFile } from '@/services/files'
 import { importGeoJson, importShapefileZip, importDxfFile, detectFileType } from '@/services/import'
 import type { ImportResult } from '@/services/import'
+import type { CrsInfo } from '@desktop-webgis/vector-io'
 
 interface AddDataDialogProps {
   open: boolean
@@ -10,7 +11,14 @@ interface AddDataDialogProps {
   onImport: (result: ImportResult) => void
 }
 
-type DialogStep = 'select' | 'confirm'
+type DialogStep = 'select' | 'confirm' | 'select-crs'
+
+// 仅列出已在 proj4 注册的 CRS (EPSG:4326 和 EPSG:3857)
+// 更多中国常用投影 (CGCS2000, Beijing 1954 等) 留待后续 PR
+const COMMON_CRS = [
+  { code: 'EPSG:4326', name: 'WGS84 (经纬度)' },
+  { code: 'EPSG:3857', name: 'Web Mercator' }
+]
 
 export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
   const [activeTab, setActiveTab] = useState<'file' | 'service'>('file')
@@ -18,12 +26,15 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [parseResult, setParseResult] = useState<ImportResult | null>(null)
+  const [pendingDxf, setPendingDxf] = useState<{ source: string | File; fileName: string } | null>(null)
+  const [selectedCrs, setSelectedCrs] = useState<string>('EPSG:4326')
 
   if (!open) return null
 
   function handleClose() {
     setStep('select')
     setParseResult(null)
+    setPendingDxf(null)
     setError(null)
     onClose()
   }
@@ -31,6 +42,7 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
   function handleCancel() {
     setStep('select')
     setParseResult(null)
+    setPendingDxf(null)
     setError(null)
   }
 
@@ -41,7 +53,7 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
     }
   }
 
-  async function parseFile(source: string | File, fileType: string, fileName: string) {
+  async function parseFile(source: string | File, fileType: string, fileName: string, crs?: CrsInfo) {
     setError(null)
     setLoading(true)
 
@@ -56,7 +68,7 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
           result = await importShapefileZip(source)
           break
         case 'dxf':
-          result = await importDxfFile(source)
+          result = await importDxfFile(source, crs)
           break
         default:
           setError(`不支持的文件类型: ${fileName}`)
@@ -65,6 +77,14 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
       }
 
       if (result.errors.length > 0) {
+        const needsCrs = result.errors[0]?.includes('坐标系')
+        if (needsCrs && fileType === 'dxf') {
+          setPendingDxf({ source, fileName })
+          setStep('select-crs')
+          setLoading(false)
+          return
+        }
+        
         setError(result.errors.join('; '))
         setLoading(false)
         return
@@ -77,6 +97,14 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
     } finally {
       setLoading(false)
     }
+  }
+  
+  async function handleCrsConfirm() {
+    if (!pendingDxf) return
+    
+    const crs: CrsInfo = { code: selectedCrs }
+    await parseFile(pendingDxf.source, 'dxf', pendingDxf.fileName, crs)
+    setPendingDxf(null)
   }
 
   async function handlePickFile() {
@@ -176,6 +204,48 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
                   <strong>导入失败:</strong> {error}
                 </div>
               )}
+            </div>
+          </>
+        )}
+
+        {step === 'select-crs' && (
+          <>
+            <div className="dialog-body">
+              <div className="crs-selector-container">
+                <div className="crs-header">
+                  <AlertCircle size={24} className="crs-icon-warning" />
+                  <h3>选择坐标系</h3>
+                </div>
+                <p className="crs-hint">
+                  此 DXF 文件未包含坐标系信息,请选择正确的坐标系以进行坐标转换:
+                </p>
+                <select 
+                  value={selectedCrs} 
+                  onChange={(e) => setSelectedCrs(e.target.value)}
+                  className="crs-select"
+                >
+                  {COMMON_CRS.map(({ code, name }) => (
+                    <option key={code} value={code}>
+                      {name} ({code})
+                    </option>
+                  ))}
+                </select>
+                <p className="crs-note">
+                  选择的坐标系将用于将 DXF 坐标转换到 WGS84 (EPSG:4326)。
+                </p>
+              </div>
+            </div>
+            <div className="dialog-footer">
+              <button className="button-secondary" onClick={handleCancel}>
+                取消
+              </button>
+              <button 
+                className="button-primary" 
+                onClick={handleCrsConfirm}
+                disabled={loading}
+              >
+                {loading ? '转换中...' : '确认'}
+              </button>
             </div>
           </>
         )}

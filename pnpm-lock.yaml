@@ -231,6 +231,9 @@ importers:
       dxf-parser:
         specifier: 1.1.2
         version: 1.1.2
+      proj4:
+        specifier: ^2.22.0
+        version: 2.22.0
       shpjs:
         specifier: 6.2.0
         version: 6.2.0
@@ -1228,8 +1231,8 @@ packages:
   process-nextick-args@2.0.1:
     resolution: {integrity: sha512-3ouUOpQhtgrbOa17J7+uxOTpITYWaGP7/AhoR3+A+/1e9skrzelGi/dXzEYyvbxubEF6Wn2ypscTKiKJFFn1ag==}
 
-  proj4@2.21.0:
-    resolution: {integrity: sha512-33HfDftqw8kY+Cl1dcL16SJuqTSzYxmz4re7Nmhk+fs1/N1fFrAkkF579msQTR/4fLeJVSNne8/gpoCz0fk1uw==}
+  proj4@2.22.0:
+    resolution: {integrity: sha512-MVvH09QrYm3A235rcX39WDiCKanrBiblu28l0KYIn/B2DofmYhvP/LLS43kE66jNDfx/P1l/nah3JmsAq8UgbQ==}
     peerDependencies:
       geotiff: '*'
     peerDependenciesMeta:
@@ -2275,7 +2278,7 @@ snapshots:
 
   process-nextick-args@2.0.1: {}
 
-  proj4@2.21.0:
+  proj4@2.22.0:
     dependencies:
       mgrs: 1.0.0
       wkt-parser: 1.5.6
@@ -2359,7 +2362,7 @@ snapshots:
     dependencies:
       but-unzip: 0.1.10
       parsedbf: 2.0.0
-      proj4: 2.21.0
+      proj4: 2.22.0
     transitivePeerDependencies:
       - geotiff
 

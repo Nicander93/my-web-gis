@@ -1102,3 +1102,60 @@ button:disabled {
   font-size: 11px;
 }
 
+.crs-selector-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.crs-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.crs-header h3 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.crs-icon-warning {
+  color: #d97706;
+}
+
+.crs-hint {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.crs-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: white;
+  font-size: 13px;
+  color: var(--color-text-primary);
+}
+
+.crs-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.crs-note {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+  margin: 0;
+  padding: 8px;
+  background: var(--color-app-bg);
+  border-radius: 4px;
+}
+

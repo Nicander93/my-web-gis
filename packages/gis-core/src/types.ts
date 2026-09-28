@@ -42,6 +42,11 @@ export interface GisFeature {
   id: string
   geometry: Geometry
   properties: Record<string, unknown>
+  metadata?: {
+    sourceId?: string | number
+    sourceCrs?: string
+    importId?: string
+  }
 }
 
 export type DataSource =
