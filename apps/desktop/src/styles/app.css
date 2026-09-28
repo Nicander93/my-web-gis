@@ -974,3 +974,131 @@ button:disabled {
   font-weight: 600;
 }
 
+.dialog-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 16px 24px;
+  border-top: 1px solid var(--color-border);
+}
+
+.button-secondary {
+  padding: 8px 20px;
+  color: var(--color-text-primary);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.button-secondary:hover:not(:disabled) {
+  background: var(--color-hover);
+}
+
+.import-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.preview-header h3 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.preview-icon-success {
+  color: var(--color-success);
+}
+
+.preview-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.preview-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  background: var(--color-app-bg);
+  border-radius: 6px;
+}
+
+.stat-label {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-value {
+  color: var(--color-text-primary);
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.preview-layers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preview-layer-item {
+  padding: 12px;
+  background: var(--color-app-bg);
+  border-radius: 6px;
+}
+
+.layer-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.layer-item-header strong {
+  flex: 1;
+  color: var(--color-text-primary);
+  font-size: 13px;
+}
+
+.layer-item-count {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.layer-warnings {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px;
+  color: #d97706;
+  background: #fffbeb;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.preview-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  color: var(--color-text-secondary);
+  background: var(--color-app-bg);
+  border-radius: 6px;
+  font-size: 11px;
+}
+
