@@ -378,7 +378,7 @@ rtk proxy pnpm --filter @desktop-webgis/desktop build
 | P05 | 已完成 | Shapefile。PR#9 |
 | P06 | 已完成 | CSV。PR#11 |
 | P07 | 已完成 | 二维 DXF。详见 phase-1-progress.md |
-| P08 | 待执行 | 样式算法 |
+| P08 | 进行中 | 样式算法 |
 | P09 | 待执行 | 样式 runtime |
 | P10 | 待执行 | 样式 UI |
 | P11 | 待执行 | Scene 样式 |
