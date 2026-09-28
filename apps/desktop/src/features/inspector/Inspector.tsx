@@ -1,15 +1,30 @@
 import { Button } from '@/components/ui/Button'
 import { useSessionStore } from '@/stores/session.store'
+import { useProjectStore } from '@/stores/project.store'
 
 type InspectorTab = 'layer' | 'feature'
 
-const MOCK_LAYER_ID = 'layer-mock-001'
-
-/** Inspector 只负责展示检查器内容，不关心右侧面板布局。 */
 export function Inspector() {
-  const session = useSessionStore((state) => state.getLayerSession(MOCK_LAYER_ID))
+  const selectedLayerId = useProjectStore((state) => state.selectedLayerId)
+  const project = useProjectStore((state) => state.project)
+  const featuresByDataset = useProjectStore((state) => state.featuresByDataset)
+  
+  const layerId = selectedLayerId || 'no-layer'
+  const session = useSessionStore((state) => state.getLayerSession(layerId))
   const setTab = useSessionStore((state) => state.setInspectorTab)
   const tab = session.inspector?.activeTab ?? 'layer'
+  
+  const selectedLayer = selectedLayerId 
+    ? project.layers.find(l => l.id === selectedLayerId)
+    : null
+  
+  const featureCount = selectedLayer
+    ? (featuresByDataset[selectedLayer.datasetId]?.length ?? 0)
+    : 0
+  
+  const geometryType = selectedLayer?.style.kind === 'point' ? 'Point' :
+                       selectedLayer?.style.kind === 'line' ? 'LineString' :
+                       selectedLayer?.style.kind === 'polygon' ? 'Polygon' : 'Mixed'
 
   return (
     <div className="feature-panel inspector-content">
@@ -22,7 +37,7 @@ export function Inspector() {
       <div className="segmented-tabs" role="tablist" aria-label="检查器类型">
         <Button
           variant={tab === 'layer' ? 'tab' : 'ghost'}
-          onClick={() => setTab(MOCK_LAYER_ID, 'layer')}
+          onClick={() => setTab(layerId, 'layer')}
           role="tab"
           aria-selected={tab === 'layer'}
         >
@@ -30,7 +45,7 @@ export function Inspector() {
         </Button>
         <Button
           variant={tab === 'feature' ? 'tab' : 'ghost'}
-          onClick={() => setTab(MOCK_LAYER_ID, 'feature')}
+          onClick={() => setTab(layerId, 'feature')}
           role="tab"
           aria-selected={tab === 'feature'}
         >
@@ -38,25 +53,28 @@ export function Inspector() {
         </Button>
       </div>
       {tab === 'layer' ? (
-        <div className="inspector-card">
-          <div className="card-title">当前图层</div>
-          <div className="inspector-row">
-            <span>名称</span>
-            <strong>道路中心线</strong>
+        selectedLayer ? (
+          <div className="inspector-card">
+            <div className="card-title">当前图层</div>
+            <div className="inspector-row">
+              <span>名称</span>
+              <strong>{selectedLayer.name}</strong>
+            </div>
+            <div className="inspector-row">
+              <span>几何类型</span>
+              <strong>{geometryType}</strong>
+            </div>
+            <div className="inspector-row">
+              <span>要素数量</span>
+              <strong>{featureCount}</strong>
+            </div>
           </div>
-          <div className="inspector-row">
-            <span>几何类型</span>
-            <strong>LineString</strong>
-          </div>
-          <div className="inspector-row">
-            <span>要素数量</span>
-            <strong>—</strong>
-          </div>
-        </div>
+        ) : (
+          <div className="empty-state empty-state-box">请选择一个图层</div>
+        )
       ) : (
         <div className="empty-state empty-state-box">请选择单个要素查看属性。</div>
       )}
-      <div className="feature-note">Inspector 是否打开由用户主动决定，不因选择要素自动弹出。</div>
     </div>
   )
 }

@@ -1,17 +1,19 @@
 import { Eye, EyeOff, Folder, GripVertical, Layers3, Search } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
+import { useProjectStore } from '@/stores/project.store'
 
-const sampleLayers = ['道路中心线', '水系', '行政区划']
-
-/** Layer Manager 只描述图层业务，不感知自己位于哪个面板。 */
 export function LayerPanel() {
   const [query, setQuery] = useState('')
-  const [visible, setVisible] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(sampleLayers.map((name) => [name, true]))
+  const projectLayers = useProjectStore((state) => state.project.layers)
+  const selectedLayerId = useProjectStore((state) => state.selectedLayerId)
+  const setSelectedLayer = useProjectStore((state) => state.setSelectedLayer)
+  
+  const [visible, setVisible] = useState<Record<string, boolean>>({})
+  
+  const filteredLayers = projectLayers.filter((layer) => 
+    layer.name.includes(query.trim())
   )
-  const [activeLayer, setActiveLayer] = useState(sampleLayers[0])
-  const layers = sampleLayers.filter((name) => name.includes(query.trim()))
 
   return (
     <div className="feature-panel layer-manager">
@@ -33,27 +35,42 @@ export function LayerPanel() {
           <Folder size={14} />
           <span>工作空间</span>
         </div>
-        {layers.map((name) => (
-          <div key={name} className={`layer-item ${activeLayer === name ? 'is-active' : ''}`}>
-            <GripVertical className="drag-icon" size={13} />
-            <Button
-              variant="icon"
-              className="visibility-button"
-              title={visible[name] ? '隐藏图层' : '显示图层'}
-              aria-label={visible[name] ? `隐藏${name}` : `显示${name}`}
-              onClick={() => setVisible((state) => ({ ...state, [name]: !state[name] }))}
-            >
-              {visible[name] ? <Eye size={14} /> : <EyeOff size={14} />}
-            </Button>
-            <button className="layer-name-button" type="button" onClick={() => setActiveLayer(name)}>
-              <span className={`layer-symbol layer-symbol-${name === '行政区划' ? 'polygon' : name === '水系' ? 'line' : 'point'}`} />
-              <span>{name}</span>
-            </button>
-          </div>
-        ))}
-        {layers.length === 0 && <p className="empty-state">没有匹配的图层</p>}
+        {filteredLayers.map((layer) => {
+          const isVisible = visible[layer.id] ?? layer.visible
+          const isActive = selectedLayerId === layer.id
+          const symbolClass = layer.style.kind === 'polygon' ? 'polygon' : 
+                             layer.style.kind === 'line' ? 'line' : 'point'
+          
+          return (
+            <div key={layer.id} className={`layer-item ${isActive ? 'is-active' : ''}`}>
+              <GripVertical className="drag-icon" size={13} />
+              <Button
+                variant="icon"
+                className="visibility-button"
+                title={isVisible ? '隐藏图层' : '显示图层'}
+                aria-label={isVisible ? `隐藏${layer.name}` : `显示${layer.name}`}
+                onClick={() => setVisible((state) => ({ ...state, [layer.id]: !isVisible }))}
+              >
+                {isVisible ? <Eye size={14} /> : <EyeOff size={14} />}
+              </Button>
+              <button 
+                className="layer-name-button" 
+                type="button" 
+                onClick={() => setSelectedLayer(layer.id)}
+              >
+                <span className={`layer-symbol layer-symbol-${symbolClass}`} />
+                <span>{layer.name}</span>
+              </button>
+            </div>
+          )
+        })}
+        {filteredLayers.length === 0 && projectLayers.length === 0 && (
+          <p className="empty-state">暂无图层，请通过"添加数据"导入</p>
+        )}
+        {filteredLayers.length === 0 && projectLayers.length > 0 && (
+          <p className="empty-state">没有匹配的图层</p>
+        )}
       </div>
-      <div className="feature-note">第一阶段仅建立图层管理器容器，GIS 图层服务将在后续接入。</div>
     </div>
   )
 }
