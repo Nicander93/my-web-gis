@@ -7,7 +7,7 @@ function normalizeView(view: SceneView): SceneView {
   }
 }
 
-/** Returns a detached scene with all v1 runtime defaults made explicit. */
+/** Returns a detached scene with all runtime defaults made explicit (canonical v2). */
 export function normalizeScene(scene: SceneManifest): SceneManifest {
   const normalized = structuredClone(scene)
 

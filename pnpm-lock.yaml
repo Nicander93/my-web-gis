@@ -153,6 +153,9 @@ importers:
 
   packages/ol-scene-runtime:
     dependencies:
+      '@desktop-webgis/ol-style':
+        specifier: workspace:*
+        version: link:../ol-style
       '@desktop-webgis/scene-schema':
         specifier: workspace:*
         version: link:../scene-schema

@@ -1,3 +1,14 @@
+/**
+ * SceneManifest types.
+ *
+ * version 1: single-symbol SceneStyle + optional LabelStyle (legacy, still readable).
+ * version 2: shared LayerStyle-shaped contract (single / categorized / graduated + label).
+ * Protocol packages stay free of OpenLayers runtime imports.
+ */
+
+export const SCENE_MANIFEST_VERSION = 2 as const
+export const SCENE_MANIFEST_VERSION_V1 = 1 as const
+
 export type JsonPrimitive = string | number | boolean | null
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue }
 
@@ -91,16 +102,7 @@ export interface TileLayer extends SceneLayerBase {
   source: string
 }
 
-export interface VectorLayer extends SceneLayerBase {
-  type: 'vector'
-  source: string
-  style: SceneStyle
-  label?: LabelStyle
-  interaction?: LayerInteraction
-}
-
-export type SceneLayer = TileLayer | VectorLayer
-
+/** v1 single-symbol style (CSS color strings). Kept for reading old documents. */
 export interface PointStyle {
   type: 'point'
   radius: number
@@ -136,6 +138,118 @@ export interface LabelStyle {
   minZoom?: number
   maxZoom?: number
 }
+
+/**
+ * Shared style contract (structurally aligned with @desktop-webgis/ol-style LayerStyle).
+ * Pure JSON types only — no OpenLayers imports.
+ */
+export interface SceneColor {
+  r: number
+  g: number
+  b: number
+  a: number
+}
+
+export interface ScenePointSymbol {
+  type: 'circle'
+  radius: number
+  fill?: SceneColor
+  stroke?: SceneColor
+  strokeWidth?: number
+}
+
+export interface SceneLineSymbol {
+  type: 'solid'
+  color: SceneColor
+  width: number
+  lineDash?: number[]
+}
+
+export interface ScenePolygonSymbol {
+  type: 'solid'
+  fill?: SceneColor
+  stroke?: SceneColor
+  strokeWidth?: number
+  lineDash?: number[]
+}
+
+export interface SceneMixedSymbol {
+  type: 'mixed'
+  point?: ScenePointSymbol
+  line?: SceneLineSymbol
+  polygon?: ScenePolygonSymbol
+}
+
+export type SceneSymbol = ScenePointSymbol | SceneLineSymbol | ScenePolygonSymbol | SceneMixedSymbol
+
+export interface SceneCategoryItem {
+  value: number | string
+  symbol: SceneSymbol
+  label?: string
+}
+
+export interface SceneGraduatedBreak {
+  value: number
+  symbol: SceneSymbol
+  label?: string
+}
+
+export interface SceneLabelConfig {
+  field: string
+  fontSize?: number
+  color?: SceneColor
+  strokeColor?: SceneColor
+  strokeWidth?: number
+  offsetX?: number
+  offsetY?: number
+  minZoom?: number
+  maxZoom?: number
+}
+
+export interface SceneSingleStyle {
+  mode: 'single'
+  symbol: SceneSymbol
+  label?: SceneLabelConfig
+}
+
+export interface SceneCategorizedStyle {
+  mode: 'categorized'
+  field: string
+  categories: SceneCategoryItem[]
+  fallback: SceneSymbol
+  label?: SceneLabelConfig
+}
+
+export interface SceneGraduatedStyle {
+  mode: 'graduated'
+  field: string
+  method: 'equal-interval' | 'quantile' | 'manual'
+  breaks: SceneGraduatedBreak[]
+  fallback: SceneSymbol
+  label?: SceneLabelConfig
+}
+
+export type SceneLayerStyle = SceneSingleStyle | SceneCategorizedStyle | SceneGraduatedStyle
+
+/** Raw vector layer as it appears in a version 1 document. */
+export interface VectorLayerV1 extends SceneLayerBase {
+  type: 'vector'
+  source: string
+  style: SceneStyle
+  label?: LabelStyle
+  interaction?: LayerInteraction
+}
+
+/** Canonical vector layer after migration / for new writes (version 2). */
+export interface VectorLayer extends SceneLayerBase {
+  type: 'vector'
+  source: string
+  style: SceneLayerStyle
+  interaction?: LayerInteraction
+}
+
+export type SceneLayer = TileLayer | VectorLayer
+export type SceneLayerInput = TileLayer | VectorLayer | VectorLayerV1
 
 export interface LayerInteraction {
   selectable?: boolean
@@ -184,23 +298,35 @@ export interface SceneChapter {
   highlightedFeatureIds?: string[]
 }
 
-export interface SceneManifestV1 {
+interface SceneManifestBase {
   $schema?: string
-  version: 1
   id: string
   title: string
   description?: string
   view: SceneView
   credentials?: Record<string, SceneCredentialReference>
   sources: Record<string, SceneSource>
-  layers: SceneLayer[]
   widgets?: SceneWidgets
   theme?: SceneTheme
   presentation?: ScenePresentation
   metadata?: Record<string, JsonValue>
 }
 
-export type SceneManifest = SceneManifestV1
+export interface SceneManifestV1 extends SceneManifestBase {
+  version: 1
+  layers: Array<TileLayer | VectorLayerV1>
+}
+
+export interface SceneManifestV2 extends SceneManifestBase {
+  version: 2
+  layers: SceneLayer[]
+}
+
+/** Canonical in-memory / write form after parse/migrate. */
+export type SceneManifest = SceneManifestV2
+
+/** Accepted on-disk / API input before migration. */
+export type SceneManifestInput = SceneManifestV1 | SceneManifestV2
 
 export interface ValidationIssue {
   path: string

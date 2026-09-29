@@ -23,13 +23,17 @@ const vectorLayer: SceneLayer = {
   type: 'vector',
   name: 'Places',
   source: 'places',
-  style: { type: 'point', radius: 6, fill: '#2563eb' }
+  style: {
+    mode: 'single',
+    symbol: { type: 'circle', radius: 6, fill: { r: 37, g: 99, b: 235, a: 1 } }
+  }
 }
 
 describe('scene domain operations', () => {
   it('creates a valid empty scene with stable defaults', () => {
     const scene = createScene({ id: 'report', title: 'Report' })
 
+    expect(scene.version).toBe(2)
     expect(scene.view).toEqual({ projection: 'EPSG:3857', center: [0, 0], zoom: 2, rotation: 0 })
     expect(scene.sources).toEqual({})
     expect(scene.layers).toEqual([])

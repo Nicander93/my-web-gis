@@ -783,3 +783,17 @@ SceneManifest v1 只有同时满足以下条件才算完成：
 - OpenLayers 类型不出现在 SceneManifest 公开模型中；
 - Feature 几何遵循 GeoJSON；
 - P0 验收场景全部自动化或有明确的可重复人工验收步骤。
+
+
+---
+
+## 附录 A — SceneManifest version 2 样式（P11）
+
+> 追加说明；不改写上文 V0.1 正文。version 1 文档仍按上文可读。
+
+- **写出**：新 Scene 必须使用 `version: 2`。
+- **读入**：`parseScene` / `migrateScene` 接受 version 1 或 2；version 1 的 `SceneStyle` + 顶层 `label` 迁移为 `SceneLayerStyle`（`mode: 'single'`，标注写入 `style.label`）。
+- **禁止**：把 `mode` / categories / breaks 塞进 version 1 假装兼容。
+- **契约**：version 2 矢量样式与 `@desktop-webgis/ol-style` 的 `LayerStyle` 结构对齐（RGBA `Color`、`single` / `categorized` / `graduated`）。协议包只含纯类型，不依赖 OpenLayers。
+- **Runtime**：Viewer（`ol-scene-runtime`）与 Desktop 共用 `compileStyle`，不复制分类/分级/标注编译器。
+

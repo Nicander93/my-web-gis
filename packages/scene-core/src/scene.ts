@@ -30,10 +30,10 @@ function assertLayerIndex(index: number, length: number): void {
   }
 }
 
-/** Creates the smallest valid v1 scene with explicit, predictable defaults. */
+/** Creates the smallest valid scene (current schema version) with explicit defaults. */
 export function createScene(options: CreateSceneOptions): SceneManifest {
   return parseScene({
-    version: 1,
+    version: 2,
     id: options.id,
     title: options.title,
     ...(options.description === undefined ? {} : { description: options.description }),

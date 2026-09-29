@@ -1743,3 +1743,81 @@ function getLabelText(feature, labelConfig) {
 
 **P11 — Scene/Viewer 样式一致性**
 
+
+---
+
+## P11 — Scene/Viewer 样式一致性
+
+- **状态**: 进行中
+- **时间**: 2026-09-29 16:30 CST
+- **分支**: `local/p11-scene-style-consistency`
+- **基于**: main `a57855e`（P10 / PR#15）
+- **说明**: 本地从 main 新建分支；未动 stash `wip-before-p10-unrelated-20260929-074855`。
+
+### 目标对照（实施中）
+
+| 计划要求 | 结果 |
+| --- | --- |
+| 新写出使用明确新 schema 版本；旧 v1 可读 | 进行中：`version: 2` 写出；v1 经 migrate |
+| 旧单一符号+字段标签进入同一 ol-style 编译器 | 进行中 |
+| 不把新字段塞进旧 schema 假装兼容 | 进行中：v1/v2 校验分岔 |
+| Desktop/Viewer 复用 `@desktop-webgis/ol-style` | 进行中：`ol-scene-runtime` 依赖 ol-style |
+| 协议层纯类型、无 OL 运行时依赖 | 进行中：`scene-schema` 无 ol 依赖 |
+| 同数据 Desktop vs Viewer 分类/断点/颜色/标注一致 | 进行中：runtime 对照测试 |
+| codegen 新能力不静默降级 | 进行中：capabilities guard |
+| 未启动 P12 | ✅ |
+
+
+---
+
+## P11 — Scene/Viewer 样式一致性（完成记录）
+
+- **状态**: 已完成（Draft PR，待审核）
+- **时间**: 2026-09-29 16:35 CST
+- **分支**: `local/p11-scene-style-consistency`
+- **基于**: main `a57855e`（P10 / PR#15）
+- **Commit**: `d38b17e`
+- **PR**: [#16](https://github.com/Nicander93/my-web-gis/pull/16)（Draft）
+
+### 目标对照
+
+| 计划要求 | 结果 |
+| --- | --- |
+| 新写出使用明确新 schema 版本；旧 v1 可读 | ✅ `version: 2` 写出；`parseScene`/`migrateScene` 升级 v1 |
+| 旧单一符号+字段标签进入同一 ol-style 编译器 | ✅ migrate → `SceneLayerStyle`；runtime 用 `compileStyle` |
+| 不把新字段塞进旧 schema 假装兼容 | ✅ v1/v2 校验分岔；v2 拒绝顶层 `label` |
+| Desktop/Viewer 复用 `@desktop-webgis/ol-style` | ✅ `ol-scene-runtime` 依赖并调用 `compileStyle` |
+| 协议层纯类型、无 OL 运行时依赖 | ✅ `scene-schema` 无 ol 依赖 |
+| 同数据 Desktop vs Viewer 分类/断点/颜色/标注一致 | ✅ `style.test.ts` 对照 `compileStyle` |
+| codegen 新能力不静默降级 | ✅ `assertSceneCodegenCapabilities` + 测试 |
+| 未启动 P12 | ✅ |
+
+### 主要改动
+
+- `scene-schema`: types v2、`colors`/`migrate`、validate/parse、JSON Schema、README
+- `ol-scene-runtime`: 接 ol-style；删除自建样式编译；`style.test.ts`
+- `ol-style`: label offset、lineDash
+- `scene-core` / `scene-codegen`: 写出 v2；codegen 能力守卫
+- `apps/viewer`: legend 适配 v2（demo `scene.json` 仍为 v1）
+- 文档：workbench §8、progress 追加、Spec 附录 A
+
+### 测试与构建
+
+1. scene-schema test — ✅ 11
+2. ol-style test — ✅ 40
+3. scene-core test — ✅ 5
+4. scene-codegen test — ✅ 3
+5. ol-scene-runtime test — ✅ 8
+6. scene-publisher test — ✅ 3
+7. viewer build — ✅
+
+### 已知限制
+
+1. 标注 min/maxZoom 仍未在共享 compiler 按分辨率裁剪（与 Desktop P10 一致）。
+2. Viewer 图例目前用主符号色块预览；完整分类/分级图例条目可后续接 `buildLegendItems`。
+3. 未启动 P12；未 npm publish。
+
+### 下一个任务
+
+**P12 — 字段条件、排序与选择**（未开始）
+

@@ -285,7 +285,7 @@ export async function createOlSceneLayer(
     minZoom: definition.minZoom,
     maxZoom: definition.maxZoom,
     source,
-    style: createOlStyleFunction(definition.style, definition.label, view)
+    style: createOlStyleFunction(definition.style)
   })
   layer.set(SCENE_LAYER_ID, definition.id)
   return layer

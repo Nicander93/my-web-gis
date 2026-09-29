@@ -1,4 +1,8 @@
-import { parseScene, type SceneManifest } from '@desktop-webgis/scene-schema'
+import {
+  parseScene,
+  type SceneLayerStyle,
+  type SceneManifest
+} from '@desktop-webgis/scene-schema'
 
 export interface OpenLayersCodegenOptions {
   targetExpression?: string
@@ -6,12 +10,32 @@ export interface OpenLayersCodegenOptions {
   includeCssImport?: boolean
 }
 
+const SUPPORTED_STYLE_MODES = new Set(['single', 'categorized', 'graduated'])
+
+/**
+ * Fail loudly when a scene uses style capabilities this codegen/runtime path cannot preserve.
+ * Currently all LayerStyle modes are supported via @desktop-webgis/ol-style — this guard
+ * exists so future modes cannot silently fall back to single-symbol output.
+ */
+export function assertSceneCodegenCapabilities(scene: SceneManifest): void {
+  for (const layer of scene.layers) {
+    if (layer.type !== 'vector') continue
+    const style: SceneLayerStyle = layer.style
+    if (!SUPPORTED_STYLE_MODES.has(style.mode)) {
+      throw new Error(
+        `Layer "${layer.id}" 使用了代码生成尚未支持的样式 mode "${String((style as { mode?: unknown }).mode)}"；拒绝静默降级`
+      )
+    }
+  }
+}
+
 /** Generates an ESM module backed by the public OpenLayers Scene Runtime. */
 export function generateOpenLayersModule(
-  input: SceneManifest,
+  input: unknown,
   options: OpenLayersCodegenOptions = {}
 ): string {
   const scene = parseScene(input)
+  assertSceneCodegenCapabilities(scene)
   const targetExpression = options.targetExpression ?? "document.getElementById('map')"
   if (!targetExpression.trim()) throw new Error('targetExpression 不得为空。')
   const credentialGlobal = options.credentialGlobal ?? '__MAP_CREDENTIALS__'
