@@ -5,8 +5,11 @@ import type {
   SceneLayer,
   SceneSource,
   TiandituSource,
+  WmsSceneSource,
+  WmtsSceneSource,
   XyzSource
 } from '@desktop-webgis/scene-schema'
+import { createSceneWmsLayer, createSceneWmtsLayer } from './service-layers.js'
 import type Feature from 'ol/Feature.js'
 import GeoJSON from 'ol/format/GeoJSON.js'
 import type Geometry from 'ol/geom/Geometry.js'
@@ -261,10 +264,24 @@ export async function createOlSceneLayer(
     if (sourceDefinition.type === 'geojson') {
       throw new Error(`Tile Layer “${definition.id}” 不能引用 GeoJSON Source`)
     }
-    const layer =
-      sourceDefinition.type === 'xyz'
-        ? createXyzLayer(sourceDefinition)
-        : await createProviderLayer(sourceDefinition, options)
+    let layer
+    if (sourceDefinition.type === 'xyz') {
+      layer = createXyzLayer(sourceDefinition)
+    } else if (sourceDefinition.type === 'wms') {
+      layer = createSceneWmsLayer(sourceDefinition as WmsSceneSource, {
+        visible: definition.visible,
+        opacity: definition.opacity
+      })
+    } else if (sourceDefinition.type === 'wmts') {
+      layer = createSceneWmtsLayer(sourceDefinition as WmtsSceneSource, {
+        visible: definition.visible,
+        opacity: definition.opacity
+      })
+    } else if (sourceDefinition.type === 'provider') {
+      layer = await createProviderLayer(sourceDefinition, options)
+    } else {
+      throw new Error(`Tile Layer "${definition.id}" 不支持 Source 类型 "${(sourceDefinition as { type?: string }).type}"`)
+    }
     layer.setVisible(definition.visible ?? true)
     layer.setOpacity(definition.opacity ?? 1)
     layer.setMinZoom(definition.minZoom ?? Number.NEGATIVE_INFINITY)

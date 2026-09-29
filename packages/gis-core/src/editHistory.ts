@@ -9,8 +9,13 @@ export interface EditContext {
 export interface EditCommand {
   readonly id: string
   readonly label: string
+  /** When true, consecutive commands with the same mergeKey coalesce into one undo step. */
+  readonly mergeable?: boolean
+  readonly mergeKey?: string
   execute(context: EditContext): void
   undo(context: EditContext): void
+  /** Optional: absorb a newer mergeable command (e.g. opacity slider). */
+  absorb?(next: EditCommand): void
 }
 
 export class AddFeatureCommand implements EditCommand {
@@ -122,6 +127,21 @@ export class EditHistory {
   }
 
   execute(command: EditCommand, context: EditContext): void {
+    const top = this.undoStack[this.undoStack.length - 1]
+    if (
+      command.mergeable &&
+      command.mergeKey &&
+      top?.mergeable &&
+      top.mergeKey === command.mergeKey &&
+      typeof top.absorb === 'function'
+    ) {
+      // Coalesce: keep original `before`, take newest `after`, apply once.
+      top.absorb(command)
+      command.execute(context)
+      this.redoStack = []
+      return
+    }
+
     command.execute(context)
     this.undoStack.push(command)
     this.redoStack = []

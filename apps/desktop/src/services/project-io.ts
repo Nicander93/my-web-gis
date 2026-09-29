@@ -1,0 +1,64 @@
+/**
+ * Project file IO — save/load ProjectSnapshot without layout or credential values.
+ */
+import {
+  assertNoSecretValues,
+  buildPersistedSnapshot,
+  parseProjectSnapshot,
+  serializeProjectSnapshot,
+  type GisFeature,
+  type Project,
+  type ProjectSnapshot
+} from '@desktop-webgis/gis-core'
+import { pickFile, pickSaveFile, readTextFile, writeTextFile } from '@/services/files'
+
+export const PROJECT_FILE_FILTER = {
+  name: 'Web GIS 项目',
+  extensions: ['webgis.json', 'json']
+}
+
+let currentProjectPath: string | null = null
+
+export function getCurrentProjectPath(): string | null {
+  return currentProjectPath
+}
+
+export function setCurrentProjectPath(path: string | null): void {
+  currentProjectPath = path
+}
+
+export function createSnapshotFromState(
+  project: Project,
+  featuresByDataset: Record<string, GisFeature[]>
+): ProjectSnapshot {
+  const snapshot = buildPersistedSnapshot(project, featuresByDataset)
+  assertNoSecretValues(snapshot)
+  return snapshot
+}
+
+export async function saveSnapshotToPath(path: string, snapshot: ProjectSnapshot): Promise<void> {
+  assertNoSecretValues(snapshot)
+  await writeTextFile(path, serializeProjectSnapshot(snapshot))
+  currentProjectPath = path
+}
+
+export async function pickAndSaveSnapshot(snapshot: ProjectSnapshot, suggestedName?: string): Promise<string | null> {
+  const path = await pickSaveFile({
+    title: '保存项目',
+    defaultPath: suggestedName ?? 'project.webgis.json',
+    filters: [PROJECT_FILE_FILTER]
+  })
+  if (!path) return null
+  await saveSnapshotToPath(path, snapshot)
+  return path
+}
+
+export async function openSnapshotFromDisk(): Promise<{ path: string; snapshot: ProjectSnapshot } | null> {
+  const path = await pickFile([PROJECT_FILE_FILTER])
+  if (!path) return null
+  const text = await readTextFile(path)
+  const snapshot = parseProjectSnapshot(text)
+  assertNoSecretValues(snapshot)
+  currentProjectPath = path
+  return { path, snapshot }
+}

@@ -11,14 +11,18 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "sideEffects": false,
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run"
   },
   "dependencies": {
-    "@desktop-webgis/scene-schema": "workspace:*"
+    "@desktop-webgis/scene-schema": "workspace:*",
+    "@desktop-webgis/gis-core": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.9.2",

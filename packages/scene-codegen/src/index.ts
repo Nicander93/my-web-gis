@@ -11,13 +11,20 @@ export interface OpenLayersCodegenOptions {
 }
 
 const SUPPORTED_STYLE_MODES = new Set(['single', 'categorized', 'graduated'])
+const SUPPORTED_SOURCE_TYPES = new Set(['geojson', 'xyz', 'provider', 'wms', 'wmts'])
 
 /**
- * Fail loudly when a scene uses style capabilities this codegen/runtime path cannot preserve.
- * Currently all LayerStyle modes are supported via @desktop-webgis/ol-style — this guard
- * exists so future modes cannot silently fall back to single-symbol output.
+ * Fail loudly when a scene uses capabilities this codegen/runtime path cannot preserve.
+ * Never silently omit WMS/WMTS/filters/styles.
  */
 export function assertSceneCodegenCapabilities(scene: SceneManifest): void {
+  for (const [sourceId, source] of Object.entries(scene.sources)) {
+    if (!SUPPORTED_SOURCE_TYPES.has(source.type)) {
+      throw new Error(
+        `Source "${sourceId}" 类型 "${String((source as { type?: unknown }).type)}" 不受支持；拒绝静默省略`
+      )
+    }
+  }
   for (const layer of scene.layers) {
     if (layer.type !== 'vector') continue
     const style: SceneLayerStyle = layer.style

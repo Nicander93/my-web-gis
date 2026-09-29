@@ -80,7 +80,51 @@ export interface GoogleMapTilesSource {
 }
 
 export type ProviderSource = TiandituSource | GoogleMapTilesSource
-export type SceneSource = GeoJsonSource | XyzSource | ProviderSource
+
+/** Shareable WMS source for Scene 鈥?never embeds secret token values. */
+export interface WmsSceneSource {
+  type: 'wms'
+  url: string
+  version: string
+  layerNames: string[]
+  styleNames?: string[]
+  format?: string
+  transparent?: boolean
+  crs?: string
+  bboxWgs84?: [number, number, number, number]
+  /** none = no auth; runtime = Viewer/runtime must supply credentials separately. */
+  authMode: 'none' | 'runtime'
+}
+
+/** Persisted WMTS matrix level (same shape as project, no secrets). */
+export interface WmtsSceneMatrix {
+  identifier: string
+  scaleDenominator: number
+  topLeftCorner: [number, number]
+  tileWidth: number
+  tileHeight: number
+  matrixWidth?: number
+  matrixHeight?: number
+}
+
+export interface WmtsSceneSource {
+  type: 'wmts'
+  url: string
+  version: string
+  layer: string
+  style?: string
+  format?: string
+  tileMatrixSet: string
+  requestEncoding: 'KVP' | 'REST'
+  urls?: string[]
+  projection?: string
+  supportedCrs?: string
+  bboxWgs84?: [number, number, number, number]
+  tileMatrices: WmtsSceneMatrix[]
+  authMode: 'none' | 'runtime'
+}
+
+export type SceneSource = GeoJsonSource | XyzSource | ProviderSource | WmsSceneSource | WmtsSceneSource
 
 export interface SceneCredentialReference {
   type: 'runtime-reference'
