@@ -5,9 +5,17 @@ import { cloneValue } from '@desktop-webgis/gis-core'
 type InspectorTab = 'layer' | 'feature' | 'style' | 'label'
 
 interface AttributeTableState {
+  /** Session-only table text search (表内搜索); does not change map filter/selection. */
   searchQuery: string
   currentPage: number
   scrollTop: number
+  /** View mode: show only S. Does not modify F. */
+  selectedOnly: boolean
+  /** Session sort specs (stable Feature ID tie-break in gis-core). */
+  sortField: string | null
+  sortDirection: 'asc' | 'desc'
+  /** Field currently shown in stats panel. */
+  statsField: string | null
 }
 
 /** 样式草稿：改草稿不改项目，应用后才写入图层配置 */
@@ -56,15 +64,20 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   setAttributeTableState: (layerId, updates) =>
     set((prev) => {
       const existing = prev.sessions[layerId]
+      const current = existing?.attributeTable
       return {
         sessions: {
           ...prev.sessions,
           [layerId]: {
             ...existing,
             attributeTable: {
-              searchQuery: updates.searchQuery ?? existing?.attributeTable?.searchQuery ?? '',
-              currentPage: updates.currentPage ?? existing?.attributeTable?.currentPage ?? 1,
-              scrollTop: updates.scrollTop ?? existing?.attributeTable?.scrollTop ?? 0
+              searchQuery: updates.searchQuery ?? current?.searchQuery ?? '',
+              currentPage: updates.currentPage ?? current?.currentPage ?? 1,
+              scrollTop: updates.scrollTop ?? current?.scrollTop ?? 0,
+              selectedOnly: updates.selectedOnly ?? current?.selectedOnly ?? false,
+              sortField: updates.sortField !== undefined ? updates.sortField : (current?.sortField ?? null),
+              sortDirection: updates.sortDirection ?? current?.sortDirection ?? 'asc',
+              statsField: updates.statsField !== undefined ? updates.statsField : (current?.statsField ?? null)
             }
           }
         }

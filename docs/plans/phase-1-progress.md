@@ -1821,3 +1821,77 @@ function getLabelText(feature, labelConfig) {
 
 **P12 — 字段条件、排序与选择**（未开始）
 
+
+---
+
+## P12 — 字段条件、排序与选择
+
+- **状态**: 进行中 → 已完成（见下方完成记录）
+- **时间**: 2026-09-29 16:40 CST
+- **分支**: `local/p12-filter-sort-select`
+- **基于**: main `bea20bc`（P11 / PR#16）
+- **说明**: 工作树干净；未动既有 stash。未启动 P13。
+
+### 目标对照（实施中）
+
+| 计划要求 | 结果 |
+| --- | --- |
+| gis-core 独立过滤/排序 + 统计 | ✅ |
+| 严格 4.2 集合语义 A/F/S | ✅ |
+| 仅选中 / 表内搜索为会话状态 | ✅ |
+| 显式「选择匹配记录」 | ✅ |
+| 稳定 Feature ID；保留分页 | ✅ |
+| 编辑后重算过滤/统计；撤销恢复 | ✅ |
+| ol-runtime 可见要素 = F | ✅ |
+| 未启动 P13 | ✅ |
+
+---
+
+## P12 — 字段条件、排序与选择（完成记录）
+
+- **状态**: 已完成（Draft PR，待审核）
+- **时间**: 2026-09-29 16:42 CST
+- **分支**: `local/p12-filter-sort-select`
+- **基于**: main `bea20bc`（P11 / PR#16）
+- **Commit**: `2738ea6`
+- **PR**: [#17](https://github.com/Nicander93/my-web-gis/pull/17)（Draft）
+
+### 目标对照
+
+| 计划要求 | 结果 |
+| --- | --- |
+| gis-core 独立过滤/排序函数 + 字段统计 | ✅ `filter` / `sort` / `stats` + 测试 |
+| 严格 4.2：A/F/S，过滤收敛 `S∩F`，显示数量 | ✅ project.store `setLayerFilter` |
+| 仅选中 / 表内搜索为会话状态；空 S 不偷偷回全部 | ✅ session + AttributeTable 清空入口 |
+| 显式「选择匹配记录」；筛选不自动选择 | ✅ `selectMatching` |
+| 稳定 Feature ID；保留现有分页（100） | ✅ sort tie-break id；PAGE_SIZE=100 |
+| 字段统计非空/空 + 数值 min/max/sum/mean，标明范围 | ✅ `computeFieldStats` + scopeLabel |
+| 编辑后重算过滤/统计；撤销恢复；隐藏不高亮 | ✅ UpdateProperties + undo；syncLayers=F |
+| 集合语义/边界/排序/编辑撤销/地图联动测试 + Desktop build | ✅ |
+| 未启动 P13 | ✅ |
+
+### 主要改动
+
+- `packages/gis-core`: `filter.ts` / `sort.ts` / `stats.ts`；`Layer.filter` 持久化
+- `apps/desktop`: project.store 选择/过滤/属性编辑撤销；session 仅选中/排序/表内搜索；AttributeTable UI
+- `packages/ol-runtime`: `syncLayers` 用 `applyFieldFilter`；selection 跳过不在 source 的要素
+- 文档：workbench P11 tip→`bea20bc`；P12→已完成
+
+### 测试与构建
+
+1. gis-core test — ✅ 29
+2. ol-runtime test — ✅ 3
+3. desktop test — ✅ 25（含 P12 8）
+4. desktop build — ✅
+
+### 已知限制
+
+1. MapCanvas 仍为占位；地图联动契约由共享 `applyFieldFilter` + 单测锁定。
+2. 导出集合快照属 P13。
+3. 属性撤销与样式撤销分栈；edit.commands 先样式后属性。
+4. 未启动 P13；未 npm publish。
+
+### 下一个任务
+
+**P13 — 导出范围与复制为新图层**（未开始）
+

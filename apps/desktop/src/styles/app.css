@@ -1670,3 +1670,105 @@ button:disabled {
 .inspector-content .inspector-card + .inspector-card {
   margin-top: 10px;
 }
+
+
+/* P12 attribute table toolbar */
+.attr-toolbar,
+.attr-filter-bar,
+.attr-stats,
+.attr-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.attr-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.attr-search input,
+.attr-filter-bar input,
+.attr-filter-bar select,
+.attr-stats select,
+.cell-editor {
+  height: 24px;
+  padding: 0 8px;
+  color: var(--color-text-primary);
+  background: var(--color-panel-elevated, var(--color-panel));
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.attr-search input {
+  min-width: 200px;
+}
+
+.attr-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.attr-filter-label {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.attr-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attr-filter-chips li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  background: var(--color-surface-muted, rgba(127, 127, 127, 0.12));
+  border-radius: 4px;
+}
+
+.attr-filter-chips button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+
+.table-scroll th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.table-scroll tr.row-selected td {
+  background: color-mix(in srgb, var(--color-accent, #3b82f6) 18%, transparent);
+}
+
+.table-scroll {
+  height: calc(100% - 38px - 96px);
+}
+
+.empty-selected-only {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.attr-pagination {
+  justify-content: center;
+  border-bottom: 0;
+  border-top: 1px solid var(--color-border);
+}

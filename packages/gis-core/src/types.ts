@@ -99,6 +99,8 @@ export interface Layer {
   opacity: number
   editable: boolean
   style: LegacyLayerStyle | import('@desktop-webgis/ol-style').LayerStyle
+  /** Persisted field filter (F). Empty/undefined ⇒ F = A. */
+  filter?: import('./filter').FieldFilterCondition[]
 }
 
 export interface MapState {
