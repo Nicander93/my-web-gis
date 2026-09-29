@@ -2048,7 +2048,7 @@ esolveExportFeatures + 计数 UI |
 - **基于**: main `f3d600f`（P14 / PR#19 squash）
 - **说明**: 工作树保留无关 stash；未 reset --hard / clean -fd；未启动 P16 完整 WMS 渲染；未使用 Cursor CloudAgent；未触碰 GeoForge / `D:\\code\\3dtiles`。
 - **Commit**: `38689f6`
-- **PR**: （打开 Draft 后回填）
+- **PR**: [#20](https://github.com/Nicander93/my-web-gis/pull/20)（Draft）
 
 ### 目标对照
 
