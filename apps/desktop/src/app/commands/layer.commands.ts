@@ -108,10 +108,14 @@ export const layerCommands = {
     const dataset = layer
       ? state.project.datasets.find((item) => item.id === layer.datasetId)
       : undefined
-    if (dataset?.kind === 'wms' && dataset.source.bboxWgs84) {
+    if (
+      (dataset?.kind === 'wms' || dataset?.kind === 'wmts') &&
+      dataset.source.bboxWgs84
+    ) {
       const [w, s, e, n] = dataset.source.bboxWgs84
+      const kind = dataset.kind.toUpperCase()
       emitCommandStatus(
-        `缩放到 WMS 范围 [${w.toFixed(2)}, ${s.toFixed(2)}, ${e.toFixed(2)}, ${n.toFixed(2)}]（地图运行时接入后自动 fit）`
+        `缩放到 ${kind} 范围 [${w.toFixed(2)}, ${s.toFixed(2)}, ${e.toFixed(2)}, ${n.toFixed(2)}]（地图运行时接入后自动 fit）`
       )
       return
     }

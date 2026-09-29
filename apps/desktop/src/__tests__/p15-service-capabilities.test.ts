@@ -103,6 +103,17 @@ describe('P15 service description / capabilities / connect', () => {
         url: 'https://example.com/wmts',
         version: '1.0.0',
         layer: 'ortho',
+        tileMatrixSet: 'GoogleMapsCompatible',
+        requestEncoding: 'KVP',
+        tileMatrices: [
+          {
+            identifier: '0',
+            scaleDenominator: 559082264.0287178,
+            topLeftCorner: [-20037508.34278925, 20037508.34278925],
+            tileWidth: 256,
+            tileHeight: 256
+          }
+        ],
         authMode: 'none'
       }
     })!

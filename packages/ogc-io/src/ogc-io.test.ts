@@ -7,9 +7,11 @@ import {
   fetchCapabilitiesXml,
   formatOgcErrorMessage,
   listSelectableLayers,
+  listCompatibleTileMatrixSets,
   normalizeServiceUrl,
   OgcError,
-  parseCapabilitiesXml
+  parseCapabilitiesXml,
+  resolveWmtsLayerOptions
 } from './index.js'
 
 const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), '../fixtures')
@@ -72,15 +74,25 @@ describe('parseCapabilitiesXml fixtures', () => {
     expect(listSelectableLayers(desc).map((l) => l.name)).toEqual(['dem'])
   })
 
-  it('parses WMTS 1.0.0 layer and tile matrix set', () => {
+  it('parses WMTS 1.0.0 KVP layer, styles, formats, and full tile matrices', () => {
     const desc = parseCapabilitiesXml(loadFixture('wmts-1.0.0-capabilities.xml'), {
       shareableUrl: 'https://example.com/wmts',
       hint: 'WMTS'
     })
     expect(desc.service).toBe('WMTS')
     expect(desc.layers[0]?.name).toBe('ortho')
-    expect(desc.tileMatrixSets?.[0]?.identifier).toBe('GoogleMapsCompatible')
-    expect(desc.tileMatrixSets?.[0]?.tileMatrices?.length).toBe(2)
+    expect(desc.layers[0]?.formats).toEqual(['image/png', 'image/jpeg'])
+    expect(desc.layers[0]?.styles?.map((s) => s.name)).toEqual(['default', 'outline'])
+    expect(desc.wmtsRequestEncodings).toContain('KVP')
+    expect(desc.wmtsGetTileUrls?.[0]).toContain('example.com/wmts')
+    expect(desc.tileMatrixSets?.map((t) => t.identifier)).toEqual([
+      'GoogleMapsCompatible',
+      'CustomNonNumeric512'
+    ])
+    const custom = desc.tileMatrixSets?.find((t) => t.identifier === 'CustomNonNumeric512')
+    expect(custom?.tileMatrices?.[0]?.identifier).toBe('EPSG:3857:0')
+    expect(custom?.tileMatrices?.[0]?.tileWidth).toBe(512)
+    expect(custom?.tileMatrices?.[0]?.topLeftCorner?.[0]).toBeCloseTo(-20037508.34278925)
   })
 
   it('parses WFS 2.0.0 feature types', () => {
@@ -210,5 +222,39 @@ describe('WMS inheritance and service exceptions (P16)', () => {
       expect(err).toMatchObject({ code: 'service-exception' })
       expect(formatOgcErrorMessage(err)).toMatch(/InvalidCRS|EPSG:9999|服务异常/)
     }
+  })
+})
+
+
+describe('WMTS resolve (P17)', () => {
+  it('parses REST ResourceURL fixture and resolves REST encoding', () => {
+    const desc = parseCapabilitiesXml(loadFixture('wmts-1.0.0-rest-capabilities.xml'), {
+      shareableUrl: 'https://tiles.example.com/wmts',
+      hint: 'WMTS'
+    })
+    expect(desc.wmtsRequestEncodings).toContain('REST')
+    expect(desc.layers[0]?.resourceUrls?.[0]?.template).toContain('{TileMatrix}')
+    const resolved = resolveWmtsLayerOptions(desc, { layer: 'coast' })
+    expect(resolved.ok).toBe(true)
+    if (!resolved.ok) return
+    expect(resolved.options.requestEncoding).toBe('REST')
+    expect(resolved.options.projection).toBe('EPSG:3857')
+    expect(resolved.options.urls[0]).not.toMatch(/token=/i)
+  })
+
+  it('refuses unlinked TileMatrixSet without silent fallback', () => {
+    const desc = parseCapabilitiesXml(loadFixture('wmts-1.0.0-capabilities.xml'), {
+      shareableUrl: 'https://example.com/wmts',
+      hint: 'WMTS'
+    })
+    const bad = resolveWmtsLayerOptions(desc, {
+      layer: 'ortho',
+      tileMatrixSet: 'Nope'
+    })
+    expect(bad.ok).toBe(false)
+    if (bad.ok) return
+    expect(bad.reason).toMatch(/不会改用其他矩阵|未链接/)
+    const sets = listCompatibleTileMatrixSets(desc, 'ortho')
+    expect(sets.length).toBe(2)
   })
 })

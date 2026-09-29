@@ -11,5 +11,6 @@ Public-domain handmade Capabilities documents for WMS 1.3.0 / 1.1.1, WMTS 1.0.0,
 | `wms-1.3.0-capabilities.xml` | WMS 1.3.0 named layers, styles, CRS/extent inheritance |
 | `wms-1.1.1-capabilities.xml` | WMS 1.1.1 LatLonBoundingBox / SRS inheritance |
 | `wms-service-exception.xml` | ServiceExceptionReport sample (P16) |
-| `wmts-1.0.0-capabilities.xml` | WMTS layer + TileMatrixSet |
+| `wmts-1.0.0-capabilities.xml` | WMTS KVP: styles/formats, non-numeric matrix IDs, 512px tiles |
+| `wmts-1.0.0-rest-capabilities.xml` | WMTS REST ResourceURL templates (P17) |
 | `wfs-2.0.0-capabilities.xml` | WFS feature types |

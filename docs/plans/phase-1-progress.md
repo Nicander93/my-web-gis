@@ -2145,3 +2145,53 @@ esolveExportFeatures + 计数 UI |
 ### 下一个任务
 
 **P17 — WMTS 添加图层**（未开始）
+
+---
+
+## P17 — WMTS 添加图层
+
+- **状态**: 已完成（Draft PR，待审核）
+- **时间**: 2026-09-29 22:20 CST
+- **分支**: `local/p17-wmts-layers`
+- **基于**: main `30b34e7`（P16 / PR#21 squash）
+- **说明**: 工作树保留无关 stash；未 reset --hard / clean -fd；未使用 Cursor CloudAgent；未触碰 GeoForge / `D:\\code\\3dtiles` / geoforge-converter；≠ 场景 G 全验收（仅 WMTS，不含 WMS+WMTS 完整场景滚动验收）。
+- **Commit**: （见 PR tip）
+- **PR**: （Draft，见提交后链接）
+
+### 目标对照
+
+| 计划要求 | 结果 |
+| --- | --- |
+| 解析 layer/style/format/TileMatrixSet/TileMatrixSetLink；列出兼容项并合理默认 | ✅ parse + `resolveWmtsLayerOptions` / `listCompatibleTileMatrixSets`；ServiceConnectPanel 选择器 |
+| 支持 capabilities 声明的 KVP 或 REST 模板 | ✅ OperationsMetadata GetTile KVP + ResourceURL REST；双 fixture |
+| 使用真实 tile matrix 的 origin、resolution、matrix ID、范围；不硬编码 XYZ / 固定数字 zoom / 固定 256 | ✅ `buildWmtsTileGrid` 从 ScaleDenominator/TopLeftCorner/TileWidth|Height/identifier 构建 |
+| 不兼容投影或缺少矩阵时明确解释，不偷偷选其他矩阵 | ✅ resolve 失败返回中文 reason；UI 显示不可用矩阵警告 |
+| 模板与认证凭据分开 | ✅ urls/templates 不含 token；credentialRef 仍会话内存 |
+| 检查：非数字 matrix ID、不同 tile size、两种请求编码、缩放与边缘瓦片、保存重开 | ✅ CustomNonNumeric512 / 512px；KVP+REST fixtures；edge tile URL；serialize/reopen |
+
+### 主要改动
+
+- `packages/ogc-io`: 完整 WMTS TileMatrix 解析、`resolve-wmts.ts`、KVP/REST fixtures
+- `packages/gis-core`: `WmtsServiceSource` 持久化 requestEncoding / urls / projection / tileMatrices / bboxWgs84
+- `packages/ol-runtime`: `createWmtsTileLayer` / `buildWmtsTileGrid`；`OlMapRuntime.syncWmtsLayer`
+- `apps/desktop`: ServiceConnectPanel WMTS 选项；Inspector WMTS 信息；P17 单测
+
+### 测试与构建
+
+1. gis-core test ✅ 41
+2. ogc-io test ✅ 17
+3. ol-runtime test ✅ 13
+4. desktop test ✅ 53（含 P17 3 条）
+5. desktop build ✅
+
+### 已知限制 / 开放项
+
+1. **MapCanvas 仍为占位**：WMTS 已在 ol-runtime 接通；桌面壳层 zoom/retry 目前为状态提示 + session bump。
+2. **场景 G**（WMS+WMTS 完整验收）未宣称完成。
+3. **P18 WFS** 未做。
+4. 设备 keychain / Token 持久化仍为会话内存（同 P15）。
+5. 未 npm publish；未发明公共代理 / 关闭 TLS。
+
+### 下一个任务
+
+**P18 — WFS 有界加载**（未开始）

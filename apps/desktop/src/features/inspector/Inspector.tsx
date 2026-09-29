@@ -149,6 +149,41 @@ export function Inspector() {
                     </strong>
                   </div>
                 </>
+              ) : dataset?.kind === 'wmts' ? (
+                <>
+                  <div className="inspector-row">
+                    <span>WMTS 版本</span>
+                    <strong>{dataset.source.version}</strong>
+                  </div>
+                  <div className="inspector-row">
+                    <span>图层</span>
+                    <strong>{dataset.source.layer}</strong>
+                  </div>
+                  <div className="inspector-row">
+                    <span>TileMatrixSet</span>
+                    <strong>{dataset.source.tileMatrixSet}</strong>
+                  </div>
+                  <div className="inspector-row">
+                    <span>投影</span>
+                    <strong>{dataset.source.projection || dataset.source.supportedCrs || '—'}</strong>
+                  </div>
+                  <div className="inspector-row">
+                    <span>编码</span>
+                    <strong>{dataset.source.requestEncoding}</strong>
+                  </div>
+                  <div className="inspector-row">
+                    <span>矩阵级数</span>
+                    <strong>{dataset.source.tileMatrices?.length ?? 0}</strong>
+                  </div>
+                  <div className="inspector-row">
+                    <span>范围</span>
+                    <strong>
+                      {dataset.source.bboxWgs84
+                        ? dataset.source.bboxWgs84.map((n) => n.toFixed(2)).join(', ')
+                        : '—'}
+                    </strong>
+                  </div>
+                </>
               ) : (
                 <>
                   <div className="inspector-row">
@@ -181,6 +216,11 @@ export function Inspector() {
             {dataset?.kind === 'wms' ? (
               <p className="config-hint">
                 WMS 为影像服务图层，不提供本地矢量属性表；GetFeatureInfo 不在本阶段范围。
+              </p>
+            ) : null}
+            {dataset?.kind === 'wmts' ? (
+              <p className="config-hint">
+                WMTS 为瓦片服务图层，使用真实 TileMatrix（非 XYZ 硬编码）；不提供本地矢量属性表。
               </p>
             ) : null}
           </>

@@ -1,6 +1,14 @@
 import { OgcError } from './errors.js'
 import type { OgcServiceType } from './url.js'
-import type { ServiceDescription, ServiceLayerInfo, TileMatrixSetInfo } from './types.js'
+import type {
+  ServiceDescription,
+  ServiceLayerInfo,
+  TileMatrixSetInfo,
+  WmtsRequestEncoding,
+  WmtsResourceUrl,
+  WmtsTileMatrixInfo,
+  WmtsTileMatrixSetLink
+} from './types.js'
 import { child, children, findDeep, parseXmlTree, textOf, type XmlElement } from './xml.js'
 
 export interface ParseCapabilitiesOptions {
@@ -22,7 +30,6 @@ function detectService(root: XmlElement): OgcServiceType {
   if (name.includes('serviceexception')) {
     throw new OgcError('service-exception', '响应为 ServiceExceptionReport，而非 Capabilities')
   }
-  // Caps root wrappers
   if (findDeep(root, 'capability') && findDeep(root, 'request')) {
     if (findDeep(root, 'layer')) return 'WMS'
   }
@@ -61,7 +68,6 @@ function parseWmsLayers(layerEl: XmlElement, parent: WmsInheritContext = { crs: 
     ...children(layerEl, 'crs').map((c) => textOf(c)),
     ...children(layerEl, 'srs').map((c) => textOf(c))
   ].filter(Boolean)
-  // WMS CRS/SRS and geographic bbox inherit from parent layers when omitted.
   const crs = localCrs.length ? localCrs : parent.crs.slice()
   const localBbox = readWmsBbox(layerEl)
   const bboxWgs84 = localBbox ?? parent.bboxWgs84
@@ -112,6 +118,115 @@ function parseWms(doc: XmlElement, shareableUrl: string): ServiceDescription {
   }
 }
 
+function parsePair(text: string): [number, number] | undefined {
+  const parts = text.trim().split(/\s+/).map(Number)
+  if (parts.length < 2 || !parts.every((n) => Number.isFinite(n))) return undefined
+  return [parts[0]!, parts[1]!]
+}
+
+function readWmtsWgs84Bbox(layerEl: XmlElement): [number, number, number, number] | undefined {
+  const box = child(layerEl, 'wgs84boundingbox')
+  if (!box) return undefined
+  const lower = parsePair(textOf(child(box, 'lowercorner')))
+  const upper = parsePair(textOf(child(box, 'uppercorner')))
+  if (!lower || !upper) return undefined
+  return [lower[0], lower[1], upper[0], upper[1]]
+}
+
+function parseTileMatrix(el: XmlElement): WmtsTileMatrixInfo | null {
+  const identifier = textOf(child(el, 'identifier'))
+  const scaleDenominator = Number(textOf(child(el, 'scaledenominator')))
+  const topLeftCorner = parsePair(textOf(child(el, 'topleftcorner')))
+  const tileWidth = Number(textOf(child(el, 'tilewidth'))) || 256
+  const tileHeight = Number(textOf(child(el, 'tileheight'))) || 256
+  if (!identifier || !Number.isFinite(scaleDenominator) || !topLeftCorner) return null
+  const matrixWidth = Number(textOf(child(el, 'matrixwidth')))
+  const matrixHeight = Number(textOf(child(el, 'matrixheight')))
+  return {
+    identifier,
+    scaleDenominator,
+    topLeftCorner,
+    tileWidth,
+    tileHeight,
+    matrixWidth: Number.isFinite(matrixWidth) ? matrixWidth : undefined,
+    matrixHeight: Number.isFinite(matrixHeight) ? matrixHeight : undefined
+  }
+}
+
+function parseTileMatrixSetLink(linkEl: XmlElement): WmtsTileMatrixSetLink | null {
+  const tileMatrixSet = textOf(child(linkEl, 'tilematrixset'))
+  if (!tileMatrixSet) return null
+  const limitsEl = child(linkEl, 'tilematrixsetlimits')
+  const limits = limitsEl
+    ? children(limitsEl, 'tilematrixlimits')
+        .map((lim) => {
+          const tileMatrix = textOf(child(lim, 'tilematrix'))
+          const minTileRow = Number(textOf(child(lim, 'mintilerow')))
+          const maxTileRow = Number(textOf(child(lim, 'maxtilerow')))
+          const minTileCol = Number(textOf(child(lim, 'mintilecol')))
+          const maxTileCol = Number(textOf(child(lim, 'maxtilecol')))
+          if (
+            !tileMatrix ||
+            ![minTileRow, maxTileRow, minTileCol, maxTileCol].every((n) => Number.isFinite(n))
+          ) {
+            return null
+          }
+          return { tileMatrix, minTileRow, maxTileRow, minTileCol, maxTileCol }
+        })
+        .filter((x): x is NonNullable<typeof x> => Boolean(x))
+    : undefined
+  return { tileMatrixSet, limits: limits?.length ? limits : undefined }
+}
+
+function parseResourceUrl(el: XmlElement): WmtsResourceUrl | null {
+  const template = el.attrs.template || textOf(el)
+  const format = el.attrs.format || ''
+  const resourceType = el.attrs.resourcetype || ''
+  if (!template) return null
+  return { format, resourceType, template }
+}
+
+function readAttrHref(el: XmlElement): string {
+  return el.attrs.href || el.attrs['xlink:href'] || ''
+}
+
+function parseWmtsOperations(root: XmlElement): {
+  getTileUrls: string[]
+  encodings: WmtsRequestEncoding[]
+} {
+  const ops = findDeep(root, 'operationsmetadata')
+  const getTileUrls: string[] = []
+  const encodings = new Set<WmtsRequestEncoding>()
+  if (!ops) return { getTileUrls, encodings: [] }
+
+  for (const op of children(ops, 'operation')) {
+    if ((op.attrs.name || '').toLowerCase() !== 'gettile') continue
+    const gets: XmlElement[] = []
+    const walk = (el: XmlElement) => {
+      if (el.name === 'get') gets.push(el)
+      for (const c of el.children) walk(c)
+    }
+    walk(op)
+    for (const getEl of gets) {
+      const href = readAttrHref(getEl)
+      const constraint = children(getEl, 'constraint').find(
+        (c) => (c.attrs.name || '').toLowerCase() === 'getencoding'
+      )
+      const values = constraint
+        ? children(findDeep(constraint, 'allowedvalues') ?? constraint, 'value').map((v) =>
+            textOf(v).toUpperCase()
+          )
+        : []
+      if (values.includes('KVP') || values.length === 0) {
+        if (href) getTileUrls.push(href)
+        encodings.add('KVP')
+      }
+      if (values.includes('REST')) encodings.add('REST')
+    }
+  }
+  return { getTileUrls, encodings: [...encodings] }
+}
+
 function parseWmts(doc: XmlElement, shareableUrl: string): ServiceDescription {
   const root = doc.children[0] ?? doc
   const version = root.attrs.version || '1.0.0'
@@ -120,41 +235,68 @@ function parseWmts(doc: XmlElement, shareableUrl: string): ServiceDescription {
     const identifier = textOf(child(layerEl, 'identifier')) || textOf(child(layerEl, 'name'))
     const styles = children(layerEl, 'style').map((s) => ({
       name: textOf(child(s, 'identifier')) || textOf(child(s, 'name')) || 'default',
-      title: textOf(child(s, 'title')) || undefined
+      title: textOf(child(s, 'title')) || undefined,
+      isDefault: s.attrs.isdefault === 'true'
     }))
     const formats = children(layerEl, 'format').map((f) => textOf(f)).filter(Boolean)
-    const tmsLinks = children(layerEl, 'tilematrixsetlink').map((link) =>
-      textOf(child(link, 'tilematrixset'))
-    )
+    const tileMatrixSetLinks = children(layerEl, 'tilematrixsetlink')
+      .map(parseTileMatrixSetLink)
+      .filter((x): x is WmtsTileMatrixSetLink => Boolean(x))
+    const resourceUrls = children(layerEl, 'resourceurl')
+      .map(parseResourceUrl)
+      .filter((x): x is WmtsResourceUrl => Boolean(x))
     return {
       name: identifier,
       title: textOf(child(layerEl, 'title')) || undefined,
       abstract: textOf(child(layerEl, 'abstract')) || undefined,
       styles: styles.length ? styles : undefined,
-      crs: tmsLinks.filter(Boolean),
-      queryable: Boolean(identifier),
-      children: formats.length
-        ? formats.map((f) => ({ name: f, title: 'format' }))
-        : undefined
+      formats: formats.length ? formats : undefined,
+      tileMatrixSetLinks: tileMatrixSetLinks.length ? tileMatrixSetLinks : undefined,
+      resourceUrls: resourceUrls.length ? resourceUrls : undefined,
+      // Keep crs as linked TMS ids for backward-compatible catalog display.
+      crs: tileMatrixSetLinks.map((l) => l.tileMatrixSet),
+      bboxWgs84: readWmtsWgs84Bbox(layerEl),
+      queryable: Boolean(identifier)
     }
   })
 
   const tileMatrixSets: TileMatrixSetInfo[] = children(contents, 'tilematrixset').map((tms) => ({
     identifier: textOf(child(tms, 'identifier')) || textOf(child(tms, 'name')),
     supportedCrs: textOf(child(tms, 'supportedcrs')) || undefined,
-    tileMatrices: children(tms, 'tilematrix').map((tm) => ({
-      identifier: textOf(child(tm, 'identifier')),
-      scaleDenominator: Number(textOf(child(tm, 'scaledenominator'))) || undefined
-    }))
+    tileMatrices: children(tms, 'tilematrix')
+      .map(parseTileMatrix)
+      .filter((x): x is WmtsTileMatrixInfo => Boolean(x))
   }))
 
+  const { getTileUrls, encodings } = parseWmtsOperations(root)
+  const hasRestTemplates = layers.some((l) =>
+    l.resourceUrls?.some((r) => r.resourceType.toLowerCase() === 'tile' || !r.resourceType)
+  )
+  const wmtsRequestEncodings: WmtsRequestEncoding[] = []
+  for (const enc of encodings) {
+    if (!wmtsRequestEncodings.includes(enc)) wmtsRequestEncodings.push(enc)
+  }
+  if (hasRestTemplates && !wmtsRequestEncodings.includes('REST')) {
+    wmtsRequestEncodings.push('REST')
+  }
+  if (getTileUrls.length && !wmtsRequestEncodings.includes('KVP')) {
+    wmtsRequestEncodings.push('KVP')
+  }
+  // Default assumption when OperationsMetadata omitted but shareable URL exists: KVP.
+  if (!wmtsRequestEncodings.length) {
+    wmtsRequestEncodings.push(hasRestTemplates ? 'REST' : 'KVP')
+  }
+
+  const identification = findDeep(root, 'serviceidentification')
   return {
     service: 'WMTS',
     version,
-    title: textOf(findDeep(root, 'title')) || undefined,
+    title: textOf(child(identification ?? root, 'title')) || textOf(findDeep(root, 'title')) || undefined,
     shareableUrl,
     layers,
     tileMatrixSets,
+    wmtsGetTileUrls: getTileUrls.length ? getTileUrls : undefined,
+    wmtsRequestEncodings,
     rawRootLocalName: root.name
   }
 }
