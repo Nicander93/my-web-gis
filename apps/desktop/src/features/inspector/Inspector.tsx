@@ -184,6 +184,48 @@ export function Inspector() {
                     </strong>
                   </div>
                 </>
+              ) : dataset?.kind === 'wfs' ? (
+                <>
+                  <div className="inspector-row">
+                    <span>WFS 版本</span>
+                    <strong>{dataset.source.version}</strong>
+                  </div>
+                  <div className="inspector-row">
+                    <span>要素类型</span>
+                    <strong>{dataset.source.typeName}</strong>
+                  </div>
+                  <div className="inspector-row">
+                    <span>快照要素</span>
+                    <strong>
+                      {dataset.source.loadedCount ?? featureCount}
+                      {dataset.source.complete === false
+                        ? dataset.source.truncatedByLimit
+                          ? '（截断，不完整）'
+                          : '（不完整）'
+                        : dataset.source.complete === true
+                          ? '（完整）'
+                          : ''}
+                    </strong>
+                  </div>
+                  <div className="inspector-row">
+                    <span>查询范围</span>
+                    <strong>
+                      {dataset.source.queryExtentWgs84
+                        ? dataset.source.queryExtentWgs84.map((n) => n.toFixed(2)).join(', ')
+                        : dataset.source.extentMode === 'full'
+                          ? '全范围'
+                          : '—'}
+                    </strong>
+                  </div>
+                  <div className="inspector-row">
+                    <span>来源</span>
+                    <strong title={dataset.source.url}>{dataset.source.url}</strong>
+                  </div>
+                  <div className="inspector-row">
+                    <span>只读快照</span>
+                    <strong>是（复制为本地图层后可编辑；不触发 WFS-T）</strong>
+                  </div>
+                </>
               ) : (
                 <>
                   <div className="inspector-row">
@@ -223,6 +265,11 @@ export function Inspector() {
                 WMTS 为瓦片服务图层，使用真实 TileMatrix（非 XYZ 硬编码）；不提供本地矢量属性表。
               </p>
             ) : null}
+            {dataset?.kind === 'wfs' ? (
+              <p className="config-hint">
+                WFS 快照为只读本地矢量；支持筛选、专题样式、导出与复制为可编辑图层。明确刷新才替换快照；刷新失败保留原快照。复制编辑不触发 WFS-T。
+              </p>
+            ) : null}
           </>
         ) : (
           <div className="empty-state empty-state-box">请选择一个图层</div>
@@ -237,7 +284,7 @@ export function Inspector() {
           </>
         ) : (
           <div className="empty-state empty-state-box">
-            {caps.isService ? '服务影像图层不支持矢量样式面板' : '请选择一个图层'}
+            {caps.canStyle ? '请选择一个图层' : caps.isService ? '服务影像图层不支持矢量样式面板' : '请选择一个图层'}
           </div>
         )
       ) : null}
@@ -247,7 +294,7 @@ export function Inspector() {
           <LabelPanel layerId={selectedLayerId} />
         ) : (
           <div className="empty-state empty-state-box">
-            {caps.isService ? '服务影像图层不支持标注面板' : '请选择一个图层'}
+            {caps.canLabel ? '请选择一个图层' : caps.isService ? '服务影像图层不支持标注面板' : '请选择一个图层'}
           </div>
         )
       ) : null}

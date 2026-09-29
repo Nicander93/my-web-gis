@@ -13,6 +13,8 @@ import { useProjectStore } from '@/stores/project.store'
 import { createId } from '@desktop-webgis/gis-core'
 import type { ImportResult } from '@/services/import'
 import type { ServiceLayerAddRequest } from '@/features/add-data/ServiceConnectPanel'
+import { startWfsBoundedLoad } from '@/services/wfs-commands'
+import { useSessionStore } from '@/stores/session.store'
 import { emitCommandStatus } from './commands/status'
 
 export default function App() {
@@ -65,7 +67,29 @@ export default function App() {
     let added = 0
     for (const layer of layers) {
       const result = addServiceLayer(layer)
-      if (result) added += 1
+      if (!result) continue
+      added += 1
+      if (layer.kind === 'wfs' && layer.wfsLoad) {
+        const viewExtent = useSessionStore.getState().mapViewExtentWgs84
+        void startWfsBoundedLoad({
+          layerId: result.layerId,
+          datasetId: result.datasetId,
+          description: layer.wfsLoad.description,
+          selection: {
+            typeName: layer.source.type === 'wfs' ? layer.source.typeName : '',
+            outputFormat: layer.source.type === 'wfs' ? layer.source.outputFormat : undefined,
+            srsName: layer.source.type === 'wfs' ? layer.source.srsName : undefined,
+            maxFeatures: layer.wfsLoad.maxFeatures,
+            extentMode: layer.wfsLoad.extentMode,
+            viewExtentWgs84:
+              layer.wfsLoad.extentMode === 'view' ? viewExtent : undefined
+          },
+          authMode: layer.wfsLoad.authMode,
+          tokenParam: layer.wfsLoad.tokenParam,
+          credentialRefKey: layer.wfsLoad.credentialRefKey,
+          isRefresh: false
+        })
+      }
     }
     emitCommandStatus(added > 0 ? `已添加 ${added} 个服务图层` : '未添加服务图层')
   }

@@ -3,6 +3,7 @@ import { projectCommands } from './project.commands'
 import { useWorkspaceStore } from '@/stores/workspace.store'
 import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
+import { refreshWfsLayer } from '@/services/wfs-commands'
 import { capabilitiesForDataset, cloneValue, isLegacyStyle, migrateLegacyStyle } from '@desktop-webgis/gis-core'
 import type { LayerStyle } from '@desktop-webgis/ol-style'
 
@@ -90,7 +91,7 @@ export function getLayerCapabilities(layerId: string | null): {
     canRename: true,
     canRemove: true,
     canZoom: true,
-    canRetry: dataset?.kind === 'wms' || dataset?.kind === 'wmts'
+    canRetry: dataset?.kind === 'wms' || dataset?.kind === 'wmts' || dataset?.kind === 'wfs'
   }
 }
 
@@ -122,7 +123,7 @@ export const layerCommands = {
     emitCommandStatus('缩放到图层（地图运行时接入后生效）')
   },
 
-  /** Re-request WMS/WMTS imagery after a transient failure (runtime refresh when mounted). */
+  /** Re-request WMS/WMTS imagery, or refresh WFS snapshot (failure keeps previous). */
   retryServiceLayer(layerId?: string | null): void {
     const id = layerId ?? useProjectStore.getState().selectedLayerId
     if (!id) {
@@ -134,8 +135,16 @@ export const layerCommands = {
     const dataset = layer
       ? state.project.datasets.find((item) => item.id === layer.datasetId)
       : undefined
-    if (!dataset || (dataset.kind !== 'wms' && dataset.kind !== 'wmts')) {
-      emitCommandStatus('仅 WMS/WMTS 图层支持重新加载')
+    if (!dataset) {
+      emitCommandStatus('图层不存在')
+      return
+    }
+    if (dataset.kind === 'wfs') {
+      void refreshWfsLayer(id)
+      return
+    }
+    if (dataset.kind !== 'wms' && dataset.kind !== 'wmts') {
+      emitCommandStatus('仅 WMS/WMTS/WFS 图层支持重新加载')
       return
     }
     useSessionStore.getState().setLayerLoading(id, true)
@@ -172,6 +181,7 @@ export const layerCommands = {
       emitCommandStatus('请先选择图层')
       return
     }
+    useSessionStore.getState().abortWfsLoad(id)
     const ok = useProjectStore.getState().removeLayer(id)
     emitCommandStatus(ok ? '已移除图层' : '图层不存在')
   },

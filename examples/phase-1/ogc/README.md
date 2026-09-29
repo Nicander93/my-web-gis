@@ -14,3 +14,6 @@ Public-domain handmade Capabilities documents for WMS 1.3.0 / 1.1.1, WMTS 1.0.0,
 | `wmts-1.0.0-capabilities.xml` | WMTS KVP: styles/formats, non-numeric matrix IDs, 512px tiles |
 | `wmts-1.0.0-rest-capabilities.xml` | WMTS REST ResourceURL templates (P17) |
 | `wfs-2.0.0-capabilities.xml` | WFS feature types |
+
+- `wfs-2.0.0-capabilities.xml` — feature types, outputFormat, ImplementsResultPaging
+- `wfs-1.1.0-capabilities.xml` — DefaultSRS urn, ResultFormat GeoJSON/GML

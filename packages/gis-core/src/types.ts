@@ -151,7 +151,27 @@ export interface WfsServiceSource {
   version: string
   typeName: string
   outputFormat?: string
+  /** Product guardrail (default 5000, phase max 50000). */
   maxFeatures?: number
+  srsName?: string
+  /** Feature-type advertised WGS84 extent when known. */
+  bboxWgs84?: [number, number, number, number]
+  /** Last successful query extent (WGS84). */
+  queryExtentWgs84?: [number, number, number, number]
+  extentMode?: 'view' | 'full'
+  /** True when paging was used on last load. */
+  paginationUsed?: boolean
+  /** Features present in the local snapshot after last successful load/refresh. */
+  loadedCount?: number
+  /**
+   * False when truncated by limit, cancelled mid-page kept partial, or later page failed.
+   * Never present truncated results as complete.
+   */
+  complete?: boolean
+  truncatedByLimit?: boolean
+  duplicateIdCount?: number
+  /** ISO timestamp of last successful snapshot replace. */
+  lastLoadedAt?: string
   authMode: ServiceAuthMode
   tokenParam?: string
   credentialRef?: CredentialRef

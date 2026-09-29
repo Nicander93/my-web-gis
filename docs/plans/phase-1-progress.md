@@ -2195,3 +2195,52 @@ esolveExportFeatures + 计数 UI |
 ### 下一个任务
 
 **P18 — WFS 有界加载**（未开始）
+
+## P18 — WFS 有界加载
+
+- **状态**: 已完成（Draft PR，待审核）
+- **时间**: 2026-09-30 07:20 CST
+- **分支**: local/p18-wfs-bounded
+- **基于**: main 5cd6634（P17 / PR#22 squash）
+- **说明**: 机制 PR，≠ 场景 H；无公网 live WFS 冒烟；MapCanvas 仍为占位，视图范围使用 session mapViewExtentWgs84 直至地图挂载。工作树保留无关 stash；未 drop/pop stash；未使用 Cursor CloudAgent；未触碰 GeoForge / D:\\code\\3dtiles / geoforge-converter；无 WFS-T。
+- **Commit**: 88a08c7
+- **PR**: [#23](https://github.com/Nicander93/my-web-gis/pull/23)（Draft）
+
+### 目标对照
+
+| 计划要求 | 结果 |
+| --- | --- |
+| 首批支持 WFS 2.0.0 与 1.1.0；解析 feature type、默认 CRS、advertised output format；优先 GeoJSON，必要时 GML | ✅ fixtures + parse/resolve；parseWfsGmlFeatures（ol-runtime）注入 |
+| 当前视图范围或明确全范围；默认上限 5000、阶段上限 50000 | ✅ ServiceConnectPanel + clampWfsMaxFeatures |
+| 分页仅在 Capabilities 允许时启用；处理版本参数差异 | ✅ planBoundedGetFeaturePages / startIndex|count vs startIndex|maxFeatures |
+| 不把截断结果显示为全部；记录 loadedCount / complete / 查询范围 | ✅ 	runcatedByLimit ⇒ complete=false；source 元数据写入 |
+| 快照只读；显式刷新才替换；刷新失败保留原快照 | ✅ capabilities 门控；isRefresh 失败路径保留 features |
+| 取消、上限截断、后续页失败、删除图层、刷新中切换项目不污染状态；复制不触发 WFS-T | ✅ desktop P18 单测 + generation abort |
+
+### 主要改动
+
+- packages/ogc-io: 
+esolve-wfs / etch-getfeature / parse-wfs；WFS 1.1/2.0 fixtures；bounded 单测
+- packages/gis-core: WfsServiceSource 快照元数据字段
+- packages/ol-runtime: parseWfsGmlFeatures
+- pps/desktop: bounded load / refresh 命令；ServiceConnectPanel WFS 选项；Inspector WFS 信息；session generation / abort
+
+### 测试与构建
+
+1. gis-core test → 41
+2. ogc-io test → 25（含 WFS bounded 8）
+3. ol-runtime test → 13
+4. desktop test → 58（含 P18 5 条）
+5. desktop build → ✅
+
+### 已知限制 / 开放项
+
+1. **MapCanvas 仍为占位**：视图 BBOX 取自 session mapViewExtentWgs84，地图挂载后需同步真实视图范围。
+2. **≠ 场景 H**：本 PR 只交付 WFS 有界加载机制，不宣称场景 H 全验收。
+3. **无公网 live WFS 冒烟**（本机未强制对公网 GetFeature）。
+4. 设备 keychain / Token 持久化仍为会话内存（同 P15）。
+5. 不 npm publish；未发明公共代理 / 关闭 TLS。
+
+### 下一个任务
+
+**P19 — 项目与 Scene 全链路集成**（未开始）

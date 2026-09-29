@@ -24,6 +24,12 @@ export interface ServiceLayerInfo {
   tileMatrixSetLinks?: WmtsTileMatrixSetLink[]
   /** WMTS ResourceURL templates (REST). Never contain auth secrets. */
   resourceUrls?: WmtsResourceUrl[]
+  /** WFS DefaultCRS / DefaultSRS. */
+  defaultCrs?: string
+  /** WFS OtherCRS / OtherSRS. */
+  otherCrs?: string[]
+  /** WFS output formats advertised for this type (rare; prefer service-level). */
+  outputFormats?: string[]
 }
 
 export interface WmtsTileMatrixSetLink {
@@ -77,6 +83,12 @@ export interface ServiceDescription {
   wmtsRequestEncodings?: WmtsRequestEncoding[]
   /** WFS feature type names (also mirrored in layers). */
   featureTypes?: ServiceLayerInfo[]
+  /** WFS GetFeature advertised output formats (shareable strings). */
+  wfsOutputFormats?: string[]
+  /** WFS GetFeature KVP endpoint(s), shareable (no secrets). */
+  wfsGetFeatureUrls?: string[]
+  /** WFS result paging capability from OperationsMetadata / Constraints. */
+  wfsPaging?: WfsPagingCapability
   rawRootLocalName?: string
 }
 
@@ -84,3 +96,20 @@ export type ServiceAuthInput =
   | { mode: 'none' }
   | { mode: 'query-token'; param: string; token: string }
   | { mode: 'bearer'; token: string }
+
+
+/** How WFS GetFeature pagination is advertised (if at all). */
+export interface WfsPagingCapability {
+  /** True when startIndex / count (2.0) or equivalent is advertised. */
+  supported: boolean
+  /** Page size hint from CountDefault when present. */
+  countDefault?: number
+}
+
+export type WfsOutputFormatKind = 'geojson' | 'gml' | 'other'
+
+export interface WfsResolvedOutputFormat {
+  /** Value to send as OUTPUTFORMAT / outputFormat. */
+  value: string
+  kind: WfsOutputFormatKind
+}
