@@ -2252,8 +2252,8 @@ esolve-wfs / etch-getfeature / parse-wfs；WFS 1.1/2.0 fixtures；bounded 单�
 - **分支**: local/p19-project-scene-integration
 - **基于**: main c156941（P18 / PR#23 squash）
 - **说明**: 机制/集成 PR；≠ 场景 G/H/I/J 全验收；MapCanvas 仍为占位；无公网 live WFS 冒烟；工作树保留无关 scripts/ 与 stash@{0}；未使用 Cursor CloudAgent；未触碰 GeoForge / D:\code\3dtiles。
-- **Commit**: （推送后回填）
-- **PR**: （创建后回填）
+- **Commit**: `a532bca`
+- **PR**: [#24](https://github.com/Nicander93/my-web-gis/pull/24)（Draft）
 
 ### 目标对照
 

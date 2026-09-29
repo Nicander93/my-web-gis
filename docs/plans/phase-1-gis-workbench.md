@@ -389,7 +389,7 @@ rtk proxy pnpm --filter @desktop-webgis/desktop build
 | P16 | 已完成 | WMS 添加图层。PR#21 squash / `30b34e7` |
 | P17 | 已完成 | WMTS 添加图层 |
 | P18 | 已完成 | WFS 有界加载。Draft PR#23 / 88a08c7 |
-| P19 | 已完成 | 项目与 Scene 全链路集成。Draft PR |
+| P19 | 已完成 | 项目与 Scene 全链路集成。Draft PR#24 / a532bca |
 | P20 | 待执行 | 包交付准备 |
 | P21 | 待执行 | 阶段验收 |
 
