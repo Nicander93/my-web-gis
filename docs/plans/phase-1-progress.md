@@ -2203,8 +2203,8 @@ esolveExportFeatures + 计数 UI |
 - **分支**: local/p18-wfs-bounded
 - **基于**: main 5cd6634（P17 / PR#22 squash）
 - **说明**: 机制 PR，≠ 场景 H；无公网 live WFS 冒烟；MapCanvas 仍为占位，视图范围使用 session mapViewExtentWgs84 直至地图挂载。工作树保留无关 stash；未 drop/pop stash；未使用 Cursor CloudAgent；未触碰 GeoForge / D:\\code\\3dtiles / geoforge-converter；无 WFS-T。
-- **Commit**: （push 后回填）
-- **PR**: （创建后回填）
+- **Commit**: 88a08c7
+- **PR**: [#23](https://github.com/Nicander93/my-web-gis/pull/23)（Draft）
 
 ### 目标对照
 
