@@ -2155,8 +2155,8 @@ esolveExportFeatures + 计数 UI |
 - **分支**: `local/p17-wmts-layers`
 - **基于**: main `30b34e7`（P16 / PR#21 squash）
 - **说明**: 工作树保留无关 stash；未 reset --hard / clean -fd；未使用 Cursor CloudAgent；未触碰 GeoForge / `D:\\code\\3dtiles` / geoforge-converter；≠ 场景 G 全验收（仅 WMTS，不含 WMS+WMTS 完整场景滚动验收）。
-- **Commit**: （见 PR tip）
-- **PR**: （Draft，见提交后链接）
+- **Commit**: `3d37c6f`
+- **PR**: [#22](https://github.com/Nicander93/my-web-gis/pull/22)（Draft）
 
 ### 目标对照
 
