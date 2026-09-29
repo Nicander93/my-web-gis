@@ -1927,8 +1927,8 @@ function getLabelText(feature, labelConfig) {
 - **时间**: 2026-09-29 16:52 CST
 - **分支**: local/p13-export-copy-layer
 - **基于**: main 8d02fc9（P12 / PR#17）
-- **Commit**: (pending tip)
-- **PR**: (pending)
+- **Commit**: 968d52
+- **PR**: [#18](https://github.com/Nicander93/my-web-gis/pull/18)（Draft）
 
 ### 目标对照
 
