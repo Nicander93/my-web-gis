@@ -381,7 +381,7 @@ rtk proxy pnpm --filter @desktop-webgis/desktop build
 | P08 | 已完成 | 样式算法。PR#13 |
 | P09 | 已完成 | 样式 runtime。PR#14 / 21f653f |
 | P10 | 已完成 | 样式 UI。PR#15 / a57855e |
-| P11 | 进行中 | Scene 样式。local/p11-scene-style-consistency |
+| P11 | 已完成 | Scene 样式。Draft PR#16 / d38b17e |
 | P12 | 待执行 | 属性过滤选择 |
 | P13 | 待执行 | 导出与复制 |
 | P14 | 待执行 | 图层工作流 |
