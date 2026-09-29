@@ -127,6 +127,21 @@ export type BasemapConfig =
       credential: string
     }
 
+
+export interface LayerGroup {
+  id: string
+  name: string
+  /** Group-level visibility. When false, children are hidden on the map but keep their own `visible`. */
+  visible: boolean
+  /** Ordered child layer IDs (references only — never copies Datasets). */
+  layerIds: string[]
+}
+
+/** Top-level LayerPanel entry: an ungrouped layer or a single-level group. */
+export type LayerTreeEntry =
+  | { type: 'layer'; id: string }
+  | { type: 'group'; id: string }
+
 export interface Project {
   id: string
   version: number
@@ -134,6 +149,13 @@ export interface Project {
   crs: string
   datasets: Dataset[]
   layers: Layer[]
+  /** Single-level groups. Absent/empty on legacy projects until normalizeLayerTree. */
+  groups: LayerGroup[]
+  /**
+   * Top-level list order (ungrouped layers + groups).
+   * Index 0 = top of list = highest map z-index.
+   */
+  rootOrder: LayerTreeEntry[]
   mapState: MapState
   basemap: BasemapConfig
   settings: Record<string, unknown>

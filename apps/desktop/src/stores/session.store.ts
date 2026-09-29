@@ -28,6 +28,8 @@ export interface StyleDraftState {
 }
 
 interface LayerSession {
+  /** Session-only loading indicator for LayerPanel. */
+  loading?: boolean
   attributeTable?: AttributeTableState
   inspector?: {
     activeTab: InspectorTab
@@ -44,6 +46,7 @@ interface SessionState {
   setStyleDraft(layerId: string, draft: StyleDraftState): void
   patchStyleDraft(layerId: string, patch: Partial<StyleDraftState>): void
   clearLayerSession(layerId: string): void
+  setLayerLoading(layerId: string, loading: boolean): void
 }
 
 const DEFAULT_CLASS_COUNT = 5
@@ -139,7 +142,17 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set((prev) => {
       const { [layerId]: _removed, ...rest } = prev.sessions
       return { sessions: rest }
-    })
+    }),
+  setLayerLoading: (layerId, loading) =>
+    set((prev) => ({
+      sessions: {
+        ...prev.sessions,
+        [layerId]: {
+          ...prev.sessions[layerId],
+          loading
+        }
+      }
+    }))
 }))
 
 export type { InspectorTab }

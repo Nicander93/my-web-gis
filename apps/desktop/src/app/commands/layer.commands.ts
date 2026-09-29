@@ -22,41 +22,221 @@ function normalizeStyle(style: LayerStyle | { kind: string }): LayerStyle {
   return cloneValue(style as LayerStyle)
 }
 
-/** 图层操作命令，供 Header 与后续 Layer Context Menu 复用。 */
+function requireSelectedLayerId(): string | null {
+  const layerId = useProjectStore.getState().selectedLayerId
+  if (!layerId) {
+    emitCommandStatus('请先选择图层')
+    return null
+  }
+  return layerId
+}
+
+/** Capabilities for gating context-menu items (vector-only project today). */
+export function getLayerCapabilities(layerId: string | null): {
+  exists: boolean
+  isVector: boolean
+  hasFeatures: boolean
+  canStyle: boolean
+  canLabel: boolean
+  canAttributeTable: boolean
+  canFilter: boolean
+  canExport: boolean
+  canCopy: boolean
+  canRename: boolean
+  canRemove: boolean
+  canZoom: boolean
+} {
+  if (!layerId) {
+    return {
+      exists: false,
+      isVector: false,
+      hasFeatures: false,
+      canStyle: false,
+      canLabel: false,
+      canAttributeTable: false,
+      canFilter: false,
+      canExport: false,
+      canCopy: false,
+      canRename: false,
+      canRemove: false,
+      canZoom: false
+    }
+  }
+  const state = useProjectStore.getState()
+  const layer = state.project.layers.find((item) => item.id === layerId)
+  if (!layer) {
+    return {
+      exists: false,
+      isVector: false,
+      hasFeatures: false,
+      canStyle: false,
+      canLabel: false,
+      canAttributeTable: false,
+      canFilter: false,
+      canExport: false,
+      canCopy: false,
+      canRename: false,
+      canRemove: false,
+      canZoom: false
+    }
+  }
+  const dataset = state.project.datasets.find((item) => item.id === layer.datasetId)
+  const isVector = dataset?.kind === 'vector'
+  const hasFeatures = (state.featuresByDataset[layer.datasetId]?.length ?? 0) > 0
+  return {
+    exists: true,
+    isVector,
+    hasFeatures,
+    canStyle: isVector,
+    canLabel: isVector,
+    canAttributeTable: isVector,
+    canFilter: isVector,
+    canExport: isVector,
+    canCopy: isVector,
+    canRename: true,
+    canRemove: true,
+    canZoom: true
+  }
+}
+
+/** 图层相关命令，供 Header 按钮与 Layer Context Menu 共用。 */
 export const layerCommands = {
-  zoomToLayer(): void {
-    emitCommandStatus('缩放到图层（地图运行时待接入）')
-  },
-  moveUp(): void {
-    emitCommandStatus('图层上移（图层服务待接入）')
-  },
-  moveDown(): void {
-    emitCommandStatus('图层下移（图层服务待接入）')
-  },
-  remove(): void {
-    emitCommandStatus('移除图层（图层服务待接入）')
-  },
-  editStyle(): void {
-    const layerId = useProjectStore.getState().selectedLayerId
-    if (!layerId) {
+  zoomToLayer(layerId?: string | null): void {
+    const id = layerId ?? useProjectStore.getState().selectedLayerId
+    if (!id) {
       emitCommandStatus('请先选择图层')
       return
     }
+    useProjectStore.getState().setSelectedLayer(id)
+    // MapCanvas is still a placeholder — status only until runtime zoom wires in.
+    emitCommandStatus('缩放到图层（地图运行时接入后生效）')
+  },
+
+  moveUp(layerId?: string | null): void {
+    const id = layerId ?? useProjectStore.getState().selectedLayerId
+    if (!id) {
+      emitCommandStatus('请先选择图层')
+      return
+    }
+    useProjectStore.getState().setSelectedLayer(id)
+    useProjectStore.getState().moveLayer(id, 'up')
+    emitCommandStatus('图层已上移')
+  },
+
+  moveDown(layerId?: string | null): void {
+    const id = layerId ?? useProjectStore.getState().selectedLayerId
+    if (!id) {
+      emitCommandStatus('请先选择图层')
+      return
+    }
+    useProjectStore.getState().setSelectedLayer(id)
+    useProjectStore.getState().moveLayer(id, 'down')
+    emitCommandStatus('图层已下移')
+  },
+
+  remove(layerId?: string | null): void {
+    const id = layerId ?? useProjectStore.getState().selectedLayerId
+    if (!id) {
+      emitCommandStatus('请先选择图层')
+      return
+    }
+    const ok = useProjectStore.getState().removeLayer(id)
+    emitCommandStatus(ok ? '已移除图层' : '图层不存在')
+  },
+
+  rename(layerId?: string | null, name?: string): void {
+    const id = layerId ?? useProjectStore.getState().selectedLayerId
+    if (!id) {
+      emitCommandStatus('请先选择图层')
+      return
+    }
+    if (name == null) {
+      emitCommandStatus('请输入新名称')
+      return
+    }
+    useProjectStore.getState().renameLayer(id, name)
+    emitCommandStatus('已重命名图层')
+  },
+
+  editStyle(layerId?: string | null): void {
+    const id = layerId ?? requireSelectedLayerId()
+    if (!id) return
+    const caps = getLayerCapabilities(id)
+    if (!caps.canStyle) {
+      emitCommandStatus('当前图层不支持样式')
+      return
+    }
+    useProjectStore.getState().setSelectedLayer(id)
     useWorkspaceStore.getState().setRightOpen(true)
-    useSessionStore.getState().setInspectorTab(layerId, 'style')
+    useSessionStore.getState().setInspectorTab(id, 'style')
     emitCommandStatus('已打开样式面板')
   },
-  openAttributeTable(): void {
+
+  editLabel(layerId?: string | null): void {
+    const id = layerId ?? requireSelectedLayerId()
+    if (!id) return
+    const caps = getLayerCapabilities(id)
+    if (!caps.canLabel) {
+      emitCommandStatus('当前图层不支持标注')
+      return
+    }
+    useProjectStore.getState().setSelectedLayer(id)
+    useWorkspaceStore.getState().setRightOpen(true)
+    useSessionStore.getState().setInspectorTab(id, 'label')
+    emitCommandStatus('已打开标注面板')
+  },
+
+  openAttributeTable(layerId?: string | null): void {
+    const id = layerId ?? requireSelectedLayerId()
+    if (!id) return
+    const caps = getLayerCapabilities(id)
+    if (!caps.canAttributeTable) {
+      emitCommandStatus('当前图层不支持属性表')
+      return
+    }
+    useProjectStore.getState().setSelectedLayer(id)
     useWorkspaceStore.getState().setBottomOpen(true)
     emitCommandStatus('属性表已打开')
   },
-  export(): void {
-    projectCommands.exportData(useProjectStore.getState().selectedLayerId)
+
+  openFilter(layerId?: string | null): void {
+    const id = layerId ?? requireSelectedLayerId()
+    if (!id) return
+    const caps = getLayerCapabilities(id)
+    if (!caps.canFilter) {
+      emitCommandStatus('当前图层不支持过滤')
+      return
+    }
+    useProjectStore.getState().setSelectedLayer(id)
+    useWorkspaceStore.getState().setBottomOpen(true)
+    emitCommandStatus('已打开属性表过滤')
   },
 
-  /** Open export dialog pre-focused on copy-friendly scopes (same dialog). */
-  copyToLocalLayer(): void {
-    projectCommands.exportData(useProjectStore.getState().selectedLayerId)
+  /** Open export dialog in export mode (no copy primary). */
+  export(layerId?: string | null): void {
+    const id = layerId ?? useProjectStore.getState().selectedLayerId
+    if (!id) {
+      emitCommandStatus('请先选择图层')
+      return
+    }
+    useProjectStore.getState().setSelectedLayer(id)
+    projectCommands.exportData(id, 'export')
+  },
+
+  /** Open export dialog in copy mode. */
+  copyToLocalLayer(layerId?: string | null): void {
+    const id = layerId ?? useProjectStore.getState().selectedLayerId
+    if (!id) {
+      emitCommandStatus('请先选择图层')
+      return
+    }
+    useProjectStore.getState().setSelectedLayer(id)
+    projectCommands.exportData(id, 'copy')
+  },
+
+  createGroup(name?: string, layerIds?: string[]): void {
+    const id = useProjectStore.getState().createGroup(name, layerIds)
+    emitCommandStatus(id ? '已创建图层组' : '创建图层组失败')
   },
 
   /**
@@ -90,7 +270,7 @@ export const layerCommands = {
     return true
   },
 
-  /** 重置草稿为当前已应用配置 */
+  /** 重置草稿为当前已应用样式 */
   resetStyleDraft(layerId: string): void {
     const applied = useProjectStore.getState().getNormalizedLayerStyle(layerId)
     if (!applied) {

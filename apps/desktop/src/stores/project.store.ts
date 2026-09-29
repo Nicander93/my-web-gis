@@ -10,17 +10,25 @@ import {
   EditHistory,
   MemoryFeatureStore,
   isLegacyStyle,
-  migrateLegacyStyle
+  migrateLegacyStyle,
+  normalizeLayerTree,
+  flattenLayerIds,
+  createLayerGroup,
+  findGroupForLayer,
+  layersWithEffectiveVisibility
 } from '@desktop-webgis/gis-core'
 import type {
   Project,
   Dataset,
   Layer,
+  LayerGroup,
+  LayerTreeEntry,
   GisFeature,
   SelectionState,
   FieldFilterCondition,
   EditContext
 } from '@desktop-webgis/gis-core'
+import { useSessionStore } from '@/stores/session.store'
 import type { LayerStyle } from '@desktop-webgis/ol-style'
 
 interface ProjectState {
@@ -72,6 +80,29 @@ interface ProjectState {
   canUndoAttributeEdit(): boolean
   canRedoAttributeEdit(): boolean
   _resetAttributeHistoryForTests(): void
+
+  /** Ordered layers for map sync (list top → bottom) with effective visibility. */
+  getMapLayers(): Layer[]
+  setLayerVisible(layerId: string, visible: boolean): void
+  setGroupVisible(groupId: string, visible: boolean): void
+  renameLayer(layerId: string, name: string): void
+  renameGroup(groupId: string, name: string): void
+  moveLayer(layerId: string, direction: 'up' | 'down'): void
+  moveRootEntry(entry: LayerTreeEntry, direction: 'up' | 'down'): void
+  createGroup(name?: string, layerIds?: string[]): string | null
+  /** removeChildren=false keeps children as ungrouped top-level layers. */
+  removeGroup(groupId: string, removeChildren: boolean): void
+  /**
+   * Remove a layer and clean selection / session drafts / group refs / orphan dataset.
+   * Returns false if layer missing.
+   */
+  removeLayer(layerId: string): boolean
+  /** Move a layer before/after a target (root or inside a group). */
+  relocateLayer(
+    layerId: string,
+    target: { kind: 'root'; index: number } | { kind: 'group'; groupId: string; index: number }
+  ): void
+  addLayersToGroup(groupId: string, layerIds: string[]): void
 }
 
 const attributeHistory = new EditHistory()
@@ -121,12 +152,19 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       }
       syncStoreFromState(featuresByDataset)
 
+      const project = normalizeLayerTree({
+        ...state.project,
+        datasets: [...state.project.datasets, dataset],
+        layers: [...state.project.layers, layer],
+        groups: state.project.groups ?? [],
+        rootOrder: [
+          ...(state.project.rootOrder ?? []),
+          { type: 'layer', id: layer.id }
+        ]
+      })
+
       return {
-        project: {
-          ...state.project,
-          datasets: [...state.project.datasets, dataset],
-          layers: [...state.project.layers, layer]
-        },
+        project,
         featuresByDataset,
         dirty: true,
         selectedLayerId: layer.id
@@ -323,6 +361,298 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   canUndoAttributeEdit: () => attributeHistory.canUndo,
   canRedoAttributeEdit: () => attributeHistory.canRedo,
+
+
+  getMapLayers: () => layersWithEffectiveVisibility(get().project),
+
+  setLayerVisible: (layerId, visible) =>
+    set((state) => ({
+      project: {
+        ...state.project,
+        layers: state.project.layers.map((layer) =>
+          layer.id === layerId ? { ...layer, visible } : layer
+        )
+      },
+      dirty: true
+    })),
+
+  setGroupVisible: (groupId, visible) =>
+    set((state) => ({
+      project: normalizeLayerTree({
+        ...state.project,
+        groups: (state.project.groups ?? []).map((group) =>
+          group.id === groupId ? { ...group, visible } : group
+        )
+      }),
+      dirty: true
+    })),
+
+  renameLayer: (layerId, name) => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    set((state) => ({
+      project: {
+        ...state.project,
+        layers: state.project.layers.map((layer) =>
+          layer.id === layerId ? { ...layer, name: trimmed } : layer
+        )
+      },
+      dirty: true
+    }))
+  },
+
+  renameGroup: (groupId, name) => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    set((state) => ({
+      project: normalizeLayerTree({
+        ...state.project,
+        groups: (state.project.groups ?? []).map((group) =>
+          group.id === groupId ? { ...group, name: trimmed } : group
+        )
+      }),
+      dirty: true
+    }))
+  },
+
+  moveRootEntry: (entry, direction) =>
+    set((state) => {
+      const project = normalizeLayerTree(state.project)
+      const order = [...(project.rootOrder ?? [])]
+      const index = order.findIndex((item) => item.type === entry.type && item.id === entry.id)
+      if (index < 0) return state
+      const swapWith = direction === 'up' ? index - 1 : index + 1
+      if (swapWith < 0 || swapWith >= order.length) return state
+      ;[order[index], order[swapWith]] = [order[swapWith]!, order[index]!]
+      return {
+        project: { ...project, rootOrder: order },
+        dirty: true
+      }
+    }),
+
+  moveLayer: (layerId, direction) => {
+    const state = get()
+    const project = normalizeLayerTree(state.project)
+    const group = findGroupForLayer(project, layerId)
+    if (group) {
+      const ids = [...group.layerIds]
+      const index = ids.indexOf(layerId)
+      const swapWith = direction === 'up' ? index - 1 : index + 1
+      if (index < 0 || swapWith < 0 || swapWith >= ids.length) {
+        // At group edge: move out to root before/after the group.
+        const rootIndex = (project.rootOrder ?? []).findIndex(
+          (e) => e.type === 'group' && e.id === group.id
+        )
+        if (rootIndex < 0) return
+        const insertAt = direction === 'up' ? rootIndex : rootIndex + 1
+        const nextGroupIds = ids.filter((id) => id !== layerId)
+        const nextGroups = (project.groups ?? []).map((g) =>
+          g.id === group.id ? { ...g, layerIds: nextGroupIds } : g
+        )
+        const nextRoot = [...(project.rootOrder ?? [])]
+        nextRoot.splice(insertAt, 0, { type: 'layer', id: layerId })
+        set({
+          project: normalizeLayerTree({
+            ...project,
+            groups: nextGroups,
+            rootOrder: nextRoot
+          }),
+          dirty: true
+        })
+        return
+      }
+      ;[ids[index], ids[swapWith]] = [ids[swapWith]!, ids[index]!]
+      set({
+        project: normalizeLayerTree({
+          ...project,
+          groups: (project.groups ?? []).map((g) =>
+            g.id === group.id ? { ...g, layerIds: ids } : g
+          )
+        }),
+        dirty: true
+      })
+      return
+    }
+    get().moveRootEntry({ type: 'layer', id: layerId }, direction)
+  },
+
+  createGroup: (name = '新建组', layerIds = []) => {
+    const state = get()
+    const project = normalizeLayerTree(state.project)
+    const validIds = layerIds.filter((id) => project.layers.some((l) => l.id === id))
+    const group = createLayerGroup(name, validIds)
+
+    // Remove members from other groups / root.
+    let groups = (project.groups ?? []).map((g) => ({
+      ...g,
+      layerIds: g.layerIds.filter((id) => !validIds.includes(id))
+    }))
+    groups = [...groups, group]
+    const rootOrder = [
+      { type: 'group' as const, id: group.id },
+      ...(project.rootOrder ?? []).filter(
+        (entry) => !(entry.type === 'layer' && validIds.includes(entry.id))
+      )
+    ]
+
+    set({
+      project: normalizeLayerTree({ ...project, groups, rootOrder }),
+      dirty: true
+    })
+    return group.id
+  },
+
+  removeGroup: (groupId, removeChildren) => {
+    const state = get()
+    const project = normalizeLayerTree(state.project)
+    const group = (project.groups ?? []).find((g) => g.id === groupId)
+    if (!group) return
+
+    if (removeChildren) {
+      for (const layerId of [...group.layerIds]) {
+        get().removeLayer(layerId)
+      }
+      // refresh after removals
+      const after = normalizeLayerTree(get().project)
+      set({
+        project: normalizeLayerTree({
+          ...after,
+          groups: (after.groups ?? []).filter((g) => g.id !== groupId),
+          rootOrder: (after.rootOrder ?? []).filter((e) => !(e.type === 'group' && e.id === groupId))
+        }),
+        dirty: true
+      })
+      return
+    }
+
+    // Keep children: insert them in place of the group in rootOrder.
+    const rootOrder: LayerTreeEntry[] = []
+    for (const entry of project.rootOrder ?? []) {
+      if (entry.type === 'group' && entry.id === groupId) {
+        for (const layerId of group.layerIds) {
+          rootOrder.push({ type: 'layer', id: layerId })
+        }
+        continue
+      }
+      rootOrder.push(entry)
+    }
+    set({
+      project: normalizeLayerTree({
+        ...project,
+        groups: (project.groups ?? []).filter((g) => g.id !== groupId),
+        rootOrder
+      }),
+      dirty: true
+    })
+  },
+
+  removeLayer: (layerId) => {
+    const state = get()
+    const project = normalizeLayerTree(state.project)
+    const layer = project.layers.find((item) => item.id === layerId)
+    if (!layer) return false
+
+    const datasetId = layer.datasetId
+    const layers = project.layers.filter((item) => item.id !== layerId)
+    const groups = (project.groups ?? []).map((g) => ({
+      ...g,
+      layerIds: g.layerIds.filter((id) => id !== layerId)
+    }))
+    const rootOrder = (project.rootOrder ?? []).filter(
+      (entry) => !(entry.type === 'layer' && entry.id === layerId)
+    )
+
+    const datasetStillUsed = layers.some((item) => item.datasetId === datasetId)
+    const datasets = datasetStillUsed
+      ? project.datasets
+      : project.datasets.filter((item) => item.id !== datasetId)
+    const featuresByDataset = { ...state.featuresByDataset }
+    if (!datasetStillUsed) {
+      delete featuresByDataset[datasetId]
+    }
+
+    const selection =
+      state.selection.layerId === layerId
+        ? { layerId: null as string | null, featureIds: [] as string[] }
+        : state.selection
+
+    useSessionStore.getState().clearLayerSession(layerId)
+
+    set({
+      project: normalizeLayerTree({
+        ...project,
+        layers,
+        datasets,
+        groups,
+        rootOrder
+      }),
+      featuresByDataset,
+      dirty: true,
+      selectedLayerId: state.selectedLayerId === layerId ? null : state.selectedLayerId,
+      selection,
+      lastSelectionCountAfterFilter:
+        state.selection.layerId === layerId ? 0 : state.lastSelectionCountAfterFilter
+    })
+    return true
+  },
+
+  relocateLayer: (layerId, target) =>
+    set((state) => {
+      const project = normalizeLayerTree(state.project)
+      if (!project.layers.some((l) => l.id === layerId)) return state
+
+      // Detach from current group / root.
+      let groups = (project.groups ?? []).map((g) => ({
+        ...g,
+        layerIds: g.layerIds.filter((id) => id !== layerId)
+      }))
+      let rootOrder = (project.rootOrder ?? []).filter(
+        (entry) => !(entry.type === 'layer' && entry.id === layerId)
+      )
+
+      if (target.kind === 'root') {
+        const index = Math.max(0, Math.min(target.index, rootOrder.length))
+        rootOrder = [
+          ...rootOrder.slice(0, index),
+          { type: 'layer', id: layerId },
+          ...rootOrder.slice(index)
+        ]
+      } else {
+        groups = groups.map((g) => {
+          if (g.id !== target.groupId) return g
+          const ids = [...g.layerIds]
+          const index = Math.max(0, Math.min(target.index, ids.length))
+          ids.splice(index, 0, layerId)
+          return { ...g, layerIds: ids }
+        })
+      }
+
+      return {
+        project: normalizeLayerTree({ ...project, groups, rootOrder }),
+        dirty: true
+      }
+    }),
+
+  addLayersToGroup: (groupId, layerIds) =>
+    set((state) => {
+      const project = normalizeLayerTree(state.project)
+      if (!project.groups.some((g) => g.id === groupId)) return state
+      const valid = layerIds.filter((id) => project.layers.some((l) => l.id === id))
+      let groups = (project.groups ?? []).map((g) => ({
+        ...g,
+        layerIds: g.layerIds.filter((id) => !valid.includes(id))
+      }))
+      groups = groups.map((g) =>
+        g.id === groupId ? { ...g, layerIds: [...g.layerIds, ...valid] } : g
+      )
+      const rootOrder = (project.rootOrder ?? []).filter(
+        (entry) => !(entry.type === 'layer' && valid.includes(entry.id))
+      )
+      return {
+        project: normalizeLayerTree({ ...project, groups, rootOrder }),
+        dirty: true
+      }
+    }),
 
   _resetAttributeHistoryForTests: () => {
     attributeHistory.clear()

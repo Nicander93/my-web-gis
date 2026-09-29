@@ -1967,3 +1967,27 @@ esolveExportFeatures + 计数 UI |
 
 **P14 — 图层上下文菜单与分组**（未开始）
 
+
+---
+
+## P14 — 图层上下文菜单与分组
+
+- **状态**: 进行中 → 已完成（见下方完成记录）
+- **时间**: 2026-09-29 17:05 CST
+- **分支**: `local/p14-layer-context-groups`
+- **基于**: main `6e980c4`（P13 / PR#18 squash）
+- **说明**: 工作树干净起步；未动既有 stash；未启动 P15；未使用 Cursor CloudAgent；未触碰 GeoForge / `D:\code\3dtiles`。
+
+### 目标对照（实施中）
+
+| 计划要求 | 结果 |
+| --- | --- |
+| 右键与「更多」共用同一菜单 | ✅ LayerContextMenu |
+| 活动图层 / 加载 / 选中要素数视觉状态 | ✅ is-active / loading / selection count |
+| 菜单：定位、样式、标注、属性表、过滤、导出、复制、重命名、移除 | ✅ 能力门控 |
+| 导出与复制分入口 | ✅ ExportDialog mode |
+| 单层分组；组显隐保留子 visible；拖拽+按钮排序 | ✅ groups/rootOrder |
+| 组只引用 layer ID；顺序与地图 z-order 一致 | ✅ flatten + layerListZIndex |
+| 移除清理选择/草稿/组引用；删组确认保留或一并移除 | ✅ removeLayer / removeGroup |
+| 未启动 P15 | ✅ |
+

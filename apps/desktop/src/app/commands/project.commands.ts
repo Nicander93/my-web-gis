@@ -1,11 +1,13 @@
 import { emitCommandStatus } from './status'
 
+export type ExportDialogMode = 'export' | 'copy'
+
 export interface AddDataCallback {
   openDialog: () => void
 }
 
 export interface ExportDataCallback {
-  openDialog: (layerId?: string | null) => void
+  openDialog: (layerId?: string | null, mode?: ExportDialogMode) => void
 }
 
 let addDataCallback: AddDataCallback | null = null
@@ -39,9 +41,9 @@ export const projectCommands = {
       emitCommandStatus('添加数据（对话框未注册）')
     }
   },
-  exportData(layerId?: string | null): void {
+  exportData(layerId?: string | null, mode: ExportDialogMode = 'export'): void {
     if (exportDataCallback) {
-      exportDataCallback.openDialog(layerId)
+      exportDataCallback.openDialog(layerId, mode)
     } else {
       emitCommandStatus('导出（对话框未注册）')
     }

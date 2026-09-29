@@ -4,7 +4,11 @@ import { StatusBar } from './StatusBar'
 import { Workspace } from './Workspace'
 import { AddDataDialog } from '@/features/add-data/AddDataDialog'
 import { ExportDialog } from '@/features/export/ExportDialog'
-import { registerAddDataCallback, registerExportDataCallback } from './commands/project.commands'
+import {
+  registerAddDataCallback,
+  registerExportDataCallback,
+  type ExportDialogMode
+} from './commands/project.commands'
 import { useProjectStore } from '@/stores/project.store'
 import { createId } from '@desktop-webgis/gis-core'
 import type { ImportResult } from '@/services/import'
@@ -15,6 +19,7 @@ export default function App() {
   const [addDataOpen, setAddDataOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const [exportLayerId, setExportLayerId] = useState<string | null>(null)
+  const [exportMode, setExportMode] = useState<ExportDialogMode>('export')
   const addLayer = useProjectStore((state) => state.addLayer)
 
   useEffect(() => {
@@ -31,8 +36,9 @@ export default function App() {
     })
 
     registerExportDataCallback({
-      openDialog: (layerId) => {
+      openDialog: (layerId, mode = 'export') => {
         setExportLayerId(layerId ?? null)
+        setExportMode(mode)
         setExportOpen(true)
       }
     })
@@ -66,9 +72,11 @@ export default function App() {
       <ExportDialog
         open={exportOpen}
         layerId={exportLayerId}
+        mode={exportMode}
         onClose={() => {
           setExportOpen(false)
           setExportLayerId(null)
+          setExportMode('export')
         }}
       />
     </div>
