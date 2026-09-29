@@ -5,7 +5,7 @@ import type {
   MixedSymbol,
   Symbol,
   Color
-} from './types'
+} from './types.js'
 
 /**
  * 符号工具函数

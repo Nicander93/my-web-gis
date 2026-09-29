@@ -1,7 +1,8 @@
 {
   "name": "@desktop-webgis/ol-style",
   "version": "0.1.0",
-  "description": "OpenLayers style utilities with classification algorithms (equal interval, quantile).",
+  "description": "OpenLayers style utilities with JSON-serializable symbology and classification algorithms (equal interval, quantile).",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -17,12 +18,16 @@
   },
   "files": [
     "dist",
+    "LICENSE",
+    "CHANGELOG.md",
     "README.md"
   ],
   "sideEffects": false,
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "pack:check": "pnpm build && pnpm pack --pack-destination .",
+    "verify:consumer": "node ./scripts/verify-consumer.mjs"
   },
   "peerDependencies": {
     "ol": "^10.10.0"
@@ -32,5 +37,13 @@
     "ol": "^10.10.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
-  }
+  },
+  "keywords": [
+    "openlayers",
+    "style",
+    "symbology",
+    "classification",
+    "legend",
+    "gis"
+  ]
 }

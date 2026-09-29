@@ -7,7 +7,7 @@ import type {
   CategoryItem,
   GraduatedBreak,
   LabelConfig
-} from './types'
+} from './types.js'
 
 /**
  * 样式工厂函数

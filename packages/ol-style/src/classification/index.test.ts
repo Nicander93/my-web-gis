@@ -4,7 +4,7 @@ import {
   classifyQuantile,
   classifyValue,
   type ClassificationResult
-} from './index'
+} from './index.js'
 
 describe('classification algorithms', () => {
   describe('classifyEqualInterval', () => {

@@ -22,8 +22,8 @@ import type {
   Color,
   LabelConfig,
   GeometryKind
-} from './types'
-import { isCategorizedStyle, isGraduatedStyle } from './style-factory'
+} from './types.js'
+import { isCategorizedStyle, isGraduatedStyle } from './style-factory.js'
 
 /**
  * 颜色转换为 OL 格式
