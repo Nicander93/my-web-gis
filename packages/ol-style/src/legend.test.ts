@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { buildLegendItems, symbolPrimaryColor } from './legend'
-import type { CategorizedStyle, GraduatedStyle, SingleStyle } from './types'
+import { buildLegendItems, symbolPrimaryColor } from './legend.js'
+import type { CategorizedStyle, GraduatedStyle, SingleStyle } from './types.js'
 
 describe('buildLegendItems', () => {
   it('single 模式生成一项', () => {

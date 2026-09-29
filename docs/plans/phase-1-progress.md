@@ -2299,3 +2299,60 @@ esolve-wfs / etch-getfeature / parse-wfs；WFS 1.1/2.0 fixtures；bounded 单�
 
 **P20 — 样式包发布准备**（未开始）
 
+## P20 — 样式包发布准备
+
+- **状态**: 已完成（Draft PR，待评审）
+- **时间**: 2026-09-30 07:50 CST
+- **分支**: `local/p20-ol-style-publish-prep`
+- **基线**: main `06475ce`（P19 / PR#24 squash）
+- **说明**: 未 npm publish；未上传静态站点；MapCanvas 仍为占位；无公开 live WFS 冒烟；keychain 仍为会话内存。保留无关 `scripts/` 与 stash@{0}；未使用 Cursor CloudAgent；未触碰 GeoForge / `D:\code\3dtiles`。
+- **Commit**: `b0dce42` (docs tip `92b2701`)
+- **PR**: [#25](https://github.com/Nicander93/my-web-gis/pull/25)（Draft）
+
+### 目标对照
+
+| 计划要求 | 结果 |
+| --- | --- |
+| 审查 exports / types / files / peerDependencies / sideEffects / 许可证 / README / 变更记录 | ✅ package.json + LICENSE + CHANGELOG + README |
+| 公开 API 避免应用内部术语与路径 | ✅ 仅样式领域术语；dist 无仓库绝对路径 / `workspace:*` |
+| 独立示例含分类、两种分级、标注、图例 | ✅ `examples/symbology-smoke` |
+| `pnpm pack` + 工作区外临时消费者安装 tarball 与声明 OL，类型检查/构建/运行 | ✅ `verify:consumer`（npm install outside workspace） |
+| 消费者无需私有工作区包 | ✅ |
+| 检查 vector-io 导出兼容并记录独立发布依赖；本阶段不强制重构数据包 | ✅ 导出未改；测试 35 通过；依赖见下 |
+
+### 主要改动
+
+- `packages/ol-style`: LICENSE、CHANGELOG、`license`/`files`/`keywords`；README 修正 peer 为 `ol@^10.10.0`；相对导入补 `.js` 以利 Node 消费者类型解析
+- `packages/ol-style/examples/symbology-smoke`: 独立示例
+- `packages/ol-style/scripts/verify-consumer.mjs`: pack → 工作区外安装 → typecheck → 运行
+- `docs/plans/*`: P20 进度与状态
+- `.gitignore`: 忽略 `*.tgz`
+
+### vector-io 兼容与独立发布依赖记录
+
+- **现有导出保持不变**：`coordinate-transform` / `csv` / `csv-write` / `dxf` / `shapefile` / `types`（`pnpm --filter @desktop-webgis/vector-io test` ✅ 35）
+- **仍含** `dependencies["@desktop-webgis/scene-schema"] = "workspace:*"`（仅类型：GeoJSON 相关）
+- **若将来独立发布所需**：先发布/可解析 `@desktop-webgis/scene-schema`（或内联 GeoJSON 类型），外加 npm 依赖 `@mapbox/shp-write@0.4.3`、`dxf-parser@1.1.2`、`papaparse`、`proj4`、`shpjs@6.2.0`；**本阶段不重构为新数据包**
+
+### 测试与构建
+
+1. ol-style test ✅ 40
+2. ol-style verify:consumer ✅（tarball + `ol@10.10.0`，typecheck + demo 运行）
+3. gis-core test ✅ 41
+4. ol-runtime test ✅ 13
+5. vector-io test ✅ 35
+6. desktop test ✅ 62
+7. desktop build ✅
+
+### 已知限制 / 非声明
+
+1. **未 npm publish**（有意；正式发布前才定 scope/账号/意图）
+2. **MapCanvas 仍为占位**
+3. **≠ 场景 K 全阶段验收签字**（本 PR 只完成 tarball 消费者机制；阶段总验收在 P21）
+4. 无公开 live WFS 冒烟
+5. keychain / Token 仍为会话内存
+6. vector-io 仍依赖 workspace scene-schema，未独立发布
+
+### 下一可执行任务
+
+**P21 — 全阶段验收与交接**（未开始）

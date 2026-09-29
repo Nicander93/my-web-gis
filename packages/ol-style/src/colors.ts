@@ -1,4 +1,4 @@
-import type { Color } from './types'
+import type { Color } from './types.js'
 
 /**
  * 颜色工具函数

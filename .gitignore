@@ -9,3 +9,6 @@ target/
 apps/desktop/dist/
 apps/desktop/src-tauri/target/
 packages/*/dist/
+
+*.tgz
+packages/ol-style/*.tgz

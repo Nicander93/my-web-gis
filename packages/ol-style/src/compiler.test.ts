@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { compileStyle, clearSymbolCache } from './compiler'
-import type { SingleStyle, CategorizedStyle, GraduatedStyle, PointSymbol, LineSymbol } from './types'
+import { compileStyle, clearSymbolCache } from './compiler.js'
+import type { SingleStyle, CategorizedStyle, GraduatedStyle, PointSymbol, LineSymbol } from './types.js'
 import Feature from 'ol/Feature'
 import Point from 'ol/geom/Point'
 import LineString from 'ol/geom/LineString'

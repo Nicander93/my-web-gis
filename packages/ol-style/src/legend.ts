@@ -2,7 +2,7 @@
  * 从图例配置生成图例项（纯函数，不依赖 OpenLayers）
  */
 
-import type { Color, LayerStyle, Symbol } from './types'
+import type { Color, LayerStyle, Symbol } from './types.js'
 
 export type LegendGeometryKind = 'point' | 'line' | 'polygon'
 
