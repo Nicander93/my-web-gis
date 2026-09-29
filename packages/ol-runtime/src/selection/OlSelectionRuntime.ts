@@ -35,6 +35,10 @@ export class OlSelectionRuntime {
     this.select = null
   }
 
+  /**
+   * Sync highlight to S. Features absent from the layer source (outside F after filter sync)
+   * are skipped so hidden features are not highlighted.
+   */
   syncSelection(state: SelectionState): void {
     if (!this.select) return
     const collection = this.select.getFeatures()

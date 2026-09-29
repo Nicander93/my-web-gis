@@ -1,4 +1,4 @@
-import type { BasemapConfig, GisFeature, Layer, MapState } from '@desktop-webgis/gis-core'
+import { applyFieldFilter, type BasemapConfig, type GisFeature, type Layer, type MapState } from '@desktop-webgis/gis-core'
 import { createOlSceneLayer, updateGoogleMapTilesAttribution } from '@desktop-webgis/ol-scene-runtime'
 import type { SceneSource } from '@desktop-webgis/scene-schema'
 import Map from 'ol/Map'
@@ -125,7 +125,9 @@ export class OlMapRuntime {
     }
 
     layers.forEach((layer, index) => {
-      const features = featuresByDataset[layer.datasetId] ?? []
+      // Visible set = F (layer.filter). Hidden features are omitted so they cannot stay highlighted.
+      const allFeatures = featuresByDataset[layer.datasetId] ?? []
+      const features = applyFieldFilter(allFeatures, layer.filter)
       const existing = this.registry.get(layer.id)
       if (existing) {
         existing.setVisible(layer.visible)
