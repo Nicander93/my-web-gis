@@ -3,7 +3,8 @@ import { Header } from './Header'
 import { StatusBar } from './StatusBar'
 import { Workspace } from './Workspace'
 import { AddDataDialog } from '@/features/add-data/AddDataDialog'
-import { registerAddDataCallback } from './commands/project.commands'
+import { ExportDialog } from '@/features/export/ExportDialog'
+import { registerAddDataCallback, registerExportDataCallback } from './commands/project.commands'
 import { useProjectStore } from '@/stores/project.store'
 import { createId } from '@desktop-webgis/gis-core'
 import type { ImportResult } from '@/services/import'
@@ -12,6 +13,8 @@ import { emitCommandStatus } from './commands/status'
 export default function App() {
   const [status, setStatus] = useState('就绪')
   const [addDataOpen, setAddDataOpen] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
+  const [exportLayerId, setExportLayerId] = useState<string | null>(null)
   const addLayer = useProjectStore((state) => state.addLayer)
 
   useEffect(() => {
@@ -22,9 +25,16 @@ export default function App() {
     }
 
     window.addEventListener('desktop-webgis:command-status', handleCommandStatus)
-    
+
     registerAddDataCallback({
       openDialog: () => setAddDataOpen(true)
+    })
+
+    registerExportDataCallback({
+      openDialog: (layerId) => {
+        setExportLayerId(layerId ?? null)
+        setExportOpen(true)
+      }
     })
 
     return () => window.removeEventListener('desktop-webgis:command-status', handleCommandStatus)
@@ -34,7 +44,7 @@ export default function App() {
     for (const layer of result.layers) {
       const datasetId = createId('dataset')
       addLayer(datasetId, layer.name, layer.features, layer.styleKind)
-      
+
       if (layer.warnings.length > 0) {
         emitCommandStatus(`已导入 ${layer.name}，有 ${layer.warnings.length} 个警告`)
       } else {
@@ -52,6 +62,14 @@ export default function App() {
         open={addDataOpen}
         onClose={() => setAddDataOpen(false)}
         onImport={handleImport}
+      />
+      <ExportDialog
+        open={exportOpen}
+        layerId={exportLayerId}
+        onClose={() => {
+          setExportOpen(false)
+          setExportLayerId(null)
+        }}
       />
     </div>
   )

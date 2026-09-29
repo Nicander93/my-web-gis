@@ -1,4 +1,4 @@
-import { open } from '@tauri-apps/plugin-dialog'
+import { open, save } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core'
 
 export interface FileContent {
@@ -12,9 +12,22 @@ export async function pickFile(filters?: { name: string; extensions: string[] }[
     directory: false,
     filters
   })
-  
+
   if (!selected || Array.isArray(selected)) return null
   return selected
+}
+
+export async function pickSaveFile(options?: {
+  title?: string
+  defaultPath?: string
+  filters?: { name: string; extensions: string[] }[]
+}): Promise<string | null> {
+  const selected = await save({
+    title: options?.title,
+    defaultPath: options?.defaultPath,
+    filters: options?.filters
+  })
+  return selected ?? null
 }
 
 export async function readTextFile(path: string): Promise<string> {

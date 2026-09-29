@@ -1,4 +1,5 @@
 import { emitCommandStatus } from './status'
+import { projectCommands } from './project.commands'
 import { useWorkspaceStore } from '@/stores/workspace.store'
 import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
@@ -50,7 +51,12 @@ export const layerCommands = {
     emitCommandStatus('属性表已打开')
   },
   export(): void {
-    emitCommandStatus('导出图层（数据服务待接入）')
+    projectCommands.exportData(useProjectStore.getState().selectedLayerId)
+  },
+
+  /** Open export dialog pre-focused on copy-friendly scopes (same dialog). */
+  copyToLocalLayer(): void {
+    projectCommands.exportData(useProjectStore.getState().selectedLayerId)
   },
 
   /**

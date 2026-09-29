@@ -1895,3 +1895,75 @@ function getLabelText(feature, labelConfig) {
 
 **P13 — 导出范围与复制为新图层**（未开始）
 
+
+
+---
+
+## P13 — 导出范围与复制为本地图层
+
+- **状态**: 进行中 → 已完成（见下方完成记录）
+- **时间**: 2026-09-29 16:50 CST
+- **分支**: local/p13-export-copy-layer
+- **基于**: main 8d02fc9（P12 / PR#17）
+- **说明**: 工作树干净；未动既有 stash。未启动 P14。
+
+### 目标对照（实施中）
+
+| 计划要求 | 结果 |
+| --- | --- |
+| GeoJSON 导出几何+属性；保留原始字符串 | ✅ stringifyGeoJson |
+| 属性 CSV 转义分隔符/换行/引号 | ✅ eaturesToCsv / escapeCsvField |
+| 默认公式前缀防护 + UI/说明 | ✅ formulaGuard + ExportDialog 帮助 |
+| 四种范围及数量按 4.2；同一快照 | ✅ exportScopes A/F/S/table |
+| 复制为独立本地图层/Dataset | ✅ copyFeaturesToLocalLayer |
+| 空范围不生成误导文件；取消≠Dirty | ✅ |
+| 未启动 P14 | ✅ |
+
+---
+
+## P13 — 导出范围与复制为本地图层（完成记录）
+
+- **状态**: 已完成（Draft PR，待审核）
+- **时间**: 2026-09-29 16:52 CST
+- **分支**: local/p13-export-copy-layer
+- **基于**: main 8d02fc9（P12 / PR#17）
+- **Commit**: (pending tip)
+- **PR**: (pending)
+
+### 目标对照
+
+| 计划要求 | 结果 |
+| --- | --- |
+| GeoJSON 导出几何和属性；保留原始字符串 | ✅ gis-core stringifyGeoJson；不加公式前缀 |
+| 属性 CSV 正确转义；默认公式防护并说明 | ✅ vector-io csv-write + 对话框帮助文案 |
+| 四种范围及数量：全部 / 图层筛选 F / 选中 S / 当前表格结果；确认后同一快照 | ✅ 
+esolveExportFeatures + 计数 UI |
+| 复制筛选/选中结果为独立本地图层，独立 Dataset，无共享可变引用 | ✅ copyFeaturesToLocalLayer + cloneValue |
+| 验收：重导入要素数+坐标正确；空范围无误导文件；编辑副本≠源；取消导出≠Dirty | ✅ 单测覆盖 |
+| 测试 + Desktop build | ✅ |
+| 未启动 P14 | ✅ |
+
+### 主要改动
+
+- packages/vector-io: csv-write.ts（转义 + formulaGuard）
+- pps/desktop: ExportDialog / exportScopes；iles.pickSaveFile；project/layer commands 接入；copyFeaturesToLocalLayer
+- 文档：workbench P12 tip→8d02fc9；P13→已完成
+
+### 测试与构建
+
+1. vector-io test — ✅ 35（含 CSV write 6）
+2. gis-core test — ✅ 29
+3. desktop test — ✅ 32（含 P13 7）
+4. desktop build — ✅
+
+### 已知限制
+
+1. 属性 CSV 默认不含几何；点要素可选 includePointXY（导出对话框当前未暴露该开关）。
+2. 导出/复制共用同一对话框；P14 上下文菜单再拆「导出」「复制」入口。
+3. MapCanvas 仍为占位；文件写出依赖 Tauri save + write_text_path。
+4. 未启动 P14；未 npm publish。
+
+### 下一个任务
+
+**P14 — 图层上下文菜单与分组**（未开始）
+
