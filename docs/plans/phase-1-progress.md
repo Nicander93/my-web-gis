@@ -1743,3 +1743,27 @@ function getLabelText(feature, labelConfig) {
 
 **P11 — Scene/Viewer 样式一致性**
 
+
+---
+
+## P11 — Scene/Viewer 样式一致性
+
+- **状态**: 进行中
+- **时间**: 2026-09-29 16:30 CST
+- **分支**: `local/p11-scene-style-consistency`
+- **基于**: main `a57855e`（P10 / PR#15）
+- **说明**: 本地从 main 新建分支；未动 stash `wip-before-p10-unrelated-20260929-074855`。
+
+### 目标对照（实施中）
+
+| 计划要求 | 结果 |
+| --- | --- |
+| 新写出使用明确新 schema 版本；旧 v1 可读 | 进行中：`version: 2` 写出；v1 经 migrate |
+| 旧单一符号+字段标签进入同一 ol-style 编译器 | 进行中 |
+| 不把新字段塞进旧 schema 假装兼容 | 进行中：v1/v2 校验分岔 |
+| Desktop/Viewer 复用 `@desktop-webgis/ol-style` | 进行中：`ol-scene-runtime` 依赖 ol-style |
+| 协议层纯类型、无 OL 运行时依赖 | 进行中：`scene-schema` 无 ol 依赖 |
+| 同数据 Desktop vs Viewer 分类/断点/颜色/标注一致 | 进行中：runtime 对照测试 |
+| codegen 新能力不静默降级 | 进行中：capabilities guard |
+| 未启动 P12 | ✅ |
+

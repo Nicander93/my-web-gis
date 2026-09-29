@@ -8,6 +8,7 @@ import type {
   ValidationIssue,
   ValidationResult
 } from './types.js'
+import { SCENE_MANIFEST_VERSION, SCENE_MANIFEST_VERSION_V1 } from './types.js'
 
 type UnknownRecord = Record<string, unknown>
 
@@ -289,6 +290,150 @@ function validateLabel(value: unknown, path: string, issues: ValidationIssue[]):
   validateZoomRange(value, path, issues)
 }
 
+function validateSceneColor(value: unknown, path: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issue(issues, path, 'type.object', '颜色必须是 { r, g, b, a } 对象')
+    return
+  }
+  for (const channel of ['r', 'g', 'b'] as const) {
+    if (!isFiniteNumber(value[channel]) || value[channel] < 0 || value[channel] > 255) {
+      issue(issues, `${path}.${channel}`, 'color.channel', '必须是 0..255 有限数值')
+    }
+  }
+  if (!isFiniteNumber(value.a) || value.a < 0 || value.a > 1) {
+    issue(issues, `${path}.a`, 'color.alpha', '必须是 0..1 有限数值')
+  }
+}
+
+function validateSceneSymbol(value: unknown, path: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issue(issues, path, 'type.object', '必须是对象')
+    return
+  }
+
+  if (value.type === 'circle') {
+    validatePositiveNumber(value.radius, `${path}.radius`, issues)
+    if (value.fill !== undefined) validateSceneColor(value.fill, `${path}.fill`, issues)
+    if (value.stroke !== undefined) validateSceneColor(value.stroke, `${path}.stroke`, issues)
+    if (value.strokeWidth !== undefined) {
+      validatePositiveNumber(value.strokeWidth, `${path}.strokeWidth`, issues, true)
+    }
+    return
+  }
+
+  if (value.type === 'solid') {
+    if ('width' in value && !('fill' in value)) {
+      if (value.color !== undefined) validateSceneColor(value.color, `${path}.color`, issues)
+      else issue(issues, `${path}.color`, 'symbol.color', '线符号必须提供 color')
+      validatePositiveNumber(value.width, `${path}.width`, issues)
+      validateLineDash(value.lineDash, `${path}.lineDash`, issues)
+      return
+    }
+    if (value.fill !== undefined) validateSceneColor(value.fill, `${path}.fill`, issues)
+    if (value.stroke !== undefined) validateSceneColor(value.stroke, `${path}.stroke`, issues)
+    if (value.strokeWidth !== undefined) {
+      validatePositiveNumber(value.strokeWidth, `${path}.strokeWidth`, issues, true)
+    }
+    validateLineDash(value.lineDash, `${path}.lineDash`, issues)
+    return
+  }
+
+  if (value.type === 'mixed') {
+    if (value.point !== undefined) validateSceneSymbol(value.point, `${path}.point`, issues)
+    if (value.line !== undefined) validateSceneSymbol(value.line, `${path}.line`, issues)
+    if (value.polygon !== undefined) validateSceneSymbol(value.polygon, `${path}.polygon`, issues)
+    if (value.point === undefined && value.line === undefined && value.polygon === undefined) {
+      issue(issues, path, 'symbol.mixed.empty', 'mixed 符号至少提供 point、line 或 polygon 之一')
+    }
+    return
+  }
+
+  issue(issues, `${path}.type`, 'symbol.type', '必须是 circle、solid 或 mixed')
+}
+
+function validateSceneLabelConfig(value: unknown, path: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issue(issues, path, 'type.object', '必须是对象')
+    return
+  }
+  requireString(value.field, `${path}.field`, issues)
+  if (value.fontSize !== undefined) validatePositiveNumber(value.fontSize, `${path}.fontSize`, issues)
+  if (value.color !== undefined) validateSceneColor(value.color, `${path}.color`, issues)
+  if (value.strokeColor !== undefined) validateSceneColor(value.strokeColor, `${path}.strokeColor`, issues)
+  if (value.strokeWidth !== undefined) {
+    validatePositiveNumber(value.strokeWidth, `${path}.strokeWidth`, issues, true)
+  }
+  optionalFiniteNumber(value.offsetX, `${path}.offsetX`, issues)
+  optionalFiniteNumber(value.offsetY, `${path}.offsetY`, issues)
+  validateZoomRange(value, path, issues)
+}
+
+function validateLayerStyle(value: unknown, path: string, issues: ValidationIssue[]): void {
+  if (!isRecord(value)) {
+    issue(issues, path, 'type.object', '必须是对象')
+    return
+  }
+
+  if (value.mode === 'single') {
+    validateSceneSymbol(value.symbol, `${path}.symbol`, issues)
+    if (value.label !== undefined) validateSceneLabelConfig(value.label, `${path}.label`, issues)
+    return
+  }
+
+  if (value.mode === 'categorized') {
+    requireString(value.field, `${path}.field`, issues)
+    if (!Array.isArray(value.categories)) {
+      issue(issues, `${path}.categories`, 'type.array', '必须是数组')
+    } else {
+      value.categories.forEach((entry, index) => {
+        const entryPath = `${path}.categories[${index}]`
+        if (!isRecord(entry)) {
+          issue(issues, entryPath, 'type.object', '必须是对象')
+          return
+        }
+        if (
+          !(typeof entry.value === 'string' || (typeof entry.value === 'number' && Number.isFinite(entry.value)))
+        ) {
+          issue(issues, `${entryPath}.value`, 'category.value', '必须是字符串或有限数值')
+        }
+        validateSceneSymbol(entry.symbol, `${entryPath}.symbol`, issues)
+        optionalString(entry.label, `${entryPath}.label`, issues)
+      })
+    }
+    validateSceneSymbol(value.fallback, `${path}.fallback`, issues)
+    if (value.label !== undefined) validateSceneLabelConfig(value.label, `${path}.label`, issues)
+    return
+  }
+
+  if (value.mode === 'graduated') {
+    requireString(value.field, `${path}.field`, issues)
+    if (value.method !== 'equal-interval' && value.method !== 'quantile' && value.method !== 'manual') {
+      issue(issues, `${path}.method`, 'graduated.method', '必须是 equal-interval、quantile 或 manual')
+    }
+    if (!Array.isArray(value.breaks)) {
+      issue(issues, `${path}.breaks`, 'type.array', '必须是数组')
+    } else {
+      value.breaks.forEach((entry, index) => {
+        const entryPath = `${path}.breaks[${index}]`
+        if (!isRecord(entry)) {
+          issue(issues, entryPath, 'type.object', '必须是对象')
+          return
+        }
+        if (!isFiniteNumber(entry.value)) {
+          issue(issues, `${entryPath}.value`, 'type.number', '必须是有限数值')
+        }
+        validateSceneSymbol(entry.symbol, `${entryPath}.symbol`, issues)
+        optionalString(entry.label, `${entryPath}.label`, issues)
+      })
+    }
+    validateSceneSymbol(value.fallback, `${path}.fallback`, issues)
+    if (value.label !== undefined) validateSceneLabelConfig(value.label, `${path}.label`, issues)
+    return
+  }
+
+  issue(issues, `${path}.mode`, 'style.mode', 'version 2 样式必须提供 mode: single | categorized | graduated')
+}
+
 function validatePopup(value: unknown, path: string, issues: ValidationIssue[]): value is PopupDefinition {
   if (!isRecord(value)) {
     issue(issues, path, 'type.object', '必须是对象')
@@ -324,7 +469,8 @@ function validateLayer(
   value: unknown,
   path: string,
   issues: ValidationIssue[],
-  sources: UnknownRecord
+  sources: UnknownRecord,
+  version: unknown
 ): value is SceneLayer {
   if (!isRecord(value)) {
     issue(issues, path, 'type.object', '必须是对象')
@@ -364,8 +510,22 @@ function validateLayer(
         issue(issues, `${path}.source`, 'reference.sourceType', 'Vector Layer 必须引用 geojson Source')
       }
     }
-    validateStyle(value.style, `${path}.style`, issues)
-    if (value.label !== undefined) validateLabel(value.label, `${path}.label`, issues)
+
+    if (version === SCENE_MANIFEST_VERSION_V1) {
+      validateStyle(value.style, `${path}.style`, issues)
+      if (value.label !== undefined) validateLabel(value.label, `${path}.label`, issues)
+    } else if (version === SCENE_MANIFEST_VERSION) {
+      if (value.label !== undefined) {
+        issue(
+          issues,
+          `${path}.label`,
+          'style.legacyLabel',
+          'version 2 不得使用顶层 label；请写入 style.label'
+        )
+      }
+      validateLayerStyle(value.style, `${path}.style`, issues)
+    }
+
     if (value.interaction !== undefined) {
       if (!isRecord(value.interaction)) {
         issue(issues, `${path}.interaction`, 'type.object', '必须是对象')
@@ -379,7 +539,7 @@ function validateLayer(
     return true
   }
 
-  issue(issues, `${path}.type`, 'layer.type', 'V0.1 只支持 tile 或 vector Layer')
+  issue(issues, `${path}.type`, 'layer.type', '只支持 tile 或 vector Layer')
   return false
 }
 
@@ -508,7 +668,11 @@ export function validateScene(input: unknown): ValidationResult {
     if (!ROOT_FIELDS.has(field)) issue(issues, `$.${field}`, 'field.unknown', '未知顶层字段')
   }
 
-  if (input.version !== 1) issue(issues, '$.version', 'version.unsupported', '只支持 SceneManifest version 1')
+  const version = input.version
+  if (version !== SCENE_MANIFEST_VERSION_V1 && version !== SCENE_MANIFEST_VERSION) {
+    issue(issues, '$.version', 'version.unsupported', '只支持 SceneManifest version 1 或 2')
+  }
+
   requireString(input.id, '$.id', issues)
   requireString(input.title, '$.title', issues)
   optionalString(input.description, '$.description', issues)
@@ -533,7 +697,7 @@ export function validateScene(input: unknown): ValidationResult {
   } else {
     input.layers.forEach((layer, index) => {
       const layerPath = `$.layers[${index}]`
-      validateLayer(layer, layerPath, issues, sourcesRecord)
+      validateLayer(layer, layerPath, issues, sourcesRecord, version)
       if (isRecord(layer) && typeof layer.id === 'string') {
         if (layerIds.has(layer.id)) issue(issues, `${layerPath}.id`, 'id.duplicate', 'Layer ID 重复')
         layerIds.add(layer.id)

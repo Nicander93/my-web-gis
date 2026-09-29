@@ -1,3 +1,5 @@
+export * from './colors.js'
+export * from './migrate.js'
 export * from './normalize.js'
 export * from './parse.js'
 export * from './types.js'

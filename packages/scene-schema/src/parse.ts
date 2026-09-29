@@ -1,5 +1,6 @@
 import { normalizeScene } from './normalize.js'
-import type { SceneManifest, ValidationIssue } from './types.js'
+import { upgradeSceneManifest } from './migrate.js'
+import type { SceneManifest, SceneManifestInput, ValidationIssue } from './types.js'
 import { validateScene } from './validate.js'
 
 export class SceneValidationError extends Error {
@@ -27,15 +28,18 @@ function decodeInput(input: unknown): unknown {
   }
 }
 
-/** Parses, validates and normalizes a SceneManifest. */
+/** Parses, validates, migrates to version 2, and normalizes a SceneManifest. */
 export function parseScene(input: unknown): SceneManifest {
   const decoded = decodeInput(input)
   const result = validateScene(decoded)
   if (!result.valid) throw new SceneValidationError(result.issues)
-  return normalizeScene(decoded as SceneManifest)
+  return normalizeScene(upgradeSceneManifest(decoded as SceneManifestInput))
 }
 
-/** Migration entry point. It currently accepts v1 and rejects all unsupported versions. */
+/**
+ * Migration entry point.
+ * Accepts version 1 or 2; always returns the canonical version 2 document.
+ */
 export function migrateScene(input: unknown): SceneManifest {
   return parseScene(input)
 }

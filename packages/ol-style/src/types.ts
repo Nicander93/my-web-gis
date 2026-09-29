@@ -36,6 +36,7 @@ export interface LineSymbol {
   type: 'solid'
   color: Color
   width: number
+  lineDash?: number[]
 }
 
 /**
@@ -46,6 +47,7 @@ export interface PolygonSymbol {
   fill?: Color
   stroke?: Color
   strokeWidth?: number
+  lineDash?: number[]
 }
 
 /**
@@ -98,6 +100,10 @@ export interface LabelConfig {
   strokeColor?: Color
   /** 描边宽度 */
   strokeWidth?: number
+  /** 水平偏移(像素) */
+  offsetX?: number
+  /** 垂直偏移(像素) */
+  offsetY?: number
   /** 最小缩放级别(可选) */
   minZoom?: number
   /** 最大缩放级别(可选) */

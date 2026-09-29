@@ -90,7 +90,8 @@ function compileLineSymbol(symbol: LineSymbol): { stroke: Stroke } {
   return {
     stroke: new Stroke({
       color: colorToOlColor(symbol.color),
-      width: symbol.width
+      width: symbol.width,
+      lineDash: symbol.lineDash
     })
   }
 }
@@ -104,7 +105,8 @@ function compilePolygonSymbol(symbol: PolygonSymbol): { fill?: Fill; stroke?: St
     stroke: symbol.stroke
       ? new Stroke({
           color: colorToOlColor(symbol.stroke),
-          width: symbol.strokeWidth ?? 1
+          width: symbol.strokeWidth ?? 1,
+          lineDash: symbol.lineDash
         })
       : undefined
   }
@@ -180,7 +182,9 @@ function getOrCreateStyle(
               color: colorToOlColor(labelConfig.strokeColor),
               width: labelConfig.strokeWidth ?? 1
             })
-          : undefined
+          : undefined,
+        offsetX: labelConfig.offsetX ?? 0,
+        offsetY: labelConfig.offsetY ?? 0
       })
     }
 

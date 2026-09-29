@@ -1,5 +1,13 @@
 import { createSceneRuntime, type RuntimeFeatureClickEvent } from '@desktop-webgis/ol-scene-runtime'
-import { parseScene, type PopupField, type SceneManifest, type VectorLayer } from '@desktop-webgis/scene-schema'
+import {
+  parseScene,
+  type PopupField,
+  type SceneColor,
+  type SceneLayerStyle,
+  type SceneManifest,
+  type SceneSymbol,
+  type VectorLayer
+} from '@desktop-webgis/scene-schema'
 import Map from 'ol/Map'
 import Overlay from 'ol/Overlay'
 import 'ol/ol.css'
@@ -133,6 +141,46 @@ function renderLayerSwitcher(manifest: SceneManifest, setVisible: (layerId: stri
   )
 }
 
+function colorToCss(color: SceneColor | undefined, fallback = 'transparent'): string {
+  if (!color) return fallback
+  return `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`
+}
+
+function primarySymbol(style: SceneLayerStyle): SceneSymbol {
+  if (style.mode === 'single') return style.symbol
+  if (style.mode === 'categorized') return style.categories[0]?.symbol ?? style.fallback
+  return style.breaks[0]?.symbol ?? style.fallback
+}
+
+function symbolKind(symbol: SceneSymbol): 'point' | 'line' | 'polygon' {
+  if (symbol.type === 'circle') return 'point'
+  if (symbol.type === 'solid' && 'width' in symbol && !('fill' in symbol)) return 'line'
+  if (symbol.type === 'mixed') return symbol.point ? 'point' : symbol.line ? 'line' : 'polygon'
+  return 'polygon'
+}
+
+function applyLegendSymbol(element: HTMLSpanElement, symbol: SceneSymbol): void {
+  const kind = symbolKind(symbol)
+  element.className = `legend-symbol legend-symbol--${kind}`
+  if (symbol.type === 'circle') {
+    element.style.background = colorToCss(symbol.fill, '#94a3b8')
+    element.style.borderColor = colorToCss(symbol.stroke, 'transparent')
+    return
+  }
+  if (symbol.type === 'solid' && 'width' in symbol && !('fill' in symbol)) {
+    element.style.background = colorToCss(symbol.color, '#64748b')
+    element.style.height = `${Math.max(2, symbol.width)}px`
+    return
+  }
+  if (symbol.type === 'solid') {
+    element.style.background = colorToCss(symbol.fill, '#94a3b8')
+    element.style.borderColor = colorToCss(symbol.stroke, 'transparent')
+    return
+  }
+  const nested = symbol.point ?? symbol.polygon ?? symbol.line
+  if (nested) applyLegendSymbol(element, nested)
+}
+
 function renderLegend(manifest: SceneManifest): void {
   if (!manifest.widgets?.legend) return
   const vectorLayers = manifest.layers.filter((layer): layer is VectorLayer => layer.type === 'vector')
@@ -143,17 +191,7 @@ function renderLegend(manifest: SceneManifest): void {
       const row = document.createElement('div')
       row.className = 'legend-row'
       const symbol = document.createElement('span')
-      symbol.className = `legend-symbol legend-symbol--${layer.style.type}`
-      if (layer.style.type === 'point') {
-        symbol.style.background = layer.style.fill
-        symbol.style.borderColor = layer.style.stroke ?? 'transparent'
-      } else if (layer.style.type === 'line') {
-        symbol.style.background = layer.style.color
-        symbol.style.height = `${Math.max(2, layer.style.width)}px`
-      } else {
-        symbol.style.background = layer.style.fill
-        symbol.style.borderColor = layer.style.stroke
-      }
+      applyLegendSymbol(symbol, primarySymbol(layer.style))
       const name = document.createElement('span')
       name.textContent = layer.name
       row.append(symbol, name)

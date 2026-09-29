@@ -127,7 +127,10 @@ describe('scene layer adapter', () => {
         type: 'vector',
         name: 'Places',
         source: 'places',
-        style: { type: 'point', radius: 6, fill: '#2563eb' }
+        style: {
+          mode: 'single',
+          symbol: { type: 'circle', radius: 6, fill: { r: 37, g: 99, b: 235, a: 1 } }
+        }
       },
       {
         places: {
