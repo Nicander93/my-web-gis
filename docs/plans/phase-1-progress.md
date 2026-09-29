@@ -1994,11 +1994,12 @@ esolveExportFeatures + 计数 UI |
 
 ### 完成记录
 
-- **状态**: 已完成（Draft PR，待开）
+- **状态**: 已完成（Draft PR，待审核）
 - **时间**: 2026-09-29 17:08 CST
 - **分支**: `local/p14-layer-context-groups`
 - **基于**: main `6e980c4`（P13 / PR#18 squash）
-- **Commit**: `153d5e5`
+- **Commit**: `153d5e5` (branch tip `e935a0e`)
+- **PR**: [#19](https://github.com/Nicander93/my-web-gis/pull/19)（Draft）
 
 ### 目标对照
 

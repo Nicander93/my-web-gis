@@ -384,7 +384,7 @@ rtk proxy pnpm --filter @desktop-webgis/desktop build
 | P11 | 已完成 | Scene 样式。PR#16 / bea20bc |
 | P12 | 已完成 | 属性过滤选择。PR#17 / 8d02fc9 |
 | P13 | 已完成 | 导出与复制。PR#18 squash / 6e980c4 |
-| P14 | 已完成 | 图层上下文菜单与分组。tip `153d5e5` |
+| P14 | 已完成 | 图层上下文菜单与分组。Draft PR#19 / e935a0e |
 | P15 | 待执行 | 服务模型 |
 | P16 | 待执行 | WMS |
 | P17 | 待执行 | WMTS |
