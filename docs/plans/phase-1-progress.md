@@ -2244,3 +2244,58 @@ esolve-wfs / etch-getfeature / parse-wfs；WFS 1.1/2.0 fixtures；bounded 单�
 ### 下一个任务
 
 **P19 — 项目与 Scene 全链路集成**（未开始）
+
+## P19 — 项目与 Scene 全链路集成
+
+- **状态**: 已完成（Draft PR，待审核）
+- **时间**: 2026-09-30 07:36 CST
+- **分支**: local/p19-project-scene-integration
+- **基于**: main c156941（P18 / PR#23 squash）
+- **说明**: 机制/集成 PR；≠ 场景 G/H/I/J 全验收；MapCanvas 仍为占位；无公网 live WFS 冒烟；工作树保留无关 scripts/ 与 stash@{0}；未使用 Cursor CloudAgent；未触碰 GeoForge / D:\code\3dtiles。
+- **Commit**: （推送后回填）
+- **PR**: （创建后回填）
+
+### 目标对照
+
+| 计划要求 | 结果 |
+| --- | --- |
+| 保存含样式、标注、分组、过滤、原始 CRS、服务连接描述；文件/WFS 快照随项目 | ✅ ProjectSnapshot + sourceCrs 元数据；featuresByDataset 含导入与 WFS 快照 |
+| WMS/WMTS 重开保留配置；失败可重试占位；离线可看本地 | ✅ 序列化保留服务配置；既有 retryServiceLayer；本地要素在 snapshot 内 |
+| Scene：WMS/WMTS、样式、分组展示、矢量过滤；WFS 为明确快照；不默认发布动态凭据 | ✅ compileProjectToScene；layerMeta.wfsSnapshot；stripCredentialRefs；分组 metadata |
+| codegen/publisher/Viewer：不能支持则显式阻止 | ✅ assertSceneCodegenCapabilities 校验 source 类型；底图含 embedded credential 显式 CompileProjectError |
+| 样式/标签/过滤/分组接入统一 EditCommand；滑块合并一次命令 | ✅ SetLayerStyle/Filter/Opacity/TreeCommand + EditHistory coalesce；editCommands 单路径 |
+| 验收：混合保存→重开正确；布局与凭据不进可分享内容 | ✅ desktop P19 单测；layout 在 workspace persist；凭证仅 credentialRef |
+
+### 主要改动
+
+- `packages/gis-core`: configCommands、project-share、EditHistory coalesce
+- `packages/scene-schema`: WMS/WMTS SceneSource + 校验
+- `packages/scene-core`: compileProjectToScene
+- `packages/ol-scene-runtime`: service-layers（WMS/WMTS）
+- `packages/scene-codegen`: source 类型硬失败
+- `apps/desktop`: 真实 save/open（project-io）、loadSnapshot、统一撤销、P19 单测
+
+### 测试与构建
+
+1. gis-core test → 41
+2. scene-schema test → 11
+3. scene-core test → 7（含 compile 2）
+4. scene-codegen test → 3
+5. ol-scene-runtime test → 8
+6. scene-publisher test → 3
+7. desktop test → 62（含 P19 4 条）
+8. desktop build → ✅
+
+### 已知限制 / 开放项
+
+1. **MapCanvas 仍为占位**（视图 BBOX 仍会话占位）。
+2. **≠ 场景 G/H/I/J**：本 PR 不宣称服务场景或发布场景全验收。
+3. **无公网 live WFS 冒烟**。
+4. 设备 keychain / Token 仍为会话内存。
+5. 不 npm publish；静态发布不上传。
+6. Scene JSON Schema 文件未同步枚举 wms/wmts（运行时 TS validate 已支持）。
+
+### 下一个任务
+
+**P20 — 样式包发布准备**（未开始）
+

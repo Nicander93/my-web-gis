@@ -293,12 +293,9 @@ export const layerCommands = {
       return false
     }
 
-    const before = normalizeStyle(layer.style as never)
     const after = cloneValue(style)
+    // setLayerStyle records a SetLayerStyleCommand on the unified EditHistory.
     projectState.setLayerStyle(layerId, after)
-
-    styleUndoStack.push({ layerId, before, after })
-    styleRedoStack.length = 0
 
     useSessionStore.getState().setStyleDraft(layerId, {
       style: cloneValue(after),
@@ -330,48 +327,32 @@ export const layerCommands = {
   },
 
   undoStyle(): boolean {
-    const op = styleUndoStack.pop()
-    if (!op) return false
-    useProjectStore.getState().setLayerStyle(op.layerId, op.before)
-    styleRedoStack.push(op)
-    const existing = useSessionStore.getState().getLayerSession(op.layerId).styleDraft
-    useSessionStore.getState().setStyleDraft(op.layerId, {
-      style: cloneValue(op.before),
-      dirty: false,
-      classCount: existing?.classCount ?? 5,
-      colorRampId: existing?.colorRampId ?? 'BlueRed'
-    })
-    emitCommandStatus('已撤销样式应用')
-    return true
+    // Style shares the unified project EditHistory; prefer editCommands.undo.
+    if (!useProjectStore.getState().canUndoEdit()) return false
+    const ok = useProjectStore.getState().undoEdit()
+    if (ok) emitCommandStatus('已撤销')
+    return ok
   },
 
   redoStyle(): boolean {
-    const op = styleRedoStack.pop()
-    if (!op) return false
-    useProjectStore.getState().setLayerStyle(op.layerId, op.after)
-    styleUndoStack.push(op)
-    const existing = useSessionStore.getState().getLayerSession(op.layerId).styleDraft
-    useSessionStore.getState().setStyleDraft(op.layerId, {
-      style: cloneValue(op.after),
-      dirty: false,
-      classCount: existing?.classCount ?? 5,
-      colorRampId: existing?.colorRampId ?? 'BlueRed'
-    })
-    emitCommandStatus('已重做样式应用')
-    return true
+    if (!useProjectStore.getState().canRedoEdit()) return false
+    const ok = useProjectStore.getState().redoEdit()
+    if (ok) emitCommandStatus('已重做')
+    return ok
   },
 
   canUndoStyle(): boolean {
-    return styleUndoStack.length > 0
+    return useProjectStore.getState().canUndoEdit()
   },
 
   canRedoStyle(): boolean {
-    return styleRedoStack.length > 0
+    return useProjectStore.getState().canRedoEdit()
   },
 
   /** 测试用：清空样式撤销栈 */
   _resetStyleHistoryForTests(): void {
     styleUndoStack.length = 0
+    useProjectStore.getState()._resetProjectHistoryForTests?.()
     styleRedoStack.length = 0
   }
 }

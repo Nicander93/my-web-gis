@@ -1,21 +1,18 @@
 import { emitCommandStatus } from './status'
-import { layerCommands } from './layer.commands'
 import { useProjectStore } from '@/stores/project.store'
 
-/** 编辑命令的最小集合；样式配置撤销优先，其次属性编辑撤销。 */
+/** 编辑命令的最小集合；样式/过滤/透明度/分组与属性编辑共用 EditHistory。 */
 export const editCommands = {
   undo(): void {
-    if (layerCommands.undoStyle()) return
-    if (useProjectStore.getState().undoAttributeEdit()) {
-      emitCommandStatus('已撤销属性编辑')
+    if (useProjectStore.getState().undoEdit()) {
+      emitCommandStatus('已撤销')
       return
     }
     emitCommandStatus('撤销（无可撤销操作）')
   },
   redo(): void {
-    if (layerCommands.redoStyle()) return
-    if (useProjectStore.getState().redoAttributeEdit()) {
-      emitCommandStatus('已重做属性编辑')
+    if (useProjectStore.getState().redoEdit()) {
+      emitCommandStatus('已重做')
       return
     }
     emitCommandStatus('重做（无可重做操作）')

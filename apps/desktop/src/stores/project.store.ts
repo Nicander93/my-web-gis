@@ -15,7 +15,12 @@ import {
   flattenLayerIds,
   createLayerGroup,
   findGroupForLayer,
-  layersWithEffectiveVisibility
+  layersWithEffectiveVisibility,
+  SetLayerStyleCommand,
+  SetLayerFilterCommand,
+  SetLayerOpacityCommand,
+  SetLayerTreeCommand,
+  snapshotLayerTree
 } from '@desktop-webgis/gis-core'
 import type {
   Project,
@@ -26,9 +31,10 @@ import type {
   GisFeature,
   SelectionState,
   FieldFilterCondition,
-  EditContext,
   ServiceSource,
-  DatasetKind
+  DatasetKind,
+  ProjectSnapshot,
+  ProjectEditContext
 } from '@desktop-webgis/gis-core'
 import { useSessionStore } from '@/stores/session.store'
 import type { LayerStyle } from '@desktop-webgis/ol-style'
@@ -69,6 +75,9 @@ interface ProjectState {
   }): { datasetId: string; layerId: string } | null
   setSelectedLayer(layerId: string | null): void
   setDirty(dirty: boolean): void
+  /** Replace project + features (open / new). Clears edit history. */
+  loadSnapshot(snapshot: ProjectSnapshot): void
+  getSnapshot(): ProjectSnapshot
   setLayerStyle(layerId: string, style: LayerStyle): void
   getNormalizedLayerStyle(layerId: string): LayerStyle | null
 
@@ -91,7 +100,13 @@ interface ProjectState {
   redoAttributeEdit(): boolean
   canUndoAttributeEdit(): boolean
   canRedoAttributeEdit(): boolean
+  /** Unified EditCommand undo (style/filter/opacity/tree + attributes). */
+  undoEdit(): boolean
+  redoEdit(): boolean
+  canUndoEdit(): boolean
+  canRedoEdit(): boolean
   _resetAttributeHistoryForTests(): void
+  _resetProjectHistoryForTests(): void
 
   /** Ordered layers for map sync (list top → bottom) with effective visibility. */
   getMapLayers(): Layer[]
@@ -125,7 +140,7 @@ interface ProjectState {
   ): void
 }
 
-const attributeHistory = new EditHistory()
+const editHistory = new EditHistory()
 const attributeFeatureStore = new MemoryFeatureStore()
 
 function syncStoreFromState(featuresByDataset: Record<string, GisFeature[]>): void {
@@ -134,11 +149,29 @@ function syncStoreFromState(featuresByDataset: Record<string, GisFeature[]>): vo
   }
 }
 
-function editContext(): EditContext {
-  return { featureStore: attributeFeatureStore }
-}
+export const useProjectStore = create<ProjectState>((set, get) => {
+  function projectEditContext(): ProjectEditContext {
+    return {
+      featureStore: attributeFeatureStore,
+      getProject: () => get().project,
+      replaceProject: (project) => {
+        set({ project: normalizeLayerTree(project), dirty: true })
+      }
+    }
+  }
 
-export const useProjectStore = create<ProjectState>((set, get) => ({
+  function reconvergeSelection(layerId: string): void {
+    const state = get()
+    if (state.selection.layerId !== layerId) return
+    const filtered = state.getFilteredFeatures(layerId)
+    const nextIds = intersectSelectionIds(state.selection.featureIds, filtered)
+    set({
+      selection: { layerId, featureIds: nextIds },
+      lastSelectionCountAfterFilter: nextIds.length
+    })
+  }
+
+  return {
   project: createProject(),
   featuresByDataset: {},
   dirty: false,
@@ -274,16 +307,42 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   setSelectedLayer: (layerId) => set({ selectedLayerId: layerId }),
   setDirty: (dirty) => set({ dirty }),
 
-  setLayerStyle: (layerId, style) =>
-    set((state) => ({
-      project: {
-        ...state.project,
-        layers: state.project.layers.map((layer) =>
-          layer.id === layerId ? { ...layer, style: cloneValue(style) } : layer
-        )
-      },
-      dirty: true
-    })),
+  loadSnapshot: (snapshot) => {
+    editHistory.clear()
+    const project = normalizeLayerTree(cloneValue(snapshot.project))
+    const featuresByDataset = cloneValue(snapshot.featuresByDataset ?? {})
+    syncStoreFromState(featuresByDataset)
+    for (const layerId of Object.keys(useSessionStore.getState().sessions)) {
+      if (!project.layers.some((l) => l.id === layerId)) {
+        useSessionStore.getState().clearLayerSession(layerId)
+      }
+    }
+    set({
+      project,
+      featuresByDataset,
+      dirty: false,
+      selectedLayerId: null,
+      selection: { layerId: null, featureIds: [] },
+      lastSelectionCountAfterFilter: null
+    })
+  },
+
+  getSnapshot: () => ({
+    project: cloneValue(get().project),
+    featuresByDataset: cloneValue(get().featuresByDataset)
+  }),
+
+  setLayerStyle: (layerId, style) => {
+    const state = get()
+    const layer = state.project.layers.find((item) => item.id === layerId)
+    if (!layer) return
+    const before = isLegacyStyle(layer.style) ? migrateLegacyStyle(layer.style) : cloneValue(layer.style)
+    const after = cloneValue(style)
+    editHistory.execute(
+      new SetLayerStyleCommand(createId('cmd'), layerId, before, after),
+      projectEditContext()
+    )
+  },
 
   getNormalizedLayerStyle: (layerId) => {
     const layer = get().project.layers.find((item) => item.id === layerId)
@@ -304,30 +363,23 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     return applyFieldFilter(all, layer.filter)
   },
 
-  setLayerFilter: (layerId, filter) =>
-    set((state) => {
-      const layers = state.project.layers.map((layer) =>
-        layer.id === layerId ? { ...layer, filter: cloneValue(filter) } : layer
-      )
-      const layer = layers.find((item) => item.id === layerId)
-      const all = layer ? (state.featuresByDataset[layer.datasetId] ?? []) : []
-      const filtered = applyFieldFilter(all, filter)
-
-      let selection = state.selection
-      let lastSelectionCountAfterFilter = state.lastSelectionCountAfterFilter
-      if (selection.layerId === layerId) {
-        const nextIds = intersectSelectionIds(selection.featureIds, filtered)
-        selection = { layerId, featureIds: nextIds }
-        lastSelectionCountAfterFilter = nextIds.length
-      }
-
-      return {
-        project: { ...state.project, layers },
-        dirty: true,
-        selection,
-        lastSelectionCountAfterFilter
-      }
-    }),
+  setLayerFilter: (layerId, filter) => {
+    const state = get()
+    const layer = state.project.layers.find((item) => item.id === layerId)
+    if (!layer) return
+    const before = cloneValue(layer.filter ?? [])
+    const after = cloneValue(filter)
+    // Skip no-op to avoid polluting history when reconverging after attribute edits.
+    if (JSON.stringify(before) === JSON.stringify(after)) {
+      reconvergeSelection(layerId)
+      return
+    }
+    editHistory.execute(
+      new SetLayerFilterCommand(createId('cmd'), layerId, before, after),
+      projectEditContext()
+    )
+    reconvergeSelection(layerId)
+  },
 
   clearLayerFilter: (layerId) => get().setLayerFilter(layerId, []),
 
@@ -389,9 +441,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     syncStoreFromState(state.featuresByDataset)
     const before = cloneValue(feature.properties)
     const after = cloneValue(nextProperties)
-    attributeHistory.execute(
+    editHistory.execute(
       new UpdatePropertiesCommand(createId('cmd'), layer.datasetId, featureId, before, after),
-      editContext()
+      projectEditContext()
     )
 
     const nextFeatures = attributeFeatureStore.getAll(layer.datasetId)
@@ -408,48 +460,45 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     return true
   },
 
-  undoAttributeEdit: () => {
+  undoEdit: () => {
     const state = get()
     syncStoreFromState(state.featuresByDataset)
-    const command = attributeHistory.undo(editContext())
+    const command = editHistory.undo(projectEditContext())
     if (!command) return false
-
     const snapshot = attributeFeatureStore.snapshot()
     set({
-      featuresByDataset: { ...state.featuresByDataset, ...snapshot },
+      featuresByDataset: { ...get().featuresByDataset, ...snapshot },
       dirty: true
     })
-
-    // Refresh F/S derived display for all layers whose datasets changed.
     for (const layer of get().project.layers) {
-      if (snapshot[layer.datasetId]) {
-        get().setLayerFilter(layer.id, layer.filter ?? [])
-      }
+      reconvergeSelection(layer.id)
     }
     return true
   },
 
-  redoAttributeEdit: () => {
+  redoEdit: () => {
     const state = get()
     syncStoreFromState(state.featuresByDataset)
-    const command = attributeHistory.redo(editContext())
+    const command = editHistory.redo(projectEditContext())
     if (!command) return false
-
     const snapshot = attributeFeatureStore.snapshot()
     set({
-      featuresByDataset: { ...state.featuresByDataset, ...snapshot },
+      featuresByDataset: { ...get().featuresByDataset, ...snapshot },
       dirty: true
     })
     for (const layer of get().project.layers) {
-      if (snapshot[layer.datasetId]) {
-        get().setLayerFilter(layer.id, layer.filter ?? [])
-      }
+      reconvergeSelection(layer.id)
     }
     return true
   },
 
-  canUndoAttributeEdit: () => attributeHistory.canUndo,
-  canRedoAttributeEdit: () => attributeHistory.canRedo,
+  canUndoEdit: () => editHistory.canUndo,
+  canRedoEdit: () => editHistory.canRedo,
+
+  undoAttributeEdit: () => get().undoEdit(),
+  redoAttributeEdit: () => get().redoEdit(),
+  canUndoAttributeEdit: () => get().canUndoEdit(),
+  canRedoAttributeEdit: () => get().canRedoEdit(),
 
 
   getMapLayers: () => layersWithEffectiveVisibility(get().project),
@@ -465,18 +514,17 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       dirty: true
     })),
 
-  setLayerOpacity: (layerId, opacity) =>
-    set((state) => ({
-      project: {
-        ...state.project,
-        layers: state.project.layers.map((layer) =>
-          layer.id === layerId
-            ? { ...layer, opacity: Math.min(1, Math.max(0, opacity)) }
-            : layer
-        )
-      },
-      dirty: true
-    })),
+  setLayerOpacity: (layerId, opacity) => {
+    const state = get()
+    const layer = state.project.layers.find((item) => item.id === layerId)
+    if (!layer) return
+    const next = Math.min(1, Math.max(0, opacity))
+    if (layer.opacity === next) return
+    editHistory.execute(
+      new SetLayerOpacityCommand(createId('cmd'), layerId, layer.opacity, next),
+      projectEditContext()
+    )
+  },
 
   setGroupVisible: (groupId, visible) =>
     set((state) => ({
@@ -579,6 +627,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   createGroup: (name = '新建组', layerIds = []) => {
+    const beforeTree = snapshotLayerTree(get().project)
     const state = get()
     const project = normalizeLayerTree(state.project)
     const validIds = layerIds.filter((id) => project.layers.some((l) => l.id === id))
@@ -597,10 +646,16 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       )
     ]
 
-    set({
-      project: normalizeLayerTree({ ...project, groups, rootOrder }),
-      dirty: true
-    })
+    const afterProject = normalizeLayerTree({ ...project, groups, rootOrder })
+    editHistory.execute(
+      new SetLayerTreeCommand(
+        createId('cmd'),
+        '创建图层组',
+        beforeTree,
+        snapshotLayerTree(afterProject)
+      ),
+      projectEditContext()
+    )
     return group.id
   },
 
@@ -757,6 +812,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }),
 
   _resetAttributeHistoryForTests: () => {
-    attributeHistory.clear()
+    editHistory.clear()
+  },
+
+  _resetProjectHistoryForTests: () => {
+    editHistory.clear()
   }
-}))
+
+}})

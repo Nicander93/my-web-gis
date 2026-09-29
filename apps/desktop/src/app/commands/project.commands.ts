@@ -1,5 +1,16 @@
+import { createProject } from '@desktop-webgis/gis-core'
 import { emitCommandStatus } from './status'
 import { useSessionStore } from '@/stores/session.store'
+import { useProjectStore } from '@/stores/project.store'
+import {
+  createSnapshotFromState,
+  getCurrentProjectPath,
+  openSnapshotFromDisk,
+  pickAndSaveSnapshot,
+  saveSnapshotToPath,
+  setCurrentProjectPath
+} from '@/services/project-io'
+import { clearSessionCredentials } from '@/services/credentials'
 
 export type ExportDialogMode = 'export' | 'copy'
 
@@ -22,21 +33,82 @@ export function registerExportDataCallback(callback: ExportDataCallback): void {
   exportDataCallback = callback
 }
 
+function bumpProjectGeneration(): void {
+  useSessionStore.getState().bumpWfsLoadGeneration()
+  useSessionStore.getState().abortAllWfsLoads()
+}
+
 export const projectCommands = {
   newProject(): void {
-    useSessionStore.getState().bumpWfsLoadGeneration()
-    emitCommandStatus('新建项目（项目服务待接入）')
+    bumpProjectGeneration()
+    useProjectStore.getState().loadSnapshot({
+      project: createProject(),
+      featuresByDataset: {}
+    })
+    setCurrentProjectPath(null)
+    emitCommandStatus('已新建项目')
   },
-  openProject(): void {
-    useSessionStore.getState().bumpWfsLoadGeneration()
-    emitCommandStatus('打开项目（项目服务待接入）')
+
+  async openProject(): Promise<void> {
+    try {
+      const opened = await openSnapshotFromDisk()
+      if (!opened) {
+        emitCommandStatus('已取消打开')
+        return
+      }
+      bumpProjectGeneration()
+      // Credentials stay in session memory by key — do not invent secrets from file.
+      useProjectStore.getState().loadSnapshot(opened.snapshot)
+      emitCommandStatus(`已打开项目：${opened.path}`)
+    } catch (error) {
+      emitCommandStatus(error instanceof Error ? `打开失败：${error.message}` : '打开失败')
+    }
   },
-  saveProject(): void {
-    emitCommandStatus('保存项目（项目服务待接入）')
+
+  async saveProject(): Promise<void> {
+    try {
+      const state = useProjectStore.getState()
+      const snapshot = createSnapshotFromState(state.project, state.featuresByDataset)
+      const existing = getCurrentProjectPath()
+      if (existing) {
+        await saveSnapshotToPath(existing, snapshot)
+        state.setDirty(false)
+        emitCommandStatus(`已保存：${existing}`)
+        return
+      }
+      const path = await pickAndSaveSnapshot(snapshot, `${state.project.name || 'project'}.webgis.json`)
+      if (!path) {
+        emitCommandStatus('已取消保存')
+        return
+      }
+      state.setDirty(false)
+      emitCommandStatus(`已保存：${path}`)
+    } catch (error) {
+      emitCommandStatus(error instanceof Error ? `保存失败：${error.message}` : '保存失败')
+    }
   },
-  saveProjectAs(): void {
-    emitCommandStatus('另存项目（项目服务待接入）')
+
+  async saveProjectAs(): Promise<void> {
+    try {
+      const state = useProjectStore.getState()
+      const snapshot = createSnapshotFromState(state.project, state.featuresByDataset)
+      const path = await pickAndSaveSnapshot(snapshot, `${state.project.name || 'project'}.webgis.json`)
+      if (!path) {
+        emitCommandStatus('已取消另存')
+        return
+      }
+      state.setDirty(false)
+      emitCommandStatus(`已另存：${path}`)
+    } catch (error) {
+      emitCommandStatus(error instanceof Error ? `另存失败：${error.message}` : '另存失败')
+    }
   },
+
+  /** Test/helper: clear session credentials (never written to project). */
+  clearCredentialsForTests(): void {
+    clearSessionCredentials()
+  },
+
   addData(): void {
     if (addDataCallback) {
       addDataCallback.openDialog()
@@ -44,6 +116,7 @@ export const projectCommands = {
       emitCommandStatus('添加数据（对话框未注册）')
     }
   },
+
   exportData(layerId?: string | null, mode: ExportDialogMode = 'export'): void {
     if (exportDataCallback) {
       exportDataCallback.openDialog(layerId, mode)

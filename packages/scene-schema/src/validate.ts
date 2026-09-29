@@ -224,9 +224,53 @@ function validateSource(
     return true
   }
 
-  issue(issues, `${path}.type`, 'source.type', 'V0.1 只支持 geojson、xyz 或 provider Source')
+﻿  if (value.type === 'wms') {
+    validateUrl(value.url, `${path}.url`, issues)
+    requireString(value.version, `${path}.version`, issues)
+    if (!Array.isArray(value.layerNames) || value.layerNames.length === 0) {
+      issue(issues, `${path}.layerNames`, 'wms.layerNames', '必须提供至少一个 layerName')
+    } else {
+      value.layerNames.forEach((name, index) => optionalString(name, `${path}.layerNames[${index}]`, issues))
+    }
+    if (value.styleNames !== undefined) {
+      if (!Array.isArray(value.styleNames)) {
+        issue(issues, `${path}.styleNames`, 'type.array', '必须是数组')
+      }
+    }
+    optionalString(value.format, `${path}.format`, issues)
+    optionalBoolean(value.transparent, `${path}.transparent`, issues)
+    optionalString(value.crs, `${path}.crs`, issues)
+    if (value.authMode !== 'none' && value.authMode !== 'runtime') {
+      issue(issues, `${path}.authMode`, 'wms.authMode', '必须是 none 或 runtime')
+    }
+    return true
+  }
+
+  if (value.type === 'wmts') {
+    validateUrl(value.url, `${path}.url`, issues)
+    requireString(value.version, `${path}.version`, issues)
+    requireString(value.layer, `${path}.layer`, issues)
+    requireString(value.tileMatrixSet, `${path}.tileMatrixSet`, issues)
+    if (value.requestEncoding !== 'KVP' && value.requestEncoding !== 'REST') {
+      issue(issues, `${path}.requestEncoding`, 'wmts.requestEncoding', '必须是 KVP 或 REST')
+    }
+    if (!Array.isArray(value.tileMatrices) || value.tileMatrices.length === 0) {
+      issue(issues, `${path}.tileMatrices`, 'wmts.tileMatrices', '必须提供 TileMatrix 定义')
+    }
+    if (value.authMode !== 'none' && value.authMode !== 'runtime') {
+      issue(issues, `${path}.authMode`, 'wmts.authMode', '必须是 none 或 runtime')
+    }
+    optionalString(value.style, `${path}.style`, issues)
+    optionalString(value.format, `${path}.format`, issues)
+    optionalString(value.projection, `${path}.projection`, issues)
+    optionalString(value.supportedCrs, `${path}.supportedCrs`, issues)
+    return true
+  }
+
+  issue(issues, `${path}.type`, 'source.type', '只支持 geojson、xyz、provider、wms 或 wmts Source')
   return false
 }
+
 
 function validateLineDash(value: unknown, path: string, issues: ValidationIssue[]): void {
   if (value === undefined) return
@@ -494,8 +538,14 @@ function validateLayer(
       const source = sources[value.source as string]
       if (!source) {
         issue(issues, `${path}.source`, 'reference.source', `Source “${String(value.source)}” 不存在`)
-      } else if (isRecord(source) && source.type !== 'xyz' && source.type !== 'provider') {
-        issue(issues, `${path}.source`, 'reference.sourceType', 'Tile Layer 必须引用 xyz 或 provider Source')
+      } else if (
+        isRecord(source) &&
+        source.type !== 'xyz' &&
+        source.type !== 'provider' &&
+        source.type !== 'wms' &&
+        source.type !== 'wmts'
+      ) {
+        issue(issues, `${path}.source`, 'reference.sourceType', 'Tile Layer 必须引用 xyz、provider、wms 或 wmts Source')
       }
     }
     return true
