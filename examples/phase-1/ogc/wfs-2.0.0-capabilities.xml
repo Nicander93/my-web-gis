@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<WFS_Capabilities version="2.0.0" xmlns="http://www.opengis.net/wfs/2.0" xmlns:ows="http://www.opengis.net/ows/1.1">
+  <ows:ServiceIdentification>
+    <ows:Title>Fixture WFS 2.0.0</ows:Title>
+  </ows:ServiceIdentification>
+  <FeatureTypeList>
+    <FeatureType>
+      <Name>playground:parks</Name>
+      <Title>Parks</Title>
+      <Abstract>Park polygons</Abstract>
+      <DefaultCRS>EPSG:4326</DefaultCRS>
+    </FeatureType>
+    <FeatureType>
+      <Name>playground:trees</Name>
+      <Title>Trees</Title>
+      <DefaultCRS>EPSG:3857</DefaultCRS>
+    </FeatureType>
+  </FeatureTypeList>
+</WFS_Capabilities>

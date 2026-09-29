@@ -1,0 +1,25 @@
+{
+  "name": "@desktop-webgis/ogc-io",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OGC WMS/WMTS/WFS URL normalize, capabilities fetch helpers, and XML parsers.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "fixtures", "README.md"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

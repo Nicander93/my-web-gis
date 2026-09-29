@@ -49,7 +49,8 @@ export interface GisFeature {
   }
 }
 
-export type DataSource =
+/** Local / imported vector sources (files, memory). */
+export type LocalVectorSource =
   | {
       type: 'geojson-file'
       path: string
@@ -71,12 +72,91 @@ export type DataSource =
       path: string
     }
 
-export interface Dataset {
+/** @deprecated Use LocalVectorSource; kept as alias for existing imports. */
+export type DataSource = LocalVectorSource
+
+export type DatasetKind = 'vector' | 'wms' | 'wmts' | 'wfs'
+
+/** Auth mode for OGC service connections. Secrets are never stored on Dataset. */
+export type ServiceAuthMode = 'none' | 'query-token' | 'bearer'
+
+/** Reference to a credential held outside the project (secure store / session). */
+export interface CredentialRef {
+  key: string
+}
+
+export interface WmsServiceSource {
+  type: 'wms'
+  /** Shareable service URL with non-secret query params; tokens stripped. */
+  url: string
+  version: string
+  layerNames: string[]
+  styleNames?: string[]
+  format?: string
+  transparent?: boolean
+  authMode: ServiceAuthMode
+  /** Query-token parameter name when authMode is query-token (value not persisted). */
+  tokenParam?: string
+  credentialRef?: CredentialRef
+}
+
+export interface WmtsServiceSource {
+  type: 'wmts'
+  url: string
+  version: string
+  layer: string
+  style?: string
+  format?: string
+  tileMatrixSet?: string
+  authMode: ServiceAuthMode
+  tokenParam?: string
+  credentialRef?: CredentialRef
+}
+
+export interface WfsServiceSource {
+  type: 'wfs'
+  url: string
+  version: string
+  typeName: string
+  outputFormat?: string
+  maxFeatures?: number
+  authMode: ServiceAuthMode
+  tokenParam?: string
+  credentialRef?: CredentialRef
+}
+
+export type ServiceSource = WmsServiceSource | WmtsServiceSource | WfsServiceSource
+
+export type VectorDataset = {
   id: string
   name: string
   kind: 'vector'
-  source: DataSource
+  source: LocalVectorSource
 }
+
+export type WmsDataset = {
+  id: string
+  name: string
+  kind: 'wms'
+  source: WmsServiceSource
+}
+
+export type WmtsDataset = {
+  id: string
+  name: string
+  kind: 'wmts'
+  source: WmtsServiceSource
+}
+
+export type WfsDataset = {
+  id: string
+  name: string
+  kind: 'wfs'
+  source: WfsServiceSource
+}
+
+/** Discriminable Dataset union: vector snapshot vs WMS vs WMTS vs WFS. */
+export type Dataset = VectorDataset | WmsDataset | WmtsDataset | WfsDataset
 
 export type LayerStyleKind = 'point' | 'line' | 'polygon' | 'mixed'
 

@@ -2037,3 +2037,60 @@ esolveExportFeatures + 计数 UI |
 ### 下一个任务
 
 **P15 — 服务数据源模型与添加入口**（未开始）
+
+---
+
+## P15 — 服务描述、能力与连接界面
+
+- **状态**: 进行中 → 已完成（见下方完成记录）
+- **时间**: 2026-09-29 21:50 CST
+- **分支**: `local/p15-service-capabilities`
+- **基于**: main `f3d600f`（P14 / PR#19 squash）
+- **说明**: 工作树保留无关 stash；未 reset --hard / clean -fd；未启动 P16 完整 WMS 渲染；未使用 Cursor CloudAgent；未触碰 GeoForge / `D:\\code\\3dtiles`。
+- **Commit**: `38689f6`
+- **PR**: [#20](https://github.com/Nicander93/my-web-gis/pull/20)（Draft）
+
+### 目标对照
+
+| 计划要求 | 结果 |
+| --- | --- |
+| gis-core Dataset/Layer 可辨识联合（vector / wms / wmts / wfs） | ✅ types.ts + capabilities.ts |
+| 明确能力标志：查询属性 / 编辑几何 / 样式 / 导出 | ✅ `capabilitiesForKind`；菜单与导出门控 |
+| 不把服务图层当可编辑 VectorLayer | ✅ ol-runtime syncLayers 跳过 WMS/WMTS；editable=false |
+| URL 规范化保留查询参数；token 与可分享 URL 分离 | ✅ ogc-io `normalizeServiceUrl` |
+| capabilities fetch 与 parse 分离；超时/取消/认证/协议/非 XML/HTML | ✅ fetch-capabilities + parse + OgcError |
+| 认证 none / query-token / Bearer；只持久化 credential 引用 | ✅ credentials.ts 会话内存；Dataset 仅 credentialRef |
+| CORS 明确说明；Tauri 最小原生 HTTP（TLS 校验开） | ✅ native-http + `http_get_text`；无公共代理 |
+| 描述变更使旧请求失效；首次连通不倾倒远程目录 | ✅ generation + Abort；目录仅 UI，用户勾选后才写入 |
+| 旧项目仍能打开；失败连接不生成空图层 | ✅ 单测覆盖 |
+| OGC capabilities fixtures（P00 债务） | ✅ `packages/ogc-io/fixtures` + `examples/phase-1/ogc/` |
+| 未启动完整 P16 WMS GetMap 渲染 | ✅ 仅连接 UI + Dataset/Layer 落盘基础 |
+
+### 主要改动
+
+- `packages/ogc-io`（新）：URL、fetch、XML parse、错误类型、fixtures、测试
+- `packages/gis-core`：Dataset 判别联合、`capabilities.ts`、项目读写兼容
+- `packages/ol-runtime`：`syncLayers(datasets)` 服务瓦片分支（不注册 VectorLayer）
+- `apps/desktop`：Add Data 服务页 `ServiceConnectPanel`、`service-connect` / `credentials` / `native-http`、store `addServiceLayer`、导出/菜单能力门控
+- `apps/desktop/src-tauri`：`http_get_text`（reqwest + rustls，不关 TLS 校验）
+
+### 测试与构建
+
+1. gis-core test ✅ 41
+2. ogc-io test ✅ 12
+3. ol-runtime test ✅ 3
+4. desktop test ✅ 46（含 P15 6）
+5. desktop build ✅
+
+### 已知限制 / 开放项
+
+1. **P16**：WMS GetMap / TileLayer 实际渲染尚未接通（仅 Dataset+Layer 记录与能力门控）。
+2. **P17/P18**：WMTS 瓦片矩阵渲染、WFS 有界加载未做。
+3. 设备安全存储尚未接入 OS keychain；Token 仅会话内存，`canPersistCredentialsSafely()` 当前为 false。
+4. MapCanvas 仍为占位；服务图层「定位」待地图 runtime 接线后生效。
+5. 未跑 `cargo check` / 完整 Tauri 原生 HTTP 冒烟（本机未强制）。
+6. 未 npm publish；未启动 P16。
+
+### 下一个任务
+
+**P16 — WMS 添加图层**（未开始）

@@ -6,11 +6,14 @@ import type { ImportResult } from '@/services/import'
 import type { CrsInfo } from '@desktop-webgis/vector-io'
 import { CsvConfigDialog } from './CsvConfigDialog'
 import type { CsvConfig } from './CsvConfigDialog'
+import { ServiceConnectPanel, type ServiceLayerAddRequest } from './ServiceConnectPanel'
 
 interface AddDataDialogProps {
   open: boolean
   onClose: () => void
   onImport: (result: ImportResult) => void
+  /** P15: add selected service layers (never called on failed connect). */
+  onAddServiceLayers?: (layers: ServiceLayerAddRequest[]) => void
 }
 
 type DialogStep = 'select' | 'confirm' | 'select-crs' | 'select-shapefile-layers' | 'select-csv-config' | 'select-dxf-config'
@@ -22,7 +25,7 @@ const COMMON_CRS = [
   { code: 'EPSG:3857', name: 'Web Mercator' }
 ]
 
-export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
+export function AddDataDialog({ open, onClose, onImport, onAddServiceLayers }: AddDataDialogProps) {
   const [activeTab, setActiveTab] = useState<'file' | 'service'>('file')
   const [step, setStep] = useState<DialogStep>('select')
   const [loading, setLoading] = useState(false)
@@ -343,9 +346,7 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
               <button
                 className={`dialog-tab ${activeTab === 'service' ? 'active' : ''}`}
                 onClick={() => setActiveTab('service')}
-                disabled
-                title="地图服务功能将在后续版本中实现"
-              >
+                            >
                 <Upload size={14} />
                 地图服务
               </button>
@@ -375,9 +376,12 @@ export function AddDataDialog({ open, onClose, onImport }: AddDataDialogProps) {
               )}
 
               {activeTab === 'service' && (
-                <div className="service-placeholder">
-                  <p>地图服务功能将在后续版本中实现</p>
-                </div>
+                <ServiceConnectPanel
+                  onAddLayers={(layers: ServiceLayerAddRequest[]) => {
+                    onAddServiceLayers?.(layers)
+                    handleClose()
+                  }}
+                />
               )}
 
               {error && (

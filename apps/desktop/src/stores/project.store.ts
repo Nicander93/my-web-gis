@@ -26,7 +26,9 @@ import type {
   GisFeature,
   SelectionState,
   FieldFilterCondition,
-  EditContext
+  EditContext,
+  ServiceSource,
+  DatasetKind
 } from '@desktop-webgis/gis-core'
 import { useSessionStore } from '@/stores/session.store'
 import type { LayerStyle } from '@desktop-webgis/ol-style'
@@ -55,6 +57,16 @@ interface ProjectState {
     name: string,
     styleKind: 'point' | 'line' | 'polygon' | 'mixed'
   ): { datasetId: string; layerId: string } | null
+  /**
+   * Add a service Dataset + Layer from a connection selection.
+   * Does not dump the remote catalog — only the caller-selected layer/typeName.
+   * Never stores secret token values (credentialRef only). Forces editable=false.
+   */
+  addServiceLayer(input: {
+    name: string
+    kind: Exclude<DatasetKind, 'vector'>
+    source: ServiceSource
+  }): { datasetId: string; layerId: string } | null
   setSelectedLayer(layerId: string | null): void
   setDirty(dirty: boolean): void
   setLayerStyle(layerId: string, style: LayerStyle): void
@@ -179,6 +191,50 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     get().addLayer(datasetId, name, cloned, styleKind)
     const layerId = get().selectedLayerId
     if (!layerId) return null
+    return { datasetId, layerId }
+  },
+
+  addServiceLayer: (input) => {
+    if (!input.name.trim()) return null
+    if (input.kind === 'wms' && input.source.type !== 'wms') return null
+    if (input.kind === 'wmts' && input.source.type !== 'wmts') return null
+    if (input.kind === 'wfs' && input.source.type !== 'wfs') return null
+
+    const datasetId = createId('dataset')
+    const layerId = createId('layer')
+    const dataset = {
+      id: datasetId,
+      name: input.name,
+      kind: input.kind,
+      source: cloneValue(input.source)
+    } as Dataset
+
+    const layer: Layer = {
+      id: layerId,
+      datasetId,
+      name: input.name,
+      visible: true,
+      opacity: 1,
+      editable: false,
+      style: createDefaultLayerStyle('mixed'),
+      filter: []
+    }
+
+    set((state) => {
+      const project = normalizeLayerTree({
+        ...state.project,
+        datasets: [...state.project.datasets, dataset],
+        layers: [...state.project.layers, layer],
+        groups: state.project.groups ?? [],
+        rootOrder: [...(state.project.rootOrder ?? []), { type: 'layer', id: layer.id }]
+      })
+      return {
+        project,
+        dirty: true,
+        selectedLayerId: layer.id
+      }
+    })
+
     return { datasetId, layerId }
   },
 

@@ -8,7 +8,8 @@
     "paths": {
       "@/*": ["src/*"],
       "@desktop-webgis/gis-core": ["../../packages/gis-core/src/index.ts"],
-      "@desktop-webgis/ol-runtime": ["../../packages/ol-runtime/src/index.ts"]
+      "@desktop-webgis/ol-runtime": ["../../packages/ol-runtime/src/index.ts"],
+      "@desktop-webgis/ogc-io": ["../../packages/ogc-io/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"]

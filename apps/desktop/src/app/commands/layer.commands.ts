@@ -3,7 +3,7 @@ import { projectCommands } from './project.commands'
 import { useWorkspaceStore } from '@/stores/workspace.store'
 import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
-import { cloneValue, isLegacyStyle, migrateLegacyStyle } from '@desktop-webgis/gis-core'
+import { capabilitiesForDataset, cloneValue, isLegacyStyle, migrateLegacyStyle } from '@desktop-webgis/gis-core'
 import type { LayerStyle } from '@desktop-webgis/ol-style'
 
 interface StyleConfigOp {
@@ -31,10 +31,11 @@ function requireSelectedLayerId(): string | null {
   return layerId
 }
 
-/** Capabilities for gating context-menu items (vector-only project today). */
+/** Capabilities for gating context-menu / edit / export (from Dataset kind flags). */
 export function getLayerCapabilities(layerId: string | null): {
   exists: boolean
   isVector: boolean
+  isService: boolean
   hasFeatures: boolean
   canStyle: boolean
   canLabel: boolean
@@ -42,57 +43,48 @@ export function getLayerCapabilities(layerId: string | null): {
   canFilter: boolean
   canExport: boolean
   canCopy: boolean
+  canEditGeometry: boolean
   canRename: boolean
   canRemove: boolean
   canZoom: boolean
 } {
-  if (!layerId) {
-    return {
-      exists: false,
-      isVector: false,
-      hasFeatures: false,
-      canStyle: false,
-      canLabel: false,
-      canAttributeTable: false,
-      canFilter: false,
-      canExport: false,
-      canCopy: false,
-      canRename: false,
-      canRemove: false,
-      canZoom: false
-    }
+  const empty = {
+    exists: false,
+    isVector: false,
+    isService: false,
+    hasFeatures: false,
+    canStyle: false,
+    canLabel: false,
+    canAttributeTable: false,
+    canFilter: false,
+    canExport: false,
+    canCopy: false,
+    canEditGeometry: false,
+    canRename: false,
+    canRemove: false,
+    canZoom: false
   }
+  if (!layerId) return empty
   const state = useProjectStore.getState()
   const layer = state.project.layers.find((item) => item.id === layerId)
-  if (!layer) {
-    return {
-      exists: false,
-      isVector: false,
-      hasFeatures: false,
-      canStyle: false,
-      canLabel: false,
-      canAttributeTable: false,
-      canFilter: false,
-      canExport: false,
-      canCopy: false,
-      canRename: false,
-      canRemove: false,
-      canZoom: false
-    }
-  }
+  if (!layer) return empty
   const dataset = state.project.datasets.find((item) => item.id === layer.datasetId)
+  const flags = capabilitiesForDataset(dataset)
   const isVector = dataset?.kind === 'vector'
+  const isService = dataset?.kind === 'wms' || dataset?.kind === 'wmts' || dataset?.kind === 'wfs'
   const hasFeatures = (state.featuresByDataset[layer.datasetId]?.length ?? 0) > 0
   return {
     exists: true,
     isVector,
+    isService,
     hasFeatures,
-    canStyle: isVector,
-    canLabel: isVector,
-    canAttributeTable: isVector,
-    canFilter: isVector,
-    canExport: isVector,
-    canCopy: isVector,
+    canStyle: flags.style,
+    canLabel: flags.style,
+    canAttributeTable: flags.queryAttributes,
+    canFilter: flags.filter,
+    canExport: flags.exportVector,
+    canCopy: flags.copyToLocal,
+    canEditGeometry: flags.editGeometry,
     canRename: true,
     canRemove: true,
     canZoom: true
