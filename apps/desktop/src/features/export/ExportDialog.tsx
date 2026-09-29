@@ -10,6 +10,7 @@ import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
 import { pickSaveFile, writeTextFile } from '@/services/files'
 import { emitCommandStatus } from '@/app/commands/status'
+import type { ExportDialogMode } from '@/app/commands/project.commands'
 import {
   EXPORT_SCOPE_LABELS,
   countExportScopes,
@@ -26,9 +27,11 @@ interface ExportDialogProps {
   onClose: () => void
   /** Optional fixed layer; defaults to selected layer. */
   layerId?: string | null
+  /** P14: export vs copy open the same dialog with the matching primary action. */
+  mode?: ExportDialogMode
 }
 
-export function ExportDialog({ open, onClose, layerId }: ExportDialogProps) {
+export function ExportDialog({ open, onClose, layerId, mode = 'export' }: ExportDialogProps) {
   const project = useProjectStore((s) => s.project)
   const featuresByDataset = useProjectStore((s) => s.featuresByDataset)
   const selection = useProjectStore((s) => s.selection)
@@ -186,7 +189,7 @@ export function ExportDialog({ open, onClose, layerId }: ExportDialogProps) {
     <div className="dialog-overlay" onClick={handleClose}>
       <div className="dialog-content export-dialog" onClick={(e) => e.stopPropagation()}>
         <header className="dialog-header">
-          <h2>导出 / 复制为本地图层</h2>
+          <h2>{mode === 'copy' ? '复制为本地图层' : '导出图层'}</h2>
           <button className="dialog-close" onClick={handleClose} aria-label="关闭">
             <X size={16} />
           </button>
@@ -221,7 +224,7 @@ export function ExportDialog({ open, onClose, layerId }: ExportDialogProps) {
                   </label>
                 ))}
                 <p className="export-hint">
-                  确认后使用同一快照执行导出或复制；之后改动不影响本次结果。
+                  {mode === 'copy' ? '确认后使用同一快照复制为本地图层；之后改动不影响本次结果。' : '确认后使用同一快照导出；之后改动不影响本次结果。'}
                 </p>
               </fieldset>
 
@@ -267,23 +270,26 @@ export function ExportDialog({ open, onClose, layerId }: ExportDialogProps) {
           <button type="button" className="button-secondary" onClick={handleClose} disabled={busy}>
             取消
           </button>
-          <button
-            type="button"
-            className="button-secondary"
-            onClick={handleCopyLocal}
-            disabled={!layer || busy || currentCount === 0}
-            title="将当前范围复制为独立本地图层（独立 Dataset）"
-          >
-            复制为本地图层
-          </button>
-          <button
-            type="button"
-            className="button-primary"
-            onClick={() => void handleExport()}
-            disabled={!layer || busy || currentCount === 0}
-          >
-            {busy ? '导出中…' : '导出'}
-          </button>
+          {mode === 'copy' ? (
+            <button
+              type="button"
+              className="button-primary"
+              onClick={handleCopyLocal}
+              disabled={!layer || busy || currentCount === 0}
+              title="将当前范围复制为独立本地图层（独立 Dataset）"
+            >
+              复制为本地图层
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="button-primary"
+              onClick={() => void handleExport()}
+              disabled={!layer || busy || currentCount === 0}
+            >
+              {busy ? '导出中…' : '导出'}
+            </button>
+          )}
         </footer>
       </div>
     </div>

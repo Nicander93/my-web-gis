@@ -28,7 +28,9 @@ describe('layerCommands.applyStyle undo', () => {
             style: createDefaultLayerStyle('point')
           }
         ],
-        mapState: { center: [0, 0], zoom: 2, rotation: 0 },
+        groups: [],
+    rootOrder: [{ type: 'layer', id: 'layer-1' }],
+    mapState: { center: [0, 0], zoom: 2, rotation: 0 },
         basemap: { type: 'osm' },
         settings: {}
       },

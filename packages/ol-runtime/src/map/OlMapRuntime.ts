@@ -1,4 +1,5 @@
-import { applyFieldFilter, type BasemapConfig, type GisFeature, type Layer, type MapState } from '@desktop-webgis/gis-core'
+import { applyFieldFilter,
+  layerListZIndex, type BasemapConfig, type GisFeature, type Layer, type MapState } from '@desktop-webgis/gis-core'
 import { createOlSceneLayer, updateGoogleMapTilesAttribution } from '@desktop-webgis/ol-scene-runtime'
 import type { SceneSource } from '@desktop-webgis/scene-schema'
 import Map from 'ol/Map'
@@ -133,7 +134,7 @@ export class OlMapRuntime {
         existing.setVisible(layer.visible)
         existing.setOpacity(layer.opacity)
         existing.setStyle(createLayerStyle(layer))
-        existing.setZIndex(index + 10)
+        existing.setZIndex(layerListZIndex(index, layers.length))
         const source = existing.getSource()
         source?.clear()
         source?.addFeatures(features.map(toOlFeature))
@@ -148,7 +149,7 @@ export class OlMapRuntime {
         visible: layer.visible,
         opacity: layer.opacity,
         style: createLayerStyle(layer),
-        zIndex: index + 10
+        zIndex: layerListZIndex(index, layers.length)
       })
       map.addLayer(vectorLayer)
       this.registry.register(layer.id, layer.datasetId, vectorLayer)

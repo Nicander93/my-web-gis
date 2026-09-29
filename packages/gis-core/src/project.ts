@@ -1,6 +1,7 @@
 import { createId } from './id'
 import { cloneValue } from './clone'
 import type { LegacyLayerStyle, Project, ProjectSnapshot, Layer, LayerStyleKind } from './types'
+import { normalizeLayerTree } from './layer-tree'
 import type { LayerStyle, SingleStyle, Symbol } from '@desktop-webgis/ol-style'
 
 export const PROJECT_VERSION = 1
@@ -158,6 +159,8 @@ export function createProject(name = 'Untitled Project'): Project {
     crs: 'EPSG:3857',
     datasets: [],
     layers: [],
+    groups: [],
+    rootOrder: [],
     mapState: {
       center: [0, 0],
       zoom: 2,
@@ -191,6 +194,11 @@ export function parseProjectSnapshot(json: string): ProjectSnapshot {
     throw new Error('Unsupported or invalid project file.')
   }
   project.basemap ??= { type: 'osm' }
+  project.groups ??= []
+  // Legacy projects only had `layers` order — rebuild rootOrder from that array.
+  if (!project.rootOrder) {
+    project.rootOrder = project.layers.map((layer) => ({ type: 'layer' as const, id: layer.id }))
+  }
 
   for (const layer of project.layers) {
     if (isLegacyStyle(layer.style)) {
@@ -198,8 +206,10 @@ export function parseProjectSnapshot(json: string): ProjectSnapshot {
     }
   }
 
+  const normalized = normalizeLayerTree(project)
+
   return {
-    project,
+    project: normalized,
     featuresByDataset: 'featuresByDataset' in parsed ? parsed.featuresByDataset : {}
   }
 }
