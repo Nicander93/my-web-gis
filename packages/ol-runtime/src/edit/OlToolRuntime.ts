@@ -39,7 +39,7 @@ export class OlToolRuntime {
 
     const layerId = callbacks.getActiveLayerId()
     if (!layerId) return
-    const layer = this.mapRuntime.registry.get(layerId)
+    const layer = this.mapRuntime.registry.getVector(layerId)
     const source = layer?.getSource() as VectorSource | undefined
     if (!source) return
 

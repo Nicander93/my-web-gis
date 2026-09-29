@@ -60,7 +60,7 @@ describe('parseCapabilitiesXml fixtures', () => {
     expect(desc.version).toBe('1.3.0')
     const selectable = listSelectableLayers(desc)
     expect(selectable.map((l) => l.name).sort()).toEqual(['cities', 'rivers'])
-    expect(selectable.find((l) => l.name === 'cities')?.bboxWgs84).toEqual([-180, -90, 180, 90])
+    expect(selectable.find((l) => l.name === 'cities')?.bboxWgs84).toEqual([-10, 40, 10, 60])
   })
 
   it('parses WMS 1.1.1', () => {
@@ -166,5 +166,49 @@ describe('fetchCapabilitiesXml', () => {
     expect(msg).toMatch(/CORS/)
     expect(msg).toMatch(/不会使用公共代理/)
     expect(msg).toMatch(/TLS/)
+  })
+})
+
+
+describe('WMS inheritance and service exceptions (P16)', () => {
+  it('inherits CRS and geographic bbox from parent layers (1.3.0)', () => {
+    const desc = parseCapabilitiesXml(loadFixture('wms-1.3.0-capabilities.xml'), {
+      shareableUrl: 'https://example.com/wms',
+      hint: 'WMS'
+    })
+    const selectable = listSelectableLayers(desc)
+    const rivers = selectable.find((l) => l.name === 'rivers')
+    expect(rivers?.crs).toEqual(['EPSG:4326', 'EPSG:3857'])
+    expect(rivers?.bboxWgs84).toEqual([-180, -90, 180, 90])
+    const cities = selectable.find((l) => l.name === 'cities')
+    expect(cities?.bboxWgs84).toEqual([-10, 40, 10, 60])
+    expect(cities?.styles?.map((s) => s.name)).toEqual(['default', 'outline'])
+  })
+
+  it('inherits LatLonBoundingBox and SRS from parent (1.1.1)', () => {
+    const desc = parseCapabilitiesXml(loadFixture('wms-1.1.1-capabilities.xml'), {
+      shareableUrl: 'https://example.com/wms',
+      hint: 'WMS'
+    })
+    const dem = listSelectableLayers(desc)[0]
+    expect(dem?.name).toBe('dem')
+    expect(dem?.crs).toEqual(['EPSG:4326', 'EPSG:3857'])
+    expect(dem?.bboxWgs84).toEqual([-180, -90, 180, 90])
+  })
+
+  it('maps ServiceExceptionReport to service-exception error', () => {
+    expect(() =>
+      parseCapabilitiesXml(loadFixture('wms-service-exception.xml'), {
+        shareableUrl: 'https://example.com/wms'
+      })
+    ).toThrow(OgcError)
+    try {
+      parseCapabilitiesXml(loadFixture('wms-service-exception.xml'), {
+        shareableUrl: 'https://example.com/wms'
+      })
+    } catch (err) {
+      expect(err).toMatchObject({ code: 'service-exception' })
+      expect(formatOgcErrorMessage(err)).toMatch(/InvalidCRS|EPSG:9999|服务异常/)
+    }
   })
 })

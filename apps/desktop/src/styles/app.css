@@ -2040,3 +2040,48 @@ button:disabled {
 .spin {
   animation: spin 0.8s linear infinite;
 }
+
+
+/* P16 — WMS catalog meta + inspector opacity */
+.service-layer-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.service-layer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding-left: 24px;
+  font-size: 12px;
+  color: var(--muted-fg, #6b7280);
+}
+
+.service-style-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.service-style-pick select {
+  max-width: 140px;
+}
+
+.inspector-opacity {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.inspector-opacity input[type='range'] {
+  width: 120px;
+}
+
+.inspector-opacity-row {
+  align-items: center;
+}

@@ -96,6 +96,7 @@ interface ProjectState {
   /** Ordered layers for map sync (list top → bottom) with effective visibility. */
   getMapLayers(): Layer[]
   setLayerVisible(layerId: string, visible: boolean): void
+  setLayerOpacity(layerId: string, opacity: number): void
   setGroupVisible(groupId: string, visible: boolean): void
   renameLayer(layerId: string, name: string): void
   renameGroup(groupId: string, name: string): void
@@ -427,6 +428,19 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         ...state.project,
         layers: state.project.layers.map((layer) =>
           layer.id === layerId ? { ...layer, visible } : layer
+        )
+      },
+      dirty: true
+    })),
+
+  setLayerOpacity: (layerId, opacity) =>
+    set((state) => ({
+      project: {
+        ...state.project,
+        layers: state.project.layers.map((layer) =>
+          layer.id === layerId
+            ? { ...layer, opacity: Math.min(1, Math.max(0, opacity)) }
+            : layer
         )
       },
       dirty: true

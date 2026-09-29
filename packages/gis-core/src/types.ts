@@ -94,6 +94,10 @@ export interface WmsServiceSource {
   styleNames?: string[]
   format?: string
   transparent?: boolean
+  /** Preferred request CRS/SRS when advertised by capabilities. */
+  crs?: string
+  /** WGS84 geographic extent [west, south, east, north] for zoom-to and persistence. */
+  bboxWgs84?: [number, number, number, number]
   authMode: ServiceAuthMode
   /** Query-token parameter name when authMode is query-token (value not persisted). */
   tokenParam?: string

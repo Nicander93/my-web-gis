@@ -1,22 +1,29 @@
 import { applyFieldFilter,
   isTileServiceKind,
-  layerListZIndex, type BasemapConfig, type Dataset, type GisFeature, type Layer, type MapState } from '@desktop-webgis/gis-core'
+  layerListZIndex, type BasemapConfig, type Dataset, type GisFeature, type Layer, type MapState, type WmsDataset } from '@desktop-webgis/gis-core'
 import { createOlSceneLayer, updateGoogleMapTilesAttribution } from '@desktop-webgis/ol-scene-runtime'
 import type { SceneSource } from '@desktop-webgis/scene-schema'
-import Map from 'ol/Map'
+import OlMap from 'ol/Map'
 import View from 'ol/View'
 import TileLayer from 'ol/layer/Tile'
 import type BaseLayer from 'ol/layer/Base'
 import VectorLayer from 'ol/layer/Vector'
 import OSM from 'ol/source/OSM'
+import TileWMS from 'ol/source/TileWMS'
 import VectorSource from 'ol/source/Vector'
 import { defaults as defaultControls, ScaleLine } from 'ol/control'
 import { defaults as defaultInteractions } from 'ol/interaction'
 import { boundingExtent, isEmpty } from 'ol/extent'
+import { transformExtent } from 'ol/proj'
 import type { Coordinate } from 'ol/coordinate'
 import { toOlFeature } from '../feature/featureAdapter'
 import { OlLayerRegistry } from '../layer/OlLayerRegistry'
 import { createLayerStyle } from '../layer/style'
+import {
+  createWmsTileLayer,
+  GIS_WMS_EXTENT_KEY,
+  refreshWmsTileLayer
+} from '../wms/createWmsLayer'
 
 export interface PointerInfo {
   coordinate: Coordinate
@@ -25,14 +32,14 @@ export interface PointerInfo {
 
 export class OlMapRuntime {
   readonly registry = new OlLayerRegistry()
-  private map: Map | null = null
+  private map: OlMap | null = null
   private basemapLayer: BaseLayer | null = null
   private basemapRevision = 0
   private fetcher: typeof globalThis.fetch | undefined = globalThis.fetch
   private pointerMove?: (info: PointerInfo) => void
 
-  mount(target: HTMLElement, mapState: MapState): Map {
-    this.map = new Map({
+  mount(target: HTMLElement, mapState: MapState): OlMap {
+    this.map = new OlMap({
       target,
       layers: [],
       view: new View({
@@ -75,7 +82,7 @@ export class OlMapRuntime {
     this.map = null
   }
 
-  getMap(): Map {
+  getMap(): OlMap {
     if (!this.map) throw new Error('Map runtime is not mounted.')
     return this.map
   }
@@ -117,8 +124,7 @@ export class OlMapRuntime {
 
   /**
    * Sync project layers to OpenLayers.
-   * Vector datasets use VectorLayer; WMS/WMTS are not registered as VectorLayer
-   * (P16/P17 add TileLayer sources). Passing datasets prevents mistaken type assertions.
+   * Vector datasets use VectorLayer; WMS uses TileWMS (P16); WMTS reserved for P17.
    */
   syncLayers(
     layers: Layer[],
@@ -138,30 +144,42 @@ export class OlMapRuntime {
 
     layers.forEach((layer, index) => {
       const dataset = datasetById.get(layer.datasetId)
-      // Service tile layers must never be treated as editable VectorLayers.
+      const zIndex = layerListZIndex(index, layers.length)
+
+      if (dataset?.kind === 'wms') {
+        this.syncWmsLayer(layer, dataset, zIndex)
+        return
+      }
+
+      // WMTS: still skip VectorLayer registration (P17).
       if (dataset && isTileServiceKind(dataset.kind)) {
         const mistaken = this.registry.get(layer.id)
         if (mistaken) {
           map.removeLayer(mistaken)
           this.registry.unregister(layer.id)
         }
-        // P16 (WMS) / P17 (WMTS) register TileLayer here.
         return
       }
 
-      // Visible set = F (layer.filter). Hidden features are omitted so they cannot stay highlighted.
       const allFeatures = featuresByDataset[layer.datasetId] ?? []
       const features = applyFieldFilter(allFeatures, layer.filter)
-      const existing = this.registry.get(layer.id)
+      const existing = this.registry.getVector(layer.id)
       if (existing) {
         existing.setVisible(layer.visible)
         existing.setOpacity(layer.opacity)
         existing.setStyle(createLayerStyle(layer))
-        existing.setZIndex(layerListZIndex(index, layers.length))
+        existing.setZIndex(zIndex)
         const source = existing.getSource()
         source?.clear()
         source?.addFeatures(features.map(toOlFeature))
         return
+      }
+
+      // Replace a prior non-vector registration if present.
+      const prior = this.registry.get(layer.id)
+      if (prior) {
+        map.removeLayer(prior)
+        this.registry.unregister(layer.id)
       }
 
       const source = new VectorSource({
@@ -172,31 +190,108 @@ export class OlMapRuntime {
         visible: layer.visible,
         opacity: layer.opacity,
         style: createLayerStyle(layer),
-        zIndex: layerListZIndex(index, layers.length)
+        zIndex
       })
       map.addLayer(vectorLayer)
       this.registry.register(layer.id, layer.datasetId, vectorLayer)
     })
   }
 
+  private syncWmsLayer(layer: Layer, dataset: WmsDataset, zIndex: number): void {
+    const map = this.getMap()
+    const existing = this.registry.get(layer.id)
+    if (existing) {
+      const source = (existing as TileLayer<TileWMS>).getSource?.()
+      const isWms = Boolean(source && typeof (source as TileWMS).updateParams === 'function')
+      if (isWms) {
+        existing.setVisible(layer.visible)
+        existing.setOpacity(layer.opacity)
+        existing.setZIndex(zIndex)
+        if (dataset.source.bboxWgs84) {
+          existing.set(GIS_WMS_EXTENT_KEY, dataset.source.bboxWgs84.slice())
+        }
+        return
+      }
+      map.removeLayer(existing)
+      this.registry.unregister(layer.id)
+    }
+
+    const wmsLayer = createWmsTileLayer({
+      layerId: layer.id,
+      dataset,
+      visible: layer.visible,
+      opacity: layer.opacity,
+      zIndex
+    })
+    map.addLayer(wmsLayer)
+    this.registry.register(layer.id, layer.datasetId, wmsLayer)
+  }
+
+  /** Re-request WMS tiles after a transient failure. */
+  retryWmsLayer(layerId: string): boolean {
+    const layer = this.registry.get(layerId) as TileLayer<TileWMS> | undefined
+    if (!layer) return false
+    const source = layer.getSource?.()
+    if (!source || typeof source.updateParams !== 'function') return false
+    refreshWmsTileLayer(layer)
+    return true
+  }
+
   zoomToLayer(layerId: string): void {
     const layer = this.registry.get(layerId)
-    const extent = layer?.getSource()?.getExtent()
-    if (!extent || isEmpty(extent)) return
-    this.getMap().getView().fit(extent, {
-      padding: [48, 48, 48, 48],
-      duration: 120,
-      maxZoom: 18
-    })
+    if (!layer) return
+
+    const vector = this.registry.getVector(layerId)
+    if (vector) {
+      const extent = vector.getSource()?.getExtent()
+      if (!extent || isEmpty(extent)) return
+      this.fitExtent(extent)
+      return
+    }
+
+    const bboxWgs84 = layer.get(GIS_WMS_EXTENT_KEY) as
+      | [number, number, number, number]
+      | undefined
+    if (!bboxWgs84) return
+    const viewProj = this.getMap().getView().getProjection()
+    const extent = transformExtent(bboxWgs84, 'EPSG:4326', viewProj)
+    if (isEmpty(extent)) return
+    this.fitExtent(extent)
   }
 
   zoomToAll(): void {
-    const extents = this.registry
-      .entries()
-      .map(([, layer]) => layer.getSource()?.getExtent())
-      .filter((extent): extent is [number, number, number, number] => Boolean(extent && !isEmpty(extent)))
+    const extents: Array<[number, number, number, number]> = []
+    for (const [layerId, layer] of this.registry.entries()) {
+      const vector = this.registry.getVector(layerId)
+      if (vector) {
+        const extent = vector.getSource()?.getExtent()
+        if (extent && !isEmpty(extent)) extents.push(extent as [number, number, number, number])
+        continue
+      }
+      const bboxWgs84 = layer.get(GIS_WMS_EXTENT_KEY) as
+        | [number, number, number, number]
+        | undefined
+      if (!bboxWgs84) continue
+      const viewProj = this.getMap().getView().getProjection()
+      const extent = transformExtent(bboxWgs84, 'EPSG:4326', viewProj) as [
+        number,
+        number,
+        number,
+        number
+      ]
+      if (!isEmpty(extent)) extents.push(extent)
+    }
     if (extents.length === 0) return
-    const extent = boundingExtent(extents.flatMap((item) => [[item[0], item[1]], [item[2], item[3]]]))
+    const extent = boundingExtent(
+      extents.flatMap((item) => [
+        [item[0], item[1]],
+        [item[2], item[3]]
+      ])
+    )
+    this.fitExtent(extent)
+  }
+
+  private fitExtent(extent: number[]): void {
     this.getMap().getView().fit(extent, {
       padding: [48, 48, 48, 48],
       duration: 120,
