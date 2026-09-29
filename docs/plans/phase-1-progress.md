@@ -2105,8 +2105,8 @@ esolveExportFeatures + 计数 UI |
 - **分支**: `local/p16-wms-layers`
 - **基于**: main `7871360`（P15 / PR#20 squash）
 - **说明**: 工作树保留无关 stash；未 reset --hard / clean -fd；未使用 Cursor CloudAgent；未触碰 GeoForge / `D:\\code\\3dtiles` / geoforge-converter；≠ 场景 G 全验收（仅 WMS，不含 WMTS/WFS 完整场景）。
-- **Commit**: `044fc53`
-- **PR**: （push 后补充 Draft URL）
+- **Commit**: `044fc53` (branch tip `3ebaf58`)
+- **PR**: [#21](https://github.com/Nicander93/my-web-gis/pull/21)（Draft）
 
 ### 目标对照
 
