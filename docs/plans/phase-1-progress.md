@@ -2094,3 +2094,54 @@ esolveExportFeatures + 计数 UI |
 ### 下一个任务
 
 **P16 — WMS 添加图层**（未开始）
+
+
+---
+
+## P16 — WMS 添加图层
+
+- **状态**: 已完成（Draft PR，待审核）
+- **时间**: 2026-09-29 22:05 CST
+- **分支**: `local/p16-wms-layers`
+- **基于**: main `7871360`（P15 / PR#20 squash）
+- **说明**: 工作树保留无关 stash；未 reset --hard / clean -fd；未使用 Cursor CloudAgent；未触碰 GeoForge / `D:\\code\\3dtiles` / geoforge-converter；≠ 场景 G 全验收（仅 WMS，不含 WMTS/WFS 完整场景）。
+- **Commit**: （见分支 tip）
+- **PR**: （见下方完成后补充）
+
+### 目标对照
+
+| 计划要求 | 结果 |
+| --- | --- |
+| WMS 1.3.0 / 1.1.1 capabilities；有 Name 的可请求子图层、样式、支持 CRS；按子图层添加 | ✅ fixtures + ServiceConnectPanel 样式/CRS/extent 展示与落盘 |
+| 优先沿用 OpenLayers 官方 source（TileWMS）处理版本与坐标轴；EPSG:4326 轴序以请求参数/范围测试确认 | ✅ `ol/source/TileWMS` + `buildGetMapUrl`（OL `getRequestUrl`）；1.3.0 4326 → lat,lon BBOX |
+| 显隐、透明度、排序、范围定位、保存重开、重试 | ✅ Layer visible/opacity/z-order；`bboxWgs84` 持久化与 zoom 提示；`retryServiceLayer` / `refreshWmsTileLayer` |
+| GetFeatureInfo 非必需；界面不假装矢量属性表 | ✅ capabilities 门控；Inspector 对 WMS 禁用样式/标注/要素属性说明 |
+| 两版本 fixtures、继承 CRS/extent、服务异常样本、GetMap URL 与请求范围 | ✅ inheritance 单测；`wms-service-exception.xml`；GetMap 轴序单测 |
+| 未启动 P17 WMTS / P18 WFS；未发明公共代理 / 关闭 TLS | ✅ |
+
+### 主要改动
+
+- `packages/ogc-io`: WMS CRS/extent 继承；ServiceExceptionReport → `service-exception`；fixtures 增强
+- `packages/gis-core`: `WmsServiceSource.crs` / `bboxWgs84`
+- `packages/ol-runtime`: `createWmsTileLayer` / `buildGetMapUrl` / `syncLayers` 注册 TileWMS；registry 支持 BaseLayer；`retryWmsLayer` / WMS zoom-to-extent
+- `apps/desktop`: ServiceConnectPanel 样式与 CRS/extent；Inspector 透明度与 WMS 信息；上下文菜单「重新加载」；`setLayerOpacity`
+
+### 测试与构建
+
+1. gis-core test ✅ 41
+2. ogc-io test ✅ 15
+3. ol-runtime test ✅ 8
+4. desktop test ✅ 50（含 P16 4）
+5. desktop build ✅
+
+### 已知限制 / 开放项
+
+1. **MapCanvas 仍为占位**：TileWMS 已在 ol-runtime 接通；桌面壳层 zoom/retry 目前为状态提示 + session loading bump，地图挂载后需订阅 runtime。
+2. **人工已知范围地图冒烟**：可选，本机未强制对公网 WMS 拉瓦片。
+3. **P17/P18** 未做；场景 G（WMS+WMTS 完整验收）未宣称完成。
+4. 设备 keychain / Token 持久化仍为会话内存（同 P15）。
+5. 未 npm publish。
+
+### 下一个任务
+
+**P17 — WMTS 添加图层**（未开始）

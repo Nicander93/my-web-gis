@@ -9,14 +9,21 @@ export interface ParseCapabilitiesOptions {
   hint?: OgcServiceType
 }
 
+interface WmsInheritContext {
+  crs: string[]
+  bboxWgs84?: [number, number, number, number]
+}
+
 function detectService(root: XmlElement): OgcServiceType {
   const name = root.name
   if (name.includes('wms') || name === 'wmt_ms_capabilities') return 'WMS'
   if (name.includes('wmts')) return 'WMTS'
   if (name.includes('wfs')) return 'WFS'
+  if (name.includes('serviceexception')) {
+    throw new OgcError('service-exception', '响应为 ServiceExceptionReport，而非 Capabilities')
+  }
   // Caps root wrappers
   if (findDeep(root, 'capability') && findDeep(root, 'request')) {
-    // WMS 1.x often WMS_Capabilities / WMT_MS_Capabilities
     if (findDeep(root, 'layer')) return 'WMS'
   }
   if (findDeep(root, 'contents') && findDeep(root, 'tilematrixset')) return 'WMTS'
@@ -24,33 +31,46 @@ function detectService(root: XmlElement): OgcServiceType {
   throw new OgcError('unsupported', `无法识别的 Capabilities 根元素: ${root.name}`)
 }
 
-function parseWmsLayers(layerEl: XmlElement): ServiceLayerInfo {
-  const name = textOf(child(layerEl, 'name'))
-  const title = textOf(child(layerEl, 'title')) || undefined
-  const abstract = textOf(child(layerEl, 'abstract')) || undefined
-  const crs = [
-    ...children(layerEl, 'crs').map((c) => textOf(c)),
-    ...children(layerEl, 'srs').map((c) => textOf(c))
-  ].filter(Boolean)
-  const styles = children(layerEl, 'style').map((s) => ({
-    name: textOf(child(s, 'name')) || 'default',
-    title: textOf(child(s, 'title')) || undefined
-  }))
+function readWmsBbox(layerEl: XmlElement): [number, number, number, number] | undefined {
   const bboxEl =
     child(layerEl, 'ex_geographicboundingbox') ??
     child(layerEl, 'latlonboundingbox') ??
     child(layerEl, 'geographicboundingbox')
-  let bboxWgs84: [number, number, number, number] | undefined
-  if (bboxEl) {
-    const west = Number(textOf(child(bboxEl, 'westboundlongitude')) || bboxEl.attrs.minx || bboxEl.attrs.westboundlongitude)
-    const east = Number(textOf(child(bboxEl, 'eastboundlongitude')) || bboxEl.attrs.maxx || bboxEl.attrs.eastboundlongitude)
-    const south = Number(textOf(child(bboxEl, 'southboundlatitude')) || bboxEl.attrs.miny || bboxEl.attrs.southboundlatitude)
-    const north = Number(textOf(child(bboxEl, 'northboundlatitude')) || bboxEl.attrs.maxy || bboxEl.attrs.northboundlatitude)
-    if ([west, south, east, north].every((n) => Number.isFinite(n))) {
-      bboxWgs84 = [west, south, east, north]
-    }
-  }
-  const nested = children(layerEl, 'layer').map(parseWmsLayers)
+  if (!bboxEl) return undefined
+  const west = Number(
+    textOf(child(bboxEl, 'westboundlongitude')) || bboxEl.attrs.minx || bboxEl.attrs.westboundlongitude
+  )
+  const east = Number(
+    textOf(child(bboxEl, 'eastboundlongitude')) || bboxEl.attrs.maxx || bboxEl.attrs.eastboundlongitude
+  )
+  const south = Number(
+    textOf(child(bboxEl, 'southboundlatitude')) || bboxEl.attrs.miny || bboxEl.attrs.southboundlatitude
+  )
+  const north = Number(
+    textOf(child(bboxEl, 'northboundlatitude')) || bboxEl.attrs.maxy || bboxEl.attrs.northboundlatitude
+  )
+  if (![west, south, east, north].every((n) => Number.isFinite(n))) return undefined
+  return [west, south, east, north]
+}
+
+function parseWmsLayers(layerEl: XmlElement, parent: WmsInheritContext = { crs: [] }): ServiceLayerInfo {
+  const name = textOf(child(layerEl, 'name'))
+  const title = textOf(child(layerEl, 'title')) || undefined
+  const abstract = textOf(child(layerEl, 'abstract')) || undefined
+  const localCrs = [
+    ...children(layerEl, 'crs').map((c) => textOf(c)),
+    ...children(layerEl, 'srs').map((c) => textOf(c))
+  ].filter(Boolean)
+  // WMS CRS/SRS and geographic bbox inherit from parent layers when omitted.
+  const crs = localCrs.length ? localCrs : parent.crs.slice()
+  const localBbox = readWmsBbox(layerEl)
+  const bboxWgs84 = localBbox ?? parent.bboxWgs84
+  const styles = children(layerEl, 'style').map((s) => ({
+    name: textOf(child(s, 'name')) || 'default',
+    title: textOf(child(s, 'title')) || undefined
+  }))
+  const childCtx: WmsInheritContext = { crs, bboxWgs84 }
+  const nested = children(layerEl, 'layer').map((childLayer) => parseWmsLayers(childLayer, childCtx))
   return {
     name,
     title,
@@ -80,7 +100,7 @@ function parseWms(doc: XmlElement, shareableUrl: string): ServiceDescription {
   const version = root.attrs.version || textOf(child(child(root, 'service') ?? root, 'version')) || '1.3.0'
   const service = child(root, 'service')
   const capability = child(root, 'capability')
-  const topLayers = capability ? children(capability, 'layer').map(parseWmsLayers) : []
+  const topLayers = capability ? children(capability, 'layer').map((el) => parseWmsLayers(el)) : []
   return {
     service: 'WMS',
     version,
@@ -113,7 +133,6 @@ function parseWmts(doc: XmlElement, shareableUrl: string): ServiceDescription {
       styles: styles.length ? styles : undefined,
       crs: tmsLinks.filter(Boolean),
       queryable: Boolean(identifier),
-      // stash format in abstract-adjacent via styles empty — keep on layer via title note
       children: formats.length
         ? formats.map((f) => ({ name: f, title: 'format' }))
         : undefined
@@ -170,6 +189,18 @@ function parseWfs(doc: XmlElement, shareableUrl: string): ServiceDescription {
   }
 }
 
+function throwIfServiceException(root: XmlElement): void {
+  const local = root.name
+  if (!local.includes('serviceexception')) return
+  const exceptionEl =
+    findDeep(root, 'serviceexception') ??
+    (local === 'serviceexception' ? root : undefined)
+  const code = exceptionEl?.attrs.code
+  const text = exceptionEl ? textOf(exceptionEl).trim() : textOf(root).trim()
+  const message = [code, text].filter(Boolean).join(': ') || 'ServiceExceptionReport'
+  throw new OgcError('service-exception', message)
+}
+
 /**
  * Parse Capabilities XML into a service description.
  * Does not fetch; does not mutate project state.
@@ -193,6 +224,8 @@ export function parseCapabilitiesXml(
 
   const rootEl = tree.children[0]
   if (!rootEl) throw new OgcError('parse', '缺少根元素')
+
+  throwIfServiceException(rootEl)
 
   const service = options.hint ?? detectService(rootEl)
   switch (service) {

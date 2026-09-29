@@ -47,6 +47,7 @@ export function getLayerCapabilities(layerId: string | null): {
   canRename: boolean
   canRemove: boolean
   canZoom: boolean
+  canRetry: boolean
 } {
   const empty = {
     exists: false,
@@ -62,7 +63,8 @@ export function getLayerCapabilities(layerId: string | null): {
     canEditGeometry: false,
     canRename: false,
     canRemove: false,
-    canZoom: false
+    canZoom: false,
+    canRetry: false
   }
   if (!layerId) return empty
   const state = useProjectStore.getState()
@@ -87,7 +89,8 @@ export function getLayerCapabilities(layerId: string | null): {
     canEditGeometry: flags.editGeometry,
     canRename: true,
     canRemove: true,
-    canZoom: true
+    canZoom: true,
+    canRetry: dataset?.kind === 'wms' || dataset?.kind === 'wmts'
   }
 }
 
@@ -100,8 +103,41 @@ export const layerCommands = {
       return
     }
     useProjectStore.getState().setSelectedLayer(id)
-    // MapCanvas is still a placeholder — status only until runtime zoom wires in.
+    const state = useProjectStore.getState()
+    const layer = state.project.layers.find((item) => item.id === id)
+    const dataset = layer
+      ? state.project.datasets.find((item) => item.id === layer.datasetId)
+      : undefined
+    if (dataset?.kind === 'wms' && dataset.source.bboxWgs84) {
+      const [w, s, e, n] = dataset.source.bboxWgs84
+      emitCommandStatus(
+        `缩放到 WMS 范围 [${w.toFixed(2)}, ${s.toFixed(2)}, ${e.toFixed(2)}, ${n.toFixed(2)}]（地图运行时接入后自动 fit）`
+      )
+      return
+    }
     emitCommandStatus('缩放到图层（地图运行时接入后生效）')
+  },
+
+  /** Re-request WMS/WMTS imagery after a transient failure (runtime refresh when mounted). */
+  retryServiceLayer(layerId?: string | null): void {
+    const id = layerId ?? useProjectStore.getState().selectedLayerId
+    if (!id) {
+      emitCommandStatus('请先选择图层')
+      return
+    }
+    const state = useProjectStore.getState()
+    const layer = state.project.layers.find((item) => item.id === id)
+    const dataset = layer
+      ? state.project.datasets.find((item) => item.id === layer.datasetId)
+      : undefined
+    if (!dataset || (dataset.kind !== 'wms' && dataset.kind !== 'wmts')) {
+      emitCommandStatus('仅 WMS/WMTS 图层支持重新加载')
+      return
+    }
+    useSessionStore.getState().setLayerLoading(id, true)
+    // Session bump lets a future MapCanvas subscriber call runtime.retryWmsLayer.
+    useSessionStore.getState().setLayerLoading(id, false)
+    emitCommandStatus('已请求重新加载服务图层')
   },
 
   moveUp(layerId?: string | null): void {

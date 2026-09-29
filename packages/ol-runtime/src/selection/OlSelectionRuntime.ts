@@ -44,7 +44,7 @@ export class OlSelectionRuntime {
     const collection = this.select.getFeatures()
     collection.clear()
     if (!state.layerId) return
-    const layer = this.mapRuntime.registry.get(state.layerId)
+    const layer = this.mapRuntime.registry.getVector(state.layerId)
     const source = layer?.getSource()
     for (const featureId of state.featureIds) {
       const feature = source?.getFeatureById(featureId)

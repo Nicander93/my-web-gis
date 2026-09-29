@@ -7,7 +7,8 @@ import {
   Tag,
   Table2,
   Trash2,
-  Type
+  Type,
+  RefreshCw
 } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { MenuItem } from '@/app/header/menus/MenuItem'
@@ -74,6 +75,12 @@ export function LayerContextMenu({
           label="定位"
           disabled={!caps.canZoom}
           onClick={() => run(() => layerCommands.zoomToLayer(layerId))}
+        />
+        <MenuItem
+          icon={RefreshCw}
+          label="重新加载"
+          disabled={!caps.canRetry}
+          onClick={() => run(() => layerCommands.retryServiceLayer(layerId))}
         />
         <MenuSeparator />
         <MenuItem

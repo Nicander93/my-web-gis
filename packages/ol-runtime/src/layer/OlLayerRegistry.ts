@@ -1,14 +1,16 @@
+import type BaseLayer from 'ol/layer/Base'
 import type VectorLayer from 'ol/layer/Vector'
 import type VectorSource from 'ol/source/Vector'
 import type { FeatureLike } from 'ol/Feature'
 
 export type RuntimeVectorLayer = VectorLayer<VectorSource<FeatureLike>>
+export type RuntimeMapLayer = BaseLayer
 
 export class OlLayerRegistry {
-  private readonly layers = new Map<string, RuntimeVectorLayer>()
+  private readonly layers = new Map<string, RuntimeMapLayer>()
   private readonly datasetToLayer = new Map<string, string>()
 
-  register(layerId: string, datasetId: string, layer: RuntimeVectorLayer): void {
+  register(layerId: string, datasetId: string, layer: RuntimeMapLayer): void {
     this.layers.set(layerId, layer)
     this.datasetToLayer.set(datasetId, layerId)
   }
@@ -20,11 +22,22 @@ export class OlLayerRegistry {
     }
   }
 
-  get(layerId: string): RuntimeVectorLayer | undefined {
+  get(layerId: string): RuntimeMapLayer | undefined {
     return this.layers.get(layerId)
   }
 
-  getByDataset(datasetId: string): RuntimeVectorLayer | undefined {
+  getVector(layerId: string): RuntimeVectorLayer | undefined {
+    const layer = this.layers.get(layerId)
+    if (!layer) return undefined
+    // Vector layers expose a VectorSource; tile/image layers do not use FeatureLike sources.
+    const source = (layer as RuntimeVectorLayer).getSource?.()
+    if (source && typeof (source as VectorSource<FeatureLike>).getFeatures === 'function') {
+      return layer as RuntimeVectorLayer
+    }
+    return undefined
+  }
+
+  getByDataset(datasetId: string): RuntimeMapLayer | undefined {
     const layerId = this.datasetToLayer.get(datasetId)
     return layerId ? this.layers.get(layerId) : undefined
   }
@@ -36,7 +49,7 @@ export class OlLayerRegistry {
     return undefined
   }
 
-  entries(): Array<[string, RuntimeVectorLayer]> {
+  entries(): Array<[string, RuntimeMapLayer]> {
     return Array.from(this.layers.entries())
   }
 

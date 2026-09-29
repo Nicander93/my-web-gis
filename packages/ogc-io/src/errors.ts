@@ -9,6 +9,7 @@ export type OgcErrorCode =
   | 'not-xml'
   | 'html-error'
   | 'parse'
+  | 'service-exception'
   | 'unsupported'
 
 export class OgcError extends Error {
@@ -32,13 +33,13 @@ export function formatOgcErrorMessage(error: unknown): string {
   if (error instanceof OgcError) {
     switch (error.code) {
       case 'timeout':
-        return '连接超时，请检查网络或增大超时时间。'
+        return '连接超时，请检查网络或稍后重试。'
       case 'cancelled':
         return '已取消连接。'
       case 'auth':
-        return '认证失败：请检查 Token / Bearer，或确认服务是否需要登录。'
+        return '认证失败，请检查 Token / Bearer，并确认服务是否需要登录。'
       case 'cors':
-        return '浏览器 CORS 阻止了请求。请在 Desktop（Tauri）中连接，或请服务端允许本源访问。不会使用公共代理，也不会关闭 TLS 校验。'
+        return '浏览器 CORS 禁止此请求。请使用 Desktop（Tauri）原生连接，或联系服务端开放跨域。不会使用公共代理，也不要关闭 TLS 校验。'
       case 'network':
         return `网络错误：${error.message}`
       case 'protocol':
@@ -47,6 +48,8 @@ export function formatOgcErrorMessage(error: unknown): string {
         return '响应不是 Capabilities XML（可能是错误页或非 OGC 端点）。'
       case 'html-error':
         return '服务返回了 HTML 错误页，而非 Capabilities 文档。'
+      case 'service-exception':
+        return `服务异常：${error.message}`
       case 'parse':
         return `无法解析 Capabilities：${error.message}`
       case 'unsupported':

@@ -22,6 +22,16 @@ interface ServiceConnectPanelProps {
 
 type ServiceChoice = OgcServiceType | 'auto'
 
+function pickPreferredCrs(crsList: string[] | undefined): string | undefined {
+  if (!crsList?.length) return undefined
+  const normalized = crsList.map((c) => c.trim())
+  return (
+    normalized.find((c) => /EPSG:3857$/i.test(c)) ||
+    normalized.find((c) => /EPSG:4326$/i.test(c)) ||
+    normalized[0]
+  )
+}
+
 export function ServiceConnectPanel({ onAddLayers }: ServiceConnectPanelProps) {
   const [url, setUrl] = useState('')
   const [service, setService] = useState<ServiceChoice>('auto')
@@ -32,14 +42,16 @@ export function ServiceConnectPanel({ onAddLayers }: ServiceConnectPanelProps) {
   const [error, setError] = useState<string | null>(null)
   const [connected, setConnected] = useState<ConnectServiceSuccess | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  /** Per-layer selected style name (WMS). */
+  const [styleByLayer, setStyleByLayer] = useState<Record<string, string>>({})
   const generationRef = useRef(0)
   const abortRef = useRef<AbortController | null>(null)
 
-  // Changing description inputs invalidates in-flight / stale results.
   useEffect(() => {
     generationRef.current += 1
     setConnected(null)
     setSelected(new Set())
+    setStyleByLayer({})
     setError(null)
     abortRef.current?.abort()
     abortRef.current = null
@@ -55,6 +67,7 @@ export function ServiceConnectPanel({ onAddLayers }: ServiceConnectPanelProps) {
     setError(null)
     setConnected(null)
     setSelected(new Set())
+    setStyleByLayer({})
 
     let auth: ConnectAuthForm = { mode: 'none' }
     if (authMode === 'query-token') {
@@ -72,7 +85,6 @@ export function ServiceConnectPanel({ onAddLayers }: ServiceConnectPanelProps) {
     })
 
     if (generation !== generationRef.current) {
-      // Stale — a newer description change superseded this request.
       return
     }
 
@@ -83,7 +95,11 @@ export function ServiceConnectPanel({ onAddLayers }: ServiceConnectPanelProps) {
     }
 
     setConnected(result)
-    // Do not auto-select all — first connect must not dump catalog into the project.
+    const defaults: Record<string, string> = {}
+    for (const layer of result.selectable) {
+      if (layer.styles?.[0]?.name) defaults[layer.name] = layer.styles[0].name
+    }
+    setStyleByLayer(defaults)
     setSelected(new Set())
   }
 
@@ -112,6 +128,7 @@ export function ServiceConnectPanel({ onAddLayers }: ServiceConnectPanelProps) {
       : undefined
 
     if (desc.service === 'WMS') {
+      const styleName = styleByLayer[layer.name] || layer.styles?.[0]?.name
       return {
         name: layer.title || layer.name,
         kind: 'wms',
@@ -120,9 +137,11 @@ export function ServiceConnectPanel({ onAddLayers }: ServiceConnectPanelProps) {
           url: conn.shareableUrl,
           version: desc.version,
           layerNames: [layer.name],
-          styleNames: layer.styles?.[0]?.name ? [layer.styles[0].name] : undefined,
+          styleNames: styleName ? [styleName] : undefined,
           format: 'image/png',
           transparent: true,
+          crs: pickPreferredCrs(layer.crs),
+          bboxWgs84: layer.bboxWgs84,
           authMode: authModeOut,
           tokenParam: conn.tokenParam,
           credentialRef
@@ -186,8 +205,8 @@ export function ServiceConnectPanel({ onAddLayers }: ServiceConnectPanelProps) {
   }
 
   const persistHint = canPersistCredentialsSafely()
-    ? '凭证将写入本机安全存储（仅引用写入项目）。'
-    : '当前环境无法安全持久化 Token：仅保存在本次会话内存；项目中只保存 credential 引用。请勿把 Token 写进文件或日志。'
+    ? '凭证将写入本机安全存储，不会写入项目文件。'
+    : '当前环境无法安全持久化 Token：密钥仅保存在本会话内存；项目里只保存 credential 引用。请勿把 Token 写入文件或日志。'
 
   return (
     <div className="service-connect-panel">
@@ -305,7 +324,11 @@ export function ServiceConnectPanel({ onAddLayers }: ServiceConnectPanelProps) {
           selectable={connected.selectable}
           shareableUrl={connected.shareableUrl}
           selected={selected}
+          styleByLayer={styleByLayer}
           onToggle={toggleLayer}
+          onStyleChange={(name, style) =>
+            setStyleByLayer((prev) => ({ ...prev, [name]: style }))
+          }
           onAdd={handleAddSelected}
         />
       )}
@@ -318,16 +341,22 @@ function ServiceCatalog({
   selectable,
   shareableUrl,
   selected,
+  styleByLayer,
   onToggle,
+  onStyleChange,
   onAdd
 }: {
   description: ServiceDescription
   selectable: ServiceLayerInfo[]
   shareableUrl: string
   selected: Set<string>
+  styleByLayer: Record<string, string>
   onToggle: (name: string) => void
+  onStyleChange: (name: string, style: string) => void
   onAdd: () => void
 }) {
+  const isWms = description.service === 'WMS'
+
   return (
     <div className="service-catalog">
       <div className="service-catalog-header">
@@ -339,7 +368,7 @@ function ServiceCatalog({
           {shareableUrl}
         </p>
         <p className="config-hint">
-          已读取远程目录（{selectable.length} 项）。只有勾选并确认后才会写入项目；连接本身不会添加图层。
+          已读取远程目录（{selectable.length} 项）。只有勾选并确认后才会写入项目；连接本身不创建图层。
         </p>
       </div>
 
@@ -348,19 +377,52 @@ function ServiceCatalog({
       ) : (
         <div className="layer-list service-layer-list">
           {selectable.map((layer) => (
-            <label key={layer.name} className="layer-checkbox-item">
-              <input
-                type="checkbox"
-                checked={selected.has(layer.name)}
-                onChange={() => onToggle(layer.name)}
-              />
-              <span>
-                <strong>{layer.title || layer.name}</strong>
-                {layer.title && layer.title !== layer.name ? (
-                  <span className="service-layer-name"> ({layer.name})</span>
+            <div key={layer.name} className="service-layer-row">
+              <label className="layer-checkbox-item">
+                <input
+                  type="checkbox"
+                  checked={selected.has(layer.name)}
+                  onChange={() => onToggle(layer.name)}
+                />
+                <span>
+                  <strong>{layer.title || layer.name}</strong>
+                  {layer.title && layer.title !== layer.name ? (
+                    <span className="service-layer-name"> ({layer.name})</span>
+                  ) : null}
+                </span>
+              </label>
+              <div className="service-layer-meta">
+                {layer.crs?.length ? (
+                  <span title={layer.crs.join(', ')}>
+                    CRS: {layer.crs.slice(0, 3).join(', ')}
+                    {layer.crs.length > 3 ? ` +${layer.crs.length - 3}` : ''}
+                  </span>
+                ) : (
+                  <span>CRS: —</span>
+                )}
+                {layer.bboxWgs84 ? (
+                  <span>
+                    Extent: {layer.bboxWgs84.map((n) => n.toFixed(1)).join(', ')}
+                  </span>
                 ) : null}
-              </span>
-            </label>
+                {isWms && layer.styles && layer.styles.length > 0 ? (
+                  <label className="service-style-pick">
+                    <span>样式</span>
+                    <select
+                      value={styleByLayer[layer.name] || layer.styles[0]!.name}
+                      onChange={(e) => onStyleChange(layer.name, e.target.value)}
+                      disabled={!selected.has(layer.name)}
+                    >
+                      {layer.styles.map((style) => (
+                        <option key={style.name} value={style.name}>
+                          {style.title || style.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+              </div>
+            </div>
           ))}
         </div>
       )}
