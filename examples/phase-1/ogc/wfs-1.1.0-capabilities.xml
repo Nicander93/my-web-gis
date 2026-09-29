@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wfs:WFS_Capabilities version="1.1.0"
+  xmlns:wfs="http://www.opengis.net/wfs"
+  xmlns:ows="http://www.opengis.net/ows"
+  xmlns:ogc="http://www.opengis.net/ogc"
+  xmlns:gml="http://www.opengis.net/gml"
+  xmlns:xlink="http://www.w3.org/1999/xlink">
+  <ows:ServiceIdentification>
+    <ows:Title>Fixture WFS 1.1.0</ows:Title>
+  </ows:ServiceIdentification>
+  <Capability>
+    <Request>
+      <GetFeature>
+        <ResultFormat>
+          <GML2/>
+          <GML3/>
+          <GeoJSON/>
+        </ResultFormat>
+        <DCPType>
+          <HTTP>
+            <Get onlineResource="https://example.com/geoserver/wfs?"/>
+          </HTTP>
+        </DCPType>
+      </GetFeature>
+    </Request>
+  </Capability>
+  <FeatureTypeList>
+    <FeatureType>
+      <Name>playground:roads</Name>
+      <Title>Roads</Title>
+      <DefaultSRS>urn:ogc:def:crs:EPSG::4326</DefaultSRS>
+      <OtherSRS>EPSG:3857</OtherSRS>
+      <LatLongBoundingBox minx="116.0" miny="39.5" maxx="117.0" maxy="40.5"/>
+    </FeatureType>
+  </FeatureTypeList>
+</wfs:WFS_Capabilities>

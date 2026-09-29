@@ -10,6 +10,7 @@ import type {
   WmtsTileMatrixSetLink
 } from './types.js'
 import { child, children, findDeep, parseXmlTree, textOf, type XmlElement } from './xml.js'
+import { parseWfsCapabilities } from './parse-wfs.js'
 
 export interface ParseCapabilitiesOptions {
   shareableUrl: string
@@ -302,33 +303,7 @@ function parseWmts(doc: XmlElement, shareableUrl: string): ServiceDescription {
 }
 
 function parseWfs(doc: XmlElement, shareableUrl: string): ServiceDescription {
-  const root = doc.children[0] ?? doc
-  const version = root.attrs.version || '2.0.0'
-  const list = findDeep(root, 'featuretypelist') ?? root
-  const featureTypes = children(list, 'featuretype').map((ft) => {
-    const name = textOf(child(ft, 'name')) || textOf(child(ft, 'title'))
-    const defaultCrs =
-      textOf(child(ft, 'defaultcrs')) ||
-      textOf(child(ft, 'defaultsrs')) ||
-      textOf(child(ft, 'srs'))
-    return {
-      name,
-      title: textOf(child(ft, 'title')) || undefined,
-      abstract: textOf(child(ft, 'abstract')) || undefined,
-      crs: defaultCrs ? [defaultCrs] : undefined,
-      queryable: Boolean(name)
-    } satisfies ServiceLayerInfo
-  })
-
-  return {
-    service: 'WFS',
-    version,
-    title: textOf(child(findDeep(root, 'serviceidentification') ?? root, 'title')) || undefined,
-    shareableUrl,
-    layers: featureTypes,
-    featureTypes,
-    rawRootLocalName: root.name
-  }
+  return parseWfsCapabilities(doc, shareableUrl)
 }
 
 function throwIfServiceException(root: XmlElement): void {

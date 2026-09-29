@@ -1,19 +1,68 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<WFS_Capabilities version="2.0.0" xmlns="http://www.opengis.net/wfs/2.0" xmlns:ows="http://www.opengis.net/ows/1.1">
+<WFS_Capabilities version="2.0.0"
+  xmlns="http://www.opengis.net/wfs/2.0"
+  xmlns:ows="http://www.opengis.net/ows/1.1"
+  xmlns:xlink="http://www.w3.org/1999/xlink"
+  xmlns:fes="http://www.opengis.net/fes/2.0">
   <ows:ServiceIdentification>
     <ows:Title>Fixture WFS 2.0.0</ows:Title>
   </ows:ServiceIdentification>
+  <ows:OperationsMetadata>
+    <ows:Operation name="GetFeature">
+      <ows:DCP>
+        <ows:HTTP>
+          <ows:Get xlink:href="https://example.com/geoserver/wfs"/>
+        </ows:HTTP>
+      </ows:DCP>
+      <ows:Parameter name="outputFormat">
+        <ows:AllowedValues>
+          <ows:Value>application/json</ows:Value>
+          <ows:Value>text/xml; subtype=gml/3.2</ows:Value>
+          <ows:Value>csv</ows:Value>
+        </ows:AllowedValues>
+      </ows:Parameter>
+      <ows:Parameter name="count">
+        <ows:AllowedValues>
+          <ows:Value>1000</ows:Value>
+        </ows:AllowedValues>
+      </ows:Parameter>
+      <ows:Parameter name="startIndex">
+        <ows:AllowedValues>
+          <ows:Value>0</ows:Value>
+        </ows:AllowedValues>
+      </ows:Parameter>
+    </ows:Operation>
+    <ows:Constraint name="ImplementsResultPaging">
+      <ows:DefaultValue>TRUE</ows:DefaultValue>
+    </ows:Constraint>
+    <ows:Constraint name="CountDefault">
+      <ows:DefaultValue>1000</ows:DefaultValue>
+    </ows:Constraint>
+  </ows:OperationsMetadata>
   <FeatureTypeList>
     <FeatureType>
       <Name>playground:parks</Name>
       <Title>Parks</Title>
       <Abstract>Park polygons</Abstract>
       <DefaultCRS>EPSG:4326</DefaultCRS>
+      <OtherCRS>EPSG:3857</OtherCRS>
+      <ows:WGS84BoundingBox>
+        <ows:LowerCorner>116.0 39.5</ows:LowerCorner>
+        <ows:UpperCorner>117.0 40.5</ows:UpperCorner>
+      </ows:WGS84BoundingBox>
+      <OutputFormats>
+        <Format>application/json</Format>
+        <Format>text/xml; subtype=gml/3.2</Format>
+      </OutputFormats>
     </FeatureType>
     <FeatureType>
       <Name>playground:trees</Name>
       <Title>Trees</Title>
       <DefaultCRS>EPSG:3857</DefaultCRS>
+      <ows:WGS84BoundingBox>
+        <ows:LowerCorner>116.2 39.8</ows:LowerCorner>
+        <ows:UpperCorner>116.6 40.1</ows:UpperCorner>
+      </ows:WGS84BoundingBox>
     </FeatureType>
   </FeatureTypeList>
 </WFS_Capabilities>

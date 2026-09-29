@@ -9,3 +9,5 @@ OGC service URL normalization, capabilities request helpers, and XML parsers for
 P16: CRS/extent inheritance for WMS layers; ServiceExceptionReport mapping (`wms-service-exception.xml`).
 
 P17: WMTS TileMatrix / style / format / KVP|REST resolve (`resolveWmtsLayerOptions`); fixtures cover non-numeric matrix IDs, 512px tiles, and REST templates.
+
+P18: WFS 2.0/1.1 feature type + outputFormat + paging parse; `resolveWfsLoadOptions` / `buildGetFeatureRequestUrl` / bounded page plan; axis-order samples for BBOX; fixtures include 1.1.0 and GeoJSON GetFeature sample.

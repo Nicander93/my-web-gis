@@ -3,7 +3,11 @@ import { AlertCircle, Link2, Loader2 } from 'lucide-react'
 import type { OgcServiceType, ServiceDescription, ServiceLayerInfo, WmtsRequestEncoding } from '@desktop-webgis/ogc-io'
 import {
   listCompatibleTileMatrixSets,
-  resolveWmtsLayerOptions
+  resolveWmtsLayerOptions,
+  pickWfsOutputFormat,
+  clampWfsMaxFeatures,
+  WFS_DEFAULT_MAX_FEATURES,
+  WFS_PHASE_MAX_FEATURES
 } from '@desktop-webgis/ogc-io'
 import type { DatasetKind, ServiceAuthMode, ServiceSource } from '@desktop-webgis/gis-core'
 import { canPersistCredentialsSafely } from '@/services/credentials'
@@ -17,6 +21,15 @@ export interface ServiceLayerAddRequest {
   name: string
   kind: Exclude<DatasetKind, 'vector'>
   source: ServiceSource
+  /** Present for WFS adds so App can kick off a bounded snapshot load. */
+  wfsLoad?: {
+    description: ServiceDescription
+    extentMode: 'view' | 'full'
+    maxFeatures: number
+    authMode: ServiceAuthMode
+    tokenParam?: string
+    credentialRefKey?: string
+  }
 }
 
 interface ServiceConnectPanelProps {
@@ -52,6 +65,8 @@ export function ServiceConnectPanel({ onAddLayers }: ServiceConnectPanelProps) {
   const [wmtsOptsByLayer, setWmtsOptsByLayer] = useState<
     Record<string, { format: string; tileMatrixSet: string; requestEncoding: WmtsRequestEncoding }>
   >({})
+  const [wfsExtentMode, setWfsExtentMode] = useState<'view' | 'full'>('view')
+  const [wfsMaxFeatures, setWfsMaxFeatures] = useState(WFS_DEFAULT_MAX_FEATURES)
   const generationRef = useRef(0)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -61,6 +76,8 @@ export function ServiceConnectPanel({ onAddLayers }: ServiceConnectPanelProps) {
     setSelected(new Set())
     setStyleByLayer({})
     setWmtsOptsByLayer({})
+    setWfsExtentMode('view')
+    setWfsMaxFeatures(WFS_DEFAULT_MAX_FEATURES)
     setError(null)
     abortRef.current?.abort()
     abortRef.current = null
@@ -78,6 +95,8 @@ export function ServiceConnectPanel({ onAddLayers }: ServiceConnectPanelProps) {
     setSelected(new Set())
     setStyleByLayer({})
     setWmtsOptsByLayer({})
+    setWfsExtentMode('view')
+    setWfsMaxFeatures(WFS_DEFAULT_MAX_FEATURES)
 
     let auth: ConnectAuthForm = { mode: 'none' }
     if (authMode === 'query-token') {
@@ -226,6 +245,10 @@ export function ServiceConnectPanel({ onAddLayers }: ServiceConnectPanelProps) {
     }
 
     if (desc.service === 'WFS') {
+      const format = pickWfsOutputFormat(
+        layer.outputFormats?.length ? layer.outputFormats : desc.wfsOutputFormats
+      )
+      const maxFeatures = clampWfsMaxFeatures(wfsMaxFeatures)
       return {
         name: layer.title || layer.name,
         kind: 'wfs',
@@ -234,11 +257,24 @@ export function ServiceConnectPanel({ onAddLayers }: ServiceConnectPanelProps) {
           url: conn.shareableUrl,
           version: desc.version,
           typeName: layer.name,
-          outputFormat: 'application/json',
-          maxFeatures: 5000,
+          outputFormat: format.value,
+          maxFeatures,
+          srsName: layer.defaultCrs || layer.crs?.[0],
+          bboxWgs84: layer.bboxWgs84,
+          extentMode: wfsExtentMode,
+          complete: false,
+          loadedCount: 0,
           authMode: authModeOut,
           tokenParam: conn.tokenParam,
           credentialRef
+        },
+        wfsLoad: {
+          description: desc,
+          extentMode: wfsExtentMode,
+          maxFeatures,
+          authMode: authModeOut,
+          tokenParam: conn.tokenParam,
+          credentialRefKey: conn.credentialRefKey
         }
       }
     }
@@ -383,6 +419,10 @@ export function ServiceConnectPanel({ onAddLayers }: ServiceConnectPanelProps) {
           selected={selected}
           styleByLayer={styleByLayer}
           wmtsOptsByLayer={wmtsOptsByLayer}
+            wfsExtentMode={wfsExtentMode}
+            wfsMaxFeatures={wfsMaxFeatures}
+            onWfsExtentModeChange={setWfsExtentMode}
+            onWfsMaxFeaturesChange={(n) => setWfsMaxFeatures(clampWfsMaxFeatures(n))}
           onToggle={toggleLayer}
           onStyleChange={(name, style) =>
             setStyleByLayer((prev) => ({ ...prev, [name]: style }))
@@ -414,9 +454,13 @@ function ServiceCatalog({
   selected,
   styleByLayer,
   wmtsOptsByLayer,
+  wfsExtentMode,
+  wfsMaxFeatures,
   onToggle,
   onStyleChange,
   onWmtsOptsChange,
+  onWfsExtentModeChange,
+  onWfsMaxFeaturesChange,
   onAdd
 }: {
   description: ServiceDescription
@@ -428,17 +472,24 @@ function ServiceCatalog({
     string,
     { format: string; tileMatrixSet: string; requestEncoding: WmtsRequestEncoding }
   >
+  wfsExtentMode: 'view' | 'full'
+  wfsMaxFeatures: number
   onToggle: (name: string) => void
   onStyleChange: (name: string, style: string) => void
   onWmtsOptsChange: (
     name: string,
     patch: Partial<{ format: string; tileMatrixSet: string; requestEncoding: WmtsRequestEncoding }>
   ) => void
+  onWfsExtentModeChange: (mode: 'view' | 'full') => void
+  onWfsMaxFeaturesChange: (n: number) => void
   onAdd: () => void
 }) {
   const isWms = description.service === 'WMS'
   const isWmts = description.service === 'WMTS'
+  const isWfs = description.service === 'WFS'
   const encodings = description.wmtsRequestEncodings ?? []
+  const wfsFormats = description.wfsOutputFormats ?? []
+  const wfsPaging = description.wfsPaging?.supported
 
   return (
     <div className="service-catalog">
@@ -454,6 +505,9 @@ function ServiceCatalog({
           已读取远程目录（{selectable.length} 项）。只有勾选并确认后才会写入项目；连接本身不创建图层。
           {isWmts
             ? ' WMTS 使用 Capabilities 声明的 TileMatrix（origin / resolution / matrix ID / tile size），不会硬编码成 XYZ。'
+            : ''}
+          {isWfs
+            ? ' WFS 加载为只读本地快照（默认上限 5000，阶段保护上限 50000）；截断不会标为完整；刷新失败保留原快照；不启用 WFS-T。'
             : ''}
         </p>
       </div>
@@ -590,6 +644,36 @@ function ServiceCatalog({
           })}
         </div>
       )}
+
+      {isWfs ? (
+        <div className="service-wfs-options">
+          <label className="service-field">
+            <span>加载范围</span>
+            <select
+              value={wfsExtentMode}
+              onChange={(e) => onWfsExtentModeChange(e.target.value as 'view' | 'full')}
+            >
+              <option value="view">当前视图范围</option>
+              <option value="full">要素类型全范围（无 BBOX 时不限范围）</option>
+            </select>
+          </label>
+          <label className="service-field">
+            <span>要素上限（默认 {WFS_DEFAULT_MAX_FEATURES}，最大 {WFS_PHASE_MAX_FEATURES}）</span>
+            <input
+              type="number"
+              min={1}
+              max={WFS_PHASE_MAX_FEATURES}
+              value={wfsMaxFeatures}
+              onChange={(e) => onWfsMaxFeaturesChange(Number(e.target.value))}
+            />
+          </label>
+          <p className="config-hint">
+            输出格式优先 GeoJSON
+            {wfsFormats.length ? `（声明: ${wfsFormats.slice(0, 3).join(', ')}）` : ''}
+            ；分页{wfsPaging ? '已启用（Capabilities 声明支持）' : '未声明，将单次请求上限条数'}。
+          </p>
+        </div>
+      ) : null}
 
       <div className="service-catalog-footer">
         <button

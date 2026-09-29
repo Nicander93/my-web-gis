@@ -1,0 +1,17 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "parks.1",
+      "geometry": { "type": "Point", "coordinates": [116.4, 39.9] },
+      "properties": { "name": "Park A" }
+    },
+    {
+      "type": "Feature",
+      "id": "parks.2",
+      "geometry": { "type": "Point", "coordinates": [116.5, 40.0] },
+      "properties": { "name": "Park B" }
+    }
+  ]
+}

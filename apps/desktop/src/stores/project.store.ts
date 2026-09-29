@@ -116,6 +116,13 @@ interface ProjectState {
     target: { kind: 'root'; index: number } | { kind: 'group'; groupId: string; index: number }
   ): void
   addLayersToGroup(groupId: string, layerIds: string[]): void
+  /** Replace features for a dataset (WFS snapshot apply / refresh). */
+  setDatasetFeatures(datasetId: string, features: GisFeature[]): void
+  /** Patch WFS service source metadata after load/refresh (no secrets). */
+  patchWfsServiceSource(
+    datasetId: string,
+    patch: Partial<Extract<ServiceSource, { type: "wfs" }>>
+  ): void
 }
 
 const attributeHistory = new EditHistory()
@@ -181,6 +188,31 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         featuresByDataset,
         dirty: true,
         selectedLayerId: layer.id
+      }
+    }),
+
+  setDatasetFeatures: (datasetId, features) =>
+    set((state) => {
+      const featuresByDataset = {
+        ...state.featuresByDataset,
+        [datasetId]: features
+      }
+      syncStoreFromState(featuresByDataset)
+      return { featuresByDataset, dirty: true }
+    }),
+
+  patchWfsServiceSource: (datasetId, patch) =>
+    set((state) => {
+      const datasets = state.project.datasets.map((ds) => {
+        if (ds.id !== datasetId || ds.kind !== "wfs") return ds
+        return {
+          ...ds,
+          source: { ...ds.source, ...patch, type: "wfs" as const }
+        }
+      })
+      return {
+        project: { ...state.project, datasets },
+        dirty: true
       }
     }),
 

@@ -37,8 +37,24 @@ interface LayerSession {
   styleDraft?: StyleDraftState
 }
 
+/** Default map view extent in WGS84 [west,south,east,north] until MapCanvas wires live view. */
+export type MapViewExtentWgs84 = [number, number, number, number]
+
+const DEFAULT_MAP_VIEW_EXTENT: MapViewExtentWgs84 = [73, 18, 135, 54]
+
 interface SessionState {
   sessions: Record<string, LayerSession>
+  /** Live / placeholder map view for WFS bounded load (extentMode=view). */
+  mapViewExtentWgs84: MapViewExtentWgs84
+  setMapViewExtentWgs84(extent: MapViewExtentWgs84): void
+  /** Monotonic token bumped on project switch; WFS loads must match to apply. */
+  wfsLoadGeneration: number
+  bumpWfsLoadGeneration(): number
+  /** Active AbortControllers keyed by layerId for in-flight WFS loads. */
+  wfsAbortByLayer: Record<string, AbortController>
+  setWfsAbort(layerId: string, controller: AbortController | null): void
+  abortWfsLoad(layerId: string): void
+  abortAllWfsLoads(): void
   getLayerSession(layerId: string): LayerSession
   setAttributeTableState(layerId: string, updates: Partial<AttributeTableState>): void
   setInspectorTab(layerId: string, tab: InspectorTab): void
@@ -63,6 +79,33 @@ function createDraftFromApplied(applied: LayerStyle): StyleDraftState {
 
 export const useSessionStore = create<SessionState>((set, get) => ({
   sessions: {},
+  mapViewExtentWgs84: DEFAULT_MAP_VIEW_EXTENT,
+  wfsLoadGeneration: 0,
+  wfsAbortByLayer: {},
+  setMapViewExtentWgs84: (extent) => set({ mapViewExtentWgs84: extent }),
+  bumpWfsLoadGeneration: () => {
+    const next = get().wfsLoadGeneration + 1
+    // Abort in-flight WFS loads so they cannot write into the new project.
+    get().abortAllWfsLoads()
+    set({ wfsLoadGeneration: next })
+    return next
+  },
+  setWfsAbort: (layerId, controller) =>
+    set((prev) => {
+      const next = { ...prev.wfsAbortByLayer }
+      if (!controller) delete next[layerId]
+      else next[layerId] = controller
+      return { wfsAbortByLayer: next }
+    }),
+  abortWfsLoad: (layerId) => {
+    const c = get().wfsAbortByLayer[layerId]
+    c?.abort()
+    get().setWfsAbort(layerId, null)
+  },
+  abortAllWfsLoads: () => {
+    for (const c of Object.values(get().wfsAbortByLayer)) c.abort()
+    set({ wfsAbortByLayer: {} })
+  },
   getLayerSession: (layerId) => get().sessions[layerId] || {},
   setAttributeTableState: (layerId, updates) =>
     set((prev) => {

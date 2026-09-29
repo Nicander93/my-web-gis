@@ -2090,3 +2090,17 @@ button:disabled {
   color: var(--color-danger, #b42318);
   font-size: 12px;
 }
+
+
+.service-wfs-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 0 12px;
+  border-top: 1px solid var(--border, #e5e7eb);
+  margin-top: 8px;
+}
+
+.service-wfs-options .service-field input[type='number'] {
+  width: 120px;
+}

@@ -1,4 +1,5 @@
 import { emitCommandStatus } from './status'
+import { useSessionStore } from '@/stores/session.store'
 
 export type ExportDialogMode = 'export' | 'copy'
 
@@ -23,9 +24,11 @@ export function registerExportDataCallback(callback: ExportDataCallback): void {
 
 export const projectCommands = {
   newProject(): void {
+    useSessionStore.getState().bumpWfsLoadGeneration()
     emitCommandStatus('新建项目（项目服务待接入）')
   },
   openProject(): void {
+    useSessionStore.getState().bumpWfsLoadGeneration()
     emitCommandStatus('打开项目（项目服务待接入）')
   },
   saveProject(): void {
