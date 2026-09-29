@@ -15,3 +15,6 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+# Default TLS verification ON (rustls). Do not enable danger_accept_invalid_certs.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }

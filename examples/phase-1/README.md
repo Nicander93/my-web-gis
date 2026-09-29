@@ -122,3 +122,7 @@
 - 修改样本时应同步更新本 README
 - 新增样本应明确记录预期特征和异常
 - 保持样本文件小型化,便于版本控制和快速测试
+
+## OGC Capabilities fixtures (P15)
+
+See [ogc/](./ogc/) for WMS 1.3.0 / 1.1.1, WMTS 1.0.0, and WFS 2.0.0 Capabilities XML samples (no credentials). Canonical test copies live in `packages/ogc-io/fixtures/`.

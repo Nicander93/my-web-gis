@@ -1941,3 +1941,102 @@ button:disabled {
   border-radius: 4px;
   font-size: 12px;
 }
+
+/* P15 service connect */
+.service-connect-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.service-connect-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.service-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.service-field input,
+.service-field select {
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-app-bg);
+  color: var(--color-text-primary);
+  font-size: 12px;
+}
+
+.service-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.service-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.service-actions .button-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.service-auth-hint,
+.service-catalog-url {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.service-connect-error {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.service-catalog {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--color-panel-bg, var(--color-app-bg));
+}
+
+.service-catalog-header h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.service-layer-list {
+  max-height: 220px;
+  overflow: auto;
+  margin: 8px 0;
+}
+
+.service-layer-name {
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+.service-catalog-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spin {
+  animation: spin 0.8s linear infinite;
+}

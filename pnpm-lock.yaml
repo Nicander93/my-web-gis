@@ -23,6 +23,9 @@ importers:
       '@desktop-webgis/gis-core':
         specifier: workspace:*
         version: link:../../packages/gis-core
+      '@desktop-webgis/ogc-io':
+        specifier: workspace:*
+        version: link:../../packages/ogc-io
       '@desktop-webgis/ol-runtime':
         specifier: workspace:*
         version: link:../../packages/ol-runtime
@@ -118,6 +121,15 @@ importers:
       '@desktop-webgis/ol-style':
         specifier: workspace:*
         version: link:../ol-style
+    devDependencies:
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)
+
+  packages/ogc-io:
     devDependencies:
       typescript:
         specifier: ^5.9.2

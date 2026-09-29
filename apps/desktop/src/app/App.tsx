@@ -12,6 +12,7 @@ import {
 import { useProjectStore } from '@/stores/project.store'
 import { createId } from '@desktop-webgis/gis-core'
 import type { ImportResult } from '@/services/import'
+import type { ServiceLayerAddRequest } from '@/features/add-data/ServiceConnectPanel'
 import { emitCommandStatus } from './commands/status'
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
   const [exportLayerId, setExportLayerId] = useState<string | null>(null)
   const [exportMode, setExportMode] = useState<ExportDialogMode>('export')
   const addLayer = useProjectStore((state) => state.addLayer)
+  const addServiceLayer = useProjectStore((state) => state.addServiceLayer)
 
   useEffect(() => {
     document.documentElement.dataset.theme = 'light'
@@ -59,6 +61,16 @@ export default function App() {
     }
   }
 
+  function handleAddServiceLayers(layers: ServiceLayerAddRequest[]): void {
+    let added = 0
+    for (const layer of layers) {
+      const result = addServiceLayer(layer)
+      if (result) added += 1
+    }
+    emitCommandStatus(added > 0 ? `已添加 ${added} 个服务图层` : '未添加服务图层')
+  }
+
+
   return (
     <div className="desktop-app">
       <Header />
@@ -68,6 +80,7 @@ export default function App() {
         open={addDataOpen}
         onClose={() => setAddDataOpen(false)}
         onImport={handleImport}
+        onAddServiceLayers={handleAddServiceLayers}
       />
       <ExportDialog
         open={exportOpen}

@@ -1,5 +1,6 @@
 import { applyFieldFilter,
-  layerListZIndex, type BasemapConfig, type GisFeature, type Layer, type MapState } from '@desktop-webgis/gis-core'
+  isTileServiceKind,
+  layerListZIndex, type BasemapConfig, type Dataset, type GisFeature, type Layer, type MapState } from '@desktop-webgis/gis-core'
 import { createOlSceneLayer, updateGoogleMapTilesAttribution } from '@desktop-webgis/ol-scene-runtime'
 import type { SceneSource } from '@desktop-webgis/scene-schema'
 import Map from 'ol/Map'
@@ -114,8 +115,18 @@ export class OlMapRuntime {
     }
   }
 
-  syncLayers(layers: Layer[], featuresByDataset: Record<string, GisFeature[]>): void {
+  /**
+   * Sync project layers to OpenLayers.
+   * Vector datasets use VectorLayer; WMS/WMTS are not registered as VectorLayer
+   * (P16/P17 add TileLayer sources). Passing datasets prevents mistaken type assertions.
+   */
+  syncLayers(
+    layers: Layer[],
+    featuresByDataset: Record<string, GisFeature[]>,
+    datasets: Dataset[] = []
+  ): void {
     const map = this.getMap()
+    const datasetById = new Map(datasets.map((dataset) => [dataset.id, dataset]))
     const liveLayerIds = new Set(layers.map((layer) => layer.id))
 
     for (const [layerId, runtimeLayer] of this.registry.entries()) {
@@ -126,6 +137,18 @@ export class OlMapRuntime {
     }
 
     layers.forEach((layer, index) => {
+      const dataset = datasetById.get(layer.datasetId)
+      // Service tile layers must never be treated as editable VectorLayers.
+      if (dataset && isTileServiceKind(dataset.kind)) {
+        const mistaken = this.registry.get(layer.id)
+        if (mistaken) {
+          map.removeLayer(mistaken)
+          this.registry.unregister(layer.id)
+        }
+        // P16 (WMS) / P17 (WMTS) register TileLayer here.
+        return
+      }
+
       // Visible set = F (layer.filter). Hidden features are omitted so they cannot stay highlighted.
       const allFeatures = featuresByDataset[layer.datasetId] ?? []
       const features = applyFieldFilter(allFeatures, layer.filter)

@@ -10,6 +10,7 @@ import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
 import { pickSaveFile, writeTextFile } from '@/services/files'
 import { emitCommandStatus } from '@/app/commands/status'
+import { getLayerCapabilities } from '@/app/commands/layer.commands'
 import type { ExportDialogMode } from '@/app/commands/project.commands'
 import {
   EXPORT_SCOPE_LABELS,
@@ -108,6 +109,12 @@ export function ExportDialog({ open, onClose, layerId, mode = 'export' }: Export
       setError('请先选择图层')
       return
     }
+    const caps = getLayerCapabilities(layer.id)
+    if (!caps.canExport) {
+      setError('当前图层不支持矢量导出（服务瓦片图层不可导出为 GeoJSON/CSV）')
+      emitCommandStatus('服务图层不支持矢量导出')
+      return
+    }
     const snapshot = takeSnapshot()
     if (snapshot.length === 0) {
       setError('当前导出范围为 0 个要素，未生成文件。')
@@ -162,6 +169,12 @@ export function ExportDialog({ open, onClose, layerId, mode = 'export' }: Export
   function handleCopyLocal(): void {
     if (!layer) {
       setError('请先选择图层')
+      return
+    }
+    const caps = getLayerCapabilities(layer.id)
+    if (!caps.canCopy) {
+      setError('当前图层不支持复制为本地图层')
+      emitCommandStatus('服务图层不支持复制为本地图层')
       return
     }
     const snapshot = takeSnapshot()
