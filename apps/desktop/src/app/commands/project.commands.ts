@@ -4,10 +4,19 @@ export interface AddDataCallback {
   openDialog: () => void
 }
 
+export interface ExportDataCallback {
+  openDialog: (layerId?: string | null) => void
+}
+
 let addDataCallback: AddDataCallback | null = null
+let exportDataCallback: ExportDataCallback | null = null
 
 export function registerAddDataCallback(callback: AddDataCallback): void {
   addDataCallback = callback
+}
+
+export function registerExportDataCallback(callback: ExportDataCallback): void {
+  exportDataCallback = callback
 }
 
 export const projectCommands = {
@@ -30,7 +39,11 @@ export const projectCommands = {
       emitCommandStatus('添加数据（对话框未注册）')
     }
   },
-  exportData(): void {
-    emitCommandStatus('导出（数据服务待接入）')
+  exportData(layerId?: string | null): void {
+    if (exportDataCallback) {
+      exportDataCallback.openDialog(layerId)
+    } else {
+      emitCommandStatus('导出（对话框未注册）')
+    }
   }
 }

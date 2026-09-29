@@ -39,6 +39,14 @@ interface ProjectState {
     features: GisFeature[],
     styleKind: 'point' | 'line' | 'polygon' | 'mixed'
   ): void
+  /**
+   * Copy features into a brand-new Dataset + Layer (deep-cloned; no shared mutable refs).
+   */
+  copyFeaturesToLocalLayer(
+    features: GisFeature[],
+    name: string,
+    styleKind: 'point' | 'line' | 'polygon' | 'mixed'
+  ): { datasetId: string; layerId: string } | null
   setSelectedLayer(layerId: string | null): void
   setDirty(dirty: boolean): void
   setLayerStyle(layerId: string, style: LayerStyle): void
@@ -124,6 +132,17 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         selectedLayerId: layer.id
       }
     }),
+
+  copyFeaturesToLocalLayer: (features, name, styleKind) => {
+    if (!features || features.length === 0) return null
+    const datasetId = createId('dataset')
+    const cloned = cloneValue(features)
+    // Ensure we never share object identity with source features.
+    get().addLayer(datasetId, name, cloned, styleKind)
+    const layerId = get().selectedLayerId
+    if (!layerId) return null
+    return { datasetId, layerId }
+  },
 
   setSelectedLayer: (layerId) => set({ selectedLayerId: layerId }),
   setDirty: (dirty) => set({ dirty }),
