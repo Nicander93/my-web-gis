@@ -26,6 +26,9 @@ importers:
       '@desktop-webgis/ol-runtime':
         specifier: workspace:*
         version: link:../../packages/ol-runtime
+      '@desktop-webgis/ol-style':
+        specifier: workspace:*
+        version: link:../../packages/ol-style
       '@desktop-webgis/scene-codegen':
         specifier: workspace:*
         version: link:../../packages/scene-codegen

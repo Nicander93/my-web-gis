@@ -2,15 +2,37 @@ import { Eye, EyeOff, Folder, GripVertical, Layers3, Search } from 'lucide-react
 import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { useProjectStore } from '@/stores/project.store'
-import { isLegacyStyle } from '@desktop-webgis/gis-core'
+import { isLegacyStyle, migrateLegacyStyle } from '@desktop-webgis/gis-core'
+import { colorToString, symbolPrimaryColor, type LayerStyle, type Symbol } from '@desktop-webgis/ol-style'
 
-function getSymbolClass(style: any): 'point' | 'line' | 'polygon' {
-  if (isLegacyStyle(style)) {
-    if (style.kind === 'polygon') return 'polygon'
-    if (style.kind === 'line') return 'line'
-    return 'point'
+function previewFromSymbol(symbol: Symbol): { kind: 'point' | 'line' | 'polygon'; color: string } {
+  const color = colorToString(symbolPrimaryColor(symbol))
+  if (symbol.type === 'circle') return { kind: 'point', color }
+  if (symbol.type === 'solid' && 'width' in symbol && !('fill' in symbol)) return { kind: 'line', color }
+  if (symbol.type === 'mixed') {
+    if (symbol.polygon) return { kind: 'polygon', color }
+    if (symbol.line) return { kind: 'line', color }
+    return { kind: 'point', color }
   }
-  return 'point'
+  return { kind: 'polygon', color }
+}
+
+function getPreviewSymbol(style: LayerStyle | { kind: string }): { kind: 'point' | 'line' | 'polygon'; color: string } {
+  if (isLegacyStyle(style as never)) {
+    const legacy = style as { kind: string; fill: string; stroke: string }
+    if (legacy.kind === 'polygon') return { kind: 'polygon', color: legacy.fill }
+    if (legacy.kind === 'line') return { kind: 'line', color: legacy.stroke }
+    return { kind: 'point', color: legacy.fill }
+  }
+
+  const normalized = style as LayerStyle
+  if (normalized.mode === 'single') {
+    return previewFromSymbol(normalized.symbol)
+  }
+  if (normalized.mode === 'categorized') {
+    return previewFromSymbol(normalized.categories[0]?.symbol ?? normalized.fallback)
+  }
+  return previewFromSymbol(normalized.breaks[0]?.symbol ?? normalized.fallback)
 }
 
 export function LayerPanel() {
@@ -18,12 +40,10 @@ export function LayerPanel() {
   const projectLayers = useProjectStore((state) => state.project.layers)
   const selectedLayerId = useProjectStore((state) => state.selectedLayerId)
   const setSelectedLayer = useProjectStore((state) => state.setSelectedLayer)
-  
+
   const [visible, setVisible] = useState<Record<string, boolean>>({})
-  
-  const filteredLayers = projectLayers.filter((layer) => 
-    layer.name.includes(query.trim())
-  )
+
+  const filteredLayers = projectLayers.filter((layer) => layer.name.includes(query.trim()))
 
   return (
     <div className="feature-panel layer-manager">
@@ -48,8 +68,9 @@ export function LayerPanel() {
         {filteredLayers.map((layer) => {
           const isVisible = visible[layer.id] ?? layer.visible
           const isActive = selectedLayerId === layer.id
-          const symbolClass = getSymbolClass(layer.style)
-          
+          const style = isLegacyStyle(layer.style) ? migrateLegacyStyle(layer.style) : layer.style
+          const preview = getPreviewSymbol(style)
+
           return (
             <div key={layer.id} className={`layer-item ${isActive ? 'is-active' : ''}`}>
               <GripVertical className="drag-icon" size={13} />
@@ -62,19 +83,26 @@ export function LayerPanel() {
               >
                 {isVisible ? <Eye size={14} /> : <EyeOff size={14} />}
               </Button>
-              <button 
-                className="layer-name-button" 
-                type="button" 
+              <button
+                className="layer-name-button"
+                type="button"
                 onClick={() => setSelectedLayer(layer.id)}
               >
-                <span className={`layer-symbol layer-symbol-${symbolClass}`} />
+                <span
+                  className={`layer-symbol layer-symbol-${preview.kind}`}
+                  style={
+                    preview.kind === 'polygon'
+                      ? { background: preview.color, borderColor: preview.color }
+                      : { background: preview.color }
+                  }
+                />
                 <span>{layer.name}</span>
               </button>
             </div>
           )
         })}
         {filteredLayers.length === 0 && projectLayers.length === 0 && (
-          <p className="empty-state">暂无图层，请通过"添加数据"导入</p>
+          <p className="empty-state">暂无图层，请通过&quot;添加数据&quot;导入</p>
         )}
         {filteredLayers.length === 0 && projectLayers.length > 0 && (
           <p className="empty-state">没有匹配的图层</p>

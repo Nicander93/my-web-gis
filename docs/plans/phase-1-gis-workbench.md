@@ -379,8 +379,8 @@ rtk proxy pnpm --filter @desktop-webgis/desktop build
 | P06 | 已完成 | CSV。PR#11 |
 | P07 | 已完成 | 二维 DXF。commit fb0387c |
 | P08 | 已完成 | 样式算法。PR#13 |
-| P09 | 待执行 | 样式 runtime |
-| P10 | 待执行 | 样式 UI |
+| P09 | 已完成 | 样式 runtime。PR#14 / 21f653f |
+| P10 | 已完成 | 样式 UI。local/p10-style-label-panel |
 | P11 | 待执行 | Scene 样式 |
 | P12 | 待执行 | 属性过滤选择 |
 | P13 | 待执行 | 导出与复制 |

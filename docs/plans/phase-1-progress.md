@@ -1678,3 +1678,68 @@ function getLabelText(feature, labelConfig) {
 - `apps/desktop/src/app/commands/layer.commands.ts` (应用样式命令)
 
 ---
+
+## P10 — 样式、标注面板和图例
+
+- **状态**: 已完成
+- **时间**: 2026-09-29 07:54 CST
+- **分支**: `local/p10-style-label-panel`
+- **基于**: main `21f653f`（P09 / PR#14）
+- **说明**: 云端 agent 中途失败且无本地 `cursor/p10-style-label-panel-0603` 分支可恢复；本地从 main 新建分支继续。无关 WIP 已 stash：`wip-before-p10-unrelated-*`。
+
+### 目标对照
+
+| 计划要求 | 结果 |
+| --- | --- |
+| 右侧 Inspector 拆出样式/标注组件，复用右侧容器 | ✅ StylePanel / LabelPanel / Legend，无嵌套面板框架 |
+| 模式、字段、分类方法、分段数、色带、分类项/断点、fallback | ✅ |
+| 标注字段、字号、颜色、描边、缩放范围 | ✅ |
+| 草稿 vs 应用；一次应用 = 一次可撤销配置操作 | ✅ session 草稿 + `layerCommands.applyStyle` 撤销栈 |
+| 重新分类是明确动作；属性编辑沿用现有断点 | ✅ 「重新分类」按钮；图例/编译不自动重算 |
+| 图例从已应用配置生成；图层列表符号预览 | ✅ Legend + LayerPanel 色块预览 |
+| `compileGraduatedStyle` 高于最大断点 → 末段符号 | ✅ 与 `classifyValue` 对齐，并补测试 |
+
+### 主要改动
+
+**ol-style**
+- `compiler.ts`: 有限数值高于全部断点时使用最后断点符号，不再落 fallback
+- `compiler.test.ts`: 精确上界 / 高于最大断点
+- 新增 `legend.ts` / `legend.test.ts`：`buildLegendItems`、`symbolPrimaryColor`
+
+**desktop**
+- `session.store.ts`: 每图层样式草稿（含 classCount / colorRampId）
+- `project.store.ts`: `setLayerStyle` / `getNormalizedLayerStyle`
+- `layer.commands.ts` / `edit.commands.ts`: 应用/重置/撤销/重做样式配置
+- `features/inspector/StylePanel.tsx`、`LabelPanel.tsx`、`Legend.tsx`、`style-draft.ts`
+- `Inspector.tsx`：图层 / 样式 / 标注 / 要素分段；图例挂在图层与样式页
+- `LayerPanel.tsx`：按已应用样式显示符号预览色
+- 依赖增加 `@desktop-webgis/ol-style`
+
+### 文档
+
+- `phase-1-gis-workbench.md` 进度表：P09→已完成（PR#14/21f653f），P10→已完成
+
+### 测试与构建结果
+
+1. `pnpm --filter @desktop-webgis/ol-style test` — ✅ 40 passed（classification 21 + compiler 15 + legend 4）
+2. `pnpm --filter @desktop-webgis/gis-core test` — ✅ 17 passed
+3. `pnpm --filter @desktop-webgis/ol-style|gis-core|vector-io|ol-runtime build` — ✅
+4. Desktop P10 相关 + 既有：`layer.style-commands` / `style-draft` / `view.commands` / `import` / `csv-import` — ✅ 17 passed
+5. `pnpm --filter @desktop-webgis/desktop build` — ✅（578.05 kB JS）
+
+**graduated 修复证据**:
+- `compileGraduatedStyle`：有限数值未命中任一上界时使用 `sortedBreaks[last].symbol`
+- 测试：`精确上界应使用对应断点符号`、`高于最大断点的有限数值应使用最后断点符号而非 fallback`（radius 断言）
+
+
+### 已知限制
+
+1. Desktop MapCanvas 仍为占位，样式应用写入 Project；地图 runtime 接入后通过 `syncLayers` 生效。
+2. 标注 min/maxZoom 已写入配置；编译器尚未按分辨率裁剪标注（后续可接）。
+3. 要素级编辑撤销仍待接入；当前 Undo/Redo 优先走样式配置栈。
+4. 未启动 P11。
+
+### 下一个任务
+
+**P11 — Scene/Viewer 样式一致性**
+

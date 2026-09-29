@@ -1,11 +1,14 @@
 import { emitCommandStatus } from './status'
+import { layerCommands } from './layer.commands'
 
-/** 编辑命令的最小集合，具体要素编辑将在 GIS 回接阶段实现。 */
+/** 编辑命令的最小集合；样式配置撤销优先于要素编辑（后者待接入）。 */
 export const editCommands = {
   undo(): void {
+    if (layerCommands.undoStyle()) return
     emitCommandStatus('撤销（编辑服务待接入）')
   },
   redo(): void {
+    if (layerCommands.redoStyle()) return
     emitCommandStatus('重做（编辑服务待接入）')
   },
   draw(): void {
