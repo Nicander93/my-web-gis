@@ -386,7 +386,7 @@ rtk proxy pnpm --filter @desktop-webgis/desktop build
 | P13 | 已完成 | 导出与复制。PR#18 squash / 6e980c4 |
 | P14 | 已完成 | 图层上下文菜单与分组。PR#19 squash / f3d600f |
 | P15 | 已完成 | 服务描述、能力与连接界面。PR#20 squash / `7871360` |
-| P16 | 已完成 | WMS 添加图层。见 phase-1-progress.md / 本分支 tip |
+| P16 | 已完成 | WMS 添加图层。tip `044fc53` |
 | P17 | 待执行 | WMTS |
 | P18 | 待执行 | WFS |
 | P19 | 待执行 | 项目与发布集成 |
