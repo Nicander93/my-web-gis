@@ -2306,7 +2306,7 @@ esolve-wfs / etch-getfeature / parse-wfs；WFS 1.1/2.0 fixtures；bounded 单�
 - **分支**: `local/p20-ol-style-publish-prep`
 - **基线**: main `06475ce`（P19 / PR#24 squash）
 - **说明**: 未 npm publish；未上传静态站点；MapCanvas 仍为占位；无公开 live WFS 冒烟；keychain 仍为会话内存。保留无关 `scripts/` 与 stash@{0}；未使用 Cursor CloudAgent；未触碰 GeoForge / `D:\code\3dtiles`。
-- **Commit**: `8d2f4e2`
+- **Commit**: `b0dce42`
 - **PR**: （创建后填写）
 
 ### 目标对照
