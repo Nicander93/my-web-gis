@@ -1,6 +1,6 @@
 import { applyFieldFilter,
   isTileServiceKind,
-  layerListZIndex, type BasemapConfig, type Dataset, type GisFeature, type Layer, type MapState, type WmsDataset } from '@desktop-webgis/gis-core'
+  layerListZIndex, type BasemapConfig, type Dataset, type GisFeature, type Layer, type MapState, type WmsDataset, type WmtsDataset } from '@desktop-webgis/gis-core'
 import { createOlSceneLayer, updateGoogleMapTilesAttribution } from '@desktop-webgis/ol-scene-runtime'
 import type { SceneSource } from '@desktop-webgis/scene-schema'
 import OlMap from 'ol/Map'
@@ -24,6 +24,12 @@ import {
   GIS_WMS_EXTENT_KEY,
   refreshWmsTileLayer
 } from '../wms/createWmsLayer'
+import {
+  createWmtsTileLayer,
+  GIS_WMTS_EXTENT_KEY,
+  refreshWmtsTileLayer
+} from '../wmts/createWmtsLayer'
+import type WMTS from 'ol/source/WMTS'
 
 export interface PointerInfo {
   coordinate: Coordinate
@@ -124,7 +130,7 @@ export class OlMapRuntime {
 
   /**
    * Sync project layers to OpenLayers.
-   * Vector datasets use VectorLayer; WMS uses TileWMS (P16); WMTS reserved for P17.
+   * Vector datasets use VectorLayer; WMS uses TileWMS (P16); WMTS uses ol/source/WMTS (P17).
    */
   syncLayers(
     layers: Layer[],
@@ -151,7 +157,12 @@ export class OlMapRuntime {
         return
       }
 
-      // WMTS: still skip VectorLayer registration (P17).
+      if (dataset?.kind === 'wmts') {
+        this.syncWmtsLayer(layer, dataset, zIndex)
+        return
+      }
+
+      // Other tile-service kinds: never register as VectorLayer.
       if (dataset && isTileServiceKind(dataset.kind)) {
         const mistaken = this.registry.get(layer.id)
         if (mistaken) {
@@ -227,6 +238,36 @@ export class OlMapRuntime {
     this.registry.register(layer.id, layer.datasetId, wmsLayer)
   }
 
+  private syncWmtsLayer(layer: Layer, dataset: WmtsDataset, zIndex: number): void {
+    const map = this.getMap()
+    const existing = this.registry.get(layer.id)
+    if (existing) {
+      const source = (existing as TileLayer<WMTS>).getSource?.()
+      const isWmts = Boolean(source && typeof (source as WMTS).getRequestEncoding === 'function')
+      if (isWmts) {
+        existing.setVisible(layer.visible)
+        existing.setOpacity(layer.opacity)
+        existing.setZIndex(zIndex)
+        if (dataset.source.bboxWgs84) {
+          existing.set(GIS_WMTS_EXTENT_KEY, dataset.source.bboxWgs84.slice())
+        }
+        return
+      }
+      map.removeLayer(existing)
+      this.registry.unregister(layer.id)
+    }
+
+    const wmtsLayer = createWmtsTileLayer({
+      layerId: layer.id,
+      dataset,
+      visible: layer.visible,
+      opacity: layer.opacity,
+      zIndex
+    })
+    map.addLayer(wmtsLayer)
+    this.registry.register(layer.id, layer.datasetId, wmtsLayer)
+  }
+
   /** Re-request WMS tiles after a transient failure. */
   retryWmsLayer(layerId: string): boolean {
     const layer = this.registry.get(layerId) as TileLayer<TileWMS> | undefined
@@ -234,6 +275,16 @@ export class OlMapRuntime {
     const source = layer.getSource?.()
     if (!source || typeof source.updateParams !== 'function') return false
     refreshWmsTileLayer(layer)
+    return true
+  }
+
+  /** Re-request WMTS tiles after a transient failure. */
+  retryWmtsLayer(layerId: string): boolean {
+    const layer = this.registry.get(layerId) as TileLayer<WMTS> | undefined
+    if (!layer) return false
+    const source = layer.getSource?.()
+    if (!source || typeof (source as WMTS).getRequestEncoding !== 'function') return false
+    refreshWmtsTileLayer(layer)
     return true
   }
 
@@ -249,7 +300,7 @@ export class OlMapRuntime {
       return
     }
 
-    const bboxWgs84 = layer.get(GIS_WMS_EXTENT_KEY) as
+    const bboxWgs84 = (layer.get(GIS_WMS_EXTENT_KEY) ?? layer.get(GIS_WMTS_EXTENT_KEY)) as
       | [number, number, number, number]
       | undefined
     if (!bboxWgs84) return
@@ -268,7 +319,7 @@ export class OlMapRuntime {
         if (extent && !isEmpty(extent)) extents.push(extent as [number, number, number, number])
         continue
       }
-      const bboxWgs84 = layer.get(GIS_WMS_EXTENT_KEY) as
+      const bboxWgs84 = (layer.get(GIS_WMS_EXTENT_KEY) ?? layer.get(GIS_WMTS_EXTENT_KEY)) as
         | [number, number, number, number]
         | undefined
       if (!bboxWgs84) continue

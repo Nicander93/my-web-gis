@@ -2085,3 +2085,8 @@ button:disabled {
 .inspector-opacity-row {
   align-items: center;
 }
+
+.service-matrix-warning {
+  color: var(--color-danger, #b42318);
+  font-size: 12px;
+}

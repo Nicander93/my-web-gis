@@ -104,14 +104,42 @@ export interface WmsServiceSource {
   credentialRef?: CredentialRef
 }
 
+/** Persisted TileMatrix level so reopen does not need Capabilities. */
+export interface WmtsPersistedMatrix {
+  identifier: string
+  scaleDenominator: number
+  /** TopLeftCorner as advertised (SupportedCRS axis order). */
+  topLeftCorner: [number, number]
+  tileWidth: number
+  tileHeight: number
+  matrixWidth?: number
+  matrixHeight?: number
+}
+
 export interface WmtsServiceSource {
   type: 'wmts'
+  /**
+   * Shareable KVP service base or first REST template (no secrets).
+   * Prefer `urls` when multiple templates / GetTile endpoints exist.
+   */
   url: string
   version: string
   layer: string
   style?: string
   format?: string
-  tileMatrixSet?: string
+  tileMatrixSet: string
+  /** KVP or REST as declared by capabilities. */
+  requestEncoding: 'KVP' | 'REST'
+  /** KVP GetTile bases or REST templates — credentials never embedded. */
+  urls?: string[]
+  /** Normalized projection of the TileMatrixSet (EPSG:3857 / EPSG:4326). */
+  projection?: string
+  /** Raw SupportedCRS string from capabilities. */
+  supportedCrs?: string
+  /** WGS84 geographic extent for zoom-to. */
+  bboxWgs84?: [number, number, number, number]
+  /** Real matrix definitions (origin / scale / id / tile size) — not XYZ zoom guesses. */
+  tileMatrices: WmtsPersistedMatrix[]
   authMode: ServiceAuthMode
   tokenParam?: string
   credentialRef?: CredentialRef

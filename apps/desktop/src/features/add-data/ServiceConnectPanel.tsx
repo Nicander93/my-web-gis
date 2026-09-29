@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { AlertCircle, Link2, Loader2 } from 'lucide-react'
-import type { OgcServiceType, ServiceDescription, ServiceLayerInfo } from '@desktop-webgis/ogc-io'
+import type { OgcServiceType, ServiceDescription, ServiceLayerInfo, WmtsRequestEncoding } from '@desktop-webgis/ogc-io'
+import {
+  listCompatibleTileMatrixSets,
+  resolveWmtsLayerOptions
+} from '@desktop-webgis/ogc-io'
 import type { DatasetKind, ServiceAuthMode, ServiceSource } from '@desktop-webgis/gis-core'
 import { canPersistCredentialsSafely } from '@/services/credentials'
 import {
@@ -44,6 +48,10 @@ export function ServiceConnectPanel({ onAddLayers }: ServiceConnectPanelProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   /** Per-layer selected style name (WMS). */
   const [styleByLayer, setStyleByLayer] = useState<Record<string, string>>({})
+  /** Per-layer WMTS format / TileMatrixSet / encoding. */
+  const [wmtsOptsByLayer, setWmtsOptsByLayer] = useState<
+    Record<string, { format: string; tileMatrixSet: string; requestEncoding: WmtsRequestEncoding }>
+  >({})
   const generationRef = useRef(0)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -52,6 +60,7 @@ export function ServiceConnectPanel({ onAddLayers }: ServiceConnectPanelProps) {
     setConnected(null)
     setSelected(new Set())
     setStyleByLayer({})
+    setWmtsOptsByLayer({})
     setError(null)
     abortRef.current?.abort()
     abortRef.current = null
@@ -68,6 +77,7 @@ export function ServiceConnectPanel({ onAddLayers }: ServiceConnectPanelProps) {
     setConnected(null)
     setSelected(new Set())
     setStyleByLayer({})
+    setWmtsOptsByLayer({})
 
     let auth: ConnectAuthForm = { mode: 'none' }
     if (authMode === 'query-token') {
@@ -96,10 +106,38 @@ export function ServiceConnectPanel({ onAddLayers }: ServiceConnectPanelProps) {
 
     setConnected(result)
     const defaults: Record<string, string> = {}
+    const wmtsDefaults: Record<
+      string,
+      { format: string; tileMatrixSet: string; requestEncoding: WmtsRequestEncoding }
+    > = {}
     for (const layer of result.selectable) {
-      if (layer.styles?.[0]?.name) defaults[layer.name] = layer.styles[0].name
+      const preferredStyle =
+        layer.styles?.find((s) => s.isDefault)?.name || layer.styles?.[0]?.name
+      if (preferredStyle) defaults[layer.name] = preferredStyle
+      if (result.description.service === 'WMTS') {
+        const resolved = resolveWmtsLayerOptions(result.description, {
+          layer: layer.name,
+          preferredCrs: 'EPSG:3857'
+        })
+        if (resolved.ok) {
+          wmtsDefaults[layer.name] = {
+            format: resolved.options.format,
+            tileMatrixSet: resolved.options.tileMatrixSet,
+            requestEncoding: resolved.options.requestEncoding
+          }
+        } else {
+          const sets = listCompatibleTileMatrixSets(result.description, layer.name)
+          const first = sets.find((s) => s.compatible) ?? sets[0]
+          wmtsDefaults[layer.name] = {
+            format: layer.formats?.[0] || 'image/png',
+            tileMatrixSet: first?.identifier || '',
+            requestEncoding: (result.description.wmtsRequestEncodings?.[0] || 'KVP') as WmtsRequestEncoding
+          }
+        }
+      }
     }
     setStyleByLayer(defaults)
+    setWmtsOptsByLayer(wmtsDefaults)
     setSelected(new Set())
   }
 
@@ -150,17 +188,36 @@ export function ServiceConnectPanel({ onAddLayers }: ServiceConnectPanelProps) {
     }
 
     if (desc.service === 'WMTS') {
+      const opts = wmtsOptsByLayer[layer.name]
+      const resolved = resolveWmtsLayerOptions(desc, {
+        layer: layer.name,
+        style: styleByLayer[layer.name] || layer.styles?.[0]?.name,
+        format: opts?.format,
+        tileMatrixSet: opts?.tileMatrixSet,
+        requestEncoding: opts?.requestEncoding,
+        preferredCrs: 'EPSG:3857'
+      })
+      if (!resolved.ok) {
+        setError(resolved.reason)
+        return null
+      }
       return {
         name: layer.title || layer.name,
         kind: 'wmts',
         source: {
           type: 'wmts',
-          url: conn.shareableUrl,
+          url: resolved.options.urls[0] || conn.shareableUrl,
           version: desc.version,
-          layer: layer.name,
-          style: layer.styles?.[0]?.name,
-          format: 'image/png',
-          tileMatrixSet: layer.crs?.[0] || desc.tileMatrixSets?.[0]?.identifier,
+          layer: resolved.options.layer,
+          style: resolved.options.style,
+          format: resolved.options.format,
+          tileMatrixSet: resolved.options.tileMatrixSet,
+          requestEncoding: resolved.options.requestEncoding,
+          urls: resolved.options.urls,
+          projection: resolved.options.projection,
+          supportedCrs: resolved.options.supportedCrs,
+          bboxWgs84: resolved.options.bboxWgs84,
+          tileMatrices: resolved.options.tileMatrices,
           authMode: authModeOut,
           tokenParam: conn.tokenParam,
           credentialRef
@@ -325,9 +382,23 @@ export function ServiceConnectPanel({ onAddLayers }: ServiceConnectPanelProps) {
           shareableUrl={connected.shareableUrl}
           selected={selected}
           styleByLayer={styleByLayer}
+          wmtsOptsByLayer={wmtsOptsByLayer}
           onToggle={toggleLayer}
           onStyleChange={(name, style) =>
             setStyleByLayer((prev) => ({ ...prev, [name]: style }))
+          }
+          onWmtsOptsChange={(name, patch) =>
+            setWmtsOptsByLayer((prev) => ({
+              ...prev,
+              [name]: {
+                ...(prev[name] ?? {
+                  format: 'image/png',
+                  tileMatrixSet: '',
+                  requestEncoding: 'KVP'
+                }),
+                ...patch
+              }
+            }))
           }
           onAdd={handleAddSelected}
         />
@@ -342,8 +413,10 @@ function ServiceCatalog({
   shareableUrl,
   selected,
   styleByLayer,
+  wmtsOptsByLayer,
   onToggle,
   onStyleChange,
+  onWmtsOptsChange,
   onAdd
 }: {
   description: ServiceDescription
@@ -351,11 +424,21 @@ function ServiceCatalog({
   shareableUrl: string
   selected: Set<string>
   styleByLayer: Record<string, string>
+  wmtsOptsByLayer: Record<
+    string,
+    { format: string; tileMatrixSet: string; requestEncoding: WmtsRequestEncoding }
+  >
   onToggle: (name: string) => void
   onStyleChange: (name: string, style: string) => void
+  onWmtsOptsChange: (
+    name: string,
+    patch: Partial<{ format: string; tileMatrixSet: string; requestEncoding: WmtsRequestEncoding }>
+  ) => void
   onAdd: () => void
 }) {
   const isWms = description.service === 'WMS'
+  const isWmts = description.service === 'WMTS'
+  const encodings = description.wmtsRequestEncodings ?? []
 
   return (
     <div className="service-catalog">
@@ -369,6 +452,9 @@ function ServiceCatalog({
         </p>
         <p className="config-hint">
           已读取远程目录（{selectable.length} 项）。只有勾选并确认后才会写入项目；连接本身不创建图层。
+          {isWmts
+            ? ' WMTS 使用 Capabilities 声明的 TileMatrix（origin / resolution / matrix ID / tile size），不会硬编码成 XYZ。'
+            : ''}
         </p>
       </div>
 
@@ -376,54 +462,132 @@ function ServiceCatalog({
         <p className="config-hint">目录中没有可添加的命名图层 / 要素类型。</p>
       ) : (
         <div className="layer-list service-layer-list">
-          {selectable.map((layer) => (
-            <div key={layer.name} className="service-layer-row">
-              <label className="layer-checkbox-item">
-                <input
-                  type="checkbox"
-                  checked={selected.has(layer.name)}
-                  onChange={() => onToggle(layer.name)}
-                />
-                <span>
-                  <strong>{layer.title || layer.name}</strong>
-                  {layer.title && layer.title !== layer.name ? (
-                    <span className="service-layer-name"> ({layer.name})</span>
-                  ) : null}
-                </span>
-              </label>
-              <div className="service-layer-meta">
-                {layer.crs?.length ? (
-                  <span title={layer.crs.join(', ')}>
-                    CRS: {layer.crs.slice(0, 3).join(', ')}
-                    {layer.crs.length > 3 ? ` +${layer.crs.length - 3}` : ''}
-                  </span>
-                ) : (
-                  <span>CRS: —</span>
-                )}
-                {layer.bboxWgs84 ? (
+          {selectable.map((layer) => {
+            const matrixSets = isWmts
+              ? listCompatibleTileMatrixSets(description, layer.name)
+              : []
+            const wmtsOpts = wmtsOptsByLayer[layer.name]
+            const selectedSet = matrixSets.find((s) => s.identifier === wmtsOpts?.tileMatrixSet)
+            const matrixWarning =
+              selectedSet && !selectedSet.compatible ? selectedSet.reason : undefined
+
+            return (
+              <div key={layer.name} className="service-layer-row">
+                <label className="layer-checkbox-item">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(layer.name)}
+                    onChange={() => onToggle(layer.name)}
+                  />
                   <span>
-                    Extent: {layer.bboxWgs84.map((n) => n.toFixed(1)).join(', ')}
+                    <strong>{layer.title || layer.name}</strong>
+                    {layer.title && layer.title !== layer.name ? (
+                      <span className="service-layer-name"> ({layer.name})</span>
+                    ) : null}
                   </span>
-                ) : null}
-                {isWms && layer.styles && layer.styles.length > 0 ? (
-                  <label className="service-style-pick">
-                    <span>样式</span>
-                    <select
-                      value={styleByLayer[layer.name] || layer.styles[0]!.name}
-                      onChange={(e) => onStyleChange(layer.name, e.target.value)}
-                      disabled={!selected.has(layer.name)}
-                    >
-                      {layer.styles.map((style) => (
-                        <option key={style.name} value={style.name}>
-                          {style.title || style.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                ) : null}
+                </label>
+                <div className="service-layer-meta">
+                  {isWmts ? (
+                    <span title={matrixSets.map((s) => s.identifier).join(', ')}>
+                      TMS: {matrixSets.map((s) => s.identifier).slice(0, 2).join(', ') || '—'}
+                      {matrixSets.length > 2 ? ` +${matrixSets.length - 2}` : ''}
+                    </span>
+                  ) : layer.crs?.length ? (
+                    <span title={layer.crs.join(', ')}>
+                      CRS: {layer.crs.slice(0, 3).join(', ')}
+                      {layer.crs.length > 3 ? ` +${layer.crs.length - 3}` : ''}
+                    </span>
+                  ) : (
+                    <span>CRS: —</span>
+                  )}
+                  {layer.bboxWgs84 ? (
+                    <span>
+                      Extent: {layer.bboxWgs84.map((n) => n.toFixed(1)).join(', ')}
+                    </span>
+                  ) : null}
+                  {(isWms || isWmts) && layer.styles && layer.styles.length > 0 ? (
+                    <label className="service-style-pick">
+                      <span>样式</span>
+                      <select
+                        value={styleByLayer[layer.name] || layer.styles[0]!.name}
+                        onChange={(e) => onStyleChange(layer.name, e.target.value)}
+                        disabled={!selected.has(layer.name)}
+                      >
+                        {layer.styles.map((style) => (
+                          <option key={style.name} value={style.name}>
+                            {style.title || style.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                  {isWmts && layer.formats && layer.formats.length > 0 ? (
+                    <label className="service-style-pick">
+                      <span>格式</span>
+                      <select
+                        value={wmtsOpts?.format || layer.formats[0]!}
+                        onChange={(e) => onWmtsOptsChange(layer.name, { format: e.target.value })}
+                        disabled={!selected.has(layer.name)}
+                      >
+                        {layer.formats.map((format) => (
+                          <option key={format} value={format}>
+                            {format}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                  {isWmts && matrixSets.length > 0 ? (
+                    <label className="service-style-pick">
+                      <span>TileMatrixSet</span>
+                      <select
+                        value={wmtsOpts?.tileMatrixSet || matrixSets[0]!.identifier}
+                        onChange={(e) =>
+                          onWmtsOptsChange(layer.name, { tileMatrixSet: e.target.value })
+                        }
+                        disabled={!selected.has(layer.name)}
+                      >
+                        {matrixSets.map((set) => (
+                          <option key={set.identifier} value={set.identifier}>
+                            {set.identifier}
+                            {set.supportedCrs ? ` (${set.supportedCrs})` : ''}
+                            {!set.compatible ? ' — 不可用' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                  {isWmts && encodings.length > 1 ? (
+                    <label className="service-style-pick">
+                      <span>编码</span>
+                      <select
+                        value={wmtsOpts?.requestEncoding || encodings[0]!}
+                        onChange={(e) =>
+                          onWmtsOptsChange(layer.name, {
+                            requestEncoding: e.target.value as WmtsRequestEncoding
+                          })
+                        }
+                        disabled={!selected.has(layer.name)}
+                      >
+                        {encodings.map((enc) => (
+                          <option key={enc} value={enc}>
+                            {enc}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : isWmts && encodings.length === 1 ? (
+                    <span>编码: {encodings[0]}</span>
+                  ) : null}
+                  {matrixWarning ? (
+                    <span className="service-matrix-warning" title={matrixWarning}>
+                      {matrixWarning}
+                    </span>
+                  ) : null}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

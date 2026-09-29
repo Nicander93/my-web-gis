@@ -143,6 +143,9 @@ importers:
       '@desktop-webgis/gis-core':
         specifier: workspace:*
         version: link:../gis-core
+      '@desktop-webgis/ogc-io':
+        specifier: workspace:*
+        version: link:../ogc-io
       '@desktop-webgis/ol-scene-runtime':
         specifier: workspace:*
         version: link:../ol-scene-runtime
