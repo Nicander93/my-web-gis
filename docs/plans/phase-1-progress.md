@@ -1991,3 +1991,48 @@ esolveExportFeatures + 计数 UI |
 | 移除清理选择/草稿/组引用；删组确认保留或一并移除 | ✅ removeLayer / removeGroup |
 | 未启动 P15 | ✅ |
 
+
+### 完成记录
+
+- **状态**: 已完成（Draft PR，待开）
+- **时间**: 2026-09-29 17:08 CST
+- **分支**: `local/p14-layer-context-groups`
+- **基于**: main `6e980c4`（P13 / PR#18 squash）
+- **Commit**: `153d5e5`
+
+### 目标对照
+
+| 计划要求 | 结果 |
+| --- | --- |
+| LayerPanel + layer.commands + project.store + gis-core 分组模型 | ✅ |
+| 右键与「更多」同一菜单；活动/加载/选中数视觉状态 | ✅ |
+| 菜单项齐全；导出/复制分入口 | ✅ ExportDialog `mode` |
+| 单层分组；组显隐保留子 visible；拖拽+按钮/键盘后备排序 | ✅ |
+| 组只引用 layer ID；列表顶 = 地图顶 z-index | ✅ `layerListZIndex` |
+| 移除清理选择/草稿/组引用；删组确认保留或一并移除 | ✅ |
+| 显隐与顺序保存往返 | ✅ serialize/parse 单测 |
+| 未启动 P15；未 CloudAgent；未动 GeoForge | ✅ |
+
+### 主要改动
+
+- `packages/gis-core`: `layer-tree.ts`（LayerGroup / rootOrder / effective visibility）
+- `packages/ol-runtime`: syncLayers 使用 list-top = highest z-index
+- `apps/desktop`: LayerContextMenu、LayerPanel 分组与拖拽、store 增删改、export/copy mode
+
+### 测试与构建
+
+1. gis-core test — ✅ 35（含 P14 6）
+2. ol-runtime test — ✅ 3
+3. desktop test — ✅ 40（含 P14 8）
+4. desktop build — ✅
+
+### 已知限制
+
+1. MapCanvas 仍为占位；「定位」仅状态栏提示，待地图运行时接入。
+2. 删组确认使用 `window.confirm` 两步（保留 / 一并移除），未做自定义对话框。
+3. 拖拽为 HTML5 DnD 基础实现；复杂落点可再打磨。
+4. 未启动 P15；未 npm publish。
+
+### 下一个任务
+
+**P15 — 服务数据源模型与添加入口**（未开始）
