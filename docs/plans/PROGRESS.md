@@ -9,9 +9,10 @@ Append-only. Local agent working on `local/p11-scene-style-consistency`.
 | 2026-09-29 16:28 | Commit + push | tip `d38b17e` pushed to origin |
 | 2026-09-29 16:29 | Draft PR attempt | create interrupted once; PR#16 already existed on retry |
 | 2026-09-29 16:30 | Docs 已完成 + push | PR#16 https://github.com/Nicander93/my-web-gis/pull/16 |
+| 2026-09-29 16:30 CST | Pushed docs commit | tip `082436a` on origin |
 
 **Current step:** done (Draft PR open; awaiting independent review)  
-**Tip SHA:** `d38b17e` (+ docs commit pending)  
+**Tip SHA:** `082436a` (feat `d38b17e` + docs)  
 **Draft PR:** https://github.com/Nicander93/my-web-gis/pull/16  
 **Blockers:** none  
 **Not started:** P12
