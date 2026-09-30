@@ -11,6 +11,7 @@ import {
   type ProjectSnapshot
 } from '@desktop-webgis/gis-core'
 import { pickFile, pickSaveFile, readTextFile, writeTextFile } from '@/services/files'
+import { getLiveMapState } from '@/features/map/map-runtime-host'
 
 export const PROJECT_FILE_FILTER = {
   name: 'Web GIS 项目',
@@ -31,7 +32,11 @@ export function createSnapshotFromState(
   project: Project,
   featuresByDataset: Record<string, GisFeature[]>
 ): ProjectSnapshot {
-  const snapshot = buildPersistedSnapshot(project, featuresByDataset)
+  const liveMapState = getLiveMapState()
+  const projectWithView = liveMapState
+    ? { ...project, mapState: liveMapState }
+    : project
+  const snapshot = buildPersistedSnapshot(projectWithView, featuresByDataset)
   assertNoSecretValues(snapshot)
   return snapshot
 }

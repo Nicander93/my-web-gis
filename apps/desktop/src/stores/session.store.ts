@@ -37,7 +37,7 @@ interface LayerSession {
   styleDraft?: StyleDraftState
 }
 
-/** Default map view extent in WGS84 [west,south,east,north] until MapCanvas wires live view. */
+/** Map view extent in WGS84 [west,south,east,north]; updated from OlMapRuntime moveend when mounted. */
 export type MapViewExtentWgs84 = [number, number, number, number]
 
 const DEFAULT_MAP_VIEW_EXTENT: MapViewExtentWgs84 = [73, 18, 135, 54]
