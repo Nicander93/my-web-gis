@@ -2445,3 +2445,31 @@ esolve-wfs / etch-getfeature / parse-wfs；WFS 1.1/2.0 fixtures；bounded 单�
 
 - P21 stays **受阻** (interactive smoke / live WFS / keychain still open)
 - This PR only lands E/L **mount debt**; evidence soft-note only
+
+## Live WFS GetFeature smoke（独立任务；≠ P21 完成）
+
+- **状态**: Draft
+- **时间**: 2026-09-30 18:11 CST
+- **分支**: `local/wfs-live-smoke`
+- **基线**: main `6ce41c874d7b631e77584e8355a39487b06e86c3`（`git fetch` 后确认）
+- **Tip**: 72722ac9d16811e7a71c1b96dd4d85132e532250
+- **说明**: **独立任务**，只补 scenario H 的 *live GetFeature path* 公开冒烟。**不**把 P21 标为已完成；**不**声称 scenario H 全 PASS（refresh-fail UI + copy-edit-export 仍开）。无 OS keychain、无 npm publish、无 Cursor CloudAgent；未动 `?? scripts/` 与 stash。
+- **证据**: [wfs-live-smoke-evidence.md](./wfs-live-smoke-evidence.md)
+
+### 端点
+
+| 角色 | URL / typeName | 本机结果 |
+| --- | --- | --- |
+| 首选 | `https://ahocevar.com/geoserver/wfs` / `topp:states` | HTTP **403**（不可达） |
+| 实际采用（备选） | `https://demo.mapserver.org/cgi-bin/wfs` / `ms:cities` | **PASS**：status 200，features=**10**，GeoJSON，无 ExceptionReport，shareable URL 无密钥 |
+
+### 命令与结果
+
+1. `pnpm --filter @desktop-webgis/ogc-io test` → **25 passed | 1 skipped**（live 默认跳过）
+2. `pnpm --filter @desktop-webgis/ogc-io test:live-wfs` → **1 passed**（primary 403 → alternate OK）
+3. `pnpm --filter @desktop-webgis/ogc-io build` → **OK**
+
+### 相对 P21
+
+- **P21 仍为受阻**（交互冒烟 / refresh-fail / copy-edit / keychain / npm 等未因本 PR 关闭）
+- 本 PR 仅清除「无公开 live WFS 冒烟」中 **GetFeature 路径** 债务

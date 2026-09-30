@@ -16,7 +16,8 @@
   "sideEffects": false,
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:live-wfs": "node ./run-live-wfs-smoke.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.2",
