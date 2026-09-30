@@ -2452,7 +2452,7 @@ esolve-wfs / etch-getfeature / parse-wfs；WFS 1.1/2.0 fixtures；bounded 单�
 - **时间**: 2026-09-30 18:11 CST
 - **分支**: `local/wfs-live-smoke`
 - **基线**: main `6ce41c874d7b631e77584e8355a39487b06e86c3`（`git fetch` 后确认）
-- **Tip**: 001e37d033355320f3f7cbc4dcec754b3debeeee
+- **Tip**: 72722ac9d16811e7a71c1b96dd4d85132e532250
 - **说明**: **独立任务**，只补 scenario H 的 *live GetFeature path* 公开冒烟。**不**把 P21 标为已完成；**不**声称 scenario H 全 PASS（refresh-fail UI + copy-edit-export 仍开）。无 OS keychain、无 npm publish、无 Cursor CloudAgent；未动 `?? scripts/` 与 stash。
 - **证据**: [wfs-live-smoke-evidence.md](./wfs-live-smoke-evidence.md)
 

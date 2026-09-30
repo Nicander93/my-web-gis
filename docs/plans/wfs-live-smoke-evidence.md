@@ -4,7 +4,7 @@
 - **Time**: 2026-09-30 18:11 CST (Asia/Shanghai)
 - **Branch**: `local/wfs-live-smoke`
 - **Base**: main `6ce41c874d7b631e77584e8355a39487b06e86c3` (confirmed after `git fetch`)
-- **Tip**: 001e37d033355320f3f7cbc4dcec754b3debeeee
+- **Tip**: 72722ac9d16811e7a71c1b96dd4d85132e532250
 - **Scope**: scenario H **live GetFeature path only** via `@desktop-webgis/ogc-io`
 - **Non-claims**: **≠ P21 已完成**; **≠ full scenario H PASS** (refresh-fail UI + copy-edit-export still open); no OS keychain; no npm publish; no Cursor CloudAgent; left repo-root `?? scripts/` and stash untouched.
 
