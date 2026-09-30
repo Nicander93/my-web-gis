@@ -10,7 +10,11 @@ import {
   saveSnapshotToPath,
   setCurrentProjectPath
 } from '@/services/project-io'
-import { clearSessionCredentials } from '@/services/credentials'
+import {
+  clearSessionCredentials,
+  collectCredentialRefKeys,
+  hydrateCredentialsFromRefs
+} from '@/services/credentials'
 
 export type ExportDialogMode = 'export' | 'copy'
 
@@ -57,8 +61,11 @@ export const projectCommands = {
         return
       }
       bumpProjectGeneration()
-      // Credentials stay in session memory by key — do not invent secrets from file.
+      // credentialRef keys only in file — hydrate secrets from OS secure store when available.
       useProjectStore.getState().loadSnapshot(opened.snapshot)
+      await hydrateCredentialsFromRefs(
+        collectCredentialRefKeys(opened.snapshot.project.datasets)
+      )
       emitCommandStatus(`已打开项目：${opened.path}`)
     } catch (error) {
       emitCommandStatus(error instanceof Error ? `打开失败：${error.message}` : '打开失败')

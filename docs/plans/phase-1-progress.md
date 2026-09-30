@@ -2473,3 +2473,17 @@ esolve-wfs / etch-getfeature / parse-wfs；WFS 1.1/2.0 fixtures；bounded 单�
 
 - **P21 仍为受阻**（交互冒烟 / refresh-fail / copy-edit / keychain / npm 等未因本 PR 关闭）
 - 本 PR 仅清除「无公开 live WFS 冒烟」中 **GetFeature 路径** 债务
+
+## Credential persistence / OS keychain wiring（独立任务；≠ P21 完成）
+- **状态**: Draft
+- **时间**: 2026-09-30 CST
+- **分支**: `local/credential-persistence`
+- **基线**: main `45ee8a812c5288a2338879d88e97b766035b8b0f`（WFS live smoke squash）
+- **说明**: **独立任务**，只清 scenario I 的 **认证持久化** 债务（Tauri → Windows Credential Manager via `keyring`）。**不**把 P21 标为已完成；**不**做交互式 A–D/F/G/J 签收；无 npm publish、无 Cursor CloudAgent。
+- **要点**:
+  - `secure_credential_{set,get,delete}` Tauri commands；service `desktop-webgis`
+  - `canPersistCredentialsSafely()` 在 Tauri 下为 true；浏览器/vitest 默认 false
+  - `persistCredentialSecurely` / `loadCredentialSecurely` / `ensureCredentialLoaded`；可注入 mock backend
+  - 成功 connect 且可安全持久化时自动 persist；打开项目时按 credentialRef  hydrate
+  - 单测用内存 backend，不碰真实 OS keychain
+- **相对 P21**: P21 **仍为受阻**，待交互重验场景 I 后再更新证据

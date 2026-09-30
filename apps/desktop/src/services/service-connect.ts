@@ -10,7 +10,11 @@ import {
   type ServiceLayerInfo
 } from '@desktop-webgis/ogc-io'
 import { fetchTextPreferNative } from './native-http'
-import { putSessionCredential } from './credentials'
+import {
+  canPersistCredentialsSafely,
+  persistCredentialSecurely,
+  putSessionCredential
+} from './credentials'
 
 export type ConnectAuthForm =
   | { mode: 'none' }
@@ -123,6 +127,10 @@ export async function connectService(input: ConnectServiceInput): Promise<Connec
       hint: service
     })
     const selectable = listSelectableLayers(description)
+
+    if (credentialRefKey && canPersistCredentialsSafely()) {
+      await persistCredentialSecurely(credentialRefKey)
+    }
 
     return {
       ok: true,
