@@ -148,3 +148,15 @@ peer `ol@^10.10.0`；tarball `desktop-webgis-ol-style-0.1.0.tgz`。
 > Independent task `local/credential-persistence` wires Tauri desktop credentials to OS secure storage (`keyring` → Windows Credential Manager).
 > Auto-persist on successful service connect when `canPersistCredentialsSafely()`; hydrate from secure store on project open / WFS load miss.
 > **P21 evidence pack status remains 受阻**; do **not** mark P21 已完成. Scenario I still needs interactive re-verify after restart/reconnect.
+
+## 附录: Scene I credential re-verify after PR#30（≠ full I PASS；≠ P21 已完成）
+
+> Independent task `local/scene-i-credential-reverify` (base `1defc84`) adds opt-in live OS Credential Manager re-verify:
+> - A OS CM round-trip **PASS**
+> - B restart hydrate (`wipeSessionMemoryOnly` → `hydrateCredentialsFromRefs` / `ensureCredentialLoaded`) **PASS**
+> - C restore-network at auth-builder / mock HTTP layer **PASS** (not live tokenized OGC)
+> - D full Tauri UI restart + E offline-open UI: **未验证**
+>
+> **P21 evidence pack status remains 受阻**; do **not** mark P21 已完成.
+> Scenario I may be described as **partial** (persist wired + automated restart hydrate PASS) but **not** full PASS / 通过.
+> See [scene-i-credential-reverify-evidence.md](./scene-i-credential-reverify-evidence.md).

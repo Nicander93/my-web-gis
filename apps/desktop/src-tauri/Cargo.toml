@@ -19,3 +19,11 @@ serde = { version = "1", features = ["derive"] }
 # Default TLS verification ON (rustls). Do not enable danger_accept_invalid_certs.
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 keyring = { version = "3", features = ["windows-native"] }
+
+[[bin]]
+name = "desktop-webgis"
+path = "src/main.rs"
+
+[[bin]]
+name = "secure-credential-probe"
+path = "src/bin/secure_credential_probe.rs"

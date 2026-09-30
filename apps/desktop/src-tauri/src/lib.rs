@@ -83,9 +83,8 @@ fn secure_entry(key: &str) -> Result<keyring::Entry, String> {
 }
 
 /// Persist a credential payload (JSON metadata+secret) under the given key.
-/// Never log the payload.
-#[tauri::command]
-fn secure_credential_set(key: String, payload: String) -> Result<(), String> {
+/// Never log the payload. Public for the live probe binary / tests.
+pub fn os_secure_credential_set(key: String, payload: String) -> Result<(), String> {
     if payload.is_empty() || payload.len() > 32_768 {
         return Err("invalid credential payload".into());
     }
@@ -96,8 +95,7 @@ fn secure_credential_set(key: String, payload: String) -> Result<(), String> {
 }
 
 /// Load a previously stored credential payload, or null when missing.
-#[tauri::command]
-fn secure_credential_get(key: String) -> Result<Option<String>, String> {
+pub fn os_secure_credential_get(key: String) -> Result<Option<String>, String> {
     let entry = secure_entry(&key)?;
     match entry.get_password() {
         Ok(password) => Ok(Some(password)),
@@ -107,14 +105,28 @@ fn secure_credential_get(key: String) -> Result<Option<String>, String> {
 }
 
 /// Best-effort delete; missing entry is success.
-#[tauri::command]
-fn secure_credential_delete(key: String) -> Result<(), String> {
+pub fn os_secure_credential_delete(key: String) -> Result<(), String> {
     let entry = secure_entry(&key)?;
     match entry.delete_credential() {
         Ok(()) => Ok(()),
         Err(keyring::Error::NoEntry) => Ok(()),
         Err(error) => Err(error.to_string()),
     }
+}
+
+#[tauri::command]
+fn secure_credential_set(key: String, payload: String) -> Result<(), String> {
+    os_secure_credential_set(key, payload)
+}
+
+#[tauri::command]
+fn secure_credential_get(key: String) -> Result<Option<String>, String> {
+    os_secure_credential_get(key)
+}
+
+#[tauri::command]
+fn secure_credential_delete(key: String) -> Result<(), String> {
+    os_secure_credential_delete(key)
 }
 
 pub fn run() {
@@ -132,4 +144,25 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running Desktop WebGIS");
+}
+
+#[cfg(test)]
+mod secure_credential_live_tests {
+    /// Opt-in: set DESKTOP_WEBGIS_LIVE_KEYCHAIN=1 to hit real Windows Credential Manager.
+    /// Default CI / cargo test skips (returns early) so no machine keychain side effects.
+    #[test]
+    fn live_os_keychain_round_trip_and_cleanup() {
+        if std::env::var("DESKTOP_WEBGIS_LIVE_KEYCHAIN").as_deref() != Ok("1") {
+            eprintln!("skip live keychain: set DESKTOP_WEBGIS_LIVE_KEYCHAIN=1 to run");
+            return;
+        }
+        let key = format!("scene-i-reverify-{}-{}", std::process::id(), "rust");
+        let payload = "{\"kind\":\"bearer\",\"value\":\"LIVE-REVERIFY-SECRET-DO-NOT-LOG\"}";
+        super::os_secure_credential_set(key.clone(), payload.to_string()).expect("set");
+        let got = super::os_secure_credential_get(key.clone()).expect("get");
+        assert_eq!(got.as_deref(), Some(payload));
+        super::os_secure_credential_delete(key.clone()).expect("delete");
+        let after = super::os_secure_credential_get(key).expect("get after delete");
+        assert!(after.is_none());
+    }
 }

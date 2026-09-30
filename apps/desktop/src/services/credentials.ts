@@ -168,6 +168,15 @@ export function clearSessionCredentials(): void {
 }
 
 /**
+ * Wipe in-memory vault only; OS secure store is untouched.
+ * Models process death / app restart (memory gone, Credential Manager still holds payload).
+ * Do not confuse with clearSessionCredentials, which also deletes OS entries.
+ */
+export function wipeSessionMemoryOnly(): void {
+  memory.clear()
+}
+
+/**
  * Persist StoredCredential already in memory into the OS secure store.
  * Returns true on success. Never uses localStorage.
  */

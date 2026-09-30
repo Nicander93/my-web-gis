@@ -12,6 +12,7 @@ import {
   loadCredentialSecurely,
   persistCredentialSecurely,
   putSessionCredential,
+  wipeSessionMemoryOnly,
   type SecureCredentialBackend
 } from '@/services/credentials'
 
@@ -169,6 +170,28 @@ describe('secure credential persistence', () => {
     ).toEqual(['a', 'b'])
   })
 
+
+  it('wipeSessionMemoryOnly clears memory but keeps OS store (restart model)', async () => {
+    const backend = memoryBackend()
+    _setSecureCredentialBackendForTests(backend)
+    const key = putSessionCredential({
+      kind: 'query-token',
+      param: 'token',
+      value: 'RESTART-SECRET',
+      key: 'ref-restart'
+    })
+    await persistCredentialSecurely(key)
+    expect(backend.store.has(key)).toBe(true)
+
+    wipeSessionMemoryOnly()
+    expect(getSessionCredential(key)).toBeUndefined()
+    expect(backend.store.has(key)).toBe(true)
+
+    const loaded = await ensureCredentialLoaded(key)
+    expect(loaded?.value).toBe('RESTART-SECRET')
+    expect(loaded?.param).toBe('token')
+    expect(getSessionCredential(key)?.value).toBe('RESTART-SECRET')
+  })
   it('never suggests localStorage path — persist fails without secure backend', async () => {
     _setSecureCredentialBackendForTests(null)
     const key = putSessionCredential({ kind: 'bearer', value: 'no-localstorage' })
