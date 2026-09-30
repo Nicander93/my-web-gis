@@ -160,3 +160,16 @@ peer `ol@^10.10.0`；tarball `desktop-webgis-ol-style-0.1.0.tgz`。
 > **P21 evidence pack status remains 受阻**; do **not** mark P21 已完成.
 > Scenario I may be described as **partial** (persist wired + automated restart hydrate PASS) but **not** full PASS / 通过.
 > See [scene-i-credential-reverify-evidence.md](./scene-i-credential-reverify-evidence.md).
+
+
+## 附录: Scene I true process restart re-verify（≠ full GUI；≠ full I PASS；≠ P21 已完成）
+
+> Independent task `local/scene-i-ui-restart-reverify` (base `52d2226`, PR#31 land) adds opt-in **true OS process restart** credential re-verify:
+> - Writer process persists via `secure-credential-probe`（same CM service as Tauri）then **exits**; writer PID confirmed dead.
+> - Fresh vitest process（empty vault；**never** `wipeSessionMemoryOnly`）hydrates via `hydrateCredentialsFromRefs` / `ensureCredentialLoaded` → **PASS**.
+> - Full Tauri **GUI** window quit/relaunch： **未验证**（no e2e/playwright/tauri driver on this LM）.
+> - Offline-open UI / live tokenized OGC： **未验证**.
+>
+> **P21 evidence pack status remains 受阻**; do **not** mark P21 已完成.
+> Scenario I may be described as **partial**（persist + A/B/C + process-restart hydrate）but **not** full PASS / 通过.
+> See [scene-i-ui-restart-reverify-evidence.md](./scene-i-ui-restart-reverify-evidence.md).
