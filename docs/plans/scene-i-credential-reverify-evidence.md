@@ -1,10 +1,10 @@
 # Scene I credential re-verify evidence (restart + restore-network; not full I PASS)
 
 - **Status**: Draft
-- **Time**: 2026-09-30 18:52 CST (Asia/Shanghai)
+- **Time**: 2026-09-30 19:02 CST (Asia/Shanghai)
 - **Branch**: `local/scene-i-credential-reverify`
 - **Base**: main `1defc842dee0f1de2da95a09d61b1d5cb67ff787` (credential persistence squash / PR#30 land)
-- **Tip**: a4a25347414ad5b3a3b51a53ba83780fc07df31c
+- **Tip**: 与本 PR 分支头一致；以门禁当时的 GitHub PR head 为准（本文件不内嵌自引用 SHA）
 - **Scope**: Honest **再验** of persisted credentials after PR#30: **app-restart hydrate** and **restore-network auth-builder** paths on this Windows LM
 - **Non-claims**:
   - **≠ P21 已完成**
