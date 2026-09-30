@@ -134,3 +134,11 @@ peer `ol@^10.10.0`；tarball `desktop-webgis-ol-style-0.1.0.tgz`。
 
 > Independent task `local/mapcanvas-selection-edit-runtime` mounts `OlSelectionRuntime` / `OlToolRuntime` in code (clears E/L not-mounted debt).
 > **This P21 evidence pack status remains 受阻**; do not treat as phase 已完成. E/L still need interactive smoke; H/I and other blockers unchanged.
+
+## 附录: live WFS GetFeature smoke landed（≠ full H；≠ P21 已完成）
+
+> Independent task `local/wfs-live-smoke` adds opt-in public live WFS GetFeature smoke under `@desktop-webgis/ogc-io` (env `DESKTOP_WEBGIS_LIVE_WFS=1` / `test:live-wfs`).
+> Primary `ahocevar.com` / `topp:states` returned **403** on this LM; alternate `demo.mapserver.org` / `ms:cities` returned **10** GeoJSON features (HTTP 200).
+> **P21 evidence pack status remains 受阻**; do **not** mark P21 已完成.
+> Scenario H: live GetFeature path smoke only — **refresh-fail UI** and **copy-edit-export** still open; **≠ full H PASS**.
+> No OS keychain; no npm publish. See [wfs-live-smoke-evidence.md](./wfs-live-smoke-evidence.md).
