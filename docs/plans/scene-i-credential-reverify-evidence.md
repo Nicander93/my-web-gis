@@ -4,7 +4,7 @@
 - **Time**: 2026-09-30 18:52 CST (Asia/Shanghai)
 - **Branch**: `local/scene-i-credential-reverify`
 - **Base**: main `1defc842dee0f1de2da95a09d61b1d5cb67ff787` (credential persistence squash / PR#30 land)
-- **Tip**: a4a2534d5b8d661ca53cba1404b9789a6c1c81d0
+- **Tip**: a4a25347414ad5b3a3b51a53ba83780fc07df31c
 - **Scope**: Honest **再验** of persisted credentials after PR#30: **app-restart hydrate** and **restore-network auth-builder** paths on this Windows LM
 - **Non-claims**:
   - **≠ P21 已完成**
