@@ -7,6 +7,7 @@
     "dev": "vite --host 127.0.0.1 --configLoader runner",
     "build": "tsc --noEmit && vite build --configLoader runner",
     "test": "vitest run",
+    "test:live-keychain": "node ./run-live-keychain-reverify.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },
