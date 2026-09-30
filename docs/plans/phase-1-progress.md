@@ -2373,3 +2373,54 @@ esolve-wfs / etch-getfeature / parse-wfs；WFS 1.1/2.0 fixtures；bounded 单�
 - `project-io` 保存时写入 live `mapState`
 - 测试：`map-canvas-runtime.test.ts`（占位消失 + host/命令接线）
 
+
+
+## P21 — 全阶段验收与交接（诚实受阻记录）
+
+- **状态**: 受阻（Draft PR；**不可**标阶段已完成）
+- **时间**: 2026-09-30 08:10 CST
+- **分支**: `local/p21-phase-acceptance-evidence`
+- **基线**: main `42d310beb9e64d205f4a841bb07cf6521528fdfd`（MapCanvas wiring squash / PR #26；已 `git fetch` 核对 origin/main）
+- **说明**: 只产出验收证据与计划/进度文档；**未**实现 selection/edit 挂载、OS keychain、npm publish、live WFS smoke；未使用 Cursor CloudAgent；未触碰 GeoForge / `D:\\code\\3dtiles`；保留未跟踪 `scripts/` 与 `stash@{0}`。
+- **证据主文件**: [p21-phase-acceptance-evidence.md](./p21-phase-acceptance-evidence.md)
+
+### 本轮实际检查
+
+1. `pnpm -r test` → **255** 通过（style-assistant 2, ol-style 40, ogc-io 25, scene-schema 11, gis-core 41, vector-io 35, scene-codegen 3, ol-scene-runtime 8, scene-core 7, ol-runtime 13, scene-publisher 3, desktop 67）
+2. `pnpm -r build` → **OK**（含 desktop / viewer）
+3. `pnpm --filter @desktop-webgis/ol-style verify:consumer` → **OK**（本 SHA 重跑）
+
+### 场景 A–L（绑定 `42d310b`；详见证据文件）
+
+| 场景 | 结果 |
+| --- | --- |
+| A | 未验证（无完整 UI） |
+| B | 未验证（无完整 UI） |
+| C | 未验证（无完整 UI） |
+| D | 未验证（无完整 UI） |
+| E | **受阻**（未挂载 OlSelectionRuntime） |
+| F | 未验证（无完整 UI） |
+| G | 未验证（无完整 UI / 无公网冒烟） |
+| H | **受阻**（无公开 live WFS smoke） |
+| I | **受阻**（凭据仅会话内存）/ 断网本地未验证 |
+| J | 未验证（无完整 Viewer 冒烟） |
+| K | **PASS**（tarball `verify:consumer` 口径；非 npm publish） |
+| L | **受阻**（未挂载 OlToolRuntime） |
+
+### 硬阻塞（关闭 P21 前必须另开任务）
+
+1. 挂载 selection + edit/tool runtime → 解锁 E、L
+2. 公开/可复现 live WFS smoke → 解锁 H 完整签收
+3. OS keychain 或明确产品降级 → 重验 I
+4. 交互式 A–D、F、G、J + 性能计时
+5. npm publish 另开（非本记录冒充）
+
+### 显式非声称
+
+- 不声称阶段已完成；不声称 A–J、L 为 PASS
+- 不声称已做 live WFS / keychain / npm publish
+- MapCanvas wiring ≠ P21；K 的 PASS ≠ npm 已发布
+
+### 下一执行任务
+
+保持 P21 **受阻**。优先独立任务：挂载 `OlSelectionRuntime` + `OlToolRuntime`（或按产品排期处理 keychain / live WFS / UI 冒烟）。

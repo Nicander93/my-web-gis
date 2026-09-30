@@ -391,7 +391,7 @@ rtk proxy pnpm --filter @desktop-webgis/desktop build
 | P18 | 已完成 | WFS 有界加载。Draft PR#23 / 88a08c7 |
 | P19 | 已完成 | 项目与 Scene 全链路集成。Draft PR#24 / a532bca |
 | P20 | 已完成 | 样式包发布准备。Draft PR#25 / b0dce42 |
-| P21 | 待执行 | 阶段验收 |
+| P21 | 受阻 | 诚实验收证据；E/H/I/L 硬阻塞。详见 p21-phase-acceptance-evidence.md |
 
 可直接交给执行模型的提示词：
 

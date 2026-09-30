@@ -14,6 +14,15 @@
 - [UI 实现设计规范 V0.1](specs/04-UI-Implementation-Design-Spec-V0.1.md)
 - [Scene Manifest 与发布 V0.1](specs/05-Scene-Manifest-and-Publishing-V0.1.md)
 
+
+### 阶段计划与验收
+
+位于 [\plans/\](plans/)：
+
+- [第一阶段执行计划](plans/phase-1-gis-workbench.md)
+- [第一阶段进度交接](plans/phase-1-progress.md)
+- [P21 全阶段验收证据（受阻）](plans/p21-phase-acceptance-evidence.md) — 绑定 SHA "d310b\；**不**表示阶段已完成
+
 ### 工程约定
 
 - [代码偏好与维护约定](engineering/code-preferences.md)
