@@ -297,6 +297,17 @@ button:disabled {
   background: #e9eee9;
 }
 
+.map-canvas__viewport {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.map-canvas__viewport .ol-viewport {
+  border-radius: 0;
+}
+
 .map-grid {
   position: absolute;
   inset: 0;
@@ -359,6 +370,7 @@ button:disabled {
 
 .map-controls {
   position: absolute;
+  z-index: 2;
   top: 14px;
   right: 14px;
   display: grid;

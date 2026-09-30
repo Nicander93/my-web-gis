@@ -2356,3 +2356,20 @@ esolve-wfs / etch-getfeature / parse-wfs；WFS 1.1/2.0 fixtures；bounded 单�
 ### 下一可执行任务
 
 **P21 — 全阶段验收与交接**（未开始）
+
+## MapCanvas ↔ OlMapRuntime wiring（非 P21）
+
+- **状态**: 进行中 / Draft PR
+- **时间**: 2026-09-30 CST
+- **分支**: `local/mapcanvas-ol-runtime-wiring`
+- **基线**: main `e002361`（P20 squash）
+- **说明**: **独立实现任务，不是 P21 验收**。不修改下方 P21 勾选/状态表。将桌面 `MapCanvas` 占位接入既有 `@desktop-webgis/ol-runtime`（`OlMapRuntime`），使画布渲染当前工程图层；zoom/view 命令经真实 map 生效。≠ 场景 A–L 验收；≠ 场景 K 阶段签收；无公网 live WFS 冒烟；无 OS keychain；无 npm publish。保留无关 `scripts/` 与 stash@{0}；未使用 Cursor CloudAgent；未触碰 GeoForge / `D:\code\3dtiles`。
+
+### 主要改动
+
+- `apps/desktop/src/features/map/map-runtime-host.ts`：挂载/卸载 `OlMapRuntime`，`syncLayers` / basemap / session view extent
+- `apps/desktop/src/features/map/MapCanvas.tsx`：去掉占位水印，挂载 OL 视口
+- `map.commands` / `layer.commands` zoom·retry 走 runtime
+- `project-io` 保存时写入 live `mapState`
+- 测试：`map-canvas-runtime.test.ts`（占位消失 + host/命令接线）
+

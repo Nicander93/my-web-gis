@@ -3,6 +3,11 @@ import { projectCommands } from './project.commands'
 import { useWorkspaceStore } from '@/stores/workspace.store'
 import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
+import {
+  isMapRuntimeMounted,
+  retryMapServiceLayer,
+  zoomMapToLayer
+} from '@/features/map/map-runtime-host'
 import { refreshWfsLayer } from '@/services/wfs-commands'
 import { capabilitiesForDataset, cloneValue, isLegacyStyle, migrateLegacyStyle } from '@desktop-webgis/gis-core'
 import type { LayerStyle } from '@desktop-webgis/ol-style'
@@ -104,23 +109,11 @@ export const layerCommands = {
       return
     }
     useProjectStore.getState().setSelectedLayer(id)
-    const state = useProjectStore.getState()
-    const layer = state.project.layers.find((item) => item.id === id)
-    const dataset = layer
-      ? state.project.datasets.find((item) => item.id === layer.datasetId)
-      : undefined
-    if (
-      (dataset?.kind === 'wms' || dataset?.kind === 'wmts') &&
-      dataset.source.bboxWgs84
-    ) {
-      const [w, s, e, n] = dataset.source.bboxWgs84
-      const kind = dataset.kind.toUpperCase()
-      emitCommandStatus(
-        `缩放到 ${kind} 范围 [${w.toFixed(2)}, ${s.toFixed(2)}, ${e.toFixed(2)}, ${n.toFixed(2)}]（地图运行时接入后自动 fit）`
-      )
+    if (zoomMapToLayer(id)) {
+      emitCommandStatus('已缩放到图层')
       return
     }
-    emitCommandStatus('缩放到图层（地图运行时接入后生效）')
+    emitCommandStatus('缩放到图层（地图运行时未挂载）')
   },
 
   /** Re-request WMS/WMTS imagery, or refresh WFS snapshot (failure keeps previous). */
@@ -148,9 +141,15 @@ export const layerCommands = {
       return
     }
     useSessionStore.getState().setLayerLoading(id, true)
-    // Session bump lets a future MapCanvas subscriber call runtime.retryWmsLayer.
+    const retried = retryMapServiceLayer(id)
     useSessionStore.getState().setLayerLoading(id, false)
-    emitCommandStatus('已请求重新加载服务图层')
+    if (retried) {
+      emitCommandStatus('已重新加载服务图层')
+      return
+    }
+    emitCommandStatus(
+      isMapRuntimeMounted() ? '服务图层重新加载失败' : '已请求重新加载服务图层（地图运行时未挂载）'
+    )
   },
 
   moveUp(layerId?: string | null): void {
