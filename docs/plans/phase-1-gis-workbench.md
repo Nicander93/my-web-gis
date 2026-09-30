@@ -391,7 +391,7 @@ rtk proxy pnpm --filter @desktop-webgis/desktop build
 | P18 | 已完成 | WFS 有界加载。Draft PR#23 / 88a08c7 |
 | P19 | 已完成 | 项目与 Scene 全链路集成。Draft PR#24 / a532bca |
 | P20 | 已完成 | 样式包发布准备。Draft PR#25 / b0dce42 |
-| P21 | 受阻 | 诚实验收证据仍受阻；E/H/L 硬阻塞；I partial（persist+automated restart hydrate PASS；UI offline-open + live reconnect 未验证）。详见 p21-phase-acceptance-evidence.md + scene-i-credential-reverify-evidence.md |
+| P21 | 受阻 | 不是阶段已完成。选择和编辑运行时已挂载（第 28 号），交互未验收。H 只有公开 live GetFeature 冒烟。I 只有部分证据，真界面重启受阻（第 33 号）。断网打开、真实令牌 OGC、A–D/F/G/J 和 npm 都没做。详见 handoff-2026-09-30.md。 |
 
 可直接交给执行模型的提示词：
 
