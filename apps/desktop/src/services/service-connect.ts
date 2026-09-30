@@ -10,7 +10,11 @@ import {
   type ServiceLayerInfo
 } from '@desktop-webgis/ogc-io'
 import { fetchTextPreferNative } from './native-http'
-import { putSessionCredential } from './credentials'
+import {
+  canPersistCredentialsSafely,
+  persistCredentialSecurely,
+  putSessionCredential
+} from './credentials'
 
 export type ConnectAuthForm =
   | { mode: 'none' }
@@ -94,6 +98,10 @@ export async function connectService(input: ConnectServiceInput): Promise<Connec
         kind: 'bearer',
         value: input.auth.token
       })
+    }
+
+    if (credentialRefKey && canPersistCredentialsSafely()) {
+      await persistCredentialSecurely(credentialRefKey)
     }
 
     const service: OgcServiceType =

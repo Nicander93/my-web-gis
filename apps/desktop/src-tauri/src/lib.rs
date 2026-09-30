@@ -69,6 +69,54 @@ async fn http_get_text(args: HttpGetArgs) -> Result<HttpGetResult, String> {
     })
 }
 
+/// Windows Credential Manager / platform keychain service name (namespaced).
+const SECURE_CREDENTIAL_SERVICE: &str = "desktop-webgis";
+
+fn secure_entry(key: &str) -> Result<keyring::Entry, String> {
+    if key.is_empty() || key.len() > 256 {
+        return Err("invalid credential key".into());
+    }
+    if key.contains('\0') || key.contains(['\n', '\r']) {
+        return Err("invalid credential key".into());
+    }
+    keyring::Entry::new(SECURE_CREDENTIAL_SERVICE, key).map_err(|error| error.to_string())
+}
+
+/// Persist a credential payload (JSON metadata+secret) under the given key.
+/// Never log the payload.
+#[tauri::command]
+fn secure_credential_set(key: String, payload: String) -> Result<(), String> {
+    if payload.is_empty() || payload.len() > 32_768 {
+        return Err("invalid credential payload".into());
+    }
+    let entry = secure_entry(&key)?;
+    entry
+        .set_password(&payload)
+        .map_err(|error| error.to_string())
+}
+
+/// Load a previously stored credential payload, or null when missing.
+#[tauri::command]
+fn secure_credential_get(key: String) -> Result<Option<String>, String> {
+    let entry = secure_entry(&key)?;
+    match entry.get_password() {
+        Ok(password) => Ok(Some(password)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+/// Best-effort delete; missing entry is success.
+#[tauri::command]
+fn secure_credential_delete(key: String) -> Result<(), String> {
+    let entry = secure_entry(&key)?;
+    match entry.delete_credential() {
+        Ok(()) => Ok(()),
+        Err(keyring::Error::NoEntry) => Ok(()),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -77,7 +125,10 @@ pub fn run() {
             write_text_path,
             read_binary_path,
             write_binary_path,
-            http_get_text
+            http_get_text,
+            secure_credential_set,
+            secure_credential_get,
+            secure_credential_delete
         ])
         .run(tauri::generate_context!())
         .expect("error while running Desktop WebGIS");

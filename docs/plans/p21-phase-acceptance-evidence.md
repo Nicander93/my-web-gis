@@ -142,3 +142,9 @@ peer `ol@^10.10.0`；tarball `desktop-webgis-ol-style-0.1.0.tgz`。
 > **P21 evidence pack status remains 受阻**; do **not** mark P21 已完成.
 > Scenario H: live GetFeature path smoke only — **refresh-fail UI** and **copy-edit-export** still open; **≠ full H PASS**.
 > No OS keychain; no npm publish. See [wfs-live-smoke-evidence.md](./wfs-live-smoke-evidence.md).
+
+## 附录: OS keychain / credential persistence landed（≠ scenario I PASS；≠ P21 已完成）
+
+> Independent task `local/credential-persistence` wires Tauri desktop credentials to OS secure storage (`keyring` → Windows Credential Manager).
+> Auto-persist on successful service connect when `canPersistCredentialsSafely()`; hydrate from secure store on project open / WFS load miss.
+> **P21 evidence pack status remains 受阻**; do **not** mark P21 已完成. Scenario I still needs interactive re-verify after restart/reconnect.

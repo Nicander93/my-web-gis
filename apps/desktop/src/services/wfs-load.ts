@@ -11,7 +11,7 @@ import {
 } from '@desktop-webgis/ogc-io'
 import { parseGeoJsonFeatures, type GisFeature } from '@desktop-webgis/gis-core'
 import { fetchTextPreferNative } from './native-http'
-import { getSessionCredential } from './credentials'
+import { ensureCredentialLoaded, getSessionCredential } from './credentials'
 
 export interface WfsLoadRequest {
   description: ServiceDescription
@@ -63,13 +63,14 @@ export interface WfsLoadSnapshotFailure {
 
 export type WfsLoadResult = WfsLoadSnapshotResult | WfsLoadSnapshotFailure
 
-function buildAuth(
+async function buildAuth(
   authMode: WfsLoadRequest['authMode'],
   tokenParam: string | undefined,
   credentialRefKey: string | undefined
-): ServiceAuthInput {
+): Promise<ServiceAuthInput> {
   if (authMode === 'none' || !credentialRefKey) return { mode: 'none' }
-  const cred = getSessionCredential(credentialRefKey)
+  const cred =
+    getSessionCredential(credentialRefKey) ?? (await ensureCredentialLoaded(credentialRefKey))
   if (!cred) return { mode: 'none' }
   if (cred.kind === 'query-token') {
     return { mode: 'query-token', param: tokenParam || cred.param || 'token', token: cred.value }
@@ -108,7 +109,7 @@ export async function loadWfsBoundedSnapshot(input: WfsLoadRequest): Promise<Wfs
     }
   }
 
-  const auth = buildAuth(input.authMode, input.tokenParam, input.credentialRefKey)
+  const auth = await buildAuth(input.authMode, input.tokenParam, input.credentialRefKey)
   const pages = planBoundedGetFeaturePages({
     maxFeatures: load.maxFeatures,
     usePaging: load.usePaging,
