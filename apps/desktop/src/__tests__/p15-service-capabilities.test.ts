@@ -9,7 +9,12 @@ import {
 import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
 import { getLayerCapabilities, layerCommands } from '@/app/commands/layer.commands'
-import { _resetCredentialsForTests, getSessionCredential, putSessionCredential } from '@/services/credentials'
+import {
+  _resetCredentialsForTests,
+  _setSecureCredentialBackendForTests,
+  getSessionCredential,
+  putSessionCredential
+} from '@/services/credentials'
 import { connectService } from '@/services/service-connect'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -149,6 +154,44 @@ describe('P15 service description / capabilities / connect', () => {
       globalThis.fetch = originalFetch
     }
     expect(useProjectStore.getState().project.layers.length).toBe(before)
+  })
+
+  it('persists credentials only after a successful connect', async () => {
+    const backend = {
+      isAvailable: () => true,
+      set: vi.fn(async (_key: string, _payload: string) => {}),
+      get: vi.fn(async () => null),
+      delete: vi.fn(async (_key: string) => {})
+    }
+    _setSecureCredentialBackendForTests(backend)
+
+    const originalFetch = globalThis.fetch
+    try {
+      globalThis.fetch = vi.fn(async () => new Response('nope', { status: 500 })) as unknown as typeof fetch
+      const failed = await connectService({
+        url: 'https://example.com/wms',
+        service: 'WMS',
+        auth: { mode: 'bearer', token: 'FAILED-TOKEN' },
+        generation: 3
+      })
+      expect(failed.ok).toBe(false)
+      expect(backend.set).not.toHaveBeenCalled()
+
+      backend.set.mockClear()
+      globalThis.fetch = vi.fn(async () =>
+        new Response(fixtureXml, { status: 200, headers: { 'content-type': 'text/xml' } })
+      ) as unknown as typeof fetch
+      const succeeded = await connectService({
+        url: 'https://example.com/wms',
+        service: 'WMS',
+        auth: { mode: 'bearer', token: 'SUCCESS-TOKEN' },
+        generation: 4
+      })
+      expect(succeeded.ok).toBe(true)
+      expect(backend.set).toHaveBeenCalledTimes(1)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
   })
 
   it('successful connect does not dump catalog into project until addServiceLayer', async () => {

@@ -100,10 +100,6 @@ export async function connectService(input: ConnectServiceInput): Promise<Connec
       })
     }
 
-    if (credentialRefKey && canPersistCredentialsSafely()) {
-      await persistCredentialSecurely(credentialRefKey)
-    }
-
     const service: OgcServiceType =
       input.service === 'auto' ? detectServiceFromUrl(normalized.shareableUrl) : input.service
 
@@ -131,6 +127,10 @@ export async function connectService(input: ConnectServiceInput): Promise<Connec
       hint: service
     })
     const selectable = listSelectableLayers(description)
+
+    if (credentialRefKey && canPersistCredentialsSafely()) {
+      await persistCredentialSecurely(credentialRefKey)
+    }
 
     return {
       ok: true,
