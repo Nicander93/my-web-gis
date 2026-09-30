@@ -173,3 +173,6 @@ peer `ol@^10.10.0`；tarball `desktop-webgis-ol-style-0.1.0.tgz`。
 > **P21 evidence pack status remains 受阻**; do **not** mark P21 已完成.
 > Scenario I may be described as **partial**（persist + A/B/C + process-restart hydrate）but **not** full PASS / 通过.
 > See [scene-i-ui-restart-reverify-evidence.md](./scene-i-ui-restart-reverify-evidence.md).
+## Append-only update: true UI restart GUI status (2026-09-30 19:15 CST)
+
+> D-GUI remains **受阻 / open**. This LM has no window automation / GUI driver, so the desktop window was not closed and reopened. PR#32's process-level D-proc evidence does not close this item, does not make full Scene I PASS, and does not complete P21. See [scene-i-ui-restart-gui-blocked-evidence.md](./scene-i-ui-restart-gui-blocked-evidence.md).
