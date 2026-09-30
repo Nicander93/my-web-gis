@@ -2424,3 +2424,24 @@ esolve-wfs / etch-getfeature / parse-wfs；WFS 1.1/2.0 fixtures；bounded 单�
 ### 下一执行任务
 
 保持 P21 **受阻**。优先独立任务：挂载 `OlSelectionRuntime` + `OlToolRuntime`（或按产品排期处理 keychain / live WFS / UI 冒烟）。
+
+## MapCanvas selection/edit runtime mount(非 P21 已完成)
+
+- **状态**: 进行中 / Draft PR
+- **时间**: 2026-09-30 CST
+- **分支**: `local/mapcanvas-selection-edit-runtime`
+- **基线**: main `d69a5f7` (P21 evidence squash; P21 仍为 **受阻**)
+- **说明**: Independent mount of `OlSelectionRuntime` + `OlToolRuntime` into desktop `map-runtime-host`. 不是 P21 已完成. P21 remains **受阻**. Unblocks E/L mount debt only; no interactive scenario PASS claim; no live WFS smoke; no OS keychain; no npm publish. Left `scripts/` and stash untouched; no CloudAgent.
+
+### Changes
+
+- `map-runtime-host.ts`: mount/unmount selection + tool with map; `setActiveEditTool`
+- `map.commands` / `edit.commands`: select/clear/draw/modify/delete via runtimes
+- `project.store`: `executeEditCommand(s)` into EditHistory
+- `MapCanvas.tsx`: `data-selection-runtime` / `data-tool-runtime`
+- Tests: `map-canvas-runtime.test.ts` mount guards
+
+### vs P21
+
+- P21 stays **受阻** (interactive smoke / live WFS / keychain still open)
+- This PR only lands E/L **mount debt**; evidence soft-note only

@@ -1,15 +1,21 @@
 import { emitCommandStatus } from './status'
 import {
+  clearMapSelection,
   isMapRuntimeMounted,
+  isSelectionRuntimeMounted,
+  setActiveEditTool,
   zoomMapBy,
   zoomMapToAll
 } from '@/features/map/map-runtime-host'
-import { useProjectStore } from '@/stores/project.store'
 
-/** 地图操作命令：接入 OlMapRuntime 后驱动真实视图。 */
+/** 地图操作命令：接入 OlMapRuntime / OlSelectionRuntime 后驱动真实视图与选择。 */
 export const mapCommands = {
   pan(): void {
-    emitCommandStatus('平移地图')
+    if (setActiveEditTool('pan')) {
+      emitCommandStatus('平移地图')
+      return
+    }
+    emitCommandStatus('平移地图（地图运行时未挂载）')
   },
   zoomIn(): void {
     if (zoomMapBy(1)) {
@@ -36,14 +42,22 @@ export const mapCommands = {
     emitCommandStatus('定位（定位服务待接入）')
   },
   select(): void {
-    emitCommandStatus('选择要素（选择服务待接入）')
+    if (setActiveEditTool('select')) {
+      emitCommandStatus('选择要素')
+      return
+    }
+    emitCommandStatus('选择要素（选择运行时未挂载）')
   },
   clearSelection(): void {
-    useProjectStore.getState().clearSelection()
+    clearMapSelection()
     emitCommandStatus('已清除选择')
   }
 }
 
 export function mapRuntimeReady(): boolean {
   return isMapRuntimeMounted()
+}
+
+export function selectionRuntimeReady(): boolean {
+  return isSelectionRuntimeMounted()
 }

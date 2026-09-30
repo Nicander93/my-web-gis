@@ -4,13 +4,18 @@ import { fileURLToPath } from 'node:url'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createProject, type MapState } from '@desktop-webgis/gis-core'
 import { mapCommands } from '@/app/commands/map.commands'
+import { editCommands } from '@/app/commands/edit.commands'
 import { layerCommands } from '@/app/commands/layer.commands'
 import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
 import {
   _setMapRuntimeForTests,
+  getActiveEditTool,
   getLiveMapState,
   isMapRuntimeMounted,
+  isSelectionRuntimeMounted,
+  isToolRuntimeMounted,
+  setActiveEditTool,
   syncMapFromProject,
   zoomMapBy,
   zoomMapToAll,
@@ -73,6 +78,8 @@ function createMockRuntime(initialZoom = 2): OlMapRuntime {
     un: vi.fn(),
     addLayer: vi.fn(),
     removeLayer: vi.fn(),
+    addInteraction: vi.fn(),
+    removeInteraction: vi.fn(),
     getLayers: () => ({ insertAt: vi.fn() })
   }
 
@@ -82,6 +89,7 @@ function createMockRuntime(initialZoom = 2): OlMapRuntime {
       entries: () => layers.entries(),
       get: (id: string) => layers.get(id),
       getVector: () => undefined,
+      getDatasetIdForLayer: () => undefined,
       unregister: (id: string) => layers.delete(id),
       register: (id: string, _datasetId: string, layer: unknown) => layers.set(id, layer)
     },
@@ -99,7 +107,7 @@ function createMockRuntime(initialZoom = 2): OlMapRuntime {
   } as unknown as OlMapRuntime
 }
 
-describe('MapCanvas ↔ OlMapRuntime wiring', () => {
+describe('MapCanvas OlMapRuntime selection tool wiring', () => {
   beforeEach(() => {
     resetStores()
   })
@@ -111,6 +119,27 @@ describe('MapCanvas ↔ OlMapRuntime wiring', () => {
     expect(src).toContain('mountMapRuntime')
     expect(src).toContain('map-runtime-host')
     expect(src).toContain('map-canvas__viewport')
+    expect(src).toContain('data-selection-runtime')
+    expect(src).toContain('data-tool-runtime')
+  })
+
+  it('host source mounts OlSelectionRuntime and OlToolRuntime with the map', () => {
+    const src = readFileSync(join(mapFeatureDir, 'map-runtime-host.ts'), 'utf8')
+    expect(src).toContain('OlSelectionRuntime')
+    expect(src).toContain('OlToolRuntime')
+    expect(src).toContain('new OlSelectionRuntime')
+    expect(src).toContain('new OlToolRuntime')
+    expect(src).toContain('isSelectionRuntimeMounted')
+    expect(src).toContain('isToolRuntimeMounted')
+    expect(src).toContain('setActiveEditTool')
+  })
+
+  it('host reports map/selection/tool mounted together', () => {
+    const runtime = createMockRuntime(4)
+    _setMapRuntimeForTests(runtime, true)
+    expect(isMapRuntimeMounted()).toBe(true)
+    expect(isSelectionRuntimeMounted()).toBe(true)
+    expect(isToolRuntimeMounted()).toBe(true)
   })
 
   it('host reports mounted and syncs layers through OlMapRuntime.syncLayers', () => {
@@ -139,7 +168,6 @@ describe('MapCanvas ↔ OlMapRuntime wiring', () => {
     expect(layers).toHaveLength(1)
     expect(Object.keys(featuresByDataset)).toContain('ds-1')
     expect(datasets).toHaveLength(1)
-    // syncMapFromProject applies project.mapState (default zoom 2) on first project id sync
     expect(getLiveMapState()?.zoom).toBe(useProjectStore.getState().project.mapState.zoom)
   })
 
@@ -217,6 +245,8 @@ describe('MapCanvas ↔ OlMapRuntime wiring', () => {
   it('zoom commands fail closed when runtime is not mounted', () => {
     _setMapRuntimeForTests(null)
     expect(isMapRuntimeMounted()).toBe(false)
+    expect(isSelectionRuntimeMounted()).toBe(false)
+    expect(isToolRuntimeMounted()).toBe(false)
     expect(zoomMapBy(1)).toBe(false)
     expect(zoomMapToAll()).toBe(false)
 
@@ -225,6 +255,111 @@ describe('MapCanvas ↔ OlMapRuntime wiring', () => {
     window.addEventListener('desktop-webgis:command-status', listener)
     mapCommands.zoomIn()
     expect(messages.at(-1)).toContain('未挂载')
+    window.removeEventListener('desktop-webgis:command-status', listener)
+  })
+
+  it('select / draw / modify / delete commands fail closed when runtimes are not mounted', () => {
+    _setMapRuntimeForTests(null)
+    const messages: string[] = []
+    const listener = (event: Event) => messages.push((event as CustomEvent<string>).detail)
+    window.addEventListener('desktop-webgis:command-status', listener)
+
+    mapCommands.select()
+    expect(messages.at(-1)).toContain('未挂载')
+    expect(messages.at(-1)).not.toContain('待接入')
+
+    editCommands.draw()
+    expect(messages.at(-1)).toContain('未挂载')
+    expect(messages.at(-1)).not.toContain('待接入')
+
+    editCommands.modify()
+    expect(messages.at(-1)).toContain('未挂载')
+
+    editCommands.deleteSelected()
+    expect(messages.at(-1)).toContain('未挂载')
+
+    window.removeEventListener('desktop-webgis:command-status', listener)
+  })
+
+  it('select command activates selection tool when runtimes are mounted', () => {
+    const runtime = createMockRuntime()
+    _setMapRuntimeForTests(runtime, true)
+
+    const messages: string[] = []
+    const listener = (event: Event) => messages.push((event as CustomEvent<string>).detail)
+    window.addEventListener('desktop-webgis:command-status', listener)
+
+    mapCommands.select()
+    expect(getActiveEditTool()).toBe('select')
+    expect(messages.at(-1)).toBe('选择要素')
+    expect(messages.at(-1)).not.toContain('待接入')
+
+    window.removeEventListener('desktop-webgis:command-status', listener)
+  })
+
+  it('draw/modify activate OlToolRuntime path for editable vector layers', () => {
+    const runtime = createMockRuntime()
+    _setMapRuntimeForTests(runtime, true)
+
+    useProjectStore.getState().addLayer(
+      'ds-edit',
+      'Editable points',
+      [
+        {
+          id: 'f1',
+          geometry: { type: 'Point', coordinates: [1, 2] },
+          properties: {}
+        }
+      ],
+      'point'
+    )
+
+    const messages: string[] = []
+    const listener = (event: Event) => messages.push((event as CustomEvent<string>).detail)
+    window.addEventListener('desktop-webgis:command-status', listener)
+
+    editCommands.draw()
+    expect(getActiveEditTool()).toBe('draw-point')
+    expect(messages.at(-1)).toContain('绘制工具已激活')
+    expect(messages.at(-1)).not.toContain('待接入')
+
+    editCommands.modify()
+    expect(getActiveEditTool()).toBe('modify')
+    expect(messages.at(-1)).toContain('修改工具已激活')
+
+    expect(setActiveEditTool('delete')).toBe(true)
+    expect(getActiveEditTool()).toBe('delete')
+
+    window.removeEventListener('desktop-webgis:command-status', listener)
+  })
+
+  it('edit commands refuse non-editable service layers', () => {
+    const runtime = createMockRuntime()
+    _setMapRuntimeForTests(runtime, true)
+
+    useProjectStore.getState().addServiceLayer({
+      name: 'WMS',
+      kind: 'wms',
+      source: {
+        type: 'wms',
+        url: 'https://example.com/wms',
+        version: '1.3.0',
+        layerNames: ['rivers'],
+        styleNames: [],
+        format: 'image/png',
+        transparent: true,
+        crs: 'EPSG:3857',
+        authMode: 'none'
+      }
+    })
+
+    const messages: string[] = []
+    const listener = (event: Event) => messages.push((event as CustomEvent<string>).detail)
+    window.addEventListener('desktop-webgis:command-status', listener)
+
+    editCommands.draw()
+    expect(messages.at(-1)).toContain('可编辑矢量图层')
+
     window.removeEventListener('desktop-webgis:command-status', listener)
   })
 })
