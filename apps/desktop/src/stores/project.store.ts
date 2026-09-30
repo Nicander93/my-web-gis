@@ -34,7 +34,8 @@ import type {
   ServiceSource,
   DatasetKind,
   ProjectSnapshot,
-  ProjectEditContext
+  ProjectEditContext,
+  EditCommand
 } from '@desktop-webgis/gis-core'
 import { useSessionStore } from '@/stores/session.store'
 import type { LayerStyle } from '@desktop-webgis/ol-style'
@@ -105,6 +106,9 @@ interface ProjectState {
   redoEdit(): boolean
   canUndoEdit(): boolean
   canRedoEdit(): boolean
+  /** Apply a feature/geometry EditCommand (draw / modify / delete from OlToolRuntime). */
+  executeEditCommand(command: EditCommand): boolean
+  executeEditCommands(commands: EditCommand[]): boolean
   _resetAttributeHistoryForTests(): void
   _resetProjectHistoryForTests(): void
 
@@ -494,6 +498,30 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
   canUndoEdit: () => editHistory.canUndo,
   canRedoEdit: () => editHistory.canRedo,
+
+  executeEditCommand: (command) => {
+    const state = get()
+    syncStoreFromState(state.featuresByDataset)
+    editHistory.execute(command, projectEditContext())
+    const snapshot = attributeFeatureStore.snapshot()
+    set({
+      featuresByDataset: { ...get().featuresByDataset, ...snapshot },
+      dirty: true
+    })
+    for (const layer of get().project.layers) {
+      reconvergeSelection(layer.id)
+    }
+    return true
+  },
+
+  executeEditCommands: (commands) => {
+    if (commands.length === 0) return false
+    let ok = false
+    for (const command of commands) {
+      if (get().executeEditCommand(command)) ok = true
+    }
+    return ok
+  },
 
   undoAttributeEdit: () => get().undoEdit(),
   redoAttributeEdit: () => get().redoEdit(),

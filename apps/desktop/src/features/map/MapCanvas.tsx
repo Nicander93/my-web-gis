@@ -4,17 +4,44 @@ import { Button } from '@/components/ui/Button'
 import { mapCommands } from '@/app/commands/map.commands'
 import { useProjectStore } from '@/stores/project.store'
 import {
+  getActiveEditTool,
+  isSelectionRuntimeMounted,
+  isToolRuntimeMounted,
   mountMapRuntime,
   syncMapFromProject,
   unmountMapRuntime,
   isMapRuntimeMounted
 } from './map-runtime-host'
 
-/** Workspace map surface: mounts the shared OlMapRuntime and keeps project layers in sync. */
+function toolHint(tool: string): string {
+  switch (tool) {
+    case 'select':
+      return '选择工具 · 单击选择要素'
+    case 'draw-point':
+      return '绘制点 · 单击地图添加'
+    case 'draw-line':
+      return '绘制线 · 单击添加节点，双击结束'
+    case 'draw-polygon':
+      return '绘制面 · 单击添加节点，双击结束'
+    case 'modify':
+      return '修改工具 · 选中后拖动节点'
+    case 'delete':
+      return '删除工具 · 单击要素删除'
+    case 'pan':
+      return '平移工具 · 拖动地图'
+    default:
+      return '地图工具'
+  }
+}
+
+/** Workspace map surface: mounts OlMapRuntime + selection/tool runtimes and keeps project layers in sync. */
 export function MapCanvas() {
   const viewportRef = useRef<HTMLDivElement>(null)
-  const [readout, setReadout] = useState('0.0000, 0.0000\u00a0\u00a0·\u00a0\u00a01:0')
+  const [readout, setReadout] = useState('0.0000, 0.0000  ·  1:0')
   const [runtimeMounted, setRuntimeMounted] = useState(false)
+  const [selectionMounted, setSelectionMounted] = useState(false)
+  const [toolMounted, setToolMounted] = useState(false)
+  const [hint, setHint] = useState(toolHint('select'))
 
   useEffect(() => {
     const target = viewportRef.current
@@ -24,14 +51,19 @@ export function MapCanvas() {
     const runtime = mountMapRuntime(target, mapState)
     runtime.onPointerMove((info) => {
       const [x, y] = info.coordinate
-      setReadout(`${x.toFixed(4)}, ${y.toFixed(4)}\u00a0\u00a0·\u00a0\u00a0${info.scaleText}`)
+      setReadout(`${x.toFixed(4)}, ${y.toFixed(4)}  ·  ${info.scaleText}`)
     })
     syncMapFromProject()
     setRuntimeMounted(true)
+    setSelectionMounted(isSelectionRuntimeMounted())
+    setToolMounted(isToolRuntimeMounted())
+    setHint(toolHint(getActiveEditTool()))
 
     return () => {
       unmountMapRuntime()
       setRuntimeMounted(false)
+      setSelectionMounted(false)
+      setToolMounted(false)
     }
   }, [])
 
@@ -53,11 +85,25 @@ export function MapCanvas() {
     return unsubscribe
   }, [])
 
+  useEffect(() => {
+    const node = viewportRef.current?.parentElement
+    if (!node) return
+    const refresh = () => setHint(toolHint(getActiveEditTool()))
+    node.addEventListener('pointerenter', refresh)
+    window.addEventListener('desktop-webgis:command-status', refresh)
+    return () => {
+      node.removeEventListener('pointerenter', refresh)
+      window.removeEventListener('desktop-webgis:command-status', refresh)
+    }
+  }, [runtimeMounted])
+
   return (
     <section
       className="map-canvas"
       aria-label="地图工作区"
       data-map-runtime={runtimeMounted ? 'mounted' : 'pending'}
+      data-selection-runtime={selectionMounted ? 'mounted' : 'pending'}
+      data-tool-runtime={toolMounted ? 'mounted' : 'pending'}
     >
       <div
         ref={viewportRef}
@@ -73,7 +119,7 @@ export function MapCanvas() {
         </Button>
       </div>
       <div className="map-readout">{readout}</div>
-      <div className="map-tool-hint">选择工具 · 单击选择要素</div>
+      <div className="map-tool-hint">{hint}</div>
     </section>
   )
 }

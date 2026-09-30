@@ -129,3 +129,8 @@ peer `ol@^10.10.0`；tarball `desktop-webgis-ol-style-0.1.0.tgz`。
 - **不**声称已做 live WFS / keychain / npm publish。
 - **不**声称 MapCanvas wiring = P21。
 - 场景 K 的 PASS **仅**覆盖 tarball 独立消费，**不**等于已发布到 npm。
+
+## 附录: follow-up independent PR mount debt (not this evidence pack completion)
+
+> Independent task `local/mapcanvas-selection-edit-runtime` mounts `OlSelectionRuntime` / `OlToolRuntime` in code (clears E/L not-mounted debt).
+> **This P21 evidence pack status remains 受阻**; do not treat as phase 已完成. E/L still need interactive smoke; H/I and other blockers unchanged.
