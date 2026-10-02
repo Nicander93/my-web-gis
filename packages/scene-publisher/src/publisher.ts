@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
-import { copyFile, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { serializeScene } from '@desktop-webgis/scene-core'
+import { serializeScene } from '@desktop-webgis/scene-core/scene'
 import { parseScene, type SceneManifest, type SceneSource } from '@desktop-webgis/scene-schema'
 import type {
   BuildStaticSceneOptions,
@@ -43,6 +43,7 @@ function sceneResourceUrls(scene: SceneManifest): string[] {
     if (source.type === 'geojson' && source.url) urls.push(source.url)
   }
   if (scene.theme?.logo) urls.push(scene.theme.logo)
+  if (scene.city) for (const asset of Object.values(scene.city.assets)) urls.push(asset.url)
   return [...new Set(urls)]
 }
 
@@ -82,14 +83,75 @@ async function planResources(
   resources: Record<string, string>
 ): Promise<ResourcePlan[]> {
   const plan: ResourcePlan[] = []
+  for (const environment of [scene.city?.basemap, scene.city?.terrain]) {
+    if (environment && !isRemoteUrl(environment.url)) throw new Error('静态发布的三维底图和地形须使用 HTTP(S) 服务 URL')
+  }
   for (const url of sceneResourceUrls(scene)) {
     if (isRemoteUrl(url)) continue
     const relativeTarget = safeRelativePath(url)
     const sourcePath = resources[url] ?? resources[relativeTarget]
     if (!sourcePath) throw new Error(`本地资源缺少文件映射：${url}`)
-    plan.push({ sourcePath: await requireFile(sourcePath, `资源 ${url}`), relativeTarget })
+    const resolved = await requireFile(sourcePath, `资源 ${url}`)
+    plan.push({ sourcePath: resolved, relativeTarget })
+    if (Object.values(scene.city?.assets ?? {}).some(asset => asset.url === url && (asset.type === '3dtiles' || asset.type === 'glb'))) {
+      await collectModelResources(resolved, relativeTarget, plan)
+    }
   }
   return plan
+}
+
+/** Collect explicit tileset/glTF dependencies before writing any publication files. */
+async function collectModelResources(sourcePath: string, relativeTarget: string, plan: ResourcePlan[]): Promise<void> {
+  const root = await realpath(path.dirname(sourcePath))
+  const visited = new Set<string>()
+  async function visit(source: string, target: string): Promise<void> {
+    const canonical = await realpath(source)
+    assertInside(root, canonical)
+    if (visited.has(canonical)) return
+    visited.add(canonical)
+    const content = await readFile(canonical)
+    const extension = path.extname(source).toLowerCase()
+    let document: unknown
+    if (extension === '.json' || extension === '.gltf') document = JSON.parse(content.toString('utf8'))
+    else if (extension === '.glb') document = parseGlbJson(content)
+    else if (extension === '.b3dm') {
+      if (content.length < 28) throw new Error(`无效 b3dm：${source}`)
+      const offset = 28 + [12,16,20,24].reduce((sum,index) => sum + content.readUInt32LE(index),0)
+      document = parseGlbJson(content.subarray(offset))
+    } else if (extension === '.i3dm' || extension === '.cmpt' || extension === '.subtree') {
+      throw new Error(`本地发布暂不支持 ${extension} 依赖收集，请使用在线 3D Tiles URL：${source}`)
+    } else return
+    const uris: string[] = []
+    function walk(value: unknown): void {
+      if (!value || typeof value !== 'object') return
+      if (Array.isArray(value)) { value.forEach(walk); return }
+      const object = value as Record<string, unknown>
+      if (object.implicitTiling) throw new Error('本地隐式 3D Tiles 请先展开，或使用在线 URL 发布')
+      for (const [key, entry] of Object.entries(object)) {
+        if ((key === 'uri' || key === 'url') && typeof entry === 'string') uris.push(entry)
+        else walk(entry)
+      }
+    }
+    walk(document)
+    for (const uri of new Set(uris)) {
+      if (isRemoteUrl(uri) || uri.startsWith('data:')) continue
+      if (/[{}%?#\\]/.test(uri) || path.isAbsolute(uri) || /^[a-zA-Z]:/.test(uri)) throw new Error(`无法收集模型资源 URI：${uri}`)
+      const nextSource = path.resolve(path.dirname(source), uri)
+      assertInside(root,nextSource)
+      const nextTarget = safeRelativePath(path.posix.normalize(path.posix.join(path.posix.dirname(target),uri)))
+      await requireFile(nextSource,`模型依赖 ${uri}`)
+      if (!plan.some(resource => resource.relativeTarget === nextTarget)) plan.push({ sourcePath:nextSource, relativeTarget:nextTarget })
+      await visit(nextSource,nextTarget)
+    }
+  }
+  await visit(sourcePath,relativeTarget)
+}
+
+function parseGlbJson(content: Buffer): unknown {
+  if (content.length < 20 || content.readUInt32LE(0) !== 0x46546c67 || content.readUInt32LE(4) !== 2 || content.readUInt32LE(16) !== 0x4e4f534a) throw new Error('无效 GLB 文件')
+  const length = content.readUInt32LE(12)
+  if (20 + length > content.length) throw new Error('GLB JSON 数据不完整')
+  return JSON.parse(content.subarray(20,20+length).toString('utf8'))
 }
 
 async function copyViewerDirectory(source: string, target: string, root = source): Promise<void> {
@@ -164,6 +226,18 @@ export async function buildStaticScene(options: BuildStaticSceneOptions): Promis
   const viewerDirectory = await requireDirectory(options.viewerDirectory, 'Viewer 目录')
   const outputDirectory = await ensureEmptyOutput(options.outputDirectory)
   const resourcePlan = await planResources(scene, options.resources ?? {})
+  const targets = new Map<string, string>()
+  for (const resource of resourcePlan) {
+    const target = resource.relativeTarget.toLowerCase()
+    const viewerFile = path.join(viewerDirectory, resource.relativeTarget)
+    const viewerContent = await readFile(viewerFile).catch(() => undefined)
+    if (RESERVED_VIEWER_FILES.has(target) || (viewerContent && !viewerContent.equals(await readFile(resource.sourcePath)))) {
+      throw new Error(`资源路径与 Viewer 文件冲突：${resource.relativeTarget}`)
+    }
+    const previous = targets.get(target)
+    if (previous && path.resolve(previous) !== path.resolve(resource.sourcePath)) throw new Error(`资源输出路径重复：${resource.relativeTarget}`)
+    targets.set(target, resource.sourcePath)
+  }
   const indexPath = await requireFile(path.join(viewerDirectory, 'index.html'), 'Viewer index.html')
   void indexPath
 

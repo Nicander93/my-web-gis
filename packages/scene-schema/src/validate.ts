@@ -9,6 +9,7 @@ import type {
   ValidationResult
 } from './types.js'
 import { SCENE_MANIFEST_VERSION, SCENE_MANIFEST_VERSION_V1 } from './types.js'
+import { validateCityScene } from '@desktop-webgis/cesium-scene-schema'
 
 type UnknownRecord = Record<string, unknown>
 
@@ -25,7 +26,8 @@ const ROOT_FIELDS = new Set([
   'widgets',
   'theme',
   'presentation',
-  'metadata'
+  'metadata',
+  'city'
 ])
 
 function isRecord(value: unknown): value is UnknownRecord {
@@ -728,6 +730,10 @@ export function validateScene(input: unknown): ValidationResult {
   optionalString(input.description, '$.description', issues)
   optionalString(input.$schema, '$.$schema', issues)
   validateView(input.view, '$.view', issues)
+  if (input.city !== undefined) {
+    if (version !== 2) issue(issues, '$.city', 'version.city', '三维扩展仅支持 SceneManifest version 2')
+    for (const entry of validateCityScene(input.city, '$.city')) issue(issues, entry.path, 'city.invalid', entry.message)
+  }
 
   const credentialIds = validateCredentials(input.credentials, '$.credentials', issues)
   let sourcesRecord: UnknownRecord = {}

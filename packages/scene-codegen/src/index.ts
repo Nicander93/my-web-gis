@@ -18,6 +18,7 @@ const SUPPORTED_SOURCE_TYPES = new Set(['geojson', 'xyz', 'provider', 'wms', 'wm
  * Never silently omit WMS/WMTS/filters/styles.
  */
 export function assertSceneCodegenCapabilities(scene: SceneManifest): void {
+  if (scene.city) throw new Error('三维场景请使用 Cesium Scene Runtime 或独立 Viewer；OpenLayers 代码生成不支持三维扩展')
   for (const [sourceId, source] of Object.entries(scene.sources)) {
     if (!SUPPORTED_SOURCE_TYPES.has(source.type)) {
       throw new Error(

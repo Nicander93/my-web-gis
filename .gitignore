@@ -1,4 +1,6 @@
 node_modules/
+.worktrees/
+.artifacts/
 .pnpm-store/
 dist/
 target/

@@ -265,6 +265,7 @@ export function compileProjectToScene(
     },
     sources,
     layers,
+    ...(project.city ? { city: structuredClone(project.city) } : {}),
     metadata: {
       compiledFromProjectId: project.id,
       compiledFromProjectVersion: project.version,

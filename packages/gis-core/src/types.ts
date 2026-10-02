@@ -275,6 +275,8 @@ export type LayerTreeEntry =
   | { type: 'group'; id: string }
 
 export interface Project {
+  /** Optional city scene; legacy 2D projects remain readable. */
+  city?: import('@desktop-webgis/cesium-scene-schema').CityScene
   id: string
   version: number
   name: string

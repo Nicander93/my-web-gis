@@ -96,7 +96,7 @@ async function readJsonRecord(filePath: string, label: string): Promise<Record<s
   return parsed as Record<string, string>
 }
 
-const helpText = `scene-publish — 构建可部署的二维 GIS 静态 Viewer
+const helpText = `scene-publish — 构建可部署的二维 / 城市三维 GIS 静态 Viewer
 
 用法：
   scene-publish --scene report.scene.json --viewer apps/viewer/dist --out publish/report

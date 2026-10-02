@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Header } from './Header'
 import { StatusBar } from './StatusBar'
 import { Workspace } from './Workspace'
@@ -16,8 +16,12 @@ import type { ServiceLayerAddRequest } from '@/features/add-data/ServiceConnectP
 import { startWfsBoundedLoad } from '@/services/wfs-commands'
 import { useSessionStore } from '@/stores/session.store'
 import { emitCommandStatus } from './commands/status'
+import '@/features/city/city.css'
+
+const CityWorkspace = lazy(() => import('@/features/city/CityWorkspace').then(module => ({ default: module.CityWorkspace })))
 
 export default function App() {
+  const [sceneMode, setSceneMode] = useState<'2d' | '3d'>(() => new URLSearchParams(window.location.search).get('view') === '3d' ? '3d' : '2d')
   const [status, setStatus] = useState('就绪')
   const [addDataOpen, setAddDataOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
@@ -96,10 +100,14 @@ export default function App() {
 
 
   return (
-    <div className="desktop-app">
+    <div className={`desktop-app${sceneMode === '3d' ? ' desktop-app--city' : ''}`}>
       <Header />
-      <Workspace />
-      <StatusBar message={status} />
+      <nav className="scene-mode" aria-label="场景模式">
+        <button aria-pressed={sceneMode === '2d'} onClick={() => setSceneMode('2d')}>二维地图</button>
+        <button aria-pressed={sceneMode === '3d'} onClick={() => setSceneMode('3d')}>城市三维</button>
+      </nav>
+      {sceneMode === '2d' ? <Workspace /> : <Suspense fallback={<p role="status">正在加载三维组件…</p>}><CityWorkspace /></Suspense>}
+      {sceneMode === '2d' ? <StatusBar message={status} /> : <footer className="city-footer">城市三维 · WGS84 经纬度 / 椭球高度 · 工程共用保存与撤销历史</footer>}
       <AddDataDialog
         open={addDataOpen}
         onClose={() => setAddDataOpen(false)}

@@ -48,6 +48,11 @@ async function start(): Promise<void> {
     descriptionElement.hidden = !scene.description
 
     applyTheme(scene)
+    if (scene.city && new URLSearchParams(window.location.search).get('mode') !== '2d') {
+      const { renderCityViewer } = await import('./city-viewer')
+      await renderCityViewer(scene, sceneUrl)
+      return
+    }
     const runtime = await createSceneRuntime({
       target: mapTarget,
       scene,
