@@ -10,7 +10,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@desktop-webgis/ol-style": "workspace:*"
+    "@desktop-webgis/ol-style": "workspace:*",
+    "@desktop-webgis/cesium-scene-schema": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.9.2",

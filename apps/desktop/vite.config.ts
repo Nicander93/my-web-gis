@@ -2,9 +2,13 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath, URL } from 'node:url'
+import { viteStaticCopy } from 'vite-plugin-static-copy'
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), viteStaticCopy({ targets: [
+    ...['Assets', 'Workers', 'ThirdParty', 'Widgets'].map(name => ({ src: `node_modules/cesium/Build/Cesium/${name}`, dest: 'cesium' })),
+    { src: '../../examples/city-3d/city-sample', dest: '.' }
+  ] })],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

@@ -1,0 +1,401 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CityScene v1",
+  "$ref": "#/$defs/cityScene",
+  "$defs": {
+    "cityPosition": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "cityTriple": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "cityTransform": {
+      "type": "object",
+      "properties": {
+        "translation": {
+          "$ref": "#/$defs/cityTriple"
+        },
+        "rotation": {
+          "$ref": "#/$defs/cityTriple"
+        },
+        "scale": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10000
+        }
+      },
+      "required": [
+        "translation",
+        "rotation",
+        "scale"
+      ]
+    },
+    "cityPopup": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "titleField": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "field"
+            ]
+          }
+        }
+      },
+      "required": [
+        "fields"
+      ]
+    },
+    "cityCamera": {
+      "type": "object",
+      "properties": {
+        "position": {
+          "$ref": "#/$defs/cityPosition"
+        },
+        "heading": {
+          "type": "number"
+        },
+        "pitch": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "roll": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "position",
+        "heading",
+        "pitch",
+        "roll"
+      ]
+    },
+    "cityAsset": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "enum": [
+            "3dtiles",
+            "glb",
+            "geojson"
+          ]
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "type",
+        "url"
+      ]
+    },
+    "cityTileset": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "name": {
+          "type": "string"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "popup": {
+          "$ref": "#/$defs/cityPopup"
+        },
+        "type": {
+          "const": "3dtiles"
+        },
+        "asset": {
+          "type": "string"
+        },
+        "transform": {
+          "$ref": "#/$defs/cityTransform"
+        },
+        "maximumScreenSpaceError": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "cacheBytes": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "visible",
+        "type",
+        "asset",
+        "transform"
+      ]
+    },
+    "cityModel": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "name": {
+          "type": "string"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "popup": {
+          "$ref": "#/$defs/cityPopup"
+        },
+        "type": {
+          "const": "model"
+        },
+        "asset": {
+          "type": "string"
+        },
+        "position": {
+          "$ref": "#/$defs/cityPosition"
+        },
+        "transform": {
+          "$ref": "#/$defs/cityTransform"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "visible",
+        "type",
+        "asset",
+        "position",
+        "transform"
+      ]
+    },
+    "cityGeoJson": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "name": {
+          "type": "string"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "popup": {
+          "$ref": "#/$defs/cityPopup"
+        },
+        "type": {
+          "const": "geojson"
+        },
+        "asset": {
+          "type": "string"
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "visible",
+        "type",
+        "asset"
+      ]
+    },
+    "cityWater": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "name": {
+          "type": "string"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "popup": {
+          "$ref": "#/$defs/cityPopup"
+        },
+        "type": {
+          "const": "water"
+        },
+        "boundary": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "$ref": "#/$defs/cityPosition"
+          }
+        },
+        "height": {
+          "type": "number"
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$"
+        },
+        "amplitude": {
+          "type": "number",
+          "minimum": 0
+        },
+        "frequency": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "speed": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "visible",
+        "type",
+        "boundary",
+        "height",
+        "amplitude",
+        "frequency",
+        "speed",
+        "color"
+      ]
+    },
+    "cityScene": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "camera": {
+          "$ref": "#/$defs/cityCamera"
+        },
+        "basemap": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string"
+            },
+            "attribution": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "url"
+          ]
+        },
+        "terrain": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "url"
+          ]
+        },
+        "assets": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/cityAsset"
+          }
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/cityTileset"
+              },
+              {
+                "$ref": "#/$defs/cityModel"
+              },
+              {
+                "$ref": "#/$defs/cityGeoJson"
+              },
+              {
+                "$ref": "#/$defs/cityWater"
+              }
+            ]
+          }
+        },
+        "effects": {
+          "type": "object",
+          "properties": {
+            "fog": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "bloom": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "fog",
+            "bloom"
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "camera",
+        "assets",
+        "nodes",
+        "effects"
+      ]
+    }
+  }
+}

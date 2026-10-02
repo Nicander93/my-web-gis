@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "id": "city-demo",
+  "title": "城市三维街区",
+  "view": { "projection": "EPSG:3857", "center": [0, 0], "zoom": 2 },
+  "sources": {},
+  "layers": [],
+  "city": {
+    "version": 1,
+    "camera": { "position": [116.391, 39.902, 850], "heading": 0, "pitch": -48, "roll": 0 },
+    "assets": { "blocks": { "type": "3dtiles", "url": "./models/city/tileset.json" } },
+    "nodes": [
+      { "id": "blocks", "name": "城市街区 · 16 栋建筑", "visible": true, "type": "3dtiles", "asset": "blocks", "transform": { "translation": [0,0,0], "rotation": [0,0,0], "scale": 1 }, "popup": { "title": "城市样例", "fields": [{ "field": "name", "label": "名称" }] } },
+      { "id": "water", "name": "街区水面", "visible": true, "type": "water", "boundary": [[116.393,39.905,0],[116.395,39.905,0],[116.395,39.909,0],[116.393,39.909,0]], "height": 2, "color": "#238bafcc", "amplitude": 4, "frequency": 1000, "speed": 0.02 }
+    ],
+    "effects": { "fog": 0, "bloom": false }
+  }
+}

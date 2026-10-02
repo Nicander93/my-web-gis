@@ -64,7 +64,7 @@ export const projectCommands = {
       // credentialRef keys only in file — hydrate secrets from OS secure store when available.
       useProjectStore.getState().loadSnapshot(opened.snapshot)
       await hydrateCredentialsFromRefs(
-        collectCredentialRefKeys(opened.snapshot.project.datasets)
+        collectCredentialRefKeys(opened.snapshot.project.datasets.filter(dataset => dataset.kind !== 'vector'))
       )
       emitCommandStatus(`已打开项目：${opened.path}`)
     } catch (error) {

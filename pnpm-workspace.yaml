@@ -1,5 +1,6 @@
 packages:
   - "apps/*"
   - "packages/*"
+  - "examples/city-3d/consumer"
 allowBuilds:
   esbuild: true

@@ -10,10 +10,14 @@
   "dependencies": {
     "@desktop-webgis/ol-scene-runtime": "workspace:*",
     "@desktop-webgis/scene-schema": "workspace:*",
-    "ol": "^10.6.1"
+    "ol": "^10.6.1",
+    "cesium": "^1.145.0",
+    "@desktop-webgis/cesium-scene-runtime": "workspace:*",
+    "@desktop-webgis/cesium-scene-schema": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.9.2",
-    "vite": "^7.1.1"
+    "vite": "^7.1.1",
+    "vite-plugin-static-copy": "^3.1.2"
   }
 }
