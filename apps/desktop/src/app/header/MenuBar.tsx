@@ -5,6 +5,9 @@ import { LayerMenu } from './menus/LayerMenu'
 import { EditMenu } from './menus/EditMenu'
 import { ViewMenu } from './menus/ViewMenu'
 import { HelpMenu } from './menus/HelpMenu'
+import { CityMenu } from '@/features/city/CityMenu'
+import { useProjectStore } from '@/stores/project.store'
+import { getProjectType } from '@/services/project-type'
 
 export type MenuId = 'project' | 'data' | 'layer' | 'edit' | 'view' | 'help'
 
@@ -27,6 +30,7 @@ const menuComponents: Record<MenuId, React.ComponentType<{ onClose(): void }>> =
 }
 
 export function MenuBar() {
+  const city = useProjectStore(state => getProjectType(state.project) === '3d')
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null)
   const menuBarRef = useRef<HTMLDivElement>(null)
 
@@ -77,11 +81,11 @@ export function MenuBar() {
               aria-haspopup="true"
               onClick={() => toggleMenu(menu.id)}
             >
-              {menu.label}
+              {city && menu.id === 'layer' ? '对象' : menu.label}
             </button>
             {isOpen && (
               <div className="menu-dropdown">
-                <MenuComponent onClose={closeMenu} />
+                {city && menu.id !== 'project' ? <CityMenu section={menu.id} onClose={closeMenu} /> : <MenuComponent onClose={closeMenu} />}
               </div>
             )}
           </div>

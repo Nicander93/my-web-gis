@@ -35,7 +35,8 @@ import type {
   DatasetKind,
   ProjectSnapshot,
   ProjectEditContext,
-  EditCommand
+  EditCommand,
+  ProcessingRecord
 } from '@desktop-webgis/gis-core'
 import { useSessionStore } from '@/stores/session.store'
 import type { LayerStyle } from '@desktop-webgis/ol-style'
@@ -54,7 +55,8 @@ interface ProjectState {
     datasetId: string,
     name: string,
     features: GisFeature[],
-    styleKind: 'point' | 'line' | 'polygon' | 'mixed'
+    styleKind: 'point' | 'line' | 'polygon' | 'mixed',
+    processing?: ProcessingRecord
   ): void
   /**
    * Copy features into a brand-new Dataset + Layer (deep-cloned; no shared mutable refs).
@@ -62,7 +64,8 @@ interface ProjectState {
   copyFeaturesToLocalLayer(
     features: GisFeature[],
     name: string,
-    styleKind: 'point' | 'line' | 'polygon' | 'mixed'
+    styleKind: 'point' | 'line' | 'polygon' | 'mixed',
+    processing?: ProcessingRecord
   ): { datasetId: string; layerId: string } | null
   /**
    * Add a service Dataset + Layer from a connection selection.
@@ -183,13 +186,14 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   selection: { layerId: null, featureIds: [] },
   lastSelectionCountAfterFilter: null,
 
-  addLayer: (datasetId, name, features, styleKind) =>
+  addLayer: (datasetId, name, features, styleKind, processing) =>
     set((state) => {
       const dataset: Dataset = {
         id: datasetId,
         name,
         kind: 'vector',
-        source: { type: 'memory', label: name }
+        source: { type: 'memory', label: name },
+        ...(processing ? { processing: cloneValue(processing) } : {})
       }
 
       const layer: Layer = {
@@ -253,12 +257,12 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       }
     }),
 
-  copyFeaturesToLocalLayer: (features, name, styleKind) => {
+  copyFeaturesToLocalLayer: (features, name, styleKind, processing) => {
     if (!features || features.length === 0) return null
     const datasetId = createId('dataset')
     const cloned = cloneValue(features)
     // Ensure we never share object identity with source features.
-    get().addLayer(datasetId, name, cloned, styleKind)
+    get().addLayer(datasetId, name, cloned, styleKind, processing)
     const layerId = get().selectedLayerId
     if (!layerId) return null
     return { datasetId, layerId }

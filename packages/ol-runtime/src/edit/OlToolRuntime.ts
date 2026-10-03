@@ -8,6 +8,9 @@ import {
   type GisFeature
 } from '@desktop-webgis/gis-core'
 import type Feature from 'ol/Feature'
+import Collection from 'ol/Collection'
+import { unByKey } from 'ol/Observable'
+import type { EventsKey } from 'ol/events'
 import Draw from 'ol/interaction/Draw'
 import Modify from 'ol/interaction/Modify'
 import Select from 'ol/interaction/Select'
@@ -28,10 +31,69 @@ export interface ToolCallbacks {
 
 type RuntimeInteraction = Draw | Modify | Select | Snap
 
+export interface SnappingOptions {
+  enabled: boolean
+  vertex: boolean
+  edge: boolean
+  pixelTolerance: number
+  scope: 'active' | 'visible'
+}
+
+export const DEFAULT_SNAPPING: SnappingOptions = { enabled: true, vertex: true, edge: true, pixelTolerance: 10, scope: 'active' }
+
 export class OlToolRuntime {
   private interactions: RuntimeInteraction[] = []
+  private snapping: SnappingOptions = { ...DEFAULT_SNAPPING }
+  private snap: Snap | null = null
+  private snapKeys: EventsKey[] = []
+  private editSource: VectorSource | null = null
+  private onSnapChange: (snapped: boolean) => void = () => undefined
 
   constructor(private readonly mapRuntime: OlMapRuntime) {}
+
+  /** Refresh only capture targets; changing settings must not discard an unfinished drawing. */
+  setSnapping(options: SnappingOptions, onChange?: (snapped: boolean) => void): void {
+    const tolerance = Number.isFinite(options.pixelTolerance) ? options.pixelTolerance : DEFAULT_SNAPPING.pixelTolerance
+    this.snapping = { ...options, pixelTolerance: Math.max(1, Math.min(30, tolerance)) }
+    if (onChange) this.onSnapChange = onChange
+    this.refreshSnapping()
+  }
+
+  refreshSnapping(): void {
+    this.clearSnapping()
+    if (!this.editSource || !this.snapping.enabled || (!this.snapping.vertex && !this.snapping.edge)) return
+    const sources = this.snapping.scope === 'active' ? [this.editSource] : this.mapRuntime.registry.entries()
+      .flatMap(([id]) => {
+        const layer = this.mapRuntime.registry.getVector(id)
+        return layer?.isVisible(this.mapRuntime.getMap().getView()) && layer.getSource() ? [layer.getSource() as VectorSource] : []
+      })
+    const targets = new Collection<Feature<Geometry>>()
+    const refreshTargets = () => {
+      targets.clear()
+      targets.extend([...new Set(sources.flatMap(source => source.getFeatures()))])
+    }
+    refreshTargets()
+    for (const source of new Set(sources)) {
+      this.snapKeys.push(source.on('addfeature', event => {
+        if (event.feature && !targets.getArray().includes(event.feature)) targets.push(event.feature)
+      }), source.on('removefeature', event => {
+        const feature = event.feature
+        if (feature && !sources.some(item => item.hasFeature(feature))) targets.remove(feature)
+      }), source.on('clear', refreshTargets))
+    }
+    this.snap = new Snap({ features: targets, vertex: this.snapping.vertex, edge: this.snapping.edge, pixelTolerance: this.snapping.pixelTolerance })
+    this.snapKeys.push(this.snap.on('snap', () => this.onSnapChange(true)), this.snap.on('unsnap', () => this.onSnapChange(false)))
+    // OpenLayers handles interactions in reverse order: Snap must precede Draw/Modify handling.
+    this.mapRuntime.getMap().addInteraction(this.snap)
+  }
+
+  private clearSnapping(): void {
+    unByKey(this.snapKeys)
+    this.snapKeys = []
+    if (this.snap) this.mapRuntime.getMap().removeInteraction(this.snap)
+    this.snap = null
+    this.onSnapChange(false)
+  }
 
   activate(tool: EditTool, callbacks: ToolCallbacks): void {
     this.deactivate()
@@ -59,6 +121,8 @@ export class OlToolRuntime {
   }
 
   deactivate(): void {
+    this.clearSnapping()
+    this.editSource = null
     const map = this.mapRuntime.getMap()
     for (const interaction of this.interactions) {
       map.removeInteraction(interaction)
@@ -79,11 +143,13 @@ export class OlToolRuntime {
       const command = new AddFeatureCommand(createId('cmd'), datasetId, feature)
       callbacks.onAddFeature(datasetId, feature, command)
     })
-    this.addInteractions(draw, new Snap({ source }))
+    this.addInteractions(draw)
+    this.editSource = source
+    this.refreshSnapping()
   }
 
   private activateModify(source: VectorSource, callbacks: ToolCallbacks): void {
-    const select = new Select({ style: createSelectionStyle() })
+    const select = new Select({ style: createSelectionStyle(), layers: layer => layer.getSource() === source })
     const modify = new Modify({ features: select.getFeatures() })
     const beforeByFeature = new Map<string, GisFeature['geometry']>()
 
@@ -118,11 +184,13 @@ export class OlToolRuntime {
       beforeByFeature.clear()
     })
 
-    this.addInteractions(select, modify, new Snap({ source }))
+    this.addInteractions(select, modify)
+    this.editSource = source
+    this.refreshSnapping()
   }
 
   private activateDelete(source: VectorSource, callbacks: ToolCallbacks): void {
-    const select = new Select({ style: createSelectionStyle() })
+    const select = new Select({ style: createSelectionStyle(), layers: layer => layer.getSource() === source })
     select.on('select', () => {
       const selected = select.getFeatures().getArray()
       if (selected.length === 0) return

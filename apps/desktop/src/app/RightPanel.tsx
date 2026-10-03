@@ -23,7 +23,6 @@ export function RightPanel({ children }: RightPanelProps) {
     >
       <header className="panel-titlebar">
         <div>
-          <span className="panel-kicker">PANEL / RIGHT</span>
           <h2>检查器</h2>
         </div>
         <Button variant="icon" title="收起检查器" aria-label="收起检查器" onClick={() => setOpen(false)}>

@@ -1,5 +1,6 @@
 [package]
 name = "desktop-webgis"
+default-run = "desktop-webgis"
 version = "0.1.0"
 description = "Lightweight 2D desktop GIS workspace"
 authors = ["Desktop WebGIS"]

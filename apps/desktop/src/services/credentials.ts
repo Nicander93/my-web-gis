@@ -235,7 +235,7 @@ export async function hydrateCredentialsFromRefs(keys: Iterable<string>): Promis
 
 /** Collect credentialRef.key values from a project-like datasets list. */
 export function collectCredentialRefKeys(
-  datasets: ReadonlyArray<{ kind?: string; source?: { credentialRef?: { key?: string } } }>
+  datasets: ReadonlyArray<{ kind?: string; source?: { type?: string; credentialRef?: { key?: string } } }>
 ): string[] {
   const keys: string[] = []
   for (const ds of datasets) {

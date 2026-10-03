@@ -1,4 +1,5 @@
-import { createProject } from '@desktop-webgis/gis-core'
+import { createEditorProject } from '@/services/project-type'
+import type { ProjectType } from '@/services/project-type'
 import { emitCommandStatus } from './status'
 import { useSessionStore } from '@/stores/session.store'
 import { useProjectStore } from '@/stores/project.store'
@@ -28,6 +29,16 @@ export interface ExportDataCallback {
 
 let addDataCallback: AddDataCallback | null = null
 let exportDataCallback: ExportDataCallback | null = null
+let newProjectCallback: (() => void) | null = null
+let replacementGuard: (() => Promise<boolean>) | null = null
+
+export function registerProjectReplacementGuard(guard: (() => Promise<boolean>) | null): void {
+  replacementGuard = guard
+}
+
+export function registerNewProjectDialog(callback: (() => void) | null): void {
+  newProjectCallback = callback
+}
 
 export function registerAddDataCallback(callback: AddDataCallback): void {
   addDataCallback = callback
@@ -44,17 +55,23 @@ function bumpProjectGeneration(): void {
 
 export const projectCommands = {
   newProject(): void {
+    if (newProjectCallback) { newProjectCallback(); return }
+    projectCommands.createWorkspace('2d', '')
+  },
+
+  createWorkspace(type: ProjectType, name: string): void {
     bumpProjectGeneration()
     useProjectStore.getState().loadSnapshot({
-      project: createProject(),
+      project: createEditorProject(type, name),
       featuresByDataset: {}
     })
     setCurrentProjectPath(null)
-    emitCommandStatus('已新建项目')
+    emitCommandStatus(type === '3d' ? '已创建三维场景' : '已创建二维地图')
   },
 
   async openProject(): Promise<void> {
     try {
+      if (useProjectStore.getState().dirty && replacementGuard && !await replacementGuard()) return
       const opened = await openSnapshotFromDisk()
       if (!opened) {
         emitCommandStatus('已取消打开')

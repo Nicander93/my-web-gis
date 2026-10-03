@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import type { VectorDataset } from '@desktop-webgis/gis-core'
 import {
   _resetCredentialsForTests,
   _setSecureCredentialBackendForTests,
@@ -161,10 +162,16 @@ describe('secure credential persistence', () => {
   })
 
   it('collectCredentialRefKeys extracts keys from datasets', () => {
+    const localDataset: VectorDataset = {
+      id: 'local-points',
+      name: 'Points',
+      kind: 'vector',
+      source: { type: 'geojson-file', path: 'points.geojson' }
+    }
     expect(
       collectCredentialRefKeys([
         { kind: 'wms', source: { credentialRef: { key: 'a' } } },
-        { kind: 'vector', source: {} },
+        localDataset,
         { kind: 'wfs', source: { credentialRef: { key: 'b' } } }
       ])
     ).toEqual(['a', 'b'])

@@ -15,18 +15,14 @@ function olFeatureToGis(feature: Feature<Geometry>, importId?: string): GisFeatu
   const json = geoJson4326.writeFeatureObject(feature, {
     dataProjection: 'EPSG:4326',
     featureProjection: 'EPSG:4326'
-  }) as {
-    id?: string | number
-    geometry: GisFeature['geometry'] | null
-    properties?: Record<string, unknown>
-  }
-  if (!json.geometry) {
-    throw new Error('empty geometry')
+  })
+  if (!json.geometry || json.geometry.type === 'GeometryCollection') {
+    throw new Error('unsupported or empty geometry')
   }
   const sourceId = feature.getId() ?? json.id
   return {
     id: sourceId !== undefined && sourceId !== null ? String(sourceId) : createId('wfs'),
-    geometry: json.geometry,
+    geometry: json.geometry as GisFeature['geometry'],
     properties: { ...(json.properties ?? {}) },
     metadata: {
       sourceId: sourceId as string | number | undefined,

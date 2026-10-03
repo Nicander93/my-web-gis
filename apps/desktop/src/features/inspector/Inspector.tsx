@@ -31,8 +31,8 @@ export function Inspector() {
   const setTab = useSessionStore((state) => state.setInspectorTab)
 
   const layerId = selectedLayerId || 'no-layer'
-  const session = useSessionStore((state) => state.sessions[layerId] ?? {})
-  const tab: InspectorTab = session.inspector?.activeTab ?? 'layer'
+  const session = useSessionStore((state) => state.sessions[layerId])
+  const tab: InspectorTab = session?.inspector?.activeTab ?? 'layer'
 
   const selectedLayer = selectedLayerId
     ? project.layers.find((layer) => layer.id === selectedLayerId)
@@ -69,12 +69,6 @@ export function Inspector() {
 
   return (
     <div className="feature-panel inspector-content">
-      <div className="feature-heading">
-        <div>
-          <span className="eyebrow">INSPECTOR</span>
-          <h3>检查器</h3>
-        </div>
-      </div>
       <div className="segmented-tabs" role="tablist" aria-label="检查器标签">
         <Button
           variant={tab === 'layer' ? 'tab' : 'ghost'}
@@ -126,6 +120,23 @@ export function Inspector() {
                 <span>数据源</span>
                 <strong>{dataset?.kind ?? '—'}</strong>
               </div>
+              {dataset?.kind === 'vector' && dataset.processing && (
+                <details className="processing-provenance">
+                  <summary>处理来源</summary>
+                  <p>输入图层：{dataset.processing.sourceLayerName}</p>
+                  <p>工具：{{ buffer: '缓冲区', centroid: '顶点质心', envelope: '整体外包矩形', explode: '多部件拆分', clip: '面裁剪', intersect: '面相交', difference: '面差集', dissolve: '面融合', 'extract-location': '按位置提取' }[dataset.processing.options.tool]}</p>
+                  <p>范围：{{ all: '全部要素', filtered: '图层筛选结果', selected: '当前选中要素' }[dataset.processing.scope]}</p>
+                  {dataset.processing.options.tool === 'buffer' && <p>距离：{dataset.processing.options.distance} {dataset.processing.options.unit === 'meters' ? '米' : '千米'}</p>}
+                  <p>{dataset.processing.inputCount} 个输入 → {dataset.processing.outputCount} 个结果</p>
+                  {dataset.processing.options.tool === 'dissolve' && <p>分组：{dataset.processing.options.field || '不分组'}</p>}
+                  {dataset.processing.options.tool === 'extract-location' && <p>关系：{{ intersects: '相交（包括边界）', within: '完全位于其中', disjoint: '不相交' }[dataset.processing.options.predicate]}</p>}
+                  {dataset.processing.overlay && <>
+                    <p>第二输入：{dataset.processing.overlay.layerName}</p>
+                    <p>第二范围：{{ all: '全部要素', filtered: '图层筛选结果', selected: '当前选中要素' }[dataset.processing.overlay.scope]}（{dataset.processing.overlay.inputCount} 个要素）</p>
+                  </>}
+                  <p>完成时间：{new Date(dataset.processing.completedAt).toLocaleString()}</p>
+                </details>
+              )}
               {dataset?.kind === 'wms' ? (
                 <>
                   <div className="inspector-row">

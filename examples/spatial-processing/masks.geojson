@@ -1,0 +1,15 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature", "id": "mask-a",
+      "properties": { "name": "掩膜 A" },
+      "geometry": { "type": "Polygon", "coordinates": [[[116.41,39.91],[116.43,39.91],[116.43,39.93],[116.41,39.93],[116.41,39.91]]] }
+    },
+    {
+      "type": "Feature", "id": "mask-b",
+      "properties": { "name": "掩膜 B" },
+      "geometry": { "type": "Polygon", "coordinates": [[[116.42,39.91],[116.45,39.91],[116.45,39.93],[116.42,39.93],[116.42,39.91]]] }
+    }
+  ]
+}

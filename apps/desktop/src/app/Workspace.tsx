@@ -1,18 +1,22 @@
-import { Layers2, PanelBottom, PanelRight } from 'lucide-react'
-import { useEffect } from 'react'
+import { FolderPlus, Layers2, PanelBottom, PanelRight, Search } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { BottomPanel } from './BottomPanel'
 import { LeftPanel } from './LeftPanel'
 import { RightPanel } from './RightPanel'
 import { viewCommands } from './commands/view.commands'
+import { layerCommands } from './commands/layer.commands'
+import { useProjectStore } from '@/stores/project.store'
 import { AttributeTable } from '@/features/attribute-table/AttributeTable'
 import { Inspector } from '@/features/inspector/Inspector'
 import { LayerPanel } from '@/features/layers/LayerPanel'
 import { MapCanvas } from '@/features/map/MapCanvas'
 import { useWorkspaceStore } from '@/stores/workspace.store'
 
-/** Map-first Workspace，地图永远占满，三面板作为其上的辅助 overlay。 */
+/** Reserve visible map space for open panels so navigation stays reachable. */
 export function Workspace() {
+  const [layerSearchOpen, setLayerSearchOpen] = useState(false)
+  const layerSearchButtonRef = useRef<HTMLButtonElement>(null)
   const left = useWorkspaceStore((state) => state.left)
   const right = useWorkspaceStore((state) => state.right)
   const bottom = useWorkspaceStore((state) => state.bottom)
@@ -57,9 +61,23 @@ export function Workspace() {
 
   return (
     <main className="workspace" aria-label="GIS Workspace">
-      <MapCanvas />
-      <LeftPanel>
-        <LayerPanel />
+      <MapCanvas leftOffset={leftOffset} rightOffset={rightOffset} bottomOffset={bottom.open ? bottom.height : 0} />
+      <LeftPanel actions={
+        <>
+          <button ref={layerSearchButtonRef} type="button" className="ui-button ui-button-icon" title="搜索图层"
+            aria-label="搜索图层" aria-expanded={layerSearchOpen} onClick={() => setLayerSearchOpen((open) => !open)}>
+            <Search size={15} />
+          </button>
+          <Button variant="icon" title="新建组" aria-label="新建组" onClick={() => {
+            const selected = useProjectStore.getState().selectedLayerId
+            layerCommands.createGroup('新建组', selected ? [selected] : [])
+          }}><FolderPlus size={15} /></Button>
+        </>
+      }>
+        <LayerPanel searchOpen={layerSearchOpen} onCloseSearch={() => {
+          setLayerSearchOpen(false)
+          layerSearchButtonRef.current?.focus()
+        }} />
       </LeftPanel>
       {!left.open && (
         <Button

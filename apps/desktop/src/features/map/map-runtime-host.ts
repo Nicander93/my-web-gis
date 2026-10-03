@@ -5,6 +5,7 @@ import { transformExtent } from 'ol/proj'
 import { getSessionCredential } from '@/services/credentials'
 import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
+import { useSnappingStore } from '@/stores/snapping.store'
 
 let runtime: OlMapRuntime | null = null
 let selectionRuntime: OlSelectionRuntime | null = null
@@ -17,6 +18,7 @@ let lastSyncedProjectId: string | null = null
 let lastBasemapKey = ''
 let moveEndKey: (() => void) | null = null
 let storeUnsub: (() => void) | null = null
+let snappingUnsub: (() => void) | null = null
 /** Avoid echoing map?store?map selection sync loops. */
 let applyingStoreSelection = false
 
@@ -62,6 +64,10 @@ export function mountMapRuntime(target: HTMLElement, mapState: MapState): OlMapR
   runtime.mount(target, mapState)
   selectionRuntime = new OlSelectionRuntime(runtime)
   toolRuntime = new OlToolRuntime(runtime)
+  toolRuntime.setSnapping(useSnappingStore.getState().options, snapped => useSnappingStore.getState().setSnapped(snapped))
+  snappingUnsub = useSnappingStore.subscribe((state, previous) => {
+    if (state.options !== previous.options) toolRuntime?.setSnapping(state.options)
+  })
   mounted = true
   selectionMounted = true
   toolMounted = true
@@ -72,6 +78,7 @@ export function mountMapRuntime(target: HTMLElement, mapState: MapState): OlMapR
   const map = runtime.getMap()
   const onMoveEnd = (): void => {
     syncSessionViewExtent()
+    toolRuntime?.refreshSnapping()
   }
   map.on('moveend', onMoveEnd)
   moveEndKey = () => map.un('moveend', onMoveEnd)
@@ -100,6 +107,8 @@ export function mountMapRuntime(target: HTMLElement, mapState: MapState): OlMapR
 }
 
 export function unmountMapRuntime(): void {
+  snappingUnsub?.()
+  snappingUnsub = null
   storeUnsub?.()
   storeUnsub = null
   moveEndKey?.()
@@ -141,6 +150,7 @@ export function syncMapFromProject(): void {
   }
 
   runtime.syncLayers(state.getMapLayers(), featuresByDataset, project.datasets)
+  toolRuntime?.refreshSnapping()
   syncSessionViewExtent()
   syncSelectionHighlight(state.selection)
 }
@@ -331,6 +341,8 @@ export function _setMapRuntimeForTests(
   isMounted = Boolean(next),
   options?: { selection?: boolean; tool?: boolean; activeTool?: EditTool }
 ): void {
+  snappingUnsub?.()
+  snappingUnsub = null
   storeUnsub?.()
   storeUnsub = null
   moveEndKey?.()
@@ -357,6 +369,7 @@ export function _setMapRuntimeForTests(
     } as unknown as OlSelectionRuntime
     toolRuntime = {
       activate: () => undefined,
+      refreshSnapping: () => undefined,
       deactivate: () => undefined
     } as unknown as OlToolRuntime
   }

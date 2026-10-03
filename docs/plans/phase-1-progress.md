@@ -1,5 +1,9 @@
 # Phase-1 执行进度记录
 
+## 2026-09-30 继续执行：P21 启动前置修复
+
+基于最新 `main@4311b46c3bcb7330e99357dda0ceaf3da6736eac`，修复实际浏览器启动时 Inspector 的 Zustand 更新循环和凭据引用收集函数的 Desktop 编译错误。Desktop 测试 89 通过、5 跳过，构建通过；浏览器正常显示工作区，检查器收起/恢复通过。P21 仍受阻，原生文件对话框无法由当前浏览器工具完成，E/L 完整交互未通过。证据见 [p21-startup-recovery-evidence.md](p21-startup-recovery-evidence.md)。
+
 本文件记录第一阶段各任务的实际执行情况、验证结果和交接信息。
 
 ---

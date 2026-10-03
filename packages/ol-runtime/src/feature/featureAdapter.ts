@@ -30,10 +30,9 @@ export function fromOlFeature(feature: Feature<Geometry>): GisFeature {
   const json = geoJsonFormat.writeFeatureObject(feature, {
     dataProjection: 'EPSG:4326',
     featureProjection: 'EPSG:3857'
-  }) as {
-    id?: string | number
-    geometry: GisFeature['geometry']
-    properties?: Record<string, unknown>
+  })
+  if (!json.geometry || json.geometry.type === 'GeometryCollection') {
+    throw new Error('Unsupported or empty geometry')
   }
 
   const properties = { ...(json.properties ?? {}) }
@@ -41,7 +40,7 @@ export function fromOlFeature(feature: Feature<Geometry>): GisFeature {
 
   return {
     id: String(feature.getId() ?? feature.get('domainFeatureId') ?? json.id),
-    geometry: json.geometry,
+    geometry: json.geometry as GisFeature['geometry'],
     properties
   }
 }

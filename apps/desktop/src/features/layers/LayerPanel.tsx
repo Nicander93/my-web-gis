@@ -4,14 +4,16 @@ import {
   Eye,
   EyeOff,
   Folder,
-  FolderPlus,
   GripVertical,
-  Layers3,
   Loader2,
   MoreHorizontal,
-  Search
+  Search,
+  X,
+  ArrowUp,
+  ArrowDown,
+  Trash2
 } from 'lucide-react'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/Button'
 import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
@@ -26,6 +28,8 @@ import {
 } from '@desktop-webgis/gis-core'
 import { colorToString, symbolPrimaryColor, type LayerStyle, type Symbol } from '@desktop-webgis/ol-style'
 import { LayerContextMenu } from './LayerContextMenu'
+import { LayerPopupMenu } from './LayerPopupMenu'
+import { MenuItem } from '@/app/header/menus/MenuItem'
 import { layerCommands } from '@/app/commands/layer.commands'
 
 function previewFromSymbol(symbol: Symbol): { kind: 'point' | 'line' | 'polygon'; color: string } {
@@ -64,8 +68,14 @@ interface MenuState {
   y: number
 }
 
-export function LayerPanel() {
+interface LayerPanelProps {
+  searchOpen: boolean
+  onCloseSearch(): void
+}
+
+export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
   const [query, setQuery] = useState('')
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const project = useProjectStore((state) => state.project)
   const selectedLayerId = useProjectStore((state) => state.selectedLayerId)
   const selection = useProjectStore((state) => state.selection)
@@ -73,13 +83,13 @@ export function LayerPanel() {
   const setLayerVisible = useProjectStore((state) => state.setLayerVisible)
   const setGroupVisible = useProjectStore((state) => state.setGroupVisible)
   const renameLayer = useProjectStore((state) => state.renameLayer)
-  const createGroup = useProjectStore((state) => state.createGroup)
   const removeGroup = useProjectStore((state) => state.removeGroup)
   const relocateLayer = useProjectStore((state) => state.relocateLayer)
   const moveRootEntry = useProjectStore((state) => state.moveRootEntry)
   const sessions = useSessionStore((state) => state.sessions)
 
   const [menu, setMenu] = useState<MenuState | null>(null)
+  const [groupMenu, setGroupMenu] = useState<{ group: LayerGroup; x: number; y: number } | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
@@ -99,7 +109,18 @@ export function LayerPanel() {
 
   const q = query.trim()
 
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus()
+    else setQuery('')
+  }, [searchOpen])
+
+  function closeSearch(): void {
+    setQuery('')
+    onCloseSearch()
+  }
+
   function openMenuFor(layerId: string, clientX: number, clientY: number): void {
+    setGroupMenu(null)
     setSelectedLayer(layerId)
     setMenu({ layerId, x: clientX, y: clientY })
   }
@@ -264,6 +285,11 @@ export function LayerPanel() {
       <div key={group.id} className="layer-group">
         <div
           className="layer-group-header"
+          onContextMenu={(event) => {
+            event.preventDefault()
+            setMenu(null)
+            setGroupMenu({ group, x: event.clientX, y: event.clientY })
+          }}
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => {
             event.preventDefault()
@@ -294,27 +320,16 @@ export function LayerPanel() {
           <span className="layer-group-count">{group.layerIds.length}</span>
           <Button
             variant="icon"
-            title="上移组"
-            aria-label="上移组"
-            onClick={() => moveRootEntry({ type: 'group', id: group.id }, 'up')}
+            title="组操作"
+            aria-label={`组操作：${group.name}`}
+            aria-haspopup="menu"
+            onClick={(event) => {
+              const rect = event.currentTarget.getBoundingClientRect()
+              setMenu(null)
+              setGroupMenu({ group, x: rect.left, y: rect.bottom + 4 })
+            }}
           >
-            ↑
-          </Button>
-          <Button
-            variant="icon"
-            title="下移组"
-            aria-label="下移组"
-            onClick={() => moveRootEntry({ type: 'group', id: group.id }, 'down')}
-          >
-            ↓
-          </Button>
-          <Button
-            variant="icon"
-            title="删除组"
-            aria-label="删除组"
-            onClick={() => handleRemoveGroup(group)}
-          >
-            ×
+            <MoreHorizontal size={14} />
           </Button>
         </div>
         {!collapsed &&
@@ -339,54 +354,17 @@ export function LayerPanel() {
 
   return (
     <div className="feature-panel layer-manager">
-      <div className="feature-heading">
-        <div>
-          <span className="eyebrow">LAYER MANAGER</span>
-          <h3>图层</h3>
-        </div>
-        <div className="layer-heading-actions">
-          <Button
-            variant="icon"
-            title="新建组"
-            aria-label="新建组"
-            onClick={() => {
-              const selected = selectedLayerId ? [selectedLayerId] : []
-              createGroup('新建组', selected)
-            }}
-          >
-            <FolderPlus size={15} />
-          </Button>
-          <Button
-            variant="icon"
-            title="上移"
-            aria-label="上移图层"
-            disabled={!selectedLayerId}
-            onClick={() => selectedLayerId && layerCommands.moveUp(selectedLayerId)}
-          >
-            ↑
-          </Button>
-          <Button
-            variant="icon"
-            title="下移"
-            aria-label="下移图层"
-            disabled={!selectedLayerId}
-            onClick={() => selectedLayerId && layerCommands.moveDown(selectedLayerId)}
-          >
-            ↓
-          </Button>
-          <Button variant="icon" title="图层选项" aria-label="图层选项">
-            <Layers3 size={15} />
-          </Button>
-        </div>
-      </div>
-      <label className="search-field">
-        <Search size={14} />
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="搜索图层"
-        />
-      </label>
+          {searchOpen && (
+            <label className="search-field layer-search">
+              <Search size={14} />
+              <input ref={searchInputRef} value={query} onChange={(event) => setQuery(event.target.value)}
+                placeholder="搜索图层" aria-label="搜索图层"
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') { event.preventDefault(); closeSearch() }
+                }} />
+              <Button variant="icon" title="关闭搜索" aria-label="关闭搜索" onClick={closeSearch}><X size={14} /></Button>
+            </label>
+          )}
       <div
         className="layer-tree"
         onDragOver={(event) => event.preventDefault()}
@@ -395,10 +373,6 @@ export function LayerPanel() {
           onDropLayer({ kind: 'root', index: rootOrder.length })
         }}
       >
-        <div className="tree-root">
-          <Folder size={14} />
-          <span>工作空间</span>
-        </div>
         {rootOrder.map((entry, index) => renderRootEntry(entry, index))}
         {tree.layers.length === 0 && <p className="empty-state">没有图层，请通过&quot;添加数据&quot;导入</p>}
         {tree.layers.length > 0 && filteredEmpty && <p className="empty-state">没有匹配的图层</p>}
@@ -411,6 +385,19 @@ export function LayerPanel() {
           onClose={() => setMenu(null)}
           onRequestRename={beginRename}
         />
+      ) : null}
+      {groupMenu ? (
+        <LayerPopupMenu x={groupMenu.x} y={groupMenu.y} label="组菜单" onClose={() => setGroupMenu(null)}>
+          <MenuItem icon={ArrowUp} label="上移组" onClick={() => {
+            moveRootEntry({ type: 'group', id: groupMenu.group.id }, 'up'); setGroupMenu(null)
+          }} />
+          <MenuItem icon={ArrowDown} label="下移组" onClick={() => {
+            moveRootEntry({ type: 'group', id: groupMenu.group.id }, 'down'); setGroupMenu(null)
+          }} />
+          <MenuItem icon={Trash2} label="删除组" onClick={() => {
+            handleRemoveGroup(groupMenu.group); setGroupMenu(null)
+          }} />
+        </LayerPopupMenu>
       ) : null}
     </div>
   )

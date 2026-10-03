@@ -1,0 +1,8 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    { "type": "Feature", "id": "inside", "properties": { "name": "重叠范围内" }, "geometry": { "type": "Point", "coordinates": [116.425, 39.92] } },
+    { "type": "Feature", "id": "boundary", "properties": { "name": "合并范围边界" }, "geometry": { "type": "Point", "coordinates": [116.41, 39.92] } },
+    { "type": "Feature", "id": "outside", "properties": { "name": "范围外" }, "geometry": { "type": "Point", "coordinates": [116.46, 39.92] } }
+  ]
+}

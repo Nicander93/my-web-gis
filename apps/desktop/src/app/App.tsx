@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Header } from './Header'
 import { StatusBar } from './StatusBar'
 import { Workspace } from './Workspace'
@@ -6,6 +6,9 @@ import { AddDataDialog } from '@/features/add-data/AddDataDialog'
 import { ExportDialog } from '@/features/export/ExportDialog'
 import {
   registerAddDataCallback,
+  registerNewProjectDialog,
+  registerProjectReplacementGuard,
+  projectCommands,
   registerExportDataCallback,
   type ExportDialogMode
 } from './commands/project.commands'
@@ -16,15 +19,27 @@ import type { ServiceLayerAddRequest } from '@/features/add-data/ServiceConnectP
 import { startWfsBoundedLoad } from '@/services/wfs-commands'
 import { useSessionStore } from '@/stores/session.store'
 import { emitCommandStatus } from './commands/status'
-import '@/features/city/city.css'
+import '@/styles/editor.css'
+import { ProcessingDialog } from '@/features/processing/ProcessingDialog'
+import { registerProcessingDialog } from './commands/processing.commands'
+import { NewProjectDialog } from '@/features/project/NewProjectDialog'
+import { getProjectType } from '@/services/project-type'
+import { ProjectStartScreen } from '@/features/project/ProjectStartScreen'
+import { UnsavedProjectDialog } from '@/features/project/UnsavedProjectDialog'
 
 const CityWorkspace = lazy(() => import('@/features/city/CityWorkspace').then(module => ({ default: module.CityWorkspace })))
 
 export default function App() {
-  const [sceneMode, setSceneMode] = useState<'2d' | '3d'>(() => new URLSearchParams(window.location.search).get('view') === '3d' ? '3d' : '2d')
+  const project = useProjectStore(state => state.project)
+  const sceneMode = getProjectType(project)
+  const hasProject = Boolean(project.settings?.workspaceType || project.city || project.layers.length || project.name !== 'Untitled Project')
+  const [newProjectOpen, setNewProjectOpen] = useState(false)
+  const [replacementOpen, setReplacementOpen] = useState(false)
+  const replacementResolve = useRef<((allow: boolean) => void) | null>(null)
   const [status, setStatus] = useState('就绪')
   const [addDataOpen, setAddDataOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
+  const [processingOpen, setProcessingOpen] = useState(false)
   const [exportLayerId, setExportLayerId] = useState<string | null>(null)
   const [exportMode, setExportMode] = useState<ExportDialogMode>('export')
   const addLayer = useProjectStore((state) => state.addLayer)
@@ -38,6 +53,9 @@ export default function App() {
     }
 
     window.addEventListener('desktop-webgis:command-status', handleCommandStatus)
+    registerProcessingDialog(() => setProcessingOpen(true))
+    registerNewProjectDialog(() => setNewProjectOpen(true))
+    registerProjectReplacementGuard(() => new Promise<boolean>(resolve => { replacementResolve.current = resolve; setReplacementOpen(true) }))
 
     registerAddDataCallback({
       openDialog: () => setAddDataOpen(true)
@@ -51,7 +69,25 @@ export default function App() {
       }
     })
 
-    return () => window.removeEventListener('desktop-webgis:command-status', handleCommandStatus)
+    return () => {
+      window.removeEventListener('desktop-webgis:command-status', handleCommandStatus)
+      registerProcessingDialog(null)
+      registerNewProjectDialog(null)
+      registerProjectReplacementGuard(null)
+      replacementResolve.current?.(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    function shortcut(event: KeyboardEvent): void {
+      if (!(event.ctrlKey || event.metaKey) || event.target instanceof HTMLElement && event.target.closest('[role="dialog"]')) return
+      if (event.key.toLowerCase() === 'n') { event.preventDefault(); setNewProjectOpen(true) }
+      else if (event.key.toLowerCase() === 's') { event.preventDefault(); void (event.shiftKey ? projectCommands.saveProjectAs() : projectCommands.saveProject()) }
+      else if (event.key.toLowerCase() === 'o') { event.preventDefault(); void projectCommands.openProject() }
+    }
+    function guard(event: BeforeUnloadEvent): void { if (useProjectStore.getState().dirty) { event.preventDefault(); event.returnValue = '' } }
+    window.addEventListener('keydown', shortcut); window.addEventListener('beforeunload', guard)
+    return () => { window.removeEventListener('keydown', shortcut); window.removeEventListener('beforeunload', guard) }
   }, [])
 
   function handleImport(result: ImportResult): void {
@@ -101,13 +137,12 @@ export default function App() {
 
   return (
     <div className={`desktop-app${sceneMode === '3d' ? ' desktop-app--city' : ''}`}>
-      <Header />
-      <nav className="scene-mode" aria-label="场景模式">
-        <button aria-pressed={sceneMode === '2d'} onClick={() => setSceneMode('2d')}>二维地图</button>
-        <button aria-pressed={sceneMode === '3d'} onClick={() => setSceneMode('3d')}>城市三维</button>
-      </nav>
-      {sceneMode === '2d' ? <Workspace /> : <Suspense fallback={<p role="status">正在加载三维组件…</p>}><CityWorkspace /></Suspense>}
-      {sceneMode === '2d' ? <StatusBar message={status} /> : <footer className="city-footer">城市三维 · WGS84 经纬度 / 椭球高度 · 工程共用保存与撤销历史</footer>}
+      <Header showToolbar={hasProject} />
+      {!hasProject ? <ProjectStartScreen /> : sceneMode === '2d' ? <Workspace key={project.id} /> : <Suspense fallback={<p role="status">正在加载三维组件…</p>}><CityWorkspace key={project.id} /></Suspense>}
+      {hasProject && sceneMode === '2d' && <StatusBar message={status} />}
+      {newProjectOpen && <NewProjectDialog onClose={() => setNewProjectOpen(false)} />}
+      {replacementOpen && <UnsavedProjectDialog onResolve={allow => { setReplacementOpen(false); replacementResolve.current?.(allow); replacementResolve.current = null }} />}
+      {processingOpen && <ProcessingDialog onClose={() => setProcessingOpen(false)} />}
       <AddDataDialog
         open={addDataOpen}
         onClose={() => setAddDataOpen(false)}

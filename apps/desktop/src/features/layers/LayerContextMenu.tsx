@@ -8,9 +8,11 @@ import {
   Table2,
   Trash2,
   Type,
-  RefreshCw
+  RefreshCw,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { LayerPopupMenu } from './LayerPopupMenu'
 import { MenuItem } from '@/app/header/menus/MenuItem'
 import { MenuSeparator } from '@/app/header/menus/MenuSeparator'
 import { getLayerCapabilities, layerCommands } from '@/app/commands/layer.commands'
@@ -31,45 +33,15 @@ export function LayerContextMenu({
   onClose,
   onRequestRename
 }: LayerContextMenuProps) {
-  const ref = useRef<HTMLDivElement>(null)
   const caps = getLayerCapabilities(layerId)
-
-  useEffect(() => {
-    function handlePointer(event: MouseEvent) {
-      if (ref.current && !ref.current.contains(event.target as Node)) {
-        onClose()
-      }
-    }
-    function handleKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose()
-    }
-    document.addEventListener('mousedown', handlePointer)
-    document.addEventListener('keydown', handleKey)
-    return () => {
-      document.removeEventListener('mousedown', handlePointer)
-      document.removeEventListener('keydown', handleKey)
-    }
-  }, [onClose])
 
   function run(action: () => void): void {
     action()
     onClose()
   }
 
-  const style = {
-    top: Math.min(y, typeof window !== 'undefined' ? window.innerHeight - 320 : y),
-    left: Math.min(x, typeof window !== 'undefined' ? window.innerWidth - 220 : x)
-  }
-
   return (
-    <div
-      ref={ref}
-      className="layer-context-menu menu-dropdown"
-      style={style}
-      role="menu"
-      aria-label="图层菜单"
-    >
-      <div className="menu-content">
+    <LayerPopupMenu x={x} y={y} label="图层菜单" onClose={onClose}>
         <MenuItem
           icon={MapPinned}
           label="定位"
@@ -127,13 +99,15 @@ export function LayerContextMenu({
           onClick={() => run(() => onRequestRename(layerId))}
         />
         <MenuSeparator />
+        <MenuItem icon={ArrowUp} label="上移图层" onClick={() => run(() => layerCommands.moveUp(layerId))} />
+        <MenuItem icon={ArrowDown} label="下移图层" onClick={() => run(() => layerCommands.moveDown(layerId))} />
+        <MenuSeparator />
         <MenuItem
           icon={Trash2}
           label="移除"
           disabled={!caps.canRemove}
           onClick={() => run(() => layerCommands.remove(layerId))}
         />
-      </div>
-    </div>
+    </LayerPopupMenu>
   )
 }

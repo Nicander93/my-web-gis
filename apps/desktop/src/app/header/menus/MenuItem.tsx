@@ -13,6 +13,7 @@ export function MenuItem({ icon: Icon, label, shortcut, disabled, onClick }: Men
     <button
       className="menu-item"
       type="button"
+      role="menuitem"
       disabled={disabled}
       onClick={onClick}
     >

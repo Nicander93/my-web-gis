@@ -35,7 +35,6 @@ export function BottomPanel({ leftOffset, rightOffset, children }: BottomPanelPr
       />
       <header className="panel-titlebar">
         <div>
-          <span className="panel-kicker">PANEL / BOTTOM</span>
           <h2>属性表</h2>
         </div>
         <Button variant="icon" title="收起属性表" aria-label="收起属性表" onClick={() => setOpen(false)}>

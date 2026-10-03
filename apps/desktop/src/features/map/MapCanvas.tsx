@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Minus, Plus } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
-import { mapCommands } from '@/app/commands/map.commands'
 import { useProjectStore } from '@/stores/project.store'
+import { useSnappingStore } from '@/stores/snapping.store'
 import {
   getActiveEditTool,
   isSelectionRuntimeMounted,
@@ -35,9 +33,15 @@ function toolHint(tool: string): string {
 }
 
 /** Workspace map surface: mounts OlMapRuntime + selection/tool runtimes and keeps project layers in sync. */
-export function MapCanvas() {
+export function MapCanvas({ leftOffset = 0, rightOffset = 0, bottomOffset = 0 }: {
+  leftOffset?: number
+  rightOffset?: number
+  bottomOffset?: number
+}) {
   const viewportRef = useRef<HTMLDivElement>(null)
-  const [readout, setReadout] = useState('0.0000, 0.0000  ·  1:0')
+  const snapped = useSnappingStore(s => s.snapped)
+  const snappingEnabled = useSnappingStore(s => s.options.enabled)
+  const [readout, setReadout] = useState('')
   const [runtimeMounted, setRuntimeMounted] = useState(false)
   const [selectionMounted, setSelectionMounted] = useState(false)
   const [toolMounted, setToolMounted] = useState(false)
@@ -51,7 +55,7 @@ export function MapCanvas() {
     const runtime = mountMapRuntime(target, mapState)
     runtime.onPointerMove((info) => {
       const [x, y] = info.coordinate
-      setReadout(`${x.toFixed(4)}, ${y.toFixed(4)}  ·  ${info.scaleText}`)
+      setReadout(`${x.toFixed(2)}, ${y.toFixed(2)}  ·  ${info.scaleText}`)
     })
     syncMapFromProject()
     setRuntimeMounted(true)
@@ -100,6 +104,7 @@ export function MapCanvas() {
   return (
     <section
       className="map-canvas"
+      style={{ left: leftOffset, right: rightOffset, bottom: bottomOffset }}
       aria-label="地图工作区"
       data-map-runtime={runtimeMounted ? 'mounted' : 'pending'}
       data-selection-runtime={selectionMounted ? 'mounted' : 'pending'}
@@ -110,16 +115,10 @@ export function MapCanvas() {
         className="map-canvas__viewport"
         data-testid="map-runtime-viewport"
       />
-      <div className="map-controls" aria-label="地图导航">
-        <Button variant="icon" title="放大" aria-label="放大" onClick={mapCommands.zoomIn}>
-          <Plus size={15} />
-        </Button>
-        <Button variant="icon" title="缩小" aria-label="缩小" onClick={mapCommands.zoomOut}>
-          <Minus size={15} />
-        </Button>
-      </div>
-      <div className="map-readout">{readout}</div>
-      <div className="map-tool-hint">{hint}</div>
+      {readout && <div className="map-readout">{readout}</div>}
+      {!hint.startsWith('选择工具') && !hint.startsWith('平移工具') && hint !== '地图工具' && (
+        <div className="map-tool-hint">{hint}{(hint.startsWith('绘制') || hint.startsWith('修改')) && <span> · {snapped ? '已捕捉' : snappingEnabled ? '捕捉开启' : '捕捉关闭'}</span>}</div>
+      )}
     </section>
   )
 }

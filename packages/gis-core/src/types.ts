@@ -1,3 +1,5 @@
+import type { ProcessingRecord } from './processing'
+
 export type Position = [number, number] | [number, number, number]
 
 export interface PointGeometry {
@@ -44,6 +46,7 @@ export interface GisFeature {
   properties: Record<string, unknown>
   metadata?: {
     sourceId?: string | number
+    overlaySourceId?: string
     sourceCrs?: string
     importId?: string
   }
@@ -184,6 +187,7 @@ export type VectorDataset = {
   name: string
   kind: 'vector'
   source: LocalVectorSource
+  processing?: ProcessingRecord
 }
 
 export type WmsDataset = {

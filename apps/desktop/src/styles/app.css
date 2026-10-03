@@ -255,6 +255,10 @@ button:disabled {
 .menu-trigger:focus-visible,
 .menu-item:focus-visible,
 .toolbar-button:focus-visible,
+.button-primary:focus-visible,
+.button-secondary:focus-visible,
+.dialog-tab:focus-visible,
+.dialog-close:focus-visible,
 .layer-name-button:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 1px;
@@ -267,8 +271,13 @@ button:disabled {
 }
 
 .ui-button-primary {
-  color: #fff;
+  color: var(--color-text-inverse);
   background: var(--color-accent);
+}
+
+.ui-button-primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  border-color: transparent;
 }
 
 .ui-button-tab {
@@ -396,7 +405,7 @@ button:disabled {
 }
 
 .map-tool-hint {
-  bottom: 14px;
+  bottom: 44px;
   left: 14px;
 }
 
@@ -441,7 +450,7 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex: 0 0 45px;
+  flex: 0 0 36px;
   padding: 5px 9px 5px 13px;
   border-bottom: 1px solid var(--color-border);
 }
@@ -955,10 +964,11 @@ button:disabled {
 }
 
 .button-primary:hover:not(:disabled) {
-  background: #3e5946;
+  background: var(--color-accent-hover);
 }
 
 .button-primary:disabled {
+  color: var(--color-text-inverse);
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -1158,7 +1168,7 @@ button:disabled {
 
 .crs-select:focus {
   outline: none;
-  border-color: var(--color-primary);
+  border-color: var(--color-accent);
 }
 
 .crs-note {
@@ -1193,7 +1203,7 @@ button:disabled {
 }
 
 .selector-icon {
-  color: var(--color-primary);
+  color: var(--color-accent);
 }
 
 .selector-hint {
@@ -1210,7 +1220,7 @@ button:disabled {
 
 .button-link {
   padding: 0;
-  color: var(--color-primary);
+  color: var(--color-accent);
   background: transparent;
   border: none;
   font-size: 12px;
@@ -1309,7 +1319,7 @@ button:disabled {
 
 .csv-config-row select:focus {
   outline: none;
-  border-color: var(--color-primary);
+  border-color: var(--color-accent);
 }
 
 .csv-config-note {
@@ -1855,16 +1865,50 @@ button:disabled {
 }
 
 /* P14 — layer context menu, groups, visual states */
-.layer-heading-actions {
+.panel-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.layer-search {
+  min-width: 0;
+  margin-bottom: 10px;
+}
+
+.layer-search input {
+  min-width: 0;
+}
+
+.layer-search .ui-button {
+  flex-shrink: 0;
+  width: 22px;
+  min-height: 22px;
+}
+
+.layer-manager .layer-tree {
+  margin-top: 0;
+  min-height: 80px;
+}
+
+.map-canvas .ol-zoom {
+  top: 12px;
+  right: 12px;
+  left: auto;
+}
+
+.map-canvas .ol-scale-line {
+  bottom: 12px;
+  left: 12px;
 }
 
 .layer-context-menu {
   position: fixed;
   z-index: 1200;
   min-width: 180px;
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
   background: var(--color-panel);
   border: 1px solid var(--color-border);
   border-radius: 6px;
@@ -2116,3 +2160,69 @@ button:disabled {
 .service-wfs-options .service-field input[type='number'] {
   width: 120px;
 }
+.dialog-content.processing-dialog {
+  width: 680px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+}
+
+.processing-content {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.processing-tools {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 16px 12px;
+  border-right: 1px solid var(--color-border);
+}
+
+.processing-tools button {
+  text-align: left;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 4px;
+}
+
+.processing-tools button[aria-pressed="true"] {
+  background: var(--color-accent);
+  color: var(--color-text-inverse);
+}
+
+.processing-form { padding: 20px; }
+.processing-form h3 { margin: 0 0 8px; font-size: 16px; }
+.processing-form label { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; font-size: 13px; }
+.processing-form input, .processing-form select {
+  width: 100%; min-width: 0; min-height: 34px; padding: 6px 8px;
+  border: 1px solid var(--color-border); border-radius: 4px;
+  color: var(--color-text-primary); background: var(--color-panel); font: inherit;
+}
+.processing-description { color: var(--color-text-secondary); font-size: 12px; line-height: 1.6; margin: 8px 0; }
+.processing-overlay-input { border: 0; border-top: 1px solid var(--color-border); padding: 8px 0 0; margin: 18px 0 0; min-width: 0; }
+.processing-overlay-input legend { font-size: 12px; color: var(--color-text-secondary); padding-right: 8px; }
+.processing-distance { display: grid; grid-template-columns: minmax(0, 1fr) 100px; gap: 12px; }
+.processing-result { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--color-border); }
+.processing-result p { font-size: 13px; overflow-wrap: anywhere; }
+.processing-provenance { font-size: 12px; margin-top: 12px; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.processing-provenance summary { cursor: pointer; color: var(--color-text-primary); }
+.processing-dialog .dialog-header, .processing-dialog .dialog-footer { flex-shrink: 0; }
+
+@media (max-width: 540px) {
+  .processing-content { grid-template-columns: 1fr; }
+  .processing-tools { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--color-border); }
+}
+.snapping-control { display: flex; align-items: center; }
+.snapping-settings { position: relative; }
+.snapping-settings > summary { display: flex; align-items: center; justify-content: center; width: 22px; height: 32px; cursor: pointer; list-style: none; }
+.snapping-settings > summary::-webkit-details-marker { display: none; }
+.snapping-settings__panel { position: absolute; z-index: 100; top: 36px; right: 0; width: 260px; max-width: calc(100vw - 24px); padding: 14px; background: var(--color-surface); color: var(--color-text-primary); border: 1px solid var(--color-border); border-radius: 6px; box-shadow: 0 4px 16px #0002; display: grid; gap: 10px; }
+.snapping-settings__panel label { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.snapping-settings__panel select, .snapping-settings__panel input[type="number"] { width: 100%; padding: 6px; color: inherit; background: inherit; border: 1px solid var(--color-border); border-radius: 4px; }
+.snapping-settings__panel p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--color-text-secondary); }

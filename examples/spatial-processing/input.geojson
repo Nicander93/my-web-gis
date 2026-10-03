@@ -1,0 +1,15 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature", "id": "area-a",
+      "properties": { "name": "区域 A", "category": "同组", "value": 10 },
+      "geometry": { "type": "Polygon", "coordinates": [[[116.4,39.9],[116.44,39.9],[116.44,39.94],[116.4,39.94],[116.4,39.9]]] }
+    },
+    {
+      "type": "Feature", "id": "area-b",
+      "properties": { "name": "区域 B", "category": "同组", "value": 20 },
+      "geometry": { "type": "Polygon", "coordinates": [[[116.43,39.9],[116.46,39.9],[116.46,39.94],[116.43,39.94],[116.43,39.9]]] }
+    }
+  ]
+}
