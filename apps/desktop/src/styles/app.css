@@ -2226,3 +2226,5 @@ button:disabled {
 .snapping-settings__panel label { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
 .snapping-settings__panel select, .snapping-settings__panel input[type="number"] { width: 100%; padding: 6px; color: inherit; background: inherit; border: 1px solid var(--color-border); border-radius: 4px; }
 .snapping-settings__panel p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--color-text-secondary); }
+.processing-form fieldset label:has(input[type="checkbox"]) { flex-direction: row; align-items: center; }
+.processing-form input[type="checkbox"] { width: 16px; min-height: 16px; padding: 0; }

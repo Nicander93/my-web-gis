@@ -2,24 +2,13 @@ import { useEffect } from 'react'
 import { Button } from '@/components/ui/Button'
 import { useSessionStore } from '@/stores/session.store'
 import { useProjectStore } from '@/stores/project.store'
-import { capabilitiesForDataset, isLegacyStyle } from '@desktop-webgis/gis-core'
+import { capabilitiesForDataset } from '@desktop-webgis/gis-core'
 import { StylePanel } from './StylePanel'
 import { LabelPanel } from './LabelPanel'
 import { Legend } from './Legend'
 import { getLayerCapabilities } from '@/app/commands/layer.commands'
 
 type InspectorTab = 'layer' | 'feature' | 'style' | 'label'
-
-function getGeometryTypeName(style: unknown): string {
-  if (isLegacyStyle(style as never)) {
-    const legacy = style as { kind: string }
-    if (legacy.kind === 'point') return 'Point'
-    if (legacy.kind === 'line') return 'LineString'
-    if (legacy.kind === 'polygon') return 'Polygon'
-    return 'Mixed'
-  }
-  return 'Mixed'
-}
 
 export function Inspector() {
   const selectedLayerId = useProjectStore((state) => state.selectedLayerId)
@@ -46,7 +35,8 @@ export function Inspector() {
     ? (featuresByDataset[selectedLayer.datasetId]?.length ?? 0)
     : 0
 
-  const geometryType = selectedLayer ? getGeometryTypeName(selectedLayer.style) : 'Mixed'
+  const geometryTypes = new Set(selectedLayer ? (featuresByDataset[selectedLayer.datasetId] ?? []).map(feature => feature.geometry.type) : [])
+  const geometryType = geometryTypes.size === 1 ? [...geometryTypes][0] : geometryTypes.size > 1 ? 'Mixed' : '—'
   const flags = capabilitiesForDataset(dataset)
 
   useEffect(() => {
@@ -124,12 +114,15 @@ export function Inspector() {
                 <details className="processing-provenance">
                   <summary>处理来源</summary>
                   <p>输入图层：{dataset.processing.sourceLayerName}</p>
-                  <p>工具：{{ buffer: '缓冲区', centroid: '顶点质心', envelope: '整体外包矩形', explode: '多部件拆分', clip: '面裁剪', intersect: '面相交', difference: '面差集', dissolve: '面融合', 'extract-location': '按位置提取' }[dataset.processing.options.tool]}</p>
+                  <p>工具：{{ buffer: '缓冲区', centroid: '顶点质心', envelope: '整体外包矩形', explode: '多部件拆分', clip: '面裁剪', intersect: '面相交', difference: '面差集', dissolve: '面融合', 'extract-location': '按位置提取', 'summarize-location': '按区域统计', 'attribute-join': '属性连接', 'spatial-join': '空间连接' }[dataset.processing.options.tool]}</p>
                   <p>范围：{{ all: '全部要素', filtered: '图层筛选结果', selected: '当前选中要素' }[dataset.processing.scope]}</p>
                   {dataset.processing.options.tool === 'buffer' && <p>距离：{dataset.processing.options.distance} {dataset.processing.options.unit === 'meters' ? '米' : '千米'}</p>}
                   <p>{dataset.processing.inputCount} 个输入 → {dataset.processing.outputCount} 个结果</p>
                   {dataset.processing.options.tool === 'dissolve' && <p>分组：{dataset.processing.options.field || '不分组'}</p>}
                   {dataset.processing.options.tool === 'extract-location' && <p>关系：{{ intersects: '相交（包括边界）', within: '完全位于其中', disjoint: '不相交' }[dataset.processing.options.predicate]}</p>}
+                  {dataset.processing.options.tool === 'summarize-location' && <p>统计：{dataset.processing.options.predicate === 'within' ? '完全位于区域内' : '相交（含边界）'}；{dataset.processing.options.field || '仅数量'}；前缀 {dataset.processing.options.prefix || '无'}</p>}
+                  {dataset.processing.options.tool === 'attribute-join' && <p>连接：{dataset.processing.options.inputKey} → {dataset.processing.options.joinKey}；{dataset.processing.options.mode === 'left' ? '保留全部输入' : '仅匹配输入'}；带入 {dataset.processing.options.fields.join('、')}；前缀 {dataset.processing.options.prefix || '无'}</p>}
+                  {dataset.processing.options.tool === 'spatial-join' && <p>空间连接：{dataset.processing.options.predicate === 'within' ? '完整位于其中' : '相交（含边界）'}；{dataset.processing.options.mode === 'left' ? '保留全部输入' : '仅匹配输入'}；带入 {dataset.processing.options.fields.join('、')}；前缀 {dataset.processing.options.prefix || '无'}</p>}
                   {dataset.processing.overlay && <>
                     <p>第二输入：{dataset.processing.overlay.layerName}</p>
                     <p>第二范围：{{ all: '全部要素', filtered: '图层筛选结果', selected: '当前选中要素' }[dataset.processing.overlay.scope]}（{dataset.processing.overlay.inputCount} 个要素）</p>

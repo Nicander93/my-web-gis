@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { isTauri } from '@tauri-apps/api/core'
 import { FileText, Upload, X, CheckCircle2, AlertCircle } from 'lucide-react'
 import { pickFile, readFile } from '@/services/files'
 import { importGeoJson, importShapefileZip, importDxfFile, importCsvFile, detectFileType } from '@/services/import'
@@ -26,6 +27,7 @@ const COMMON_CRS = [
 ]
 
 export function AddDataDialog({ open, onClose, onImport, onAddServiceLayers }: AddDataDialogProps) {
+  const browserFileInput = useRef<HTMLInputElement>(null)
   const [activeTab, setActiveTab] = useState<'file' | 'service'>('file')
   const [step, setStep] = useState<DialogStep>('select')
   const [loading, setLoading] = useState(false)
@@ -291,6 +293,11 @@ export function AddDataDialog({ open, onClose, onImport, onAddServiceLayers }: A
   }
 
   async function handlePickFile() {
+    if (!isTauri()) {
+      browserFileInput.current?.click()
+      return
+    }
+    try {
     const path = await pickFile([
       { name: 'GeoJSON', extensions: ['geojson', 'json'] },
       { name: 'Shapefile', extensions: ['zip'] },
@@ -303,6 +310,9 @@ export function AddDataDialog({ open, onClose, onImport, onAddServiceLayers }: A
 
     const fileType = detectFileType(path)
     await parseFile(path, fileType, path)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '无法打开文件选择窗口。')
+    }
   }
 
   async function handleDrop(event: React.DragEvent) {
@@ -326,6 +336,11 @@ export function AddDataDialog({ open, onClose, onImport, onAddServiceLayers }: A
   return (
     <div className="dialog-overlay" onClick={handleClose}>
       <div className="dialog-content" onClick={(e) => e.stopPropagation()}>
+        <input ref={browserFileInput} type="file" hidden accept=".geojson,.json,.zip,.dxf,.csv" onChange={event => {
+          const file = event.currentTarget.files?.[0]
+          event.currentTarget.value = ''
+          if (file) void parseFile(file, detectFileType(file.name), file.name)
+        }} />
         <header className="dialog-header">
           <h2>添加数据</h2>
           <button className="dialog-close" onClick={handleClose} aria-label="关闭">

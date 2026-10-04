@@ -15,8 +15,8 @@ import { createId } from './id'
 import type { Geometry, GisFeature, Position, PolygonGeometry, MultiPolygonGeometry } from './types'
 
 export type OverlayTool = 'clip' | 'intersect' | 'difference'
-export type ProcessingTool = 'buffer' | 'centroid' | 'envelope' | 'explode' | OverlayTool | 'dissolve' | 'extract-location'
-export type ProcessingOptions =
+export type ProcessingTool = 'buffer' | 'centroid' | 'envelope' | 'explode' | OverlayTool | 'dissolve' | 'extract-location' | 'summarize-location' | 'attribute-join' | 'spatial-join'
+export type GeometryProcessingOptions =
   | { tool: 'buffer'; distance: number; unit: 'meters' | 'kilometers' }
   | { tool: 'centroid' }
   | { tool: 'envelope' }
@@ -24,6 +24,12 @@ export type ProcessingOptions =
   | { tool: OverlayTool }
   | { tool: 'dissolve'; field?: string }
   | { tool: 'extract-location'; predicate: 'intersects' | 'within' | 'disjoint' }
+
+/** Serializable application requests; statistical algorithms are implemented by the analysis extension. */
+export type ProcessingOptions = GeometryProcessingOptions
+  | { tool: 'summarize-location'; predicate: 'intersects' | 'within'; field?: string; prefix: string }
+  | { tool: 'attribute-join'; inputKey: string; joinKey: string; fields: string[]; prefix: string; mode: 'left' | 'inner' }
+  | { tool: 'spatial-join'; predicate: 'intersects' | 'within'; fields: string[]; prefix: string; mode: 'left' | 'inner' }
 
 export interface ProcessingResult {
   features: GisFeature[]
@@ -43,12 +49,12 @@ export interface ProcessingRecord {
   overlay?: { layerId: string; layerName: string; scope: 'all' | 'filtered' | 'selected'; inputCount: number }
 }
 
-export function requiresOverlay(tool: ProcessingTool): tool is OverlayTool | 'extract-location' {
-  return tool === 'clip' || tool === 'intersect' || tool === 'difference' || tool === 'extract-location'
+export function requiresOverlay(tool: ProcessingTool): boolean {
+  return tool === 'clip' || tool === 'intersect' || tool === 'difference' || tool === 'extract-location' || tool === 'summarize-location' || tool === 'attribute-join' || tool === 'spatial-join'
 }
 
 export function requiresPolygon(tool: ProcessingTool): boolean {
-  return (requiresOverlay(tool) && tool !== 'extract-location') || tool === 'dissolve'
+  return tool === 'clip' || tool === 'intersect' || tool === 'difference' || tool === 'dissolve' || tool === 'summarize-location'
 }
 
 function positions(geometry: Geometry): Position[] {
@@ -162,7 +168,7 @@ function extractByLocation(features: GisFeature[], options: Extract<ProcessingOp
   return { features: output, inputCount: features.length, overlayCount: overlay.length }
 }
 
-function processPolygons(features: GisFeature[], options: ProcessingOptions, overlay: GisFeature[]): ProcessingResult {
+function processPolygons(features: GisFeature[], options: GeometryProcessingOptions, overlay: GisFeature[]): ProcessingResult {
   features.forEach(validatePolygon)
   const input = features as PolygonFeature[]
   if (options.tool === 'dissolve') {
@@ -214,7 +220,7 @@ function processPolygons(features: GisFeature[], options: ProcessingOptions, ove
 }
 
 /** Pure WGS84 processing: results never share data with their inputs or mutate a project. */
-export function processFeatures(features: GisFeature[], options: ProcessingOptions, overlay: GisFeature[] = []): ProcessingResult {
+export function processFeatures(features: GisFeature[], options: GeometryProcessingOptions, overlay: GisFeature[] = []): ProcessingResult {
   if (!features.length) throw new Error('当前处理范围没有要素。')
   if (options.tool === 'extract-location') return extractByLocation(features, options, overlay)
   if (requiresPolygon(options.tool)) return processPolygons(features, options, overlay)

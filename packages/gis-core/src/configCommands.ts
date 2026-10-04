@@ -6,7 +6,7 @@ import type { LayerStyle } from '@desktop-webgis/ol-style'
 import { cloneValue } from './clone'
 import type { EditCommand, EditContext } from './editHistory'
 import type { FieldFilterCondition } from './filter'
-import type { Layer, LayerGroup, LayerTreeEntry, Project } from './types'
+import type { Dataset, GisFeature, Layer, LayerGroup, LayerTreeEntry, Project } from './types'
 
 export interface ProjectEditContext extends EditContext {
   getProject(): Project
@@ -31,6 +31,37 @@ function replaceLayer(project: Project, layerId: string, patch: Partial<Layer>):
   return {
     ...project,
     layers: project.layers.map((layer) => (layer.id === layerId ? { ...layer, ...patch } : layer))
+  }
+}
+
+/** Add an independent local layer and dataset as one reversible project operation. */
+export class AddLocalLayerCommand implements EditCommand {
+  readonly label = '添加结果图层'
+  private readonly dataset: Extract<Dataset, { kind: 'vector' }>
+  private readonly layer: Layer
+  private readonly features: GisFeature[]
+
+  constructor(readonly id: string, dataset: Extract<Dataset, { kind: 'vector' }>, layer: Layer, features: GisFeature[]) {
+    if (layer.datasetId !== dataset.id) throw new Error('图层与数据集标识不一致。')
+    this.dataset = cloneValue(dataset); this.layer = cloneValue(layer); this.features = cloneValue(features)
+  }
+
+  execute(context: EditContext): void {
+    const ctx = requireProjectContext(context), project = ctx.getProject()
+    if (project.layers.some(layer => layer.id === this.layer.id) || project.datasets.some(dataset => dataset.id === this.dataset.id)) throw new Error('结果图层或数据集已存在。')
+    ctx.featureStore.setAll(this.dataset.id, cloneValue(this.features))
+    ctx.replaceProject({ ...project, datasets: [...project.datasets, cloneValue(this.dataset)], layers: [...project.layers, cloneValue(this.layer)], rootOrder: [...(project.rootOrder ?? []), { type: 'layer', id: this.layer.id }] })
+  }
+
+  undo(context: EditContext): void {
+    const ctx = requireProjectContext(context), project = ctx.getProject()
+    ctx.featureStore.clear(this.dataset.id)
+    ctx.replaceProject({ ...project,
+      datasets: project.datasets.filter(dataset => dataset.id !== this.dataset.id),
+      layers: project.layers.filter(layer => layer.id !== this.layer.id),
+      rootOrder: (project.rootOrder ?? []).filter(entry => entry.type !== 'layer' || entry.id !== this.layer.id),
+      groups: (project.groups ?? []).map(group => ({ ...group, layerIds: group.layerIds.filter(id => id !== this.layer.id) }))
+    })
   }
 }
 

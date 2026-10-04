@@ -47,6 +47,9 @@ importers:
       '@desktop-webgis/scene-schema':
         specifier: workspace:*
         version: link:../../packages/scene-schema
+      '@desktop-webgis/spatial-analysis':
+        specifier: workspace:*
+        version: link:../../packages/spatial-analysis
       '@desktop-webgis/style-assistant':
         specifier: workspace:*
         version: link:../../packages/style-assistant
@@ -439,6 +442,25 @@ importers:
         specifier: workspace:*
         version: link:../cesium-scene-schema
     devDependencies:
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)
+
+  packages/spatial-analysis:
+    dependencies:
+      '@types/geojson':
+        specifier: 7946.0.16
+        version: 7946.0.16
+      jsts:
+        specifier: 2.7.1
+        version: 2.7.1
+    devDependencies:
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
       typescript:
         specifier: ^5.9.2
         version: 5.9.2

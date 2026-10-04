@@ -31,15 +31,17 @@ export const processingCommands = {
     let overlayFeatures = [] as typeof input
     let overlayRecord: ProcessingRecord['overlay']
     if (requiresOverlay(options.tool)) {
-      if (!args.overlay) throw new Error('请选择第二输入面图层。')
+      if (!args.overlay) throw new Error('请选择第二输入图层。')
       const overlayLayer = useProjectStore.getState().project.layers.find(layer => layer.id === args.overlay?.layerId)
       overlayFeatures = processingInput(args.overlay.layerId, args.overlay.scope)
-      if (!overlayFeatures.length) throw new Error('第二输入范围没有面要素。')
+      if (!overlayFeatures.length && options.tool !== 'summarize-location' && options.tool !== 'attribute-join' && options.tool !== 'spatial-join') throw new Error('第二输入范围没有要素。')
       overlayRecord = { layerId: args.overlay.layerId, layerName: overlayLayer?.name ?? '', scope: args.overlay.scope, inputCount: overlayFeatures.length }
     }
     const result = await runProcessing(input, options, args.signal, overlayFeatures)
     if (args.signal.aborted) throw new DOMException('已取消', 'AbortError')
-    if (!result.features.length) throw new Error(options.tool === 'extract-location'
+    if (!result.features.length) throw new Error(options.tool === 'attribute-join' || options.tool === 'spatial-join'
+      ? '没有匹配的连接记录，未创建图层。请检查连接键或选择保留全部输入。'
+      : options.tool === 'extract-location'
       ? '没有符合空间关系的要素，未创建图层。请检查输入范围或调整关系。'
       : '没有符合条件的面结果，未创建图层。请检查两层范围；仅边界接触不生成面。')
     const layerId = addProcessingResult(projectId, args.name, result, {

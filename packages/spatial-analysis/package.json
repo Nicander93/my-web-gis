@@ -1,0 +1,17 @@
+{
+  "name": "@desktop-webgis/spatial-analysis",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && esbuild src/index.ts --bundle --format=esm --platform=neutral --target=es2022 --outfile=dist/index.js",
+    "test": "vitest run",
+    "test:consumer": "node examples/consumer.mjs && tsc --noEmit --strict --target es2022 --module nodenext --moduleResolution nodenext examples/consumer.ts"
+  },
+  "dependencies": { "jsts": "2.7.1", "@types/geojson": "7946.0.16" },
+  "devDependencies": { "typescript": "^5.9.2", "vitest": "^3.2.4", "esbuild": "0.28.2" }
+}

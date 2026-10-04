@@ -13,26 +13,27 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@desktop-webgis/cesium-scene-runtime": "workspace:*",
+    "@desktop-webgis/cesium-scene-schema": "workspace:*",
     "@desktop-webgis/gis-core": "workspace:*",
+    "@desktop-webgis/ogc-io": "workspace:*",
     "@desktop-webgis/ol-runtime": "workspace:*",
+    "@desktop-webgis/ol-style": "workspace:*",
     "@desktop-webgis/scene-codegen": "workspace:*",
     "@desktop-webgis/scene-core": "workspace:*",
     "@desktop-webgis/scene-schema": "workspace:*",
+    "@desktop-webgis/spatial-analysis": "workspace:*",
     "@desktop-webgis/style-assistant": "workspace:*",
     "@desktop-webgis/vector-io": "workspace:*",
     "@tauri-apps/api": "^2.7.0",
     "@tauri-apps/plugin-dialog": "^2.3.3",
+    "cesium": "^1.145.0",
     "lucide-react": "^1.38.0",
     "nanoid": "^5.1.5",
     "ol": "^10.6.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "zustand": "^5.0.15",
-    "@desktop-webgis/ol-style": "workspace:*",
-    "@desktop-webgis/ogc-io": "workspace:*",
-    "cesium": "^1.145.0",
-    "@desktop-webgis/cesium-scene-runtime": "workspace:*",
-    "@desktop-webgis/cesium-scene-schema": "workspace:*"
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

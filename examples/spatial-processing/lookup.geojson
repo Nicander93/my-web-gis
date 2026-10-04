@@ -1,0 +1,7 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    { "type": "Feature", "id": "lookup-a", "properties": { "name": "掩膜 A", "manager": "区域负责人 A" }, "geometry": { "type": "Point", "coordinates": [116.41, 39.92] } },
+    { "type": "Feature", "id": "lookup-b", "properties": { "name": "掩膜 B", "manager": "区域负责人 B" }, "geometry": { "type": "Point", "coordinates": [116.44, 39.92] } }
+  ]
+}

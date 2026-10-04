@@ -20,6 +20,7 @@ import {
   SetLayerFilterCommand,
   SetLayerOpacityCommand,
   SetLayerTreeCommand,
+  AddLocalLayerCommand,
   snapshotLayerTree
 } from '@desktop-webgis/gis-core'
 import type {
@@ -178,6 +179,11 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     })
   }
 
+  function editedFeatures(): Record<string, GisFeature[]> {
+    const ids = new Set(get().project.datasets.map(dataset => dataset.id))
+    return Object.fromEntries(Object.entries({ ...get().featuresByDataset, ...attributeFeatureStore.snapshot() }).filter(([id]) => ids.has(id)))
+  }
+
   return {
   project: createProject(),
   featuresByDataset: {},
@@ -260,11 +266,20 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   copyFeaturesToLocalLayer: (features, name, styleKind, processing) => {
     if (!features || features.length === 0) return null
     const datasetId = createId('dataset')
-    const cloned = cloneValue(features)
-    // Ensure we never share object identity with source features.
-    get().addLayer(datasetId, name, cloned, styleKind, processing)
-    const layerId = get().selectedLayerId
-    if (!layerId) return null
+    const layerId = createId('layer')
+    const dataset: Extract<Dataset, { kind: 'vector' }> = { id: datasetId, name, kind: 'vector', source: { type: 'memory', label: name }, ...(processing ? { processing: cloneValue(processing) } : {}) }
+    const layer: Layer = { id: layerId, datasetId, name, visible: true, opacity: 1, editable: false, style: createDefaultLayerStyle(styleKind), filter: [] }
+    const beforeLayer = get().selectedLayerId, beforeSelection = cloneValue(get().selection)
+    const command = new AddLocalLayerCommand(createId('cmd'), dataset, layer, features)
+    get().executeEditCommand({ id: command.id, label: command.label,
+      execute: context => { command.execute(context); set({ selectedLayerId: layerId, selection: { layerId: null, featureIds: [] } }) },
+      undo: context => {
+        command.undo(context)
+        const existing = get().project.layers
+        set({ selectedLayerId: existing.some(layer => layer.id === beforeLayer) ? beforeLayer : null,
+          selection: existing.some(layer => layer.id === beforeSelection.layerId) ? cloneValue(beforeSelection) : { layerId: null, featureIds: [] } })
+      }
+    })
     return { datasetId, layerId }
   },
 
@@ -473,9 +488,9 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     syncStoreFromState(state.featuresByDataset)
     const command = editHistory.undo(projectEditContext())
     if (!command) return false
-    const snapshot = attributeFeatureStore.snapshot()
+    const snapshot = editedFeatures()
     set({
-      featuresByDataset: { ...get().featuresByDataset, ...snapshot },
+      featuresByDataset: snapshot,
       dirty: true
     })
     for (const layer of get().project.layers) {
@@ -489,9 +504,9 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     syncStoreFromState(state.featuresByDataset)
     const command = editHistory.redo(projectEditContext())
     if (!command) return false
-    const snapshot = attributeFeatureStore.snapshot()
+    const snapshot = editedFeatures()
     set({
-      featuresByDataset: { ...get().featuresByDataset, ...snapshot },
+      featuresByDataset: snapshot,
       dirty: true
     })
     for (const layer of get().project.layers) {
@@ -507,9 +522,9 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     const state = get()
     syncStoreFromState(state.featuresByDataset)
     editHistory.execute(command, projectEditContext())
-    const snapshot = attributeFeatureStore.snapshot()
+    const snapshot = editedFeatures()
     set({
-      featuresByDataset: { ...get().featuresByDataset, ...snapshot },
+      featuresByDataset: snapshot,
       dirty: true
     })
     for (const layer of get().project.layers) {
