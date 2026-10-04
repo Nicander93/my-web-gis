@@ -7,6 +7,7 @@ export function updateCity(label: string, update: (scene: CityScene) => CityScen
   const state = useProjectStore.getState()
   const before = state.project.city
   const after = update(structuredClone(before ?? createCityScene()))
+  after.version = 2
   if (JSON.stringify(before) === JSON.stringify(after)) return
   state.executeEditCommand(new SetCitySceneCommand(createId('cmd'), label, before, after))
 }

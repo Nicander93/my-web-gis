@@ -34,6 +34,46 @@ interface NodeBase {
   name: string
   visible: boolean
   popup?: PopupDefinition
+  locked?: boolean
+}
+
+export type GraphicType = 'point' | 'polyline' | 'polygon'
+export interface GraphicGeometry { type: GraphicType; positions: GeoPosition[]; heightMode: 'ground' | 'absolute' }
+export interface GraphicStyle { color: string; width: number; pointSize: number; label?: string }
+export interface GraphicNode extends NodeBase {
+  type: 'graphic'
+  geometry: GraphicGeometry
+  style: GraphicStyle
+  properties: Record<string, unknown>
+}
+
+/** Validates the standalone graphic contract before allocating Cesium objects. */
+export function validateGraphic(value: unknown): value is GraphicNode {
+  if (!record(value) || value.type !== 'graphic' || typeof value.id !== 'string' || !value.id.trim() || typeof value.name !== 'string' || typeof value.visible !== 'boolean') return false
+  const geometry = value.geometry, style = value.style
+  if (!record(geometry) || !['point','polyline','polygon'].includes(String(geometry.type)) || !['ground','absolute'].includes(String(geometry.heightMode)) || !Array.isArray(geometry.positions) || !geometry.positions.every(position)) return false
+  const minimum = geometry.type === 'point' ? 1 : geometry.type === 'polyline' ? 2 : 3
+  if (geometry.positions.length < minimum || (geometry.type === 'point' && geometry.positions.length !== 1)) return false
+  if (new Set(geometry.positions.map(p => geometry.type === 'polygon' ? `${p[0]},${p[1]}` : JSON.stringify(p))).size < minimum) return false
+  if (value.locked !== undefined && typeof value.locked !== 'boolean') return false
+  if (value.popup !== undefined && !validatePopup(value.popup)) return false
+  return record(style) && typeof style.color === 'string' && /^#[\da-f]{6}([\da-f]{2})?$/i.test(style.color) && finite(style.width) && style.width > 0 && style.width <= 64 && finite(style.pointSize) && style.pointSize > 0 && style.pointSize <= 128 && (style.label === undefined || typeof style.label === 'string') && record(value.properties) && jsonValue(value.properties)
+}
+
+function validatePopup(value: unknown): value is PopupDefinition {
+  return record(value) && (value.title === undefined || typeof value.title === 'string') && (value.titleField === undefined || typeof value.titleField === 'string') && Array.isArray(value.fields) && value.fields.every(field => record(field) && typeof field.field === 'string' && (field.label === undefined || typeof field.label === 'string'))
+}
+
+// Reject cycles, class instances and values JSON would silently discard.
+function jsonValue(value: unknown, ancestors = new Set<object>()): boolean {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true
+  if (typeof value === 'number') return Number.isFinite(value)
+  if (typeof value !== 'object' || ancestors.has(value)) return false
+  if (!Array.isArray(value) && Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) return false
+  ancestors.add(value)
+  const valid = Object.values(value).every(child => jsonValue(child, ancestors))
+  ancestors.delete(value)
+  return valid
 }
 
 export interface TilesetNode extends NodeBase {
@@ -68,15 +108,16 @@ export interface WaterNode extends NodeBase {
   speed: number
 }
 
-export type CityNode = TilesetNode | ModelNode | GeoJsonNode | WaterNode
+export type CityNode = TilesetNode | ModelNode | GeoJsonNode | WaterNode | GraphicNode
 export interface CityScene {
-  version: 1
+  version: 1 | 2
   camera: CityCamera
   basemap?: { url: string; attribution?: string }
   terrain?: { url: string }
   assets: Record<string, CityAsset>
   nodes: CityNode[]
   effects: { fog: number; bloom: boolean }
+  lighting?: { sunlight: boolean; shadows: boolean; time: string }
 }
 
 export interface CityValidationIssue { path: string; message: string }
@@ -86,7 +127,7 @@ export function createTransform(): Transform {
 
 export function createCityScene(): CityScene {
   return {
-    version: 1,
+    version: 2,
     camera: { position: [116.391, 39.907, 2500], heading: 0, pitch: -45, roll: 0 },
     assets: {}, nodes: [], effects: { fog: 0, bloom: false }
   }
@@ -123,7 +164,8 @@ export function validateCityScene(input: unknown, root = '$'): CityValidationIss
   const issues: CityValidationIssue[] = []
   function check(valid: boolean, path: string, message: string): void { if (!valid) issues.push({ path: `${root}.${path}`, message }) }
   if (!record(input)) return [{ path: root, message: '三维场景必须是对象' }]
-  check(input.version === 1, 'version', '只支持 CityScene version 1')
+  check(input.version === 1 || input.version === 2, 'version', '只支持 CityScene version 1 或 2')
+  if (input.lighting !== undefined) check(input.version === 2 && record(input.lighting) && typeof input.lighting.sunlight === 'boolean' && typeof input.lighting.shadows === 'boolean' && typeof input.lighting.time === 'string' && Number.isFinite(Date.parse(input.lighting.time)), 'lighting', '光照需要 version 2、有效时间和布尔设置')
   const camera = input.camera
   check(record(camera) && position(camera.position) && finite(camera.heading) && finite(camera.pitch) && Math.abs(camera.pitch) <= 90 && finite(camera.roll), 'camera', '相机必须使用有效的经纬度、高度和角度')
   if (input.basemap !== undefined) check(record(input.basemap) && isCityResourceUrl(input.basemap.url), 'basemap', '底图 URL 无效')
@@ -142,9 +184,14 @@ export function validateCityScene(input: unknown, root = '$'): CityValidationIss
     check(typeof node.id === 'string' && Boolean(node.id.trim()) && !ids.has(node.id), `${path}.id`, '对象 ID 为空或重复')
     if (typeof node.id === 'string') ids.add(node.id)
     check(typeof node.name === 'string' && typeof node.visible === 'boolean', path, '对象名称或显隐状态无效')
+    if (node.locked !== undefined) check(typeof node.locked === 'boolean', `${path}.locked`, '锁定状态必须是布尔值')
     if (node.popup !== undefined) {
       const popup = node.popup
       check(record(popup) && (popup.title === undefined || typeof popup.title === 'string') && (popup.titleField === undefined || typeof popup.titleField === 'string') && Array.isArray(popup.fields) && popup.fields.every(f => record(f) && typeof f.field === 'string' && (f.label === undefined || typeof f.label === 'string')), `${path}.popup`, 'Popup 字段结构无效')
+    }
+    if (node.type === 'graphic') {
+      check(input.version === 2 && validateGraphic(node), path, '图形需要 version 2 和有效的几何、样式与属性')
+      return
     }
     if (node.type === 'water') {
       const validBoundary = Array.isArray(node.boundary) && node.boundary.length >= 3 && node.boundary.every(position)

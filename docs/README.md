@@ -24,6 +24,7 @@
 - [第二阶段：空间处理工作流](plans/phase-2-spatial-processing.md)
 - [二维编辑捕捉](plans/editing-snapping.md)
 - [GeoLibre 对标与下一阶段建议](plans/geolibre-gap-review-2026-10-03.md)
+- [城市编辑器产品与核心能力演进](plans/city-editor-product-and-core.md) — 功能区交互、Mars3D 风格 API 与绘制/编辑/可视化路线讨论稿
 - [P21 全阶段验收证据（受阻）](plans/p21-phase-acceptance-evidence.md) — 绑定 SHA "d310b\；**不**表示阶段已完成
 
 ### 工程约定

@@ -68,7 +68,7 @@ export function MenuBar() {
 
   return (
     <nav className="menu-bar" ref={menuBarRef}>
-      {menus.map((menu) => {
+      {menus.filter(menu => !city || menu.id === 'project' || menu.id === 'help').map((menu) => {
         const isOpen = openMenu === menu.id
         const MenuComponent = menuComponents[menu.id]
 

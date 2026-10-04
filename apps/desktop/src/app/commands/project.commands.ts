@@ -1,4 +1,5 @@
 import { createEditorProject } from '@/services/project-type'
+import { isTauri } from '@tauri-apps/api/core'
 import type { ProjectType } from '@/services/project-type'
 import { emitCommandStatus } from './status'
 import { useSessionStore } from '@/stores/session.store'
@@ -106,7 +107,7 @@ export const projectCommands = {
         return
       }
       state.setDirty(false)
-      emitCommandStatus(`已保存：${path}`)
+      emitCommandStatus(isTauri() ? `已保存：${path}` : `项目下载已发起：${path}`)
     } catch (error) {
       emitCommandStatus(error instanceof Error ? `保存失败：${error.message}` : '保存失败')
     }
@@ -122,7 +123,7 @@ export const projectCommands = {
         return
       }
       state.setDirty(false)
-      emitCommandStatus(`已另存：${path}`)
+      emitCommandStatus(isTauri() ? `已另存：${path}` : `项目下载已发起：${path}`)
     } catch (error) {
       emitCommandStatus(error instanceof Error ? `另存失败：${error.message}` : '另存失败')
     }

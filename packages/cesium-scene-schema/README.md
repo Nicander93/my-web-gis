@@ -10,7 +10,9 @@ city.nodes.push({ id: 'blocks', name: '城市街区', type: '3dtiles', asset: 'b
 const validated = parseCityScene(JSON.stringify(city))
 ```
 
-CityScene.version=1；集成进项目 SceneManifest 时使用 `SceneManifest.version=2` 的可选 `city` 字段，旧二维场景保持可读。相机、模型位置及水面边界为 WGS84 度和椭球米；变换为原始模型 ENU 平移（米）、HPR（度）、正数等比缩放。
+新建 CityScene.version=2；解析器仍接受旧版 1。版本 2 增加 `graphic` 节点、可选对象锁定和 `lighting`（太阳光、阴影、ISO 时间）。图形保存几何类型、WGS84 坐标、高度模式、颜色/线宽/点大小/标签、JSON 属性和 Popup。版本 1 不接受图形和光照配置；编辑器修改旧场景时升级到 2，撤销恢复原始版本。
+
+集成进项目 SceneManifest 时使用 `SceneManifest.version=2` 的可选 `city` 字段，旧二维场景保持可读。相机、模型位置及图形/水面边界为 WGS84 度和椭球米；变换为原始模型 ENU 平移（米）、HPR（度）、正数等比缩放。
 
 `validateCityScene` 返回带路径的错误，`parseCityScene` 验证并返回独立克隆。校验包含资源类型匹配、唯一对象 ID、至少三个不同的水面顶点、数值范围及 URL。资源 URL 接受 HTTP(S) 或相对路径；令牌应由宿主注入，不能写入场景 URL。
 

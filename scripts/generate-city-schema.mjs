@@ -9,7 +9,7 @@ const positive = { type: 'number', exclusiveMinimum: 0 }
 const ref = name => ({ $ref: `#/$defs/${name}` })
 const object = (properties, required = Object.keys(properties)) => ({ type: 'object', properties, required })
 const tuple = items => ({ type: 'array', prefixItems: items, minItems: items.length, maxItems: items.length })
-const base = { id: { type: 'string', pattern: '\\S' }, name: text, visible: boolean, popup: ref('cityPopup') }
+const base = { id: { type: 'string', pattern: '\\S' }, name: text, visible: boolean, popup: ref('cityPopup'), locked: boolean }
 const asset = { asset: text }
 const node = properties => object({ ...base, ...properties }, ['id', 'name', 'visible', ...Object.keys(properties).filter(key => !['maximumScreenSpaceError', 'cacheBytes', 'color'].includes(key))])
 const defs = {
@@ -23,9 +23,12 @@ const defs = {
   cityModel: node({ type: { const: 'model' }, ...asset, position: ref('cityPosition'), transform: ref('cityTransform') }),
   cityGeoJson: node({ type: { const: 'geojson' }, ...asset, color: { type: 'string', pattern: '^#[0-9a-fA-F]{6}$' } }),
   cityWater: node({ type: { const: 'water' }, boundary: { type: 'array', minItems: 3, items: ref('cityPosition') }, height: number, color: { type: 'string', pattern: '^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$' }, amplitude: { ...number, minimum: 0 }, frequency: positive, speed: { ...number, minimum: 0 } }),
-  cityScene: object({ version: { const: 1 }, camera: ref('cityCamera'), basemap: object({ url: text, attribution: text }, ['url']), terrain: object({ url: text }), assets: { type: 'object', additionalProperties: ref('cityAsset') }, nodes: { type: 'array', items: { oneOf: ['cityTileset', 'cityModel', 'cityGeoJson', 'cityWater'].map(ref) } }, effects: object({ fog: { ...number, minimum: 0, maximum: 1 }, bloom: boolean }) }, ['version', 'camera', 'assets', 'nodes', 'effects'])
+  cityGraphic: node({ type: { const: 'graphic' }, geometry: object({ type: { enum: ['point','polyline','polygon'] }, positions: { type: 'array', minItems: 1, items: ref('cityPosition') }, heightMode: { enum: ['ground','absolute'] } }), style: object({ color: { type: 'string', pattern: '^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$' }, width: { ...positive, maximum: 64 }, pointSize: { ...positive, maximum: 128 }, label: text }, ['color','width','pointSize']), properties: { type: 'object' } }),
+  cityScene: object({ version: { enum: [1,2] }, camera: ref('cityCamera'), basemap: object({ url: text, attribution: text }, ['url']), terrain: object({ url: text }), assets: { type: 'object', additionalProperties: ref('cityAsset') }, nodes: { type: 'array', items: { oneOf: ['cityTileset', 'cityModel', 'cityGeoJson', 'cityWater', 'cityGraphic'].map(ref) } }, effects: object({ fog: { ...number, minimum: 0, maximum: 1 }, bloom: boolean }), lighting: object({ sunlight: boolean, shadows: boolean, time: { type: 'string', format: 'date-time' } }) }, ['version', 'camera', 'assets', 'nodes', 'effects'])
 }
-const schema = { $schema: 'https://json-schema.org/draft/2020-12/schema', title: 'CityScene v1', ...ref('cityScene'), $defs: defs }
+defs.cityGraphic.properties.geometry.allOf = ['point','polyline','polygon'].map((type, index) => ({ if: { properties: { type: { const: type } } }, then: { properties: { positions: { minItems: index + 1, ...(type === 'point' ? { maxItems: 1 } : {}) } } } }))
+defs.cityScene.allOf = [{ if: { properties: { version: { const: 1 } } }, then: { not: { required: ['lighting'] }, properties: { nodes: { items: { not: { properties: { type: { const: 'graphic' } }, required: ['type'] } } } } } }]
+const schema = { $schema: 'https://json-schema.org/draft/2020-12/schema', title: 'CityScene v2 (v1 compatible)', ...ref('cityScene'), $defs: defs }
 defs.cityWater.required.push('color')
 await writeFile(new URL('../packages/cesium-scene-schema/city.schema.json', import.meta.url), JSON.stringify(schema, null, 2) + '\n')
 const scenePath = new URL('../packages/scene-schema/scene.schema.json', import.meta.url)

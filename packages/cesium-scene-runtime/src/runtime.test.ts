@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { EntityCollection, JulianDate } from 'cesium'
 import type { Viewer } from 'cesium'
 import { createCityScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
 import { CitySceneRuntime } from './index'
@@ -19,8 +20,8 @@ vi.mock('@desktop-webgis/cesium-layer', async original => {
 })
 vi.mock('@desktop-webgis/cesium-tileset-edit', () => ({ TilesetEditor: class {
   stopEditing = vi.fn(); cancel = vi.fn()
-  constructor() { probe.editors.push(this) }
-  startEditing(): void {} setMode(): void {} refresh(): void {} destroy(): void {}
+  constructor(_viewer: Viewer, private options: { onStart(): void }) { probe.editors.push(this) }
+  startEditing(): void { this.options.onStart() } setMode(): void {} refresh(): void {} destroy(): void {}
 } }))
 beforeEach(() => { probe.created = 0; probe.released = 0; probe.editors = []; vi.stubGlobal('document', { baseURI: 'https://local.test/' }); vi.stubGlobal('CESIUM_BASE_URL', 'https://local.test/cesium/') })
 afterEach(() => vi.unstubAllGlobals())
@@ -32,6 +33,47 @@ function setup() {
   return { scene, viewer, runtime: new CitySceneRuntime(viewer, { target: 'map', scene }) }
 }
 describe('incremental scene reconciliation', () => {
+  it('switches draw to model editing without a late cancellation restoring picking', async () => {
+    const s = setup(); await s.runtime.updateScene(s.scene)
+    const drawing = s.runtime.startDraw({ type: 'polygon' })
+    expect(s.runtime.layers.pickingEnabled).toBe(false)
+    s.runtime.startEditing('blocks')
+    await expect(drawing.result).resolves.toEqual({ status: 'cancelled' })
+    expect(s.runtime.layers.pickingEnabled).toBe(false)
+    s.runtime.setPreview(true)
+    expect(s.runtime.layers.popupsEnabled).toBe(true)
+    expect(s.runtime.layers.pickingEnabled).toBe(true)
+    s.runtime.setPreview(false); expect(s.runtime.layers.popupsEnabled).toBe(false)
+    s.scene.nodes[0].locked = true; await s.runtime.updateScene(s.scene)
+    expect(() => s.runtime.startEditing('blocks')).toThrow('锁定')
+    expect(probe.created).toBe(1)
+    s.scene.nodes[0].name = 'Renamed'; await s.runtime.updateScene(s.scene)
+    expect(s.runtime.layers.getLayer('blocks')?.name).toBe('Renamed')
+    expect(probe.created).toBe(1)
+    s.runtime.destroy()
+  })
+  it('reuses graphic resources for style updates and restores baseline lighting on undo', async () => {
+    const s = setup()
+    s.viewer.dataSources = { add: vi.fn(async source => source), remove: vi.fn() } as unknown as Viewer['dataSources']
+    s.viewer.entities = new EntityCollection()
+    s.viewer.scene.globe = { enableLighting: false } as Viewer['scene']['globe']
+    s.viewer.clock = { currentTime: JulianDate.fromIso8601('2026-10-04T00:00:00Z') } as Viewer['clock']
+    s.scene.nodes.push({ id: 'p', name: 'Point', type: 'graphic', visible: true, geometry: { type: 'point', heightMode: 'ground', positions: [[116,39,0]] }, style: { color: '#336699', width: 3, pointSize: 10 }, properties: {} })
+    await s.runtime.updateScene(s.scene)
+    const layer = s.runtime.layers.getLayer('p')
+    const graphic = s.scene.nodes[1]; if (graphic.type === 'graphic') graphic.style.color = '#ff0000'
+    s.scene.lighting = { sunlight: true, shadows: true, time: '2026-10-04T12:00:00Z' }
+    await s.runtime.updateScene(s.scene)
+    expect(s.runtime.layers.getLayer('p')).toBe(layer)
+    expect(s.viewer.dataSources.add).toHaveBeenCalledOnce()
+    expect(s.viewer.scene.globe.enableLighting).toBe(true)
+    expect(s.viewer.shadows).toBe(true)
+    s.scene.lighting = undefined; await s.runtime.updateScene(s.scene)
+    expect(s.viewer.scene.globe.enableLighting).toBe(false)
+    expect(s.viewer.shadows).toBe(false)
+    s.runtime.destroy()
+    expect(s.viewer.dataSources.remove).toHaveBeenCalledOnce()
+  })
   it('reuses the loaded tileset for transforms and cancels gestures on authoritative updates', async () => {
     const s = setup(); await s.runtime.updateScene(s.scene)
     const original = s.runtime.layers.getLayer('blocks')

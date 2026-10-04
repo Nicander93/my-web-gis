@@ -1,98 +1,17 @@
-import { Cartesian2, Cartesian3, Cartographic, Cesium3DTileFeature, Cesium3DTileset, Color, Entity, GeoJsonDataSource, JulianDate, Math as CesiumMath, Matrix4, Model, ScreenSpaceEventHandler, ScreenSpaceEventType, Transforms } from 'cesium'
+import { Cartesian2, Cartesian3, Cartographic, Cesium3DTileFeature, Cesium3DTileset, Color, ColorMaterialProperty, ConstantProperty, Entity, GeoJsonDataSource, JulianDate, Math as CesiumMath, Matrix4, Model, ScreenSpaceEventHandler, ScreenSpaceEventType, Transforms } from 'cesium'
 import type { BoundingSphere, Resource, Viewer } from 'cesium'
-import { Popup } from '@desktop-webgis/cesium-popup'
-import type { PopupContent } from '@desktop-webgis/cesium-popup'
 import { createTransform, validateTransform } from '@desktop-webgis/cesium-scene-schema'
 import type { GeoPosition, Transform } from '@desktop-webgis/cesium-scene-schema'
 import { composeTransform } from './transform.js'
 export { composeTransform } from './transform.js'
 
-export interface LayerOptions { id: string; name?: string; show?: boolean }
-export interface LayerClickEvent { layer: BaseLayer; position: Cartesian3; properties: Record<string, unknown>; picked: unknown }
-interface LayerEvents { click: LayerClickEvent; load: BaseLayer; error: Error }
-
-/** An explicit lifecycle for framework-independent Cesium layers. */
-export abstract class BaseLayer {
-  readonly id: string
-  readonly name: string
-  protected viewer?: Viewer
-  private visible: boolean
-  private popupContent?: PopupContent
-  private popup?: Popup
-  private revision = 0
-  private abort?: AbortController
-  private destroyed = false
-  private listeners: { [K in keyof LayerEvents]?: Set<(event: LayerEvents[K]) => void> } = {}
-  state: 'idle' | 'loading' | 'ready' | 'error' = 'idle'
-
-  constructor(options: LayerOptions) {
-    this.id = options.id
-    this.name = options.name ?? options.id
-    this.visible = options.show ?? true
-  }
-  get show(): boolean { return this.visible }
-  set show(value: boolean) { this.visible = value; this.setNativeVisible(value); if (!value) this.popup?.close(); this.viewer?.scene.requestRender() }
-  bindPopup(content: PopupContent): this { this.popupContent = content; return this }
-  unbindPopup(): this { this.popupContent = undefined; this.popup?.destroy(); this.popup = undefined; return this }
-  closePopup(): void { this.popup?.close() }
-  on<K extends keyof LayerEvents>(type: K, listener: (event: LayerEvents[K]) => void): () => void {
-    const set = this.listeners[type] as Set<(event: LayerEvents[K]) => void> | undefined
-    const listeners = set ?? new Set<(event: LayerEvents[K]) => void>()
-    if (!set) Object.assign(this.listeners, { [type]: listeners })
-    listeners.add(listener)
-    return () => { listeners.delete(listener) }
-  }
-  protected emit<K extends keyof LayerEvents>(type: K, event: LayerEvents[K]): void {
-    const listeners = this.listeners[type] as Set<(event: LayerEvents[K]) => void> | undefined
-    listeners?.forEach(listener => listener(event))
-  }
-  async addTo(collection: LayerCollection): Promise<this> { await collection.addLayer(this); return this }
-  async mount(viewer: Viewer): Promise<void> {
-    if (this.destroyed) throw new Error(`图层 ${this.id} 已销毁`)
-    if (this.viewer) throw new Error(`图层 ${this.id} 已挂载`)
-    this.viewer = viewer
-    const revision = ++this.revision
-    this.abort = new AbortController()
-    this.state = 'loading'
-    try {
-      const release = await this.createNative(viewer, this.abort.signal)
-      if (revision !== this.revision) { release(); return }
-      this.releaseNative = release
-      this.state = 'ready'
-      this.setNativeVisible(this.visible)
-      this.emit('load', this)
-      viewer.scene.requestRender()
-    } catch (cause) {
-      if (revision !== this.revision) return
-      this.viewer = undefined
-      this.state = 'error'
-      const error = cause instanceof Error ? cause : new Error(String(cause))
-      this.emit('error', error)
-      throw error
-    }
-  }
-  private releaseNative?: () => void
-  unmount(): void {
-    this.revision++
-    this.abort?.abort(); this.abort = undefined
-    this.popup?.destroy(); this.popup = undefined
-    this.releaseNative?.(); this.releaseNative = undefined
-    this.viewer = undefined
-    this.state = 'idle'
-  }
-  destroy(): void { if (this.destroyed) return; this.unmount(); this.destroyed = true; this.listeners = {} }
-  async handleClick(event: LayerClickEvent): Promise<void> {
-    this.emit('click', event)
-    if (!this.popupContent || !this.viewer || !this.show) return
-    this.popup ??= new Popup(this.viewer)
-    try { await this.popup.open({ position: event.position, properties: event.properties, title: this.name }, this.popupContent) }
-    catch (cause) { this.emit('error', cause instanceof Error ? cause : new Error(String(cause))) }
-  }
-  abstract contains(picked: unknown): boolean
-  abstract flyTo(): Promise<void>
-  protected abstract createNative(viewer: Viewer, signal: AbortSignal): Promise<() => void>
-  protected abstract setNativeVisible(value: boolean): void
-}
+export { BaseLayer } from './base-layer.js'
+export type { LayerOptions, LayerClickEvent } from './base-layer.js'
+import { BaseLayer } from './base-layer.js'
+import type { LayerOptions } from './base-layer.js'
+export { Graphic, GraphicLayer } from './graphic-layer.js'
+export { DrawSession } from './draw.js'
+export type { DrawOptions, DrawResult } from './draw.js'
 
 export interface TransformLayer {
   readonly id: string
@@ -182,6 +101,17 @@ export class ModelLayer extends AssetLayer {
 export interface GeoJsonLayerOptions extends LayerOptions { data: string | Resource | object; color?: string }
 export class GeoJsonLayer extends BaseLayer {
   dataSource?: GeoJsonDataSource
+  setColor(value: string): void {
+    const color = Color.fromCssColorString(value)
+    if (!color) throw new Error('颜色无效')
+    for (const entity of this.dataSource?.entities.values ?? []) {
+      if (entity.polygon) entity.polygon.material = new ColorMaterialProperty(color.withAlpha(.35))
+      if (entity.polyline) entity.polyline.material = new ColorMaterialProperty(color)
+      if (entity.point) entity.point.color = new ConstantProperty(color)
+      if (entity.billboard) entity.billboard.color = new ConstantProperty(color)
+    }
+    this.viewer?.scene.requestRender()
+  }
   constructor(private readonly options: GeoJsonLayerOptions) { super(options) }
   contains(picked: unknown): boolean { return isPick(picked) && picked.id instanceof Entity && Boolean(this.dataSource?.entities.contains(picked.id)) }
   async flyTo(): Promise<void> { if (this.viewer && this.dataSource) await this.viewer.flyTo(this.dataSource) }
@@ -205,6 +135,7 @@ export class LayerCollection {
   private readonly handler: ScreenSpaceEventHandler
   private destroyed = false
   pickingEnabled = true
+  popupsEnabled = true
   constructor(readonly viewer: Viewer) {
     this.handler = new ScreenSpaceEventHandler(viewer.canvas)
     this.handler.setInputAction((event: { position: Cartesian2 }) => {
@@ -223,7 +154,7 @@ export class LayerCollection {
         const bag = picked.id.properties as { getValue(time: JulianDate): Record<string, unknown> } | undefined
         Object.assign(properties, bag?.getValue(viewer.clock.currentTime))
       }
-      void layer.handleClick({ layer, position, properties, picked })
+      void layer.handleClick({ layer, position, properties, picked }, this.popupsEnabled)
     }, ScreenSpaceEventType.LEFT_CLICK)
   }
   get layers(): BaseLayer[] { return [...this.registry.values()] }

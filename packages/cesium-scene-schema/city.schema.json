@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "CityScene v1",
+  "title": "CityScene v2 (v1 compatible)",
   "$ref": "#/$defs/cityScene",
   "$defs": {
     "cityPosition": {
@@ -152,6 +152,9 @@
         "popup": {
           "$ref": "#/$defs/cityPopup"
         },
+        "locked": {
+          "type": "boolean"
+        },
         "type": {
           "const": "3dtiles"
         },
@@ -195,6 +198,9 @@
         "popup": {
           "$ref": "#/$defs/cityPopup"
         },
+        "locked": {
+          "type": "boolean"
+        },
         "type": {
           "const": "model"
         },
@@ -234,6 +240,9 @@
         "popup": {
           "$ref": "#/$defs/cityPopup"
         },
+        "locked": {
+          "type": "boolean"
+        },
         "type": {
           "const": "geojson"
         },
@@ -268,6 +277,9 @@
         },
         "popup": {
           "$ref": "#/$defs/cityPopup"
+        },
+        "locked": {
+          "type": "boolean"
         },
         "type": {
           "const": "water"
@@ -312,11 +324,158 @@
         "color"
       ]
     },
+    "cityGraphic": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "name": {
+          "type": "string"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "popup": {
+          "$ref": "#/$defs/cityPopup"
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "type": {
+          "const": "graphic"
+        },
+        "geometry": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "enum": [
+                "point",
+                "polyline",
+                "polygon"
+              ]
+            },
+            "positions": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/cityPosition"
+              }
+            },
+            "heightMode": {
+              "enum": [
+                "ground",
+                "absolute"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "positions",
+            "heightMode"
+          ],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "type": {
+                    "const": "point"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "positions": {
+                    "minItems": 1,
+                    "maxItems": 1
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "type": {
+                    "const": "polyline"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "positions": {
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "type": {
+                    "const": "polygon"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "positions": {
+                    "minItems": 3
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "style": {
+          "type": "object",
+          "properties": {
+            "color": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$"
+            },
+            "width": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 64
+            },
+            "pointSize": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 128
+            },
+            "label": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "color",
+            "width",
+            "pointSize"
+          ]
+        },
+        "properties": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "visible",
+        "type",
+        "geometry",
+        "style",
+        "properties"
+      ]
+    },
     "cityScene": {
       "type": "object",
       "properties": {
         "version": {
-          "const": 1
+          "enum": [
+            1,
+            2
+          ]
         },
         "camera": {
           "$ref": "#/$defs/cityCamera"
@@ -367,6 +526,9 @@
               },
               {
                 "$ref": "#/$defs/cityWater"
+              },
+              {
+                "$ref": "#/$defs/cityGraphic"
               }
             ]
           }
@@ -387,6 +549,26 @@
             "fog",
             "bloom"
           ]
+        },
+        "lighting": {
+          "type": "object",
+          "properties": {
+            "sunlight": {
+              "type": "boolean"
+            },
+            "shadows": {
+              "type": "boolean"
+            },
+            "time": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "required": [
+            "sunlight",
+            "shadows",
+            "time"
+          ]
         }
       },
       "required": [
@@ -395,6 +577,40 @@
         "assets",
         "nodes",
         "effects"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "version": {
+                "const": 1
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "lighting"
+              ]
+            },
+            "properties": {
+              "nodes": {
+                "items": {
+                  "not": {
+                    "properties": {
+                      "type": {
+                        "const": "graphic"
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
       ]
     }
   }
