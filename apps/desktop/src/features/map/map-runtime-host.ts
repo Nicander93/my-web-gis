@@ -1,7 +1,7 @@
 import type { BasemapConfig, EditCommand, EditTool, MapState, SelectionState } from '@desktop-webgis/gis-core'
 import { capabilitiesForDataset, isLegacyStyle } from '@desktop-webgis/gis-core'
 import { OlMapRuntime, OlSelectionRuntime, OlToolRuntime, type ToolCallbacks } from '@desktop-webgis/ol-runtime'
-import { transformExtent } from 'ol/proj'
+import { transform, transformExtent } from 'ol/proj'
 import { getSessionCredential } from '@/services/credentials'
 import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
@@ -173,6 +173,34 @@ export function zoomMapToAll(): boolean {
 export function zoomMapToLayer(layerId: string): boolean {
   if (!runtime || !mounted) return false
   runtime.zoomToLayer(layerId)
+  return true
+}
+
+/** Focus a diagnostic coordinate, or the finite bounds of its source feature. */
+export function zoomMapToFeature(layerId: string, featureId: string, location: [number, number] | null): boolean {
+  if (!runtime || !mounted) return false
+  const state = useProjectStore.getState()
+  const layer = state.project.layers.find(item => item.id === layerId)
+  const feature = layer && state.featuresByDataset[layer.datasetId]?.find(item => item.id === featureId)
+  if (!feature) return false
+  const view = runtime.getMap().getView()
+  if (location) {
+    view.animate({ center: transform(location, 'EPSG:4326', view.getProjection()), zoom: Math.max(view.getZoom() ?? 0, 16), duration: 150 })
+    return true
+  }
+  const extent = [Infinity, Infinity, -Infinity, -Infinity]
+  const visit = (value: unknown): void => {
+    if (!Array.isArray(value)) return
+    if (typeof value[0] === 'number') {
+      const [x, y] = value
+      if (!Number.isFinite(x) || !Number.isFinite(y) || Math.abs(x) > 180 || Math.abs(y) > 90) return
+      extent[0] = Math.min(extent[0], x); extent[1] = Math.min(extent[1], y)
+      extent[2] = Math.max(extent[2], x); extent[3] = Math.max(extent[3], y)
+    } else value.forEach(visit)
+  }
+  visit(feature.geometry.coordinates)
+  if (!extent.every(Number.isFinite)) return false
+  view.fit(transformExtent(extent, 'EPSG:4326', view.getProjection()), { padding: [60, 60, 60, 60], maxZoom: 16, duration: 150 })
   return true
 }
 

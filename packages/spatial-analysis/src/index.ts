@@ -4,6 +4,8 @@ import RelateOp from 'jsts/org/locationtech/jts/operation/relate/RelateOp.js'
 import IsValidOp from 'jsts/org/locationtech/jts/operation/valid/IsValidOp.js'
 import STRtree from 'jsts/org/locationtech/jts/index/strtree/STRtree.js'
 import type { Point, MultiPoint, LineString, MultiLineString, Polygon, MultiPolygon } from 'geojson'
+export { checkGeometries } from './geometry-check.js'
+export type { GeometryCheckInput, GeometryIssue, GeometryCheckReport } from './geometry-check.js'
 
 export type AnalysisGeometry = Point | MultiPoint | LineString | MultiLineString | Polygon | MultiPolygon
 

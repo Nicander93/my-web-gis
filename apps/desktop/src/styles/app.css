@@ -2228,3 +2228,6 @@ button:disabled {
 .snapping-settings__panel p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--color-text-secondary); }
 .processing-form fieldset label:has(input[type="checkbox"]) { flex-direction: row; align-items: center; }
 .processing-form input[type="checkbox"] { width: 16px; min-height: 16px; padding: 0; }
+.geometry-report ul { list-style: none; padding: 0; }
+.geometry-report li { padding: 12px 0; border-bottom: 1px solid var(--color-border, #ddd); overflow-wrap: anywhere; }
+.geometry-report li p { margin: 6px 0; }

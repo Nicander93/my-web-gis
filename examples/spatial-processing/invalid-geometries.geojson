@@ -1,0 +1,8 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    { "type": "Feature", "properties": { "name": "正常点" }, "geometry": { "type": "Point", "coordinates": [116.42, 39.92] } },
+    { "type": "Feature", "properties": { "name": "自交面" }, "geometry": { "type": "Polygon", "coordinates": [[[116.41,39.91],[116.43,39.93],[116.41,39.93],[116.43,39.91],[116.41,39.91]]] } },
+    { "type": "Feature", "properties": { "name": "外环之外的孔洞" }, "geometry": { "type": "Polygon", "coordinates": [[[116.44,39.91],[116.46,39.91],[116.46,39.93],[116.44,39.93],[116.44,39.91]],[[116.47,39.91],[116.48,39.91],[116.48,39.92],[116.47,39.91]]] } }
+  ]
+}

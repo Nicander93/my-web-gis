@@ -6,8 +6,12 @@ import { resolveProcessingInput, type ProcessingScope } from '@/services/process
 import { processingCommands } from '@/app/commands/processing.commands'
 import { emitCommandStatus } from '@/app/commands/status'
 import { layerCommands } from '@/app/commands/layer.commands'
+import { checkLayerGeometry, selectGeometryIssues, type GeometryCheckResult } from '@/app/commands/geometry-check.commands'
+import type { GeometryIssue } from '@desktop-webgis/spatial-analysis'
 
-const tools: Array<{ id: ProcessingTool; name: string; description: string }> = [
+type Tool = ProcessingTool | 'check-geometry'
+const tools: Array<{ id: Tool; name: string; description: string }> = [
+  { id: 'check-geometry', name: '几何检查', description: '检查坐标、结构和单个要素的拓扑有效性，列出问题及可用的位置。不修改原数据，不检查要素之间的重叠或缝隙。' },
   { id: 'buffer', name: '缓冲区', description: '按距离为每个要素生成缓冲面，保留属性。重叠范围不会自动融合。' },
   { id: 'centroid', name: '顶点质心', description: '为每个要素生成顶点平均位置。结果可能落在面外，不是面积加权中心。' },
   { id: 'envelope', name: '整体外包矩形', description: '为整个输入范围生成一个矩形面，属性记录输入数量。' },
@@ -35,7 +39,8 @@ export function ProcessingDialog({ onClose }: { onClose(): void }) {
     return rows.length > 0 && rows.every(feature => feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon')
   })
   const [layerId, setLayerId] = useState(() => vectorLayers.some(l => l.id === selectedLayerId) ? selectedLayerId! : vectorLayers[0]?.id ?? '')
-  const [tool, setTool] = useState<ProcessingTool>('buffer')
+  const [tool, setTool] = useState<Tool>('buffer')
+  const [geometryReport, setGeometryReport] = useState<GeometryCheckResult | null>(null)
   const [scope, setScope] = useState<ProcessingScope>('all')
   const [overlayId, setOverlayId] = useState('')
   const [overlayScope, setOverlayScope] = useState<ProcessingScope>('all')
@@ -58,7 +63,8 @@ export function ProcessingDialog({ onClose }: { onClose(): void }) {
   const mounted = useRef(true)
   const active = tools.find(item => item.id === tool)!
   const isJoin = tool === 'attribute-join' || tool === 'spatial-join'
-  const candidates = requiresPolygon(tool) ? polygonLayers : vectorLayers
+  const isCheck = tool === 'check-geometry'
+  const candidates = !isCheck && requiresPolygon(tool) ? polygonLayers : vectorLayers
   const layer = candidates.find(item => item.id === layerId)
   const overlayCandidates = tool === 'summarize-location' || isJoin ? vectorLayers : polygonLayers
   const overlayLayer = overlayCandidates.find(item => item.id === overlayId)
@@ -73,9 +79,10 @@ export function ProcessingDialog({ onClose }: { onClose(): void }) {
   }))
   const defaultName = `${layer?.name ?? '结果'}_${active.name}`
   const count = layer ? resolveProcessingInput(layer, scope, featuresByDataset[layer.datasetId] ?? [], selection).length : 0
+  const issueNames = new Map(geometryReport?.source.map(feature => [feature.id, typeof feature.properties.name === 'string' ? feature.properties.name : '']) ?? [])
 
-  function selectTool(nextTool: ProcessingTool): void {
-    const available = requiresPolygon(nextTool) ? polygonLayers : vectorLayers
+  function selectTool(nextTool: Tool): void {
+    const available = nextTool !== 'check-geometry' && requiresPolygon(nextTool) ? polygonLayers : vectorLayers
     const nextLayerId = available.some(item => item.id === layerId) ? layerId : available[0]?.id ?? ''
     setTool(nextTool)
     setLayerId(nextLayerId)
@@ -103,11 +110,30 @@ export function ProcessingDialog({ onClose }: { onClose(): void }) {
 
   function close(): void { controller.current?.abort(); onClose() }
 
+  useEffect(() => {
+    if (tool === 'check-geometry') controller.current?.abort()
+    setGeometryReport(null)
+  }, [layerId, scope, tool, featuresByDataset, project.id])
+
+  function inspectIssues(issue?: GeometryIssue): void {
+    if (!geometryReport) return
+    try { selectGeometryIssues(geometryReport, issue); close() }
+    catch (reason) { setError(reason instanceof Error ? reason.message : '无法选择问题要素。') }
+  }
+
   async function run(): Promise<void> {
     setError(''); setSuccess(null)
     const abort = new AbortController()
     controller.current = abort
     try {
+      if (tool === 'check-geometry') {
+        setGeometryReport(null); setBusy(true)
+        const result = await checkLayerGeometry(layerId, scope, abort.signal)
+        if (!mounted.current || abort.signal.aborted) return
+        setGeometryReport(result)
+        emitCommandStatus(`几何检查：${result.report.valid} 个有效，${result.report.invalid} 个无效，${result.report.unsupported} 个不支持`)
+        return
+      }
       const resultName = (name || defaultName).trim()
       if (!resultName) throw new Error('请输入结果图层名称。')
       const options: ProcessingOptions = tool === 'buffer' ? { tool, distance: Number(distance), unit }
@@ -152,11 +178,11 @@ export function ProcessingDialog({ onClose }: { onClose(): void }) {
         <nav className="processing-tools" aria-label="处理工具">{tools.map(item => <button key={item.id} type="button" aria-pressed={tool === item.id} disabled={busy} onClick={() => selectTool(item.id)}>{item.name}</button>)}</nav>
         <div className="processing-form">
           <h3>{active.name}</h3><p className="processing-description">{active.description}</p>
-          {!candidates.length ? <p role="status">{requiresPolygon(tool) ? '请先添加面图层。此工具仅支持纯面图层，不支持点、线或混合图层。' : '请先添加矢量数据。WMS 和 WMTS 图像图层不支持空间处理。'}</p> : <>
+          {!candidates.length ? <p role="status">{!isCheck && requiresPolygon(tool) ? '请先添加面图层。此工具仅支持纯面图层，不支持点、线或混合图层。' : '请先添加矢量数据。WMS 和 WMTS 图像图层不支持空间处理。'}</p> : <>
             <label>输入图层<select value={layerId} disabled={busy} onChange={event => { setLayerId(event.target.value); setScope('all'); setError(''); setSuccess(null) }}>{candidates.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
             <label>处理范围<select value={scope} disabled={busy} onChange={event => { setScope(event.target.value as ProcessingScope); setError(''); setSuccess(null) }}>{(Object.keys(scopeLabels) as ProcessingScope[]).map(key => <option key={key} value={key}>{scopeLabels[key]}</option>)}</select></label>
             <p className="processing-description" aria-live="polite">本次输入 {count} 个要素{scope === 'selected' ? '（仅包含通过图层筛选的选中要素）' : ''}</p>
-            {requiresOverlay(tool) && <fieldset className="processing-overlay-input">
+            {!isCheck && requiresOverlay(tool) && <fieldset className="processing-overlay-input">
               <legend>{tool === 'summarize-location' ? '被统计图层' : isJoin ? '连接数据图层' : '第二输入 B（面图层）'}</legend>
               <label>第二图层<select value={overlayId} disabled={busy} onChange={event => { setOverlayId(event.target.value); setOverlayScope('all'); setSummaryField(''); setJoinKey(''); setJoinFields([]); setError(''); setSuccess(null) }}><option value="">请选择图层</option>{overlayCandidates.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
               <label>第二输入范围<select value={overlayScope} disabled={busy} onChange={event => { setOverlayScope(event.target.value as ProcessingScope); setSummaryField(''); setJoinKey(''); setJoinFields([]); setError(''); setSuccess(null) }}>{(Object.keys(scopeLabels) as ProcessingScope[]).map(key => <option key={key} value={key}>{scopeLabels[key]}</option>)}</select></label>
@@ -185,15 +211,22 @@ export function ProcessingDialog({ onClose }: { onClose(): void }) {
             </>}
             {(tool === 'summarize-location' || isJoin) && <><label>新增字段前缀<input value={prefix} disabled={busy} onChange={event => { setPrefix(event.target.value); setSuccess(null) }} /></label><p className="processing-description">{tool === 'summarize-location' ? `输出：${prefix}count${summaryField ? `、${prefix}sum、${prefix}mean` : ''}` : `带入字段使用 ${prefix || '无'} 前缀`}；已有字段同名时会报错，不覆盖原属性。</p></>}
             {tool === 'buffer' && <div className="processing-distance"><label>缓冲距离<input type="number" min="0" step="any" value={distance} disabled={busy} onChange={event => setDistance(event.target.value)} /></label><label>单位<select value={unit} disabled={busy} onChange={event => setUnit(event.target.value as typeof unit)}><option value="meters">米</option><option value="kilometers">千米</option></select></label></div>}
-            <label>结果图层名称<input value={name} placeholder={defaultName} disabled={busy} onChange={event => setName(event.target.value)} /></label>
-            <p className="processing-description">结果保存为独立本地图层，可继续处理、编辑或导出。原图层保持不变。</p>
+            {!isCheck && <><label>结果图层名称<input value={name} placeholder={defaultName} disabled={busy} onChange={event => setName(event.target.value)} /></label>
+            <p className="processing-description">结果保存为独立本地图层，可继续处理、编辑或导出。原图层保持不变。</p></>}
+            {isCheck && <p className="processing-description">按 WGS84 经纬度检查 XY 拓扑；每个要素报告首个问题。不支持的类型或跨日期变更线输入单独列出，不计为有效。选择问题后关闭窗口，返回地图查看。</p>}
             {tool === 'buffer' && <p className="processing-description">使用 WGS84 经纬度计算距离；暂不支持极区、跨日期变更线或大于 1000 千米的缓冲。</p>}
           </>}
           {error && <p className="export-error" role="alert">{error}</p>}
+          {isCheck && geometryReport && <section className="geometry-report" aria-label="几何检查报告">
+            <p role="status">已检查 {geometryReport.report.checked} 个：有效 {geometryReport.report.valid}、无效 {geometryReport.report.invalid}、不支持 {geometryReport.report.unsupported}。</p>
+            {!!geometryReport.report.issues.length && <><button type="button" className="button-secondary" onClick={() => inspectIssues()}>选择全部问题要素并查看</button>
+              <ul>{geometryReport.report.issues.slice(0, 100).map(issue => <li key={issue.inputIndex}><strong title={issue.featureId}>第 {issue.inputIndex + 1} 个{issueNames.get(issue.featureId) ? ` · ${issueNames.get(issue.featureId)}` : ''}</strong><p>{issue.status === 'unsupported' ? '不支持：' : ''}{issue.message}</p><button type="button" onClick={() => inspectIssues(issue)}>选择并定位</button></li>)}</ul>
+              {geometryReport.report.issues.length > 100 && <p>仅展示前 100 条；“选择全部”包含所有问题要素。</p>}</>}
+          </section>}
           {success && <div className="processing-result" role="status"><p>{success.text}</p><button type="button" className="button-secondary" onClick={() => { layerCommands.zoomToLayer(success.layerId); close() }}>查看结果</button></div>}
         </div>
       </div>
-      <footer className="dialog-footer"><button type="button" className="button-secondary" onClick={() => busy ? controller.current?.abort() : close()}>{busy ? '取消处理' : '关闭'}</button><button type="button" className="button-primary" disabled={busy || !layer || count === 0 || (isJoin && !joinFields.length) || (tool === 'attribute-join' && (!inputKey || !joinKey)) || (requiresOverlay(tool) && (!overlayLayer || (overlayCount === 0 && tool !== 'summarize-location' && !isJoin)))} onClick={() => void run()}>{busy ? '处理中…' : '生成结果图层'}</button></footer>
+      <footer className="dialog-footer"><button type="button" className="button-secondary" onClick={() => busy ? controller.current?.abort() : close()}>{busy ? '取消处理' : '关闭'}</button><button type="button" className="button-primary" disabled={busy || !layer || count === 0 || (isJoin && !joinFields.length) || (tool === 'attribute-join' && (!inputKey || !joinKey)) || (!isCheck && requiresOverlay(tool) && (!overlayLayer || (overlayCount === 0 && tool !== 'summarize-location' && !isJoin)))} onClick={() => void run()}>{busy ? '处理中…' : isCheck ? '检查几何' : '生成结果图层'}</button></footer>
     </div>
   </div>
 }

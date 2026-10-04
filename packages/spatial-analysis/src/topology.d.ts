@@ -8,7 +8,11 @@ declare module 'jsts/org/locationtech/jts/operation/relate/RelateOp.js' {
   }
 }
 declare module 'jsts/org/locationtech/jts/operation/valid/IsValidOp.js' {
-  export default class IsValidOp { constructor(geometry: unknown); isValid(): boolean }
+  export default class IsValidOp {
+    constructor(geometry: unknown)
+    isValid(): boolean
+    getValidationError(): { getErrorType(): number; getMessage(): string; getCoordinate(): { x: number; y: number } | null } | null
+  }
 }
 declare module 'jsts/org/locationtech/jts/index/strtree/STRtree.js' {
   export default class STRtree<T> {

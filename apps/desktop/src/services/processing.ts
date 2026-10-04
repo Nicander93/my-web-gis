@@ -23,6 +23,11 @@ export function processingInput(layerId: string, scope: ProcessingScope): GisFea
 
 /** A worker per operation lets cancellation stop computation and release its memory. */
 export function runProcessing(features: GisFeature[], options: ProcessingOptions, signal: AbortSignal, overlay: GisFeature[] = []): Promise<ProcessingResult> {
+  return runProcessingWorker<ProcessingResult>({ features, options, overlay }, signal)
+}
+
+/** Shared worker lifecycle for read-only reports and result-producing operations. */
+export function runProcessingWorker<T>(request: unknown, signal: AbortSignal): Promise<T> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) { reject(new DOMException('已取消', 'AbortError')); return }
     const worker = new Worker(new URL('../features/processing/processing.worker.ts', import.meta.url), { type: 'module' })
@@ -41,7 +46,7 @@ export function runProcessing(features: GisFeature[], options: ProcessingOptions
     }
     worker.onerror = () => { cleanup(); reject(new Error('处理程序未能运行，请重试。')) }
     try {
-      worker.postMessage({ features, options, overlay })
+      worker.postMessage(request)
     } catch {
       cleanup()
       reject(new Error('输入数据无法传递给处理程序。'))

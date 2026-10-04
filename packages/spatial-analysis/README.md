@@ -2,6 +2,14 @@
 
 面向业务开发的空间汇总与连接扩展。无 React、Zustand、OpenLayers 或项目 Store 依赖；输入为带字符串 `id`、GeoJSON 几何和 `properties` 的普通对象，输出为独立复制的要素。当前包仅在工作区内使用，尚未发布到 npm。
 
+## 几何诊断
+
+`checkGeometries([{ id, geometry }])` 接受只带 ID 和未知几何的输入，返回 `{ checked, valid, invalid, unsupported, issues }`，不要求业务属性，也不修改数据。
+
+每个问题包含 `featureId`、`inputIndex`（从零开始）、`status`、`code`、中文说明及可选的 WGS84 XY `location`。每个要素最多返回首个问题；报告不会因为一条坏几何停止整个批次。未支持的 GeometryCollection 等类型和跨日期变更线输入单独计数，不计为有效。投影坐标超出经纬度范围时报告坐标错误，调用方应先明确输入 CRS。
+
+复用 JSTS IsValidOp 检查单个几何的有效性，包括自交面、孔洞越界或嵌套、重叠多面部件等；有限坐标、非空部件、最小坐标数及 XY 环闭合先做结构检查。第三维保留但不参与拓扑判定；普通自交线不一定是无效几何。它不检查独立要素间的重叠、缝隙、贴边或业务拓扑规则，也不自动修复。无可用诊断坐标时 `location` 为 null。
+
 ## 公共 API
 
 ```ts
