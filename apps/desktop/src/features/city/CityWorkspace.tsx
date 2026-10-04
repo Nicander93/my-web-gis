@@ -18,6 +18,8 @@ import type { CityResourceType } from './CityResourceDialog'
 import { CityInspector, SceneSettings } from './CityInspector'
 import type { CityAction } from './city-actions'
 import { useCityDrawing } from './useCityDrawing'
+import { useCityGraphicEditing } from './useCityGraphicEditing'
+import { GraphicVertexInspector } from './GraphicVertexInspector'
 import type { CityDrawKind } from './useCityDrawing'
 import { CityRibbon } from './CityRibbon'
 import type { CityRibbonGroup } from './CityRibbon'
@@ -65,6 +67,10 @@ export function CityWorkspace() {
 
   function report(reason: unknown): void { setError(reason instanceof Error ? reason.message : '操作失败，请检查输入或资源地址。') }
   function notify(text: string): void { setError(''); setStatus(text) }
+  const graphicEditing = useCityGraphicEditing(runtime.current, result => {
+    if (result.changed) updateCity('编辑图形几何', scene => ({ ...scene, nodes: scene.nodes.map(item => item.id === result.id && item.type === 'graphic' ? { ...item, geometry: result.after } : item) }))
+    notify(result.changed ? '几何修改已应用，可一次撤销恢复' : '几何未发生变化')
+  }, report, () => notify('已取消几何编辑，原几何已恢复'))
 
   useEffect(() => {
     if (!target.current) return
@@ -93,6 +99,7 @@ export function CityWorkspace() {
     if (key !== cameraKey.current) { runtime.current.stopEditing(); setEditing(null); runtime.current.setCamera(city.camera); cameraKey.current = key }
     void runtime.current.updateScene(city).catch(() => { setError('部分资源未能加载，其他对象仍可使用。请选择失败对象检查数据源。') })
   }, [city, project.id, ready])
+  useEffect(() => { runtime.current?.setSelected(preview || !selected ? [] : [selected]) }, [selected, preview, ready])
 
   const drawing = useCityDrawing(runtime.current, (graphic, kind, id) => {
     try {
@@ -114,14 +121,19 @@ export function CityWorkspace() {
     } catch (reason) { report(reason) }
   }, report, () => notify('已取消绘制'))
 
-  function stopEditing(): void { runtime.current?.stopEditing(); setEditing(null) }
+  function stopEditing(): void { graphicEditing.cancel(); runtime.current?.stopEditing(); setEditing(null) }
   function select(id: string): void { drawing.cancel(); stopEditing(); setSelected(id); setPickedProperties({}); setInspectorTab('object'); useWorkspaceStore.getState().setRightOpen(true) }
   function startEditing(mode: EditMode): void {
     if (!node || !canEdit || !runtime.current) return
-    drawing.cancel()
+    drawing.cancel(); graphicEditing.cancel()
     try { runtime.current.startEditing(node.id, mode); setEditing(mode); notify('拖动彩色手柄调整模型；松手应用，Esc 取消当前拖动') } catch (reason) { report(reason) }
   }
   function startWater(id?: string): void { startDraw('water', id) }
+  function startGraphicEditing(): void {
+    if (!node || node.type !== 'graphic' || node.locked || !node.visible || states[node.id]?.state !== 'ready') return
+    drawing.cancel(); stopEditing(); setInspectorTab('object'); useWorkspaceStore.getState().setRightOpen(true)
+    graphicEditing.start(node.id); notify('编辑顶点：拖动调整 · 白色中点插入 · Enter 应用 · Esc 取消')
+  }
   function startDraw(kind: CityDrawKind, id?: string): void {
     if (!ready) return
     stopEditing(); drawing.start(kind, id)
@@ -206,7 +218,7 @@ export function CityWorkspace() {
       { label: '管理', commands: [command('properties','属性',Table2,() => showProperties('properties'),selectionReason),command('reload','刷新',RefreshCw,reload,!node ? '请先选择一个对象' : undefined),command('source','数据源',Globe,() => showProperties('source'),!node || node.type === 'water' || node.type === 'graphic' ? '此对象没有外部数据源' : undefined)] }
     ],
     scene: [{ label: '环境与地表', commands: [command('lighting','光照与时间',Sun,showScene),command('surface','底图与地形',Globe,showScene)] },{ label: '视角', commands: [command('camera','保存初始视角',Eye,saveCamera,ready ? undefined : '场景尚未就绪')] }],
-    edit: [{ label: '选择', commands: [command('select','选择',MousePointer2,() => { drawing.cancel(); stopEditing(); notify('选择对象') },undefined,!editing && !drawing.drawing)] },{ label: '模型变换', commands: [command('move','移动',Move,() => startEditing('translate'),transformReason,editing === 'translate'),command('rotate','旋转',RotateCw,() => startEditing('rotate'),transformReason,editing === 'rotate'),command('scale','缩放',Maximize2,() => startEditing('scale'),transformReason,editing === 'scale'),command('precise','精确定位',LocateFixed,() => showProperties('object'),transformReason)] },{ label: '整理', commands: [command('copy','复制',Copy,copyNode,!node ? '请先选择一个对象' : undefined),command('lock',node?.locked ? '解锁' : '锁定',LockKeyhole,toggleLock,!node ? '请先选择一个对象' : undefined,node?.locked),command('delete','删除',Trash2,() => setDeleting(true),!node ? '请先选择一个对象' : node.locked ? '对象已锁定，请先解锁' : undefined)] }],
+    edit: [{ label: '选择', commands: [command('select','选择',MousePointer2,() => { drawing.cancel(); stopEditing(); notify('选择对象') },undefined,!editing && !drawing.drawing && !graphicEditing.active)] },{ label: '图形几何', commands: [command('vertices','编辑顶点',Shapes,startGraphicEditing,selectionReason ?? (node?.type !== 'graphic' ? '请选择标绘图形' : undefined),graphicEditing.active)] },{ label: '模型变换', commands: [command('move','移动',Move,() => startEditing('translate'),transformReason,editing === 'translate'),command('rotate','旋转',RotateCw,() => startEditing('rotate'),transformReason,editing === 'rotate'),command('scale','缩放',Maximize2,() => startEditing('scale'),transformReason,editing === 'scale'),command('precise','精确定位',LocateFixed,() => showProperties('object'),transformReason)] },{ label: '整理', commands: [command('copy','复制',Copy,copyNode,!node ? '请先选择一个对象' : undefined),command('lock',node?.locked ? '解锁' : '锁定',LockKeyhole,toggleLock,!node ? '请先选择一个对象' : undefined,node?.locked),command('delete','删除',Trash2,() => setDeleting(true),!node ? '请先选择一个对象' : node.locked ? '对象已锁定，请先解锁' : undefined)] }],
     effects: [{ label: '全局效果', commands: [command('environment','雾与辉光',SlidersHorizontal,showScene)] },{ label: '局部效果', commands: [command('water','水面',Waves,() => startWater(),ready ? undefined : '场景尚未就绪',drawing.kind === 'water')] }],
     view: [{ label: '导航', commands: [command('fit','定位对象',LocateFixed,() => { if (node) void runtime.current?.flyTo(node.id).catch(report) },!node || states[node.id]?.state !== 'ready' ? '请选择已加载的对象' : undefined),command('initial','初始视角',Eye,() => runtime.current?.setCamera(city.camera))] },{ label: '工作区', commands: [command('left','场景树',Layers2,() => useWorkspaceStore.getState().setLeftOpen(!left.open),undefined,left.open),command('right','属性面板',PanelRightClose,() => useWorkspaceStore.getState().setRightOpen(!right.open),undefined,right.open),command('reset','恢复布局',PanelLeftClose,() => useWorkspaceStore.getState().resetLayout())] },{ label: '交付', commands: [command('export','导出场景',Download,() => { void exportScene() })] }]
   }
@@ -228,6 +240,7 @@ export function CityWorkspace() {
   useEffect(() => {
     function onAction(event: Event): void { handleAction.current((event as CustomEvent<CityAction>).detail) }
     function onHistory(event: KeyboardEvent): void {
+      if (event.defaultPrevented) return
       if (event.target instanceof HTMLElement && (event.target.closest('[role="dialog"]') || event.target.closest('input,textarea,select,[contenteditable="true"]'))) return
       if (event.key === 'Escape') { if (preview) togglePreview(); else { drawing.cancel(); stopEditing(); notify('已退出当前工具') }; return }
       if (preview) return
@@ -264,8 +277,8 @@ export function CityWorkspace() {
         </div>
         <footer className="city-panel-footer">单击选择 · 双击定位</footer><ResizeHandle orientation="horizontal" label="调整对象面板宽度" onResize={delta => useWorkspaceStore.getState().setLeftWidth(useWorkspaceStore.getState().left.width + delta)} />
       </aside>}
-      <section className={`city-canvas${drawing.drawing ? ' city-canvas--drawing' : ''}`} aria-label="三维视图" onDragOver={event => event.preventDefault()} onDrop={event => {
-        event.preventDefault(); if (drawing.drawing || preview) return
+      <section className={`city-canvas${drawing.drawing || graphicEditing.active ? ' city-canvas--drawing' : ''}`} aria-label="三维视图" onDragOver={event => event.preventDefault()} onDrop={event => {
+        event.preventDefault(); if (drawing.drawing || graphicEditing.active || preview) return
         const source = city.nodes.find(n => n.id === event.dataTransfer.getData('application/x-city-node'))
         if (source?.type !== 'model' || source.locked || !runtime.current) return
         const rect = runtime.current.viewer.canvas.getBoundingClientRect(), position = pickGround(event.clientX - rect.left, event.clientY - rect.top)
@@ -273,6 +286,7 @@ export function CityWorkspace() {
         try { stopEditing(); updateCity('拖动放置模型', scene => ({ ...scene, nodes: scene.nodes.map(item => item.id === source.id ? { ...source, position } : item) })); select(source.id); notify('模型位置已更新，可撤销恢复') } catch (reason) { report(reason) }
       }}>
         <div className="city-canvas__viewport" ref={target} />
+        {graphicEditing.state && <div className="city-drawing-bar"><Shapes size={16} aria-hidden="true" /><span>编辑几何 · {graphicEditing.state.geometry.positions.length} 个顶点</span><button className="button-primary" onClick={graphicEditing.finish}><Check size={14} aria-hidden="true" />应用修改</button><button className="button-secondary" onClick={() => { stopEditing(); notify('已取消几何编辑，原几何已恢复') }}>取消编辑</button></div>}
         {!leftVisible && !preview && <button className="city-panel-restore city-panel-restore--left" aria-label="展开对象面板" onClick={() => useWorkspaceStore.getState().setLeftOpen(true)}><Layers2 size={16} aria-hidden="true" /></button>}
         {!rightVisible && !preview && <button className="city-panel-restore city-panel-restore--right" aria-label="展开属性面板" onClick={() => useWorkspaceStore.getState().setRightOpen(true)}><PanelRightClose size={16} aria-hidden="true" /></button>}
         {drawing.drawing && <div className="city-drawing-bar"><DrawingIcon size={16} aria-hidden="true" /><span>{drawing.kind ? drawLabels[drawing.kind] : "绘制"} · {drawing.count} 个顶点</span><button className="button-primary" disabled={drawing.count < drawing.minimum} onClick={drawing.finish}><Check size={14} aria-hidden="true" />完成</button><button className="button-secondary" onClick={() => { drawing.cancel(); notify('已取消绘制') }}>取消</button></div>}
@@ -281,7 +295,7 @@ export function CityWorkspace() {
         <header className="panel-titlebar"><h2>属性</h2><button aria-label="收起属性面板" onClick={() => useWorkspaceStore.getState().setRightOpen(false)}><PanelRightClose size={15} aria-hidden="true" /></button></header>
         <div className="city-inspector-tabs" role="tablist" aria-label="属性范围"><button role="tab" aria-selected={inspectorTab === 'object'} onClick={() => setInspectorTab('object')}>对象</button><button role="tab" aria-selected={inspectorTab === 'scene'} onClick={() => setInspectorTab('scene')}>场景</button></div>
         <div className="city-panel__scroll" role="tabpanel" aria-label={inspectorTab === 'object' ? '对象属性' : '场景设置'}>
-          {inspectorTab === 'scene' ? <SceneSettings key={JSON.stringify([city.effects,city.basemap,city.terrain,city.lighting])} city={city} onSaveCamera={saveCamera} onApply={patch => { stopEditing(); updateCity('设置场景环境', scene => ({ ...scene, ...patch })); notify('场景设置已应用') }} /> : node ? <CityInspector pickedProperties={pickedProperties} section={inspectorSection} node={node} assetUrl={node.type !== 'water' && node.type !== 'graphic' ? city.assets[node.asset]?.url : undefined} error={states[node.id]?.error} onPatch={patchNode} onReload={reload} onResource={url => { if (node.type === 'water' || node.type === 'graphic') return; updateCity('更新三维资源地址', scene => ({ ...scene, assets: { ...scene.assets, [node.asset]: { ...scene.assets[node.asset], url } } })); notify('资源地址已更新，正在加载…') }} onDrawBoundary={() => startWater(node.id)} onDelete={() => setDeleting(true)} /> : <div className="city-empty"><MousePointer2 size={24} aria-hidden="true" /><strong>选择一个对象</strong><p>在视图中单击模型，或在左侧对象列表中选择。</p><button className="city-text-action" onClick={() => setInspectorTab('scene')}>编辑场景环境</button></div>}
+          {inspectorTab === 'scene' ? <SceneSettings key={JSON.stringify([city.effects,city.basemap,city.terrain,city.lighting])} city={city} onSaveCamera={saveCamera} onApply={patch => { stopEditing(); updateCity('设置场景环境', scene => ({ ...scene, ...patch })); notify('场景设置已应用') }} /> : graphicEditing.state ? <GraphicVertexInspector state={graphicEditing.state} onSelect={graphicEditing.selectVertex} onPosition={graphicEditing.setPosition} onInsert={graphicEditing.insertVertex} onRemove={graphicEditing.removeVertex} /> : node ? <CityInspector pickedProperties={pickedProperties} section={inspectorSection} node={node} assetUrl={node.type !== 'water' && node.type !== 'graphic' ? city.assets[node.asset]?.url : undefined} error={states[node.id]?.error} onPatch={patchNode} onReload={reload} onResource={url => { if (node.type === 'water' || node.type === 'graphic') return; updateCity('更新三维资源地址', scene => ({ ...scene, assets: { ...scene.assets, [node.asset]: { ...scene.assets[node.asset], url } } })); notify('资源地址已更新，正在加载…') }} onDrawBoundary={() => startWater(node.id)} onEditGeometry={startGraphicEditing} geometryDisabled={!!selectionReason} onDelete={() => setDeleting(true)} /> : <div className="city-empty"><MousePointer2 size={24} aria-hidden="true" /><strong>选择一个对象</strong><p>在视图中单击模型，或在左侧对象列表中选择。</p><button className="city-text-action" onClick={() => setInspectorTab('scene')}>编辑场景环境</button></div>}
         </div>
         <ResizeHandle orientation="horizontal" label="调整三维属性面板宽度" onResize={delta => useWorkspaceStore.getState().setRightWidth(useWorkspaceStore.getState().right.width - delta)} />
       </aside>}

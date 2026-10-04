@@ -1,6 +1,6 @@
 # 城市编辑器：产品交互与核心能力演进
 
-日期：2026-10-03；实现更新：2026-10-04。状态：首段通用绘制与分组功能区已实现，后续几何编辑、分类样式等继续按下文推进。
+日期：2026-10-03；实现更新：2026-10-04。状态：通用绘制、分组功能区、顶点编辑、结构化属性与字段标注已实现；下一阶段优先场景分组、多选和批量操作，再补分类样式。
 
 ## 产品定位
 
@@ -70,11 +70,11 @@
 | cesium-scene-runtime | 配置驱动图层复用、资源更换、选择、模型编辑与环境 | 绘制和编辑会话协调；提供一致的高层入口 |
 | Desktop useWaterDrawing | 点击采集、Enter/右键完成、Esc 取消 | 从 React hook 抽离通用绘制，桌面 hook 仅负责订阅和界面联动 |
 
-2026-10-04 已增加 GraphicLayer、Graphic、DrawSession 与点线面绘制。通用顶点编辑和完整三维分类样式 API 尚未实现。已有包提供 ESM 和类型声明，尚未发布 npm；对外发布仍需完成独立消费者验证和文档验收。
+2026-10-04 已增加 GraphicLayer、Graphic、DrawSession、EditSession 与点线面绘制、顶点编辑、属性字段标注。完整三维分类样式 API 尚未实现。已有包提供 ESM 和类型声明，尚未发布 npm；对外发布仍需完成独立消费者交互复核和发布验收。
 
 ## 目标 API 形态
 
-下面是后续设计示例，不可当作当前已可调用的代码。保持已有 `LayerCollection` 入口，避免为外观另造一个大型统一 MapEngine。
+下面展示已实现的核心入口；宿主回调自行接入 UI 和历史。保持已有 `LayerCollection` 入口，避免为外观另造一个大型统一 MapEngine。
 
 ```ts
 const layers = new LayerCollection(viewer)
@@ -96,15 +96,17 @@ const result = await draw.result
 if (result.status === 'completed') {
   const graphic = annotations.addGraphic(result.graphic)
   graphic.bindPopup({ fields: [{ field: 'name', label: '名称' }] })
-  // 以下顶点编辑仍为规划。
-  const edit = annotations.startEditing(graphic, { mode: 'vertices' })
-  edit.on('commit', ({ before, after }) => saveGeometryChange(before, after))
+  const edit = annotations.startEditing(graphic.id)
+  const edited = await edit.result
+  if (edited.status === 'completed' && edited.changed) {
+    saveGeometryChange(edited.id, edited.before, edited.after)
+  }
 }
 ```
 
 `startDraw` 返回包含 `result/finish/cancel` 的会话。结果以 `completed/cancelled` 明确区分；取消是正常用户操作，运行错误才拒绝 Promise。绘制完成返回纯定义，由宿主决定加入图层和保存；命名与 Mars3D 接近，提交边界采用本项目约定。
 
-Layer 不反向依赖编辑包。`startDraw/startEditing` 高层便利入口由绘制/编辑能力组合提供，具体模块归属在实现通用 Graphic 时确定。模型编辑继续保留现有 `TilesetEditor`，避免打断独立消费者。
+图形绘制和编辑位于 cesium-layer 内部，GraphicLayer 组合其便利入口；编辑模块仅以类型依赖 Graphic，避免运行时循环。模型编辑继续保留独立 `TilesetEditor`。
 
 ### 一致性要求
 
@@ -137,6 +139,31 @@ Layer 不反向依赖编辑包。`startDraw/startEditing` 高层便利入口由�
 验收：更新样式不重新下载原始数据；离开编辑模式后 Popup 正常工作；发布场景复现配置；连续渲染仅在有活动动态效果时启用；独立消费者打包与使用不依赖工作区源码。
 
 每段完成源码、测试、真实交互验证及消费者示例后再推进下一段。产品界面按能力逐步接入，避免一次性铺满未实现按钮。
+
+## 2026-10-04 顶点编辑与属性显示实现
+
+- 已实现 `GraphicLayer.startEditing(id)` / `EditSession`，移动顶点、中点插入、Delete 删除、精确经纬度和高度、取消恢复、相机输入恢复和会话清理。同一 Viewer 的绘制与顶点编辑共享输入所有权。
+- 编辑器在右侧显示顶点面板，画布提供应用/取消条；整个会话确认一次提交一条历史。切换对象、撤销、工具切换和权威场景更新取消未完成修改。选中高亮不写入保存样式。
+- 图形属性改为字段编辑表，支持文本、数字、布尔、null 和嵌套 JSON；空字段、重复字段和无效类型值阻止应用。新增 `style.labelField`，属性、标注、Popup 使用同一属性值；固定文字作为字段缺失时的后备。
+- 核心配置、两个 JSON Schema 和生成器同步；编辑器和只读 Viewer 复用字段标注。普通 Cesium consumer 使用同一 EditSession，包含编辑所选图形、应用、取消和撤销，未引入 UI 框架依赖。
+
+### 验证与剩余验收
+
+- 图层包 20、运行时 6、城市协议 14、场景协议 14 项测试通过；Desktop 全量 130 项通过、5 项环境相关测试跳过。图层测试覆盖拖动、插入、最小顶点数、取消、相机恢复、绘制/编辑互斥、锁定和字段 0/false；项目测试覆盖整体几何撤销/重做及序列化重开。
+- 城市协议、图层、运行时、Desktop、Viewer 和独立 consumer 构建通过；consumer 旧输出目录权限限制通过在 `.artifacts/city-edit-20261004/consumer` 构建解决。Cesium 包体和已有混合导入提示仍存在。
+- 实际浏览器及 Desktop 正式构建：城市样例、图形绘制、顶点拖动、增删、坐标预览、取消恢复原坐标、确认后整体撤销/重做、Delete 删除顶点而不删除对象、字段编辑与地图标签显示均已检查。
+- 实际生成 `城市数据编辑.webgis.json`，文件内容已核对修改后几何、数字属性 0、字段标注和 Popup。浏览器下载事件回执未返回，但文件已在 Downloads 落盘。随后通过界面重新打开文件的操作被自动审批拦截：账户用量不足导致审批无法完成，非安全性拒绝。不能将文件内容检查或序列化测试记为本轮真实界面重开完成。
+- 独立 consumer 本轮完成源码、核心测试和构建，新增编辑按钮的真实交互复核仍待补齐。窄屏验证和原生 Tauri 文件对话框验收也仍待补齐。
+
+### 下一阶段：城市数据整理
+
+1. 场景分组、组内排序和移动；先实现一层分组，暂不引入递归管理框架。
+2. Ctrl 多选、Shift 范围选择；批量显隐、锁定、复制、删除、分组，每次批量操作一条历史。
+3. 多选属性面板显示一致值/混合值；明确锁定、隐藏和加载失败对象的可用操作，选择与画布反馈同步。
+4. 保存、重开、撤销、预览验证分组和多选操作结果；复核独立消费者与窄屏，补齐上述验证缺口。
+5. 再接按属性分类着色和图例，优先标绘/GeoJSON 的常用分类显示，编辑器、协议和 Viewer 共用规则。
+
+验收场景：加载城市模型、道路和规划区，按用途分组；多选一组对象批量显隐/锁定，撤销一次恢复；编辑区域几何与属性并保存，重新打开后层级、几何、标签和 Popup 一致。
 
 ## 2026-10-04 首段实现
 

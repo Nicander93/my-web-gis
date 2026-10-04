@@ -30,3 +30,7 @@ Cesium 为 peer dependency。首版 0.1.0，MIT；尚未发布 npm。
 `runtime.startDraw({ type: 'point' | 'polyline' | 'polygon', heightMode: 'ground' | 'absolute' })` 返回核心 `DrawSession`。完成返回图形纯配置，由宿主更新 CityScene v2 并调用 `updateScene`；取消不修改配置。水面也可以由 polygon 结果生成。运行时协调绘制与模型编辑的切换、Popup 和拾取状态；`cancelDraw()` 取消当前绘制，权威场景更新及销毁也会取消会话。
 
 `setPreview(true)` 停止编辑/绘制并允许点击弹窗，`setPreview(false)` 关闭弹窗、保留选择事件。它管理交互状态；面板布局由宿主 UI 管理。`onSelect(id, properties)` 的第二个参数为拾取构件的实际属性，可用于属性面板和 Popup 字段预览。锁定对象禁止模型编辑；重命名、锁定、颜色和图形样式修改复用已加载资源。
+
+`startGraphicEditing(id, { onChange })` 返回 `EditSession`，提供点位置和线面顶点移动、增删及精确坐标输入。完成结果包含 `id/before/after/changed`，宿主确认后更新场景一次；取消恢复层内原几何。`cancelGraphicEditing()` 或 `stopEditing()` 清理会话。权威场景更新、绘制/模型工具切换、预览和销毁会取消未完成的顶点修改；迟到的取消结果不会恢复其他工具正在禁用的拾取。
+
+`setSelected(ids)` 设置临时图形高亮，不写入场景协议。图形 `style.labelField` 和属性在编辑器、只读 Viewer 共用渲染逻辑，属性更新后标签同步更新且无需重新挂载资源。

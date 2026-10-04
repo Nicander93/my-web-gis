@@ -8,6 +8,18 @@ import { loadCitySample,updateCity } from './city-commands'
 
 beforeEach(() => useProjectStore.getState().loadSnapshot({project:createProject(),featuresByDataset:{}}))
 describe('city workflow in the existing project store',() => {
+  it('commits geometry once, undoes/redoes the entire change and reopens attributes/field labels unchanged', () => {
+    updateCity('绘制面', city => { city.nodes.push({ id: 'area', name: 'Area', type: 'graphic', visible: true, geometry: { type: 'polygon', heightMode: 'ground', positions: [[116,39,0],[116.1,39,0],[116,39.1,0]] }, style: { color: '#336699', width: 3, pointSize: 10, labelField: 'zone' }, properties: { zone: '住宅区', height: 0, enabled: false }, popup: { fields: [{ field: 'zone', label: '用途' }] } }); return city })
+    const store = useProjectStore.getState(), before = store.getSnapshot()
+    updateCity('编辑图形几何', city => { const node = city.nodes[0]; if (node.type === 'graphic') node.geometry.positions = [[115.99,39,0],[116.05,39,0],[116.1,39,0],[116,39.1,0]]; return city })
+    const after = store.getSnapshot()
+    expect(store.undoEdit()).toBe(true); expect(store.getSnapshot()).toEqual(before)
+    expect(store.redoEdit()).toBe(true); expect(store.getSnapshot()).toEqual(after)
+    const reopened = parseProjectSnapshot(serializeProjectSnapshot(after))
+    store.loadSnapshot(reopened); expect(store.getSnapshot()).toEqual(after)
+    expect(compileProjectToScene(reopened).scene.city).toEqual(after.project.city)
+    expect(store.undoEdit()).toBe(false)
+  })
   it('commits one graphic, persists style and popup, and keeps ribbon preferences outside history',() => {
     const store = useProjectStore.getState()
     updateCity('绘制面', city => { city.nodes.push({ id: 'area', name: 'Area', type: 'graphic', visible: true, geometry: { type: 'polygon', heightMode: 'ground', positions: [[116,39,0],[116.1,39,0],[116,39.1,0]] }, style: { color: '#336699', width: 3, pointSize: 10, label: 'Zone' }, properties: { name: 'Area' }, popup: { fields: [{ field: 'name', label: '名称' }] } }); return city })

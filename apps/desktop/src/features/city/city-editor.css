@@ -104,3 +104,9 @@
 .city-attribute-list > div { display: grid; grid-template-columns: minmax(65px,1fr) minmax(0,1.3fr); gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--color-border); }
 .city-attribute-list dt { color: var(--color-text-secondary); overflow-wrap: anywhere; }
 .city-attribute-list dd { margin: 0; overflow-wrap: anywhere; }
+.city-attribute-editor { display: grid; gap: 10px; margin-bottom: 12px; }
+.city-attribute-editor fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.city-attribute-editor legend { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
+.city-attribute-editor__header { display: grid; grid-template-columns: minmax(0, 1fr) 70px 24px; gap: 4px; margin-bottom: 4px; align-items: center; }
+.city-attribute-editor input, .city-attribute-editor select, .city-attribute-editor textarea { width: 100%; min-width: 0; box-sizing: border-box; padding: 6px; border: 1px solid var(--border-color, #dce2dd); border-radius: 3px; background: var(--surface, #fff); color: inherit; font: inherit; }
+.city-attribute-editor textarea { min-height: 60px; resize: vertical; }

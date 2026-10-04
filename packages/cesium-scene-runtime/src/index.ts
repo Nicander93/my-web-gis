@@ -1,6 +1,6 @@
 import { Cartesian3, CesiumTerrainProvider, EllipsoidTerrainProvider, ImageryLayer, JulianDate, Math as CesiumMath, Resource, TileMapServiceImageryProvider, UrlTemplateImageryProvider, Viewer, buildModuleUrl } from 'cesium'
 import { BaseLayer, DrawSession, GeoJsonLayer, GraphicLayer, LayerCollection, ModelLayer, TilesetLayer } from '@desktop-webgis/cesium-layer'
-import type { DrawOptions } from '@desktop-webgis/cesium-layer'
+import type { DrawOptions, EditSession, GraphicEditOptions } from '@desktop-webgis/cesium-layer'
 import { TilesetEditor } from '@desktop-webgis/cesium-tileset-edit'
 import type { EditMode, TransformEditEvent } from '@desktop-webgis/cesium-tileset-edit'
 import { CityEffects, WaterLayer } from '@desktop-webgis/cesium-effects'
@@ -9,6 +9,7 @@ import type { CityCamera, CityNode, CityScene } from '@desktop-webgis/cesium-sce
 export type { EditMode, TransformEditEvent } from '@desktop-webgis/cesium-tileset-edit'
 export type { CityScene, CityNode, Transform } from '@desktop-webgis/cesium-scene-schema'
 export type { DrawOptions, DrawResult } from '@desktop-webgis/cesium-layer'
+export type { EditState, GraphicEditOptions, GraphicEditResult } from '@desktop-webgis/cesium-layer'
 
 export interface CityRuntimeOptions {
   target: HTMLElement | string
@@ -33,6 +34,8 @@ export class CitySceneRuntime {
   private scene: CityScene
   private editingId?: string
   private drawing?: DrawSession
+  private graphicEditing?: EditSession
+  private selectedIds: readonly string[] = []
   private destroyed = false
   private baseLayer?: ImageryLayer
   private environmentRevision = 0
@@ -57,7 +60,7 @@ export class CitySceneRuntime {
     if (this.destroyed) throw new Error('CitySceneRuntime 已销毁')
     const scene = parseCityScene(input)
     // Cancel an in-flight gesture before applying authoritative state (undo/import/hide).
-    this.cancelDraw(); this.editor.cancel()
+    this.cancelDraw(); this.cancelGraphicEditing(); this.editor.cancel()
     this.scene = scene
     this.effects.update(scene.effects)
     const lightingKey = JSON.stringify(scene.lighting ?? null)
@@ -88,6 +91,7 @@ export class CitySceneRuntime {
         layer.show = node.visible
         if ((layer instanceof TilesetLayer || layer instanceof ModelLayer) && (node.type === '3dtiles' || node.type === 'model')) layer.setTransform(node.transform)
         if (layer instanceof GraphicLayer && node.type === 'graphic') layer.getGraphic(node.id)?.setOptions(node)
+        if (layer instanceof GraphicLayer) layer.setSelected(this.selectedIds)
         if (layer instanceof GeoJsonLayer && node.type === 'geojson') layer.setColor(node.color ?? '#55a6ff')
         if (node.popup) layer.bindPopup(node.popup); else layer.unbindPopup()
         continue
@@ -102,6 +106,7 @@ export class CitySceneRuntime {
         const latest = this.nodes.get(node.id)
         if (latest && (latest.type === '3dtiles' || latest.type === 'model') && (mounted instanceof TilesetLayer || mounted instanceof ModelLayer)) mounted.setTransform(latest.transform)
         if (latest?.type === 'geojson' && mounted instanceof GeoJsonLayer) mounted.setColor(latest.color ?? '#55a6ff')
+        if (mounted instanceof GraphicLayer) mounted.setSelected(this.selectedIds)
         this.options.onLayerState?.(node.id, mounted.state)
       })
       this.options.onLayerState?.(node.id, 'loading')
@@ -115,14 +120,31 @@ export class CitySceneRuntime {
   }
 
   startEditing(id: string, mode: EditMode = 'translate'): void {
-    this.cancelDraw()
+    this.cancelDraw(); this.cancelGraphicEditing()
     const layer = this.layers.getLayer(id)
     if (!(layer instanceof TilesetLayer || layer instanceof ModelLayer)) throw new Error('请选择已加载的模型或 3D Tiles 图层')
     if (!layer.show) throw new Error('隐藏图层不能编辑')
     if (this.nodes.get(id)?.locked) throw new Error('锁定对象不能编辑')
     this.editor.setMode(mode); this.editor.startEditing(layer); this.editingId = id
   }
-  stopEditing(): void { this.editor.stopEditing(); this.editingId = undefined; this.layers.pickingEnabled = true }
+  stopEditing(): void { this.cancelGraphicEditing(); this.editor.stopEditing(); this.editingId = undefined; this.layers.pickingEnabled = true }
+  startGraphicEditing(id: string, options: GraphicEditOptions = {}): EditSession {
+    if (this.destroyed) throw new Error('CitySceneRuntime 已销毁')
+    const layer = this.layers.getLayer(id)
+    if (!(layer instanceof GraphicLayer)) throw new Error('请选择已加载的标绘图形')
+    const definition = layer.getGraphic(id)?.toJSON()
+    if (!definition || !layer.show || !definition.visible || definition.locked) throw new Error('隐藏或锁定图形不能编辑')
+    this.stopEditing(); this.cancelDraw()
+    const editing = layer.startEditing(id, options)
+    this.graphicEditing = editing; this.layers.pickingEnabled = false; this.layers.layers.forEach(item => item.closePopup())
+    void editing.result.then(() => { if (this.graphicEditing !== editing) return; this.graphicEditing = undefined; this.layers.pickingEnabled = true })
+    return editing
+  }
+  cancelGraphicEditing(): void { const editing = this.graphicEditing; this.graphicEditing = undefined; editing?.cancel(); this.layers.pickingEnabled = true }
+  setSelected(ids: readonly string[]): void {
+    this.selectedIds = [...ids]
+    this.layers.layers.forEach(layer => { if (layer instanceof GraphicLayer) layer.setSelected(ids) })
+  }
   startDraw(options: DrawOptions): DrawSession {
     if (this.destroyed) throw new Error('CitySceneRuntime 已销毁')
     this.stopEditing(); this.cancelDraw()
@@ -146,7 +168,7 @@ export class CitySceneRuntime {
   destroy(): void {
     if (this.destroyed) return
     this.destroyed = true; this.environmentRevision++
-    this.cancelDraw(); this.editor.destroy(); this.layers.destroy(); this.effects.destroy()
+    this.cancelDraw(); this.cancelGraphicEditing(); this.editor.destroy(); this.layers.destroy(); this.effects.destroy()
     this.viewer.destroy()
   }
 

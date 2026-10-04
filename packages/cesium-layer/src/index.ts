@@ -12,6 +12,9 @@ import type { LayerOptions } from './base-layer.js'
 export { Graphic, GraphicLayer } from './graphic-layer.js'
 export { DrawSession } from './draw.js'
 export type { DrawOptions, DrawResult } from './draw.js'
+export { EditSession } from './graphic-edit.js'
+export type { EditState, GraphicEditOptions, GraphicEditResult } from './graphic-edit.js'
+export { resolveGraphicLabel } from './graphic-label.js'
 
 export interface TransformLayer {
   readonly id: string

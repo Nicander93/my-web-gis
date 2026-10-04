@@ -2,6 +2,7 @@ import { Cartesian3, Cartographic, Color, ConstantPositionProperty, ConstantProp
 import type { Cartesian2, Entity, Viewer } from 'cesium'
 import type { GeoPosition, GraphicNode, GraphicStyle, GraphicType } from '@desktop-webgis/cesium-scene-schema'
 import { validateGraphic } from '@desktop-webgis/cesium-scene-schema'
+import { claimInteraction, releaseInteraction } from './interaction.js'
 
 export interface DrawOptions {
   type: GraphicType
@@ -13,7 +14,6 @@ export interface DrawOptions {
   onChange?: (count: number) => void
 }
 export type DrawResult = { status: 'completed'; graphic: GraphicNode } | { status: 'cancelled' }
-const sessions = new WeakMap<Viewer, DrawSession>()
 
 /** One cancellable gesture. It owns temporary geometry, never project history. */
 export class DrawSession {
@@ -37,7 +37,6 @@ export class DrawSession {
     if (!validateGraphic(definition)) throw new Error('绘制参数无效')
     this.options = structuredClone({ ...options, onChange: undefined })
     this.options.onChange = options.onChange
-    sessions.get(viewer)?.cancel()
     this.minimum = options.type === 'point' ? 1 : options.type === 'polyline' ? 2 : 3
     this.result = new Promise(resolve => { this.resolve = resolve })
     this.input = new ScreenSpaceEventHandler(viewer.canvas)
@@ -54,7 +53,7 @@ export class DrawSession {
     this.input.setInputAction(() => this.finish(), ScreenSpaceEventType.RIGHT_CLICK)
     this.keyTarget?.addEventListener('keydown', this.handleKey, true)
     this.keyTarget?.addEventListener('blur', this.cancel)
-    sessions.set(viewer, this)
+    claimInteraction(viewer, this)
   }
   get count(): number { return this.points.length }
   get isActive(): boolean { return this.active }
@@ -110,6 +109,6 @@ export class DrawSession {
     this.keyTarget?.removeEventListener('blur', this.cancel)
     if (!this.viewer.isDestroyed()) { if (this.preview) this.viewer.entities.remove(this.preview); this.viewer.scene.requestRender() }
     this.preview = undefined
-    if (sessions.get(this.viewer) === this) sessions.delete(this.viewer)
+    releaseInteraction(this.viewer, this)
   }
 }

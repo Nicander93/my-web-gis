@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { isCityResourceUrl } from '@desktop-webgis/cesium-scene-schema'
 import type { CityNode, CityScene, GeoPosition, GraphicNode, PopupDefinition, Transform, WaterNode } from '@desktop-webgis/cesium-scene-schema'
+import { GraphicAttributes } from './GraphicAttributes'
 
 export type CityInspectorSection = 'object' | 'popup' | 'source' | 'style' | 'properties'
 
@@ -15,10 +16,12 @@ interface CityInspectorProps {
   onResource(url: string): void
   onReload(): void
   onDrawBoundary(): void
+  onEditGeometry(): void
+  geometryDisabled?: boolean
   onDelete(): void
 }
 
-export function CityInspector({ node, section = 'object', pickedProperties = {}, assetUrl, error, onPatch, onResource, onReload, onDrawBoundary, onDelete }: CityInspectorProps) {
+export function CityInspector({ node, section = 'object', pickedProperties = {}, assetUrl, error, onPatch, onResource, onReload, onDrawBoundary, onEditGeometry, geometryDisabled, onDelete }: CityInspectorProps) {
   const properties = node.type === 'graphic' ? { name: node.name, ...node.properties } : pickedProperties
   return <fieldset className="city-properties city-properties--fields" disabled={node.locked}>
     <section className="city-property-section">
@@ -29,9 +32,10 @@ export function CityInspector({ node, section = 'object', pickedProperties = {},
     {section === 'object' && node.type === 'model' && <PositionFields key={`${node.id}:${JSON.stringify(node.position)}`} position={node.position} onApply={position => onPatch({ position } as Partial<CityNode>, '设置模型地理位置')} />}
     {section === 'object' && (node.type === 'model' || node.type === '3dtiles') && <TransformFields key={`${node.id}:${JSON.stringify(node.transform)}`} transform={node.transform} onApply={transform => onPatch({ transform } as Partial<CityNode>, '输入模型变换')} />}
     {section === 'object' && node.type === 'water' && <WaterFields key={`${node.id}:${JSON.stringify(node)}`} node={node} onApply={patch => onPatch(patch, '修改水面材质')} onDrawBoundary={onDrawBoundary} />}
+    {section === 'object' && node.type === 'graphic' && <section className="city-property-section"><h3>几何</h3><p className="editor-help">{node.geometry.positions.length} 个顶点 · {node.geometry.heightMode === 'ground' ? '贴地' : '绝对高度'}</p><button className="button-secondary" disabled={geometryDisabled} onClick={onEditGeometry}>编辑顶点与坐标</button></section>}
     {node.type === 'graphic' && (section === 'style' || section === 'object') && <GraphicFields key={`${node.id}:${JSON.stringify(node.style)}`} node={node} onPatch={onPatch} />}
     {node.type === 'geojson' && section === 'style' && <section className="city-property-section"><h3>矢量样式</h3><label className="editor-field">颜色<input type="color" value={node.color ?? '#55a6ff'} onChange={event => onPatch({ color: event.target.value }, '设置矢量颜色')} /></label></section>}
-    {node.type === 'graphic' && section === 'properties' && <GraphicProperties key={`${node.id}:${JSON.stringify(node.properties)}`} node={node} onPatch={onPatch} />}
+    {node.type === 'graphic' && section === 'properties' && <GraphicAttributes key={`${node.id}:${JSON.stringify(node.properties)}`} node={node} onApply={properties => onPatch({ properties }, '设置图形属性')} />}
     {section === 'properties' && node.type !== 'graphic' && <section className="city-property-section"><h3>拾取对象属性</h3>{Object.keys(properties).length ? <dl className="city-attribute-list">{Object.entries(properties).map(([key,value]) => <div key={key}><dt>{key}</dt><dd>{displayValue(value)}</dd></div>)}</dl> : <p className="editor-help">在三维视图中单击构件，查看实际属性。</p>}</section>}
     <PopupFields properties={properties} open={section === 'popup'} key={`${node.id}:${JSON.stringify(node.popup)}`} node={node} onApply={popup => onPatch({ popup }, '设置属性弹窗')} />
     {assetUrl && <ResourceFields open={section === 'source'} key={`${node.id}:${assetUrl}`} url={assetUrl} onApply={onResource} onReload={onReload} />}
@@ -46,15 +50,10 @@ function GraphicFields({ node, onPatch }: { node: GraphicNode; onPatch: CityInsp
     <h3>样式与标注</h3><p className="editor-help">{node.geometry.positions.length} 个顶点 · {node.geometry.heightMode === 'ground' ? '贴地' : '绝对高度'}</p>
     <label className="editor-field">颜色<input type="color" value={style.color.slice(0,7)} onChange={event => setStyle({ ...style, color: event.target.value })} /></label>
     <label className="editor-field">{node.geometry.type === 'point' ? '点大小（像素）' : '线宽（像素）'}<input type="number" required min="1" max={node.geometry.type === 'point' ? 128 : 64} value={node.geometry.type === 'point' ? style.pointSize : style.width} onChange={event => setStyle({ ...style, [node.geometry.type === 'point' ? 'pointSize' : 'width']: Number(event.target.value) })} /></label>
-    <label className="editor-field">标注文字<input value={style.label ?? ''} onChange={event => setStyle({ ...style, label: event.target.value })} /></label>
+    <label className="editor-field">标注字段<select value={style.labelField ?? ''} onChange={event => setStyle({ ...style, labelField: event.target.value || undefined })}><option value="">固定文字</option>{[...new Set(['name', ...Object.keys(node.properties), ...(style.labelField ? [style.labelField] : [])])].map(field => <option key={field} value={field}>{field}{field in node.properties || field === 'name' ? '' : '（字段已移除）'}</option>)}</select></label>
+    <label className="editor-field">{style.labelField ? '字段缺失时的文字' : '标注文字'}<input value={style.label ?? ''} onChange={event => setStyle({ ...style, label: event.target.value })} /></label>
+    {style.labelField && <p className="editor-help">标注随文本、数字和布尔属性自动更新。</p>}
     {error && <p className="editor-error" role="alert">{error}</p>}<button type="submit" className="button-primary">应用样式</button>
-  </form>
-}
-
-function GraphicProperties({ node, onPatch }: { node: GraphicNode; onPatch: CityInspectorProps['onPatch'] }) {
-  const [draft, setDraft] = useState(JSON.stringify(node.properties, null, 2)), [error, setError] = useState('')
-  return <form className="city-property-section" onSubmit={event => { event.preventDefault(); try { const value: unknown = JSON.parse(draft); if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('属性必须是 JSON 对象'); onPatch({ properties: value as Record<string, unknown> }, '设置图形属性'); setError('') } catch (reason) { setError(reason instanceof Error ? reason.message : '属性格式无效') } }}>
-    <h3>对象属性</h3><label className="editor-field">属性 JSON<textarea spellCheck={false} value={draft} onChange={event => setDraft(event.target.value)} /></label>{error && <p className="editor-error" role="alert">{error}</p>}<button className="button-primary" type="submit">应用属性</button>
   </form>
 }
 

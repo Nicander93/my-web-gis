@@ -10,7 +10,14 @@ const viewer = new Viewer('map', { baseLayer: false, infoBox: false, selectionIn
 const layers = new LayerCollection(viewer)
 const annotations = new GraphicLayer({ id: 'annotations', name: '标绘' })
 let drawing
+let graphicEditing, selectedGraphic
 function cancelDrawing() { const previous = drawing; drawing = undefined; previous?.cancel(); layers.pickingEnabled = true }
+function cancelGraphicEditing() { const previous = graphicEditing; graphicEditing = undefined; previous?.cancel(); layers.pickingEnabled = true }
+annotations.on('click', event => {
+  const id = event.picked?.id?.id
+  if (!annotations.getGraphic(id)) return
+  selectedGraphic = id; annotations.setSelected([id])
+})
 const city = new TilesetLayer({ id: 'blocks', name: '城市街区', url: './city-sample/tileset.json' })
 city.bindPopup({ title: '城市样例', fields: [{ field: 'name', label: '名称' }] })
 const water = new WaterLayer({ id: 'water', boundary: [[116.394,39.905,0],[116.397,39.905,0],[116.397,39.91,0],[116.394,39.91,0]], height: 2 })
@@ -24,14 +31,29 @@ const editor = new TilesetEditor(viewer, {
   onCommit: event => { layers.pickingEnabled = true; history.push(event); status.textContent = `已变换 ${event.id}，可撤销` }
 })
 document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => {
-  cancelDrawing()
+  cancelDrawing(); cancelGraphicEditing()
   try { editor.setMode(button.dataset.mode); editor.startEditing(city); status.textContent = '拖动彩色手柄；Esc 取消' }
   catch (error) { status.textContent = error.message }
 }))
-document.getElementById('stop').addEventListener('click', () => { cancelDrawing(); editor.stopEditing() })
+document.getElementById('stop').addEventListener('click', () => { cancelDrawing(); cancelGraphicEditing(); editor.stopEditing(); status.textContent = '已结束编辑；未应用的图形修改已恢复' })
+document.getElementById('edit-graphic').addEventListener('click', async () => {
+  if (!selectedGraphic) { status.textContent = '请先绘制或选择一个图形'; return }
+  try {
+    editor.stopEditing(); cancelDrawing(); cancelGraphicEditing()
+    const session = annotations.startEditing(selectedGraphic)
+    graphicEditing = session; layers.pickingEnabled = false
+    status.textContent = '拖动顶点，点击白色中点插入；Enter 应用，Esc 取消'
+    const result = await session.result
+    if (graphicEditing !== session) return
+    graphicEditing = undefined; layers.pickingEnabled = true
+    if (result.status === 'completed' && result.changed) history.push({ ...result, kind: 'graphic' })
+    status.textContent = result.status === 'completed' ? '几何修改已应用，可撤销' : '已取消几何修改'
+  } catch (error) { layers.pickingEnabled = true; status.textContent = error.message }
+})
+document.getElementById('apply-graphic').addEventListener('click', () => graphicEditing?.finish())
 document.querySelectorAll('[data-draw]').forEach(button => button.addEventListener('click', async () => {
   try {
-    editor.stopEditing(); cancelDrawing()
+    editor.stopEditing(); cancelDrawing(); cancelGraphicEditing()
     const session = annotations.startDraw({ type: button.dataset.draw, properties: { name: '独立标绘' } })
     drawing = session; layers.pickingEnabled = false
     status.textContent = '单击采集；Enter 或右键完成，Esc 取消'
@@ -40,13 +62,14 @@ document.querySelectorAll('[data-draw]').forEach(button => button.addEventListen
     drawing = undefined; layers.pickingEnabled = true
     if (result.status === 'completed') {
       annotations.addGraphic(result.graphic).bindPopup({ title: '标绘', fields: [{ field: 'name', label: '名称' }] })
+      selectedGraphic = result.graphic.id; annotations.setSelected([selectedGraphic])
       status.textContent = `已创建图形，共 ${annotations.allGraphics.length} 个；单击查看属性`
     } else status.textContent = '已取消绘制'
   } catch (error) { layers.pickingEnabled = true; status.textContent = error.message }
 }))
 document.getElementById('water').addEventListener('click', () => { water.show = !water.show })
-document.getElementById('undo').addEventListener('click', () => { editor.cancel(); const event = history.pop(); if (event) { city.setTransform(event.before); editor.refresh(); status.textContent = '已撤销上次变换' } })
-window.addEventListener('pagehide', () => { cancelDrawing(); editor.destroy(); layers.destroy(); effects.destroy(); viewer.destroy() }, { once: true })
+document.getElementById('undo').addEventListener('click', () => { cancelDrawing(); cancelGraphicEditing(); editor.cancel(); const event = history.pop(); if (event) { if (event.kind === 'graphic') annotations.getGraphic(event.id)?.setOptions({ geometry: event.before }); else { city.setTransform(event.before); editor.refresh() }; status.textContent = '已撤销上次修改' } })
+window.addEventListener('pagehide', () => { cancelDrawing(); cancelGraphicEditing(); editor.destroy(); layers.destroy(); effects.destroy(); viewer.destroy() }, { once: true })
 try {
   const imagery = await TileMapServiceImageryProvider.fromUrl(new URL('cesium/Assets/Textures/NaturalEarthII', document.baseURI).href)
   viewer.imageryLayers.addImageryProvider(imagery)

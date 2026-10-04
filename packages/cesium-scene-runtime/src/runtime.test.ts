@@ -33,6 +33,26 @@ function setup() {
   return { scene, viewer, runtime: new CitySceneRuntime(viewer, { target: 'map', scene }) }
 }
 describe('incremental scene reconciliation', () => {
+  it('cancels vertex previews when switching to drawing or receiving authoritative geometry', async () => {
+    const s = setup()
+    s.viewer.entities = new EntityCollection()
+    s.viewer.dataSources = { add: vi.fn(async source => source), remove: vi.fn() } as unknown as Viewer['dataSources']
+    s.scene.nodes.push({ id: 'p', name: 'Point', type: 'graphic', visible: true, geometry: { type: 'point', heightMode: 'ground', positions: [[116,39,0]] }, style: { color: '#336699', width: 3, pointSize: 10 }, properties: {} })
+    await s.runtime.updateScene(s.scene)
+    const editing = s.runtime.startGraphicEditing('p'); editing.setVertexPosition(0, [117,39,0])
+    expect(s.scene.nodes[1].type === 'graphic' && s.scene.nodes[1].geometry.positions[0][0]).toBe(116)
+    const drawing = s.runtime.startDraw({ type: 'polygon' })
+    await expect(editing.result).resolves.toEqual({ status: 'cancelled' }); expect(s.runtime.layers.pickingEnabled).toBe(false)
+    s.runtime.cancelDraw(); await drawing.result
+    const second = s.runtime.startGraphicEditing('p'); second.setVertexPosition(0, [118,39,0])
+    const node = s.scene.nodes[1]; if (node.type === 'graphic') node.geometry.positions[0] = [115,39,0]
+    await s.runtime.updateScene(s.scene)
+    await expect(second.result).resolves.toEqual({ status: 'cancelled' })
+    const third = s.runtime.startGraphicEditing('p'); expect(third.state.geometry.positions[0][0]).toBe(115)
+    s.runtime.setPreview(true); await expect(third.result).resolves.toEqual({ status: 'cancelled' })
+    expect(s.viewer.entities.values).toHaveLength(0); expect(s.runtime.layers.pickingEnabled).toBe(true)
+    s.runtime.destroy()
+  })
   it('switches draw to model editing without a late cancellation restoring picking', async () => {
     const s = setup(); await s.runtime.updateScene(s.scene)
     const drawing = s.runtime.startDraw({ type: 'polygon' })

@@ -39,7 +39,7 @@ interface NodeBase {
 
 export type GraphicType = 'point' | 'polyline' | 'polygon'
 export interface GraphicGeometry { type: GraphicType; positions: GeoPosition[]; heightMode: 'ground' | 'absolute' }
-export interface GraphicStyle { color: string; width: number; pointSize: number; label?: string }
+export interface GraphicStyle { color: string; width: number; pointSize: number; label?: string; labelField?: string }
 export interface GraphicNode extends NodeBase {
   type: 'graphic'
   geometry: GraphicGeometry
@@ -57,7 +57,7 @@ export function validateGraphic(value: unknown): value is GraphicNode {
   if (new Set(geometry.positions.map(p => geometry.type === 'polygon' ? `${p[0]},${p[1]}` : JSON.stringify(p))).size < minimum) return false
   if (value.locked !== undefined && typeof value.locked !== 'boolean') return false
   if (value.popup !== undefined && !validatePopup(value.popup)) return false
-  return record(style) && typeof style.color === 'string' && /^#[\da-f]{6}([\da-f]{2})?$/i.test(style.color) && finite(style.width) && style.width > 0 && style.width <= 64 && finite(style.pointSize) && style.pointSize > 0 && style.pointSize <= 128 && (style.label === undefined || typeof style.label === 'string') && record(value.properties) && jsonValue(value.properties)
+  return record(style) && typeof style.color === 'string' && /^#[\da-f]{6}([\da-f]{2})?$/i.test(style.color) && finite(style.width) && style.width > 0 && style.width <= 64 && finite(style.pointSize) && style.pointSize > 0 && style.pointSize <= 128 && (style.label === undefined || typeof style.label === 'string') && (style.labelField === undefined || typeof style.labelField === 'string' && !!style.labelField.trim()) && record(value.properties) && jsonValue(value.properties)
 }
 
 function validatePopup(value: unknown): value is PopupDefinition {

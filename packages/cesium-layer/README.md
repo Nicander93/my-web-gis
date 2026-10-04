@@ -46,8 +46,26 @@ if (result.status === 'completed') {
 const savedGraphics = annotations.toJSON()
 ```
 
-单击采集，线至少 2 点、面至少 3 点；点单击后完成。Enter/右键或 `draw.finish()` 完成，Esc/失焦或 `draw.cancel()` 取消，Backspace 移除最后一点。一次 Viewer 只允许一个 DrawSession；隐藏或移除图形层会取消其会话。会话只拥有临时预览；完成返回纯配置，**不会自动入层**，历史和保存由宿主接入。使用 LayerCollection 时，宿主应在绘制期间关闭 `pickingEnabled`，结束后恢复；CitySceneRuntime 已协调此行为。
+单击采集，线至少 2 点、面至少 3 点；点单击后完成。Enter/右键或 `draw.finish()` 完成，Esc/失焦或 `draw.cancel()` 取消，Backspace 移除最后一点。同一 Viewer 的绘制和顶点编辑共用一个输入所有者，新会话取消旧会话；隐藏或移除图形层也会取消。绘制完成返回纯配置，**不会自动入层**，历史和保存由宿主接入。使用 LayerCollection 时，宿主应在会话期间关闭 `pickingEnabled`，结束后恢复；CitySceneRuntime 已协调此行为。
 
-`ground` 拾取地形/椭球并贴地渲染；`absolute` 优先深度拾取模型表面，失败时拾取地表，并保留椭球高度。坐标统一为 WGS84 `[经度,纬度,高度]`。样式包括颜色、线宽、点大小和固定文本标签；暂不提供顶点拖拽、分类样式或吸附。
+`ground` 拾取地形/椭球并贴地渲染；绘制时 `absolute` 优先深度拾取模型表面，失败时拾取地表，并保留椭球高度。坐标统一为 WGS84 `[经度,纬度,高度]`。样式包括颜色、线宽、点大小和标签；`style.labelField` 读取文本、数字、布尔属性，缺失、null 或结构化值使用 `style.label` 作为后备。`resolveGraphicLabel(node)` 可独立计算标签，数字 0 和布尔 false 不会被丢弃。分类样式和吸附仍待实现。
 
 `getGraphic/addGraphic/removeGraphic` 管理稳定 ID；`Graphic.toJSON()` 返回独立克隆。属性只能包含 JSON 值；拒绝循环引用、回调、Cesium 实例和非有限数。更新图形或 GeoJSON 颜色不重新下载资源。`layers.popupsEnabled` 可关闭点击弹窗，同时保留选择事件。
+
+## 顶点编辑
+
+```ts
+const edit = annotations.startEditing(graphic.id, {
+  onChange: ({ geometry, selectedIndex }) => updateCoordinatePanel(geometry, selectedIndex)
+})
+const result = await edit.result
+if (result.status === 'completed' && result.changed) {
+  saveOneHistoryCommand(result.id, result.before, result.after)
+}
+```
+
+`EditSession` 预览会直接更新层内 Graphic，宿主项目配置和历史在完成前保持原值。`finish()` / Enter 返回独立克隆的 before/after；`cancel()` / Esc / 失焦恢复原几何。删除图形、隐藏或卸载图层会取消并移除临时手柄。宿主应在调用 `toJSON()` 保存前完成或取消编辑，避免保存预览数据。
+
+拖动实心顶点移动经纬度，点击白色中点插入顶点，Delete / Backspace 删除当前顶点；最少保留点 1、线 2、面 3 个顶点。拖动保留原高度，`setVertexPosition(index, [经度,纬度,高度])` 可精确修改。`selectVertex`、`insertVertex(afterIndex, position?)`、`removeVertex` 和独立克隆的 `state` 支持宿主坐标面板。取消或结束拖动恢复相机原输入状态；锁定和隐藏图形不能开始编辑。
+
+`setSelected(ids)` 只改变绘制高亮，不修改可保存样式。运行时使用同一 GraphicLayer API，独立 consumer 也提供选中图形编辑、应用、取消与撤销示例。
