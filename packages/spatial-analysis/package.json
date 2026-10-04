@@ -19,6 +19,7 @@
     "build": "tsc -p tsconfig.json && esbuild src/index.ts --bundle --format=esm --platform=neutral --target=es2022 --outfile=dist/index.js",
     "test": "vitest run",
     "benchmark": "node examples/benchmark.mjs",
+    "benchmark:complex": "node examples/complex-benchmark.mjs",
     "test:consumer": "node examples/consumer.mjs && tsc --noEmit --strict --target es2022 --module nodenext --moduleResolution nodenext examples/consumer.ts"
   },
   "dependencies": {

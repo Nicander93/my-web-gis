@@ -34,7 +34,7 @@ export type ProcessingOptions = GeometryProcessingOptions
   | { tool: 'calculate-field'; field: string; expression: string }
   | { tool: 'summarize-location'; predicate: 'intersects' | 'within'; field?: string; prefix: string }
   | { tool: 'attribute-join'; inputKey: string; joinKey: string; fields: string[]; prefix: string; mode: 'left' | 'inner' }
-  | { tool: 'spatial-join'; predicate: 'intersects' | 'within'; fields: string[]; prefix: string; mode: 'left' | 'inner' }
+  | { tool: 'spatial-join'; predicate: 'intersects' | 'within'; fields: string[]; prefix: string; mode: 'left' | 'inner'; maxResults?: number }
 
 export interface ProcessingResult {
   features: GisFeature[]

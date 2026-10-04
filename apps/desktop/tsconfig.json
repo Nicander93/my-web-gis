@@ -12,5 +12,5 @@
       "@desktop-webgis/ogc-io": ["../../packages/ogc-io/src/index.ts"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "benchmarks/**/*.ts"]
 }

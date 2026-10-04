@@ -68,6 +68,30 @@ describe('processing workflow', () => {
     return TestWorker
   }
 
+  it('a spatial result limit fails atomically and is retained in successful provenance', async () => {
+    const layerId = useProjectStore.getState().selectedLayerId!
+    const area: GisFeature = { id: 'area', properties: { code: 'A' }, geometry: { type: 'Polygon', coordinates: [[[116, 39], [117, 39], [117, 41], [116, 41], [116, 39]]] } }
+    useProjectStore.getState().addLayer('join-areas', '重叠区域', [area, { ...area, id: 'area2' }], 'polygon')
+    const overlayId = useProjectStore.getState().selectedLayerId!
+    const before = useProjectStore.getState().getSnapshot()
+    const workers = fakeWorker()
+    const options: ProcessingOptions = { tool: 'spatial-join', predicate: 'within', fields: ['code'], prefix: 'region_', mode: 'inner', maxResults: 5 }
+    const args = { layerId, scope: 'all' as const, overlay: { layerId: overlayId, scope: 'all' as const }, options, name: '有限结果', signal: new AbortController().signal }
+    const failure = processingCommands.run(args)
+    let worker = workers.current
+    try { executeProcessing(worker.payload.features, worker.payload.options, worker.payload.overlay) }
+    catch (error) { worker.onmessage!({ data: { error: (error as Error).message } }) }
+    await expect(failure).rejects.toThrow('超过 5')
+    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
+    const pending = processingCommands.run({ ...args, options: { ...options, maxResults: 6 } })
+    worker = workers.current
+    worker.onmessage!({ data: { result: executeProcessing(worker.payload.features, worker.payload.options, worker.payload.overlay) } })
+    const result = await pending
+    const snapshot = parseProjectSnapshot(serializeProjectSnapshot(useProjectStore.getState().getSnapshot()))
+    const layer = snapshot.project.layers.find(layer => layer.id === result.layerId)!
+    expect(snapshot.project.datasets.find(dataset => dataset.id === layer.datasetId)).toMatchObject({ processing: { options: { maxResults: 6 } } })
+  })
+
   it('measurement fields support selection, independent data, undo and serialized provenance', async () => {
     const area: GisFeature = { id: 'area', properties: { population: 100 }, geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] } }
     useProjectStore.getState().addLayer('areas', '区域', [area, { ...area, id: 'other' }], 'polygon')

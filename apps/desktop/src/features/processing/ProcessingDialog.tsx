@@ -41,6 +41,7 @@ export function ProcessingDialog({ onClose }: { onClose(): void }) {
   const [joinKey, setJoinKey] = useState('')
   const [joinFields, setJoinFields] = useState<string[]>([])
   const [joinMode, setJoinMode] = useState<'left' | 'inner'>('left')
+  const [resultLimit, setResultLimit] = useState('100000')
   const [distance, setDistance] = useState('100')
   const [unit, setUnit] = useState<'meters' | 'kilometers'>('meters')
   const [name, setName] = useState('')
@@ -163,7 +164,7 @@ export function ProcessingDialog({ onClose }: { onClose(): void }) {
         : tool === 'dissolve' ? { tool, field: fields.includes(groupField) ? groupField : undefined }
         : tool === 'summarize-location' ? { tool, predicate: predicate === 'within' ? 'within' : 'intersects', field: summaryField || undefined, prefix }
         : tool === 'attribute-join' ? { tool, inputKey, joinKey, fields: joinFields, prefix, mode: joinMode }
-        : tool === 'spatial-join' ? { tool, predicate: predicate === 'within' ? 'within' : 'intersects', fields: joinFields, prefix, mode: joinMode }
+        : tool === 'spatial-join' ? { tool, predicate: predicate === 'within' ? 'within' : 'intersects', fields: joinFields, prefix, mode: joinMode, maxResults: Number(resultLimit) }
         : tool === 'extract-location' ? { tool, predicate } : { tool }
       if (tool === 'buffer' && (!Number.isFinite(Number(distance)) || Number(distance) <= 0 || Number(distance) * (unit === 'kilometers' ? 1000 : 1) > 1000000)) {
         throw new Error('缓冲距离必须大于 0，且不超过 1000 千米。')
@@ -230,6 +231,7 @@ export function ProcessingDialog({ onClose }: { onClose(): void }) {
               </> : <label>空间关系<select value={predicate} disabled={busy} onChange={event => { setPredicate(event.target.value as typeof predicate); setSuccess(null) }}><option value="intersects">相交（含边界）</option><option value="within">输入完整位于第二要素内（要求内部相交）</option></select></label>}
               <fieldset disabled={busy}><legend>带入字段</legend>{overlayFields.map(field => <label key={field}><input type="checkbox" checked={joinFields.includes(field)} onChange={event => { setJoinFields(previous => event.target.checked ? [...previous, field] : previous.filter(item => item !== field)); setSuccess(null) }} />{field}</label>)}</fieldset>
               <label>连接方式<select value={joinMode} disabled={busy} onChange={event => { setJoinMode(event.target.value as typeof joinMode); setSuccess(null) }}><option value="left">保留全部输入（左连接）</option><option value="inner">仅保留匹配输入（内连接）</option></select></label>
+              {tool === 'spatial-join' && <label>结果数量上限<input type="number" min="1" step="1" value={resultLimit} disabled={busy} onChange={event => { setResultLimit(event.target.value); setSuccess(null) }} /><p className="processing-description">默认 100,000 条，重叠区域可放大结果。超限时整个任务失败，不截断结果；提高上限会增加内存与返回耗时。</p></label>}
               <p className="processing-description">{tool === 'attribute-join' ? '数字 1 与文本“1”不同，文本区分大小写且不自动去空格。空值不匹配；重复的非空连接键会报错。' : '边界接触属于相交；完整位于其中要求内部相交。多个匹配会增加结果数量；第二要素不会先融合。'}缺失的带入字段为 null。</p>
             </>}
             {(tool === 'summarize-location' || isJoin) && <><label>新增字段前缀<input value={prefix} disabled={busy} onChange={event => { setPrefix(event.target.value); setSuccess(null) }} /></label><p className="processing-description">{tool === 'summarize-location' ? `输出：${prefix}count${summaryField ? `、${prefix}sum、${prefix}mean` : ''}` : `带入字段使用 ${prefix || '无'} 前缀`}；已有字段同名时会报错，不覆盖原属性。</p></>}

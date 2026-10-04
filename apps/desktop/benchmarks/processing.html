@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>空间处理 Worker 基准</title>
+<style>body{font:15px/1.6 system-ui,sans-serif;margin:32px auto;padding:0 24px;max-width:1000px;background:#f7f8f6;color:#202821}button{font:inherit;padding:8px 16px;margin:8px 8px 8px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:white;border:1px solid #d5dcd5;padding:16px}label{display:block}h1{font-size:24px}</style></head>
+<body><h1>空间处理 Worker 基准</h1><p>运行应用实际 Worker 和取消服务；使用独立合成数据，不读取项目。耗时包含冷启动及双向传输。10ms 定时器最大间隔用于观察本页主线程调度，不代表地图渲染已验收。</p>
+<label>输入规模 <select id="size"><option value="1000">1,000</option><option value="10000">10,000</option></select></label>
+<button id="run">运行 Worker 基准</button><button id="cancel-test">运行取消与恢复验证</button><button id="limit-test">运行结果上限验证（10,000 输入）</button>
+<p id="status" role="status">尚未运行</p><pre id="result" aria-label="基准结果">等待运行</pre>
+<script type="module" src="./processing.ts"></script></body></html>

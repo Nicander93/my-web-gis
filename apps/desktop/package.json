@@ -10,6 +10,8 @@
     "test:live-keychain": "node ./run-live-keychain-reverify.mjs",
     "test:ui-restart": "node ./run-ui-restart-reverify.mjs",
     "preview": "vite preview",
+    "benchmark:build": "tsc --noEmit && vite build --config vite.benchmark.config.ts --configLoader runner",
+    "benchmark:browser": "vite --config vite.benchmark.config.ts --configLoader runner",
     "tauri": "tauri"
   },
   "dependencies": {

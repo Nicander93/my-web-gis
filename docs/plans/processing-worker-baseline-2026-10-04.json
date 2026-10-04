@@ -1,0 +1,128 @@
+{
+  "runs": [
+    {
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36",
+      "visibility": "visible",
+      "samples": 1,
+      "dataset": "Deterministic synthetic data; no map rendering or Store commits",
+      "rows": [
+        {
+          "id": "idle-timer-baseline",
+          "ticks": 10,
+          "maxTimerGapMs": 11.3
+        },
+        {
+          "id": "overlap-join",
+          "inputCount": 1000,
+          "outputCount": 12000,
+          "dispatchMs": 1,
+          "elapsedMs": 229.2999999821186,
+          "ticks": 21,
+          "maxTimerGapMs": 19.1
+        },
+        {
+          "id": "hole-clip",
+          "inputCount": 1000,
+          "outputCount": 1000,
+          "dispatchMs": 0.5,
+          "elapsedMs": 129.09999999403954,
+          "ticks": 12,
+          "maxTimerGapMs": 11.2
+        },
+        {
+          "id": "dense-measure",
+          "inputCount": 100,
+          "outputCount": 100,
+          "dispatchMs": 4.699999988079071,
+          "elapsedMs": 113.5,
+          "ticks": 10,
+          "maxTimerGapMs": 13.5
+        }
+      ]
+    },
+    {
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36",
+      "visibility": "visible",
+      "samples": 1,
+      "dataset": "Deterministic synthetic data; no map rendering or Store commits",
+      "rows": [
+        {
+          "id": "idle-timer-baseline",
+          "ticks": 10,
+          "maxTimerGapMs": 11.3
+        },
+        {
+          "id": "overlap-join",
+          "inputCount": 10000,
+          "outputCount": 120000,
+          "dispatchMs": 7,
+          "elapsedMs": 1588.2999999821186,
+          "ticks": 141,
+          "maxTimerGapMs": 177.3
+        },
+        {
+          "id": "hole-clip",
+          "inputCount": 10000,
+          "outputCount": 10000,
+          "dispatchMs": 5.299999982118607,
+          "elapsedMs": 548.7999999821186,
+          "ticks": 53,
+          "maxTimerGapMs": 17.6
+        },
+        {
+          "id": "dense-measure",
+          "inputCount": 100,
+          "outputCount": 100,
+          "dispatchMs": 5.0999999940395355,
+          "elapsedMs": 112.30000001192093,
+          "ticks": 10,
+          "maxTimerGapMs": 11.2
+        }
+      ]
+    },
+    {
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36",
+      "visibility": "visible",
+      "samples": 1,
+      "dataset": "Deterministic synthetic data; no map rendering or Store commits",
+      "rows": [
+        {
+          "id": "cancel-after-dispatch",
+          "inputCount": 10000,
+          "requestedDelayMs": 50,
+          "actualAbortDelayMs": 70.09999999403954,
+          "rejectionAfterAbortMs": 0.20000001788139343,
+          "state": "AbortError",
+          "note": "Worker may still be starting; this does not prove cancellation after algorithm entry."
+        },
+        {
+          "id": "overlap-join",
+          "inputCount": 10,
+          "outputCount": 120,
+          "dispatchMs": 0.09999999403953552,
+          "elapsedMs": 42.69999998807907,
+          "ticks": 4,
+          "maxTimerGapMs": 11.1
+        }
+      ]
+    },
+    {
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36",
+      "visibility": "visible",
+      "samples": 1,
+      "dataset": "Deterministic synthetic data; no map rendering or Store commits",
+      "rows": [
+        {
+          "id": "bounded-overlap-join",
+          "inputCount": 10000,
+          "maxResults": 100000,
+          "state": "rejected-without-results",
+          "error": "空间连接结果超过 100000 条上限，请缩小范围、减少重叠或提高上限；未返回部分结果。",
+          "elapsedMs": 1164.0999999940395,
+          "ticks": 114,
+          "maxTimerGapMs": 28.1
+        }
+      ]
+    }
+  ]
+}

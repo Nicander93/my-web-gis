@@ -1,0 +1,31 @@
+﻿{
+  "node": "v24.11.0",
+  "cpu": "Intel(R) Core(TM) i5-14600KF",
+  "platform": "win32",
+  "data": "Deterministic synthetic overlaps, holes, 640-vertex polygons; no real business data",
+  "warmup": 1,
+  "samples": 3,
+  "rows": [
+    {
+      "id": "overlap-join",
+      "inputCount": 10000,
+      "overlayCount": 12,
+      "outputCount": 120000,
+      "medianMs": 1323.95
+    },
+    {
+      "id": "hole-clip",
+      "inputCount": 10000,
+      "overlayCount": 1,
+      "outputCount": 10000,
+      "medianMs": 544.85
+    },
+    {
+      "id": "dense-measure",
+      "inputCount": 100,
+      "overlayCount": 0,
+      "outputCount": 100,
+      "medianMs": 42.121
+    }
+  ]
+}
