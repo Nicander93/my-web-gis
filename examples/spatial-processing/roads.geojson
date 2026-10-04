@@ -1,0 +1,8 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    { "type": "Feature", "properties": { "name": "穿越道路", "road_code": "R1" }, "geometry": { "type": "LineString", "coordinates": [[116.40,39.92],[116.46,39.92]] } },
+    { "type": "Feature", "properties": { "name": "边界道路", "road_code": "R2" }, "geometry": { "type": "LineString", "coordinates": [[116.40,39.91],[116.46,39.91]] } },
+    { "type": "Feature", "properties": { "name": "外部道路", "road_code": "R3" }, "geometry": { "type": "LineString", "coordinates": [[116.40,39.94],[116.46,39.94]] } }
+  ]
+}

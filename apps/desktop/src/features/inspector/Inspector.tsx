@@ -7,6 +7,7 @@ import { StylePanel } from './StylePanel'
 import { LabelPanel } from './LabelPanel'
 import { Legend } from './Legend'
 import { getLayerCapabilities } from '@/app/commands/layer.commands'
+import { processingToolName } from '@/features/processing/processing-tools'
 
 type InspectorTab = 'layer' | 'feature' | 'style' | 'label'
 
@@ -114,7 +115,7 @@ export function Inspector() {
                 <details className="processing-provenance">
                   <summary>处理来源</summary>
                   <p>输入图层：{dataset.processing.sourceLayerName}</p>
-                  <p>工具：{{ buffer: '缓冲区', centroid: '顶点质心', envelope: '整体外包矩形', explode: '多部件拆分', clip: '面裁剪', intersect: '面相交', difference: '面差集', dissolve: '面融合', 'extract-location': '按位置提取', 'summarize-location': '按区域统计', 'attribute-join': '属性连接', 'spatial-join': '空间连接' }[dataset.processing.options.tool]}</p>
+                  <p>工具：{processingToolName(dataset.processing.options.tool)}</p>
                   <p>范围：{{ all: '全部要素', filtered: '图层筛选结果', selected: '当前选中要素' }[dataset.processing.scope]}</p>
                   {dataset.processing.options.tool === 'buffer' && <p>距离：{dataset.processing.options.distance} {dataset.processing.options.unit === 'meters' ? '米' : '千米'}</p>}
                   <p>{dataset.processing.inputCount} 个输入 → {dataset.processing.outputCount} 个结果</p>

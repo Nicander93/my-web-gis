@@ -15,7 +15,7 @@ import { createId } from './id'
 import type { Geometry, GisFeature, Position, PolygonGeometry, MultiPolygonGeometry } from './types'
 
 export type OverlayTool = 'clip' | 'intersect' | 'difference'
-export type ProcessingTool = 'buffer' | 'centroid' | 'envelope' | 'explode' | OverlayTool | 'dissolve' | 'extract-location' | 'summarize-location' | 'attribute-join' | 'spatial-join'
+export type ProcessingTool = 'buffer' | 'centroid' | 'envelope' | 'explode' | OverlayTool | 'dissolve' | 'extract-location' | 'summarize-location' | 'attribute-join' | 'spatial-join' | 'clip-lines'
 export type GeometryProcessingOptions =
   | { tool: 'buffer'; distance: number; unit: 'meters' | 'kilometers' }
   | { tool: 'centroid' }
@@ -27,6 +27,7 @@ export type GeometryProcessingOptions =
 
 /** Serializable application requests; statistical algorithms are implemented by the analysis extension. */
 export type ProcessingOptions = GeometryProcessingOptions
+  | { tool: 'clip-lines' }
   | { tool: 'summarize-location'; predicate: 'intersects' | 'within'; field?: string; prefix: string }
   | { tool: 'attribute-join'; inputKey: string; joinKey: string; fields: string[]; prefix: string; mode: 'left' | 'inner' }
   | { tool: 'spatial-join'; predicate: 'intersects' | 'within'; fields: string[]; prefix: string; mode: 'left' | 'inner' }
@@ -50,7 +51,7 @@ export interface ProcessingRecord {
 }
 
 export function requiresOverlay(tool: ProcessingTool): boolean {
-  return tool === 'clip' || tool === 'intersect' || tool === 'difference' || tool === 'extract-location' || tool === 'summarize-location' || tool === 'attribute-join' || tool === 'spatial-join'
+  return tool === 'clip-lines' || tool === 'clip' || tool === 'intersect' || tool === 'difference' || tool === 'extract-location' || tool === 'summarize-location' || tool === 'attribute-join' || tool === 'spatial-join'
 }
 
 export function requiresPolygon(tool: ProcessingTool): boolean {

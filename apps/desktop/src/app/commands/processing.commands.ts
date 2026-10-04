@@ -41,6 +41,8 @@ export const processingCommands = {
     if (args.signal.aborted) throw new DOMException('已取消', 'AbortError')
     if (!result.features.length) throw new Error(options.tool === 'attribute-join' || options.tool === 'spatial-join'
       ? '没有匹配的连接记录，未创建图层。请检查连接键或选择保留全部输入。'
+      : options.tool === 'clip-lines'
+      ? '没有裁剪后的线段，未创建图层。仅单点接触不生成线。'
       : options.tool === 'extract-location'
       ? '没有符合空间关系的要素，未创建图层。请检查输入范围或调整关系。'
       : '没有符合条件的面结果，未创建图层。请检查两层范围；仅边界接触不生成面。')

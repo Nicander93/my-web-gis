@@ -244,6 +244,48 @@ describe('processing workflow', () => {
     expect(snapshot.project.datasets.find(dataset => dataset.id === layer.datasetId)).toMatchObject({ processing: { options, overlay: { scope: 'filtered', inputCount: 1 } } })
   })
 
+  it('line clipping uses selected inputs, preserves multipart results and supports undo/save', async () => {
+    const road: GisFeature = { id: 'road', properties: { name: '道路', value: 7 }, geometry: { type: 'LineString', coordinates: [[-2, 5], [12, 5]] } }
+    const area: GisFeature = { id: 'area', properties: {}, geometry: { type: 'Polygon', coordinates: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]], [[4, 4], [4, 6], [6, 6], [6, 4], [4, 4]]] } }
+    useProjectStore.getState().addLayer('roads', '道路', [road, { ...road, id: 'unselected' }], 'line')
+    const layerId = useProjectStore.getState().selectedLayerId!
+    useProjectStore.getState().addLayer('areas', '范围', [area], 'polygon')
+    const overlayId = useProjectStore.getState().selectedLayerId!
+    useProjectStore.getState().setSelection({ layerId, featureIds: ['road'] })
+    const before = useProjectStore.getState().getSnapshot()
+    const workerClass = fakeWorker()
+    const pending = processingCommands.run({ layerId, scope: 'selected', overlay: { layerId: overlayId, scope: 'all' }, options: { tool: 'clip-lines' }, name: '道路裁剪', signal: new AbortController().signal })
+    const worker = workerClass.current
+    worker.onmessage!({ data: { result: executeProcessing(worker.payload.features, worker.payload.options, worker.payload.overlay) } })
+    const completed = await pending
+    const snapshot = useProjectStore.getState().getSnapshot()
+    const resultLayer = snapshot.project.layers.find(layer => layer.id === completed.layerId)!
+    expect(snapshot.featuresByDataset[resultLayer.datasetId]).toHaveLength(1)
+    expect(snapshot.featuresByDataset[resultLayer.datasetId][0]).toMatchObject({ geometry: { type: 'MultiLineString' }, properties: road.properties, metadata: { sourceId: 'road' } })
+    const saved = parseProjectSnapshot(serializeProjectSnapshot(snapshot))
+    expect(saved.project.datasets.find(dataset => dataset.id === resultLayer.datasetId)).toMatchObject({ processing: { options: { tool: 'clip-lines' }, scope: 'selected', inputCount: 1, outputCount: 1 } })
+    expect(useProjectStore.getState().undoEdit()).toBe(true)
+    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
+    expect(useProjectStore.getState().redoEdit()).toBe(true)
+    expect(useProjectStore.getState().getSnapshot()).toEqual(snapshot)
+  })
+
+  it('empty line clipping reports no segments without changing project state', async () => {
+    useProjectStore.getState().addLayer('roads', '道路', [{ id: 'outside', properties: {}, geometry: { type: 'LineString', coordinates: [[-2, -2], [-1, -1]] } }], 'line')
+    const layerId = useProjectStore.getState().selectedLayerId!
+    useProjectStore.getState().addLayer('areas', '范围', [{ id: 'area', properties: {}, geometry: { type: 'Polygon', coordinates: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]] } }], 'polygon')
+    const overlayId = useProjectStore.getState().selectedLayerId!
+    useProjectStore.setState({ dirty: false })
+    const before = useProjectStore.getState().getSnapshot()
+    const workerClass = fakeWorker()
+    const pending = processingCommands.run({ layerId, scope: 'all', overlay: { layerId: overlayId, scope: 'all' }, options: { tool: 'clip-lines' }, name: '空裁剪', signal: new AbortController().signal })
+    const worker = workerClass.current
+    worker.onmessage!({ data: { result: executeProcessing(worker.payload.features, worker.payload.options, worker.payload.overlay) } })
+    await expect(pending).rejects.toThrow('没有裁剪后的线段')
+    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
+    expect(useProjectStore.getState().dirty).toBe(false)
+  })
+
   it('spatial join preserves pair provenance and multiple matches through save/reopen', async () => {
     const layerId = useProjectStore.getState().selectedLayerId!
     const area: GisFeature = { id: 'area', properties: { name: '区域' }, geometry: { type: 'Polygon', coordinates: [[[116, 39], [117, 39], [117, 41], [116, 41], [116, 39]]] } }

@@ -1,6 +1,6 @@
 # @desktop-webgis/spatial-analysis
 
-面向业务开发的空间汇总与连接扩展。无 React、Zustand、OpenLayers 或项目 Store 依赖；输入为带字符串 `id`、GeoJSON 几何和 `properties` 的普通对象，输出为独立复制的要素。当前包仅在工作区内使用，尚未发布到 npm。
+面向业务开发的空间汇总、连接、诊断与裁剪扩展。无 React、Zustand、OpenLayers 或项目 Store 依赖；处理输入为带字符串 `id`、GeoJSON 几何和 `properties` 的普通对象，输出为独立复制的要素；诊断仅需 ID 和待检查几何。当前包仅在工作区内使用，尚未发布到 npm。
 
 ## 几何诊断
 
@@ -11,6 +11,14 @@
 复用 JSTS IsValidOp 检查单个几何的有效性，包括自交面、孔洞越界或嵌套、重叠多面部件等；有限坐标、非空部件、最小坐标数及 XY 环闭合先做结构检查。第三维保留但不参与拓扑判定；普通自交线不一定是无效几何。它不检查独立要素间的重叠、缝隙、贴边或业务拓扑规则，也不自动修复。无可用诊断坐标时 `location` 为 null。
 
 ## 公共 API
+
+### 线裁剪
+
+`clipLines(lines, masks)` 接受 LineString/MultiLineString 输入和 Polygon/MultiPolygon 掩膜，复用 JSTS OverlayOp：先融合掩膜，再逐个裁剪输入，避免重叠掩膜重复输出。每个输入最多输出一个独立要素；一段为 LineString，多段为 MultiLineString，无线段则不输出。保留输入属性，生成新 ID，`metadata.sourceId` 指向直接输入；不带入掩膜属性。
+
+沿外边界或孔洞边界的非零长度线段保留；孔洞内部、面外部及孤立接触点不输出。裁剪按 WGS84 XY 平面拓扑计算，结果不保留 Z/M，部件顺序、方向或节点数可能变化，不适合作为保留里程与行进顺序的路线切割。空输入或空掩膜返回空数组；几何无效或不支持时明确报错，不自动修复。输入和结果属性不共享可变对象。
+
+多掩膜融合与复杂线裁剪尚未进行大数据性能验收。库抛出拓扑计算错误时整个任务失败，调用方可先检查或拆分复杂要素；不提供悄悄丢弃失败输入的模式。
 
 ```ts
 import { summarizeByLocation, joinAttributes, joinByLocation } from '@desktop-webgis/spatial-analysis'
@@ -42,7 +50,7 @@ const sitesWithRegions = joinByLocation(sites, regions, {
 - 统计不融合区域，每个完整要素在每区最多计一次，重叠区域各自计数。`countField` 计算几何匹配数量；数值统计仅接受有限 number，文本数字、空值和非有限值忽略。无有效值时 sum=0，mean/min/max=null；求和溢出报错。
 - 属性连接按类型严格相等，文本不自动 trim 或转换大小写；null/undefined/复杂值不匹配。第二输入的重复非空键报错。左连接保留所有输入，内连接仅保留匹配输入。
 - 空间连接每个匹配配对输出一条，按第一输入和第二输入原顺序排列；零匹配时左连接保留一次，内连接不输出。`metadata.sourceId` / `overlaySourceId` 标记双方。
-- 所有 API 保留原几何，包括 Z，不剪切要素；拓扑关系只判断 XY。输出生成新 ID，不与输入共享可变对象。原字段、几何和数据不修改。
+- 汇总与连接 API 保留原几何，包括 Z，不剪切要素；拓扑关系只判断 XY。输出生成新 ID，不与输入共享可变对象。原字段、几何和数据不修改。线裁剪会生成新的 XY 几何，Z/M 不保留，详见线裁剪契约。
 - 输出字段不能为空、重复或覆盖第一输入已有属性。缺失带入字段填 null；连接字段须至少在一条非空输入中存在。
 - 索引使用 JSTS STRtree，几何关系使用 RelateOp；有交叠包围盒的候选仍需逐个精确判断，不能保证任意大数据规模的耗时。
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
-import { capabilitiesForDataset, requiresOverlay, requiresPolygon, type ProcessingTool, type ProcessingOptions } from '@desktop-webgis/gis-core'
+import { capabilitiesForDataset, requiresOverlay, requiresPolygon, type ProcessingOptions } from '@desktop-webgis/gis-core'
 import { useProjectStore } from '@/stores/project.store'
 import { resolveProcessingInput, type ProcessingScope } from '@/services/processing'
 import { processingCommands } from '@/app/commands/processing.commands'
@@ -8,23 +8,8 @@ import { emitCommandStatus } from '@/app/commands/status'
 import { layerCommands } from '@/app/commands/layer.commands'
 import { checkLayerGeometry, selectGeometryIssues, type GeometryCheckResult } from '@/app/commands/geometry-check.commands'
 import type { GeometryIssue } from '@desktop-webgis/spatial-analysis'
+import { processingTools as tools, type DesktopProcessingTool as Tool } from './processing-tools'
 
-type Tool = ProcessingTool | 'check-geometry'
-const tools: Array<{ id: Tool; name: string; description: string }> = [
-  { id: 'check-geometry', name: '几何检查', description: '检查坐标、结构和单个要素的拓扑有效性，列出问题及可用的位置。不修改原数据，不检查要素之间的重叠或缝隙。' },
-  { id: 'buffer', name: '缓冲区', description: '按距离为每个要素生成缓冲面，保留属性。重叠范围不会自动融合。' },
-  { id: 'centroid', name: '顶点质心', description: '为每个要素生成顶点平均位置。结果可能落在面外，不是面积加权中心。' },
-  { id: 'envelope', name: '整体外包矩形', description: '为整个输入范围生成一个矩形面，属性记录输入数量。' },
-  { id: 'explode', name: '多部件拆分', description: '将多点、多线、多面拆成单部件，复制原属性；单部件保持原几何。' },
-  { id: 'clip', name: '面裁剪', description: '用第二输入的面范围裁剪输入面，保留输入属性。掩膜会先融合，避免重复结果。' },
-  { id: 'intersect', name: '面相交', description: '按两层面要素配对生成重叠区域。属性分别使用 A_、B_ 前缀；仅边界接触不生成面。' },
-  { id: 'difference', name: '面差集', description: '从输入面扣除第二输入的覆盖范围，保留输入属性。完全覆盖的要素不输出。' },
-  { id: 'dissolve', name: '面融合', description: '融合全部面，或按字段分组融合。仅保留分组字段，不自动汇总其他属性。' },
-  { id: 'extract-location', name: '按位置提取', description: '按与第二输入合并范围的空间关系提取点、线或面。每个匹配要素只输出一次，保留完整几何和原属性。' },
-  { id: 'summarize-location', name: '按区域统计', description: '保留每个输入区域，统计第二图层中符合空间关系的要素数量，可同时计算数值合计和均值。' },
-  { id: 'attribute-join', name: '属性连接', description: '按两层字段的相等值带入属性，保留输入几何。重复连接键明确报错，避免悄悄选择一条记录。' },
-  { id: 'spatial-join', name: '空间连接', description: '按空间关系带入第二图层的属性，保留完整输入几何。匹配多个要素时，每个配对输出一条记录。' }
-]
 const scopeLabels: Record<ProcessingScope, string> = { all: '全部要素', filtered: '图层筛选结果', selected: '当前选中要素' }
 
 /** One compact processing workflow; drafts and cancellation never modify the source project. */
@@ -37,6 +22,10 @@ export function ProcessingDialog({ onClose }: { onClose(): void }) {
   const polygonLayers = vectorLayers.filter(layer => {
     const rows = featuresByDataset[layer.datasetId] ?? []
     return rows.length > 0 && rows.every(feature => feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon')
+  })
+  const lineLayers = vectorLayers.filter(layer => {
+    const rows = featuresByDataset[layer.datasetId] ?? []
+    return rows.length > 0 && rows.every(feature => feature.geometry.type === 'LineString' || feature.geometry.type === 'MultiLineString')
   })
   const [layerId, setLayerId] = useState(() => vectorLayers.some(l => l.id === selectedLayerId) ? selectedLayerId! : vectorLayers[0]?.id ?? '')
   const [tool, setTool] = useState<Tool>('buffer')
@@ -64,7 +53,7 @@ export function ProcessingDialog({ onClose }: { onClose(): void }) {
   const active = tools.find(item => item.id === tool)!
   const isJoin = tool === 'attribute-join' || tool === 'spatial-join'
   const isCheck = tool === 'check-geometry'
-  const candidates = !isCheck && requiresPolygon(tool) ? polygonLayers : vectorLayers
+  const candidates = tool === 'clip-lines' ? lineLayers : !isCheck && requiresPolygon(tool) ? polygonLayers : vectorLayers
   const layer = candidates.find(item => item.id === layerId)
   const overlayCandidates = tool === 'summarize-location' || isJoin ? vectorLayers : polygonLayers
   const overlayLayer = overlayCandidates.find(item => item.id === overlayId)
@@ -82,7 +71,7 @@ export function ProcessingDialog({ onClose }: { onClose(): void }) {
   const issueNames = new Map(geometryReport?.source.map(feature => [feature.id, typeof feature.properties.name === 'string' ? feature.properties.name : '']) ?? [])
 
   function selectTool(nextTool: Tool): void {
-    const available = nextTool !== 'check-geometry' && requiresPolygon(nextTool) ? polygonLayers : vectorLayers
+    const available = nextTool === 'clip-lines' ? lineLayers : nextTool !== 'check-geometry' && requiresPolygon(nextTool) ? polygonLayers : vectorLayers
     const nextLayerId = available.some(item => item.id === layerId) ? layerId : available[0]?.id ?? ''
     setTool(nextTool)
     setLayerId(nextLayerId)
@@ -178,7 +167,7 @@ export function ProcessingDialog({ onClose }: { onClose(): void }) {
         <nav className="processing-tools" aria-label="处理工具">{tools.map(item => <button key={item.id} type="button" aria-pressed={tool === item.id} disabled={busy} onClick={() => selectTool(item.id)}>{item.name}</button>)}</nav>
         <div className="processing-form">
           <h3>{active.name}</h3><p className="processing-description">{active.description}</p>
-          {!candidates.length ? <p role="status">{!isCheck && requiresPolygon(tool) ? '请先添加面图层。此工具仅支持纯面图层，不支持点、线或混合图层。' : '请先添加矢量数据。WMS 和 WMTS 图像图层不支持空间处理。'}</p> : <>
+          {!candidates.length ? <p role="status">{tool === 'clip-lines' ? '请先添加纯线图层（LineString 或 MultiLineString）。' : !isCheck && requiresPolygon(tool) ? '请先添加面图层。此工具仅支持纯面图层，不支持点、线或混合图层。' : '请先添加矢量数据。WMS 和 WMTS 图像图层不支持空间处理。'}</p> : <>
             <label>输入图层<select value={layerId} disabled={busy} onChange={event => { setLayerId(event.target.value); setScope('all'); setError(''); setSuccess(null) }}>{candidates.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
             <label>处理范围<select value={scope} disabled={busy} onChange={event => { setScope(event.target.value as ProcessingScope); setError(''); setSuccess(null) }}>{(Object.keys(scopeLabels) as ProcessingScope[]).map(key => <option key={key} value={key}>{scopeLabels[key]}</option>)}</select></label>
             <p className="processing-description" aria-live="polite">本次输入 {count} 个要素{scope === 'selected' ? '（仅包含通过图层筛选的选中要素）' : ''}</p>
@@ -215,6 +204,7 @@ export function ProcessingDialog({ onClose }: { onClose(): void }) {
             <p className="processing-description">结果保存为独立本地图层，可继续处理、编辑或导出。原图层保持不变。</p></>}
             {isCheck && <p className="processing-description">按 WGS84 经纬度检查 XY 拓扑；每个要素报告首个问题。不支持的类型或跨日期变更线输入单独列出，不计为有效。选择问题后关闭窗口，返回地图查看。</p>}
             {tool === 'buffer' && <p className="processing-description">使用 WGS84 经纬度计算距离；暂不支持极区、跨日期变更线或大于 1000 千米的缓冲。</p>}
+            {tool === 'clip-lines' && <p className="processing-description">保留沿面边界的线段，忽略仅单点相切；孔洞内部不保留。按二维经纬度裁剪，结果不保留 Z；部件顺序和方向可能变化。无结果不创建图层。</p>}
           </>}
           {error && <p className="export-error" role="alert">{error}</p>}
           {isCheck && geometryReport && <section className="geometry-report" aria-label="几何检查报告">

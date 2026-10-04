@@ -20,3 +20,12 @@ declare module 'jsts/org/locationtech/jts/index/strtree/STRtree.js' {
     query(envelope: unknown): { toArray(): T[] }
   }
 }
+declare module 'jsts/org/locationtech/jts/io/GeoJSONWriter.js' {
+  export default class GeoJSONWriter { write(geometry: unknown): import('geojson').Geometry }
+}
+declare module 'jsts/org/locationtech/jts/operation/overlay/OverlayOp.js' {
+  export default class OverlayOp {
+    static union(a: unknown, b: unknown): unknown
+    static intersection(a: unknown, b: unknown): unknown
+  }
+}

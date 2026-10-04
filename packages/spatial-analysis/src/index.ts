@@ -3,6 +3,9 @@ import GeoJSONReader from 'jsts/org/locationtech/jts/io/GeoJSONReader.js'
 import RelateOp from 'jsts/org/locationtech/jts/operation/relate/RelateOp.js'
 import IsValidOp from 'jsts/org/locationtech/jts/operation/valid/IsValidOp.js'
 import STRtree from 'jsts/org/locationtech/jts/index/strtree/STRtree.js'
+import GeoJSONWriter from 'jsts/org/locationtech/jts/io/GeoJSONWriter.js'
+import OverlayOp from 'jsts/org/locationtech/jts/operation/overlay/OverlayOp.js'
+import { checkGeometries } from './geometry-check.js'
 import type { Point, MultiPoint, LineString, MultiLineString, Polygon, MultiPolygon } from 'geojson'
 export { checkGeometries } from './geometry-check.js'
 export type { GeometryCheckInput, GeometryIssue, GeometryCheckReport } from './geometry-check.js'
@@ -172,4 +175,39 @@ export function joinByLocation<T extends AnalysisFeature>(features: T[], joinFea
       return result
     })
   })
+}
+
+/** Clip XY lines to the union of polygon masks, retaining boundary segments and discarding isolated contacts. */
+export function clipLines<T extends AnalysisFeature>(features: readonly T[], masks: readonly AnalysisFeature[]): T[] {
+  for (const feature of features) {
+    if (feature.geometry.type !== 'LineString' && feature.geometry.type !== 'MultiLineString') throw new Error(`输入 ${feature.id} 不是线。`)
+  }
+  for (const mask of masks) {
+    if (mask.geometry.type !== 'Polygon' && mask.geometry.type !== 'MultiPolygon') throw new Error(`掩膜 ${mask.id} 不是面。`)
+  }
+  const invalid = checkGeometries([...features, ...masks]).issues[0]
+  if (invalid) throw new Error(`要素 ${invalid.featureId}：${invalid.message}。`)
+  if (!features.length || !masks.length) return []
+  const reader = new GeoJSONReader(), writer = new GeoJSONWriter()
+  let mask: unknown = reader.read(masks[0].geometry)
+  try {
+    for (let i = 1; i < masks.length; i++) mask = OverlayOp.union(mask, reader.read(masks[i].geometry))
+    return features.flatMap(feature => {
+      const clipped = writer.write(OverlayOp.intersection(reader.read(feature.geometry), mask))
+      const parts: number[][][] = []
+      const collect = (geometry: import('geojson').Geometry): void => {
+        if (geometry.type === 'LineString') parts.push(geometry.coordinates)
+        else if (geometry.type === 'MultiLineString') parts.push(...geometry.coordinates)
+        else if (geometry.type === 'GeometryCollection') geometry.geometries.forEach(collect)
+      }
+      collect(clipped)
+      const segments = parts.filter(part => part.length >= 2 && part.some((point, index) => index > 0 && (point[0] !== part[index - 1][0] || point[1] !== part[index - 1][1])))
+      if (!segments.length) return []
+      const result = copyResult(feature, {})
+      result.geometry = segments.length === 1 ? { type: 'LineString', coordinates: segments[0] } : { type: 'MultiLineString', coordinates: segments }
+      return [result]
+    })
+  } catch (error) {
+    throw new Error(`线裁剪失败：${error instanceof Error ? error.message : '拓扑计算失败'}。请检查几何或先拆分复杂要素。`)
+  }
 }
