@@ -35,7 +35,7 @@ export function CsvConfigDialog({
   const [yField, setYField] = useState(() => 
     findCoordinateField(initialPreview.fields, ['y', 'lat', 'latitude', 'wd', '纬度'])
   )
-  const [crsCode, setCrsCode] = useState('EPSG:4326')
+  const [crsCode, setCrsCode] = useState(() => COMMON_CRS.find(crs => crs.code === initialPreview.declaredCrs)?.code ?? 'EPSG:4326')
   const [preview, setPreview] = useState<CsvPreviewResult>(initialPreview)
 
   useEffect(() => {

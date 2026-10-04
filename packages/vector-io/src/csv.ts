@@ -10,6 +10,8 @@ export interface CsvImportOptions {
 }
 
 export interface CsvPreviewResult {
+  /** A uniform EPSG declaration in the optional `crs` column, checked across all rows. */
+  declaredCrs?: string
   totalRows: number
   validRows: number
   invalidRows: number
@@ -32,6 +34,8 @@ export function previewCsv(content: string, options?: { xField?: string; yField?
   const fields = parseResult.meta.fields || []
   const totalRows = parseResult.data.length
   const sampleRows = parseResult.data.slice(0, 5)
+  const declarations = new Set(parseResult.data.map(row => row.crs?.trim().toUpperCase()).filter(value => value && /^EPSG:\d+$/.test(value)))
+  const declaredCrs = declarations.size === 1 ? [...declarations][0] : undefined
 
   if (!options?.xField || !options?.yField) {
     return {
@@ -40,6 +44,7 @@ export function previewCsv(content: string, options?: { xField?: string; yField?
       invalidRows: 0,
       fields,
       sampleRows,
+      declaredCrs,
       errors: []
     }
   }
@@ -51,6 +56,11 @@ export function previewCsv(content: string, options?: { xField?: string; yField?
   for (let i = 0; i < parseResult.data.length; i++) {
     const row = parseResult.data[i]
     const rowNumber = i + 2
+    const declared = row?.crs?.trim().toUpperCase()
+    if (declared && /^EPSG:\d+$/.test(declared) && crs?.code && declared !== crs.code.toUpperCase()) {
+      errors.push({ row: rowNumber, reason: `crs 列声明 ${declared}，与所选坐标系冲突` })
+      continue
+    }
 
     if (!row || Object.keys(row).every(k => row[k] === '')) {
       continue
@@ -64,8 +74,8 @@ export function previewCsv(content: string, options?: { xField?: string; yField?
       continue
     }
 
-    const x = parseFloat(xValue.trim())
-    const y = parseFloat(yValue.trim())
+    const x = xValue.trim() ? Number(xValue.trim()) : NaN
+    const y = yValue.trim() ? Number(yValue.trim()) : NaN
 
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
       errors.push({ row: rowNumber, reason: '坐标值无效 (非数字或非有限值)' })
@@ -92,6 +102,7 @@ export function previewCsv(content: string, options?: { xField?: string; yField?
     invalidRows: errors.length,
     fields,
     sampleRows,
+    declaredCrs,
     errors
   }
 }
@@ -128,6 +139,10 @@ export function importCsv(
   const features: GeoJsonFeature[] = []
   const invalidRows: Array<{ row: number; reason: string }> = []
   const rows = parseResult.data
+  for (let i = 0; i < rows.length; i++) {
+    const declared = rows[i]?.crs?.trim().toUpperCase()
+    if (declared && /^EPSG:\d+$/.test(declared) && declared !== crs.code?.toUpperCase()) throw new Error(`第 ${i + 2} 行 crs 列声明 ${declared}，与所选坐标系冲突。`)
+  }
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
@@ -145,8 +160,8 @@ export function importCsv(
       continue
     }
 
-    const x = parseFloat(xValue.trim())
-    const y = parseFloat(yValue.trim())
+    const x = xValue.trim() ? Number(xValue.trim()) : NaN
+    const y = yValue.trim() ? Number(yValue.trim()) : NaN
 
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
       invalidRows.push({ row: rowNumber, reason: '坐标值无效 (非数字或非有限值)' })

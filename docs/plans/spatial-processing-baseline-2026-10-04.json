@@ -1,0 +1,71 @@
+﻿{
+  "node": "v24.11.0",
+  "platform": "win32",
+  "arch": "x64",
+  "cpu": "Intel(R) Core(TM) i5-14600KF",
+  "data": "Synthetic WGS84: 100 adjacent non-overlapping squares and interior points",
+  "warmup": 1,
+  "samples": 3,
+  "rows": [
+    {
+      "tool": "measure-area",
+      "inputCount": 100,
+      "outputCount": 100,
+      "medianMs": 7.462
+    },
+    {
+      "tool": "calculate-field",
+      "inputCount": 100,
+      "outputCount": 100,
+      "medianMs": 0.349
+    },
+    {
+      "tool": "summarize-location",
+      "inputCount": 100,
+      "outputCount": 100,
+      "medianMs": 8.02
+    },
+    {
+      "tool": "spatial-join",
+      "inputCount": 100,
+      "outputCount": 100,
+      "medianMs": 4.811
+    },
+    {
+      "tool": "calculate-field",
+      "inputCount": 1000,
+      "outputCount": 1000,
+      "medianMs": 2.843
+    },
+    {
+      "tool": "summarize-location",
+      "inputCount": 1000,
+      "outputCount": 100,
+      "medianMs": 15.588
+    },
+    {
+      "tool": "spatial-join",
+      "inputCount": 1000,
+      "outputCount": 1000,
+      "medianMs": 18.247
+    },
+    {
+      "tool": "calculate-field",
+      "inputCount": 10000,
+      "outputCount": 10000,
+      "medianMs": 25.919
+    },
+    {
+      "tool": "summarize-location",
+      "inputCount": 10000,
+      "outputCount": 100,
+      "medianMs": 90.75
+    },
+    {
+      "tool": "spatial-join",
+      "inputCount": 10000,
+      "outputCount": 10000,
+      "medianMs": 138.662
+    }
+  ]
+}

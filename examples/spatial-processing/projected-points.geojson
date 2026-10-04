@@ -1,0 +1,8 @@
+{
+  "type": "FeatureCollection",
+  "crs": { "type": "name", "properties": { "name": "EPSG:3857" } },
+  "features": [
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [-111319.49079327357, -111325.14286638597, 20] }, "properties": { "name": "负经纬度点" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [111319.49079327357, 111325.1428663851, 30] }, "properties": { "name": "正经纬度点" } }
+  ]
+}

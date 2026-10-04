@@ -45,6 +45,7 @@ export function AddDataDialog({ open, onClose, onImport, onAddServiceLayers }: A
   } | null>(null)
   const [pendingCsv, setPendingCsv] = useState<{ source: string | File; fileName: string; content: string } | null>(null)
   const [selectedCrs, setSelectedCrs] = useState<string>('EPSG:4326')
+  const [geoJsonCrs, setGeoJsonCrs] = useState('auto')
   const [selectedShapefileLayers, setSelectedShapefileLayers] = useState<Set<string>>(new Set())
   const [selectedDxfLayers, setSelectedDxfLayers] = useState<Set<string>>(new Set())
 
@@ -59,6 +60,7 @@ export function AddDataDialog({ open, onClose, onImport, onAddServiceLayers }: A
     setSelectedShapefileLayers(new Set())
     setSelectedDxfLayers(new Set())
     setSelectedCrs('EPSG:4326')
+    setGeoJsonCrs('auto')
     setError(null)
     onClose()
   }
@@ -109,7 +111,7 @@ export function AddDataDialog({ open, onClose, onImport, onAddServiceLayers }: A
 
       switch (fileType) {
         case 'geojson':
-          result = await importGeoJson(source)
+          result = await importGeoJson(source, geoJsonCrs === 'auto' ? {} : { sourceCrs: { code: geoJsonCrs } })
           break
         case 'shapefile': {
           const preResult = await importShapefileZip(source, shapefileOptions)
@@ -368,6 +370,14 @@ export function AddDataDialog({ open, onClose, onImport, onAddServiceLayers }: A
             </div>
 
             <div className="dialog-body">
+              {activeTab === 'file' && <details className="export-fieldset">
+                <summary>GeoJSON 源坐标系设置</summary>
+                <label>源坐标系 <select value={geoJsonCrs} disabled={loading} onChange={event => setGeoJsonCrs(event.target.value)}>
+                  <option value="auto">文件声明；未声明则 WGS84</option>
+                  {COMMON_CRS.map(crs => <option key={crs.code} value={crs.code}>{crs.code} · {crs.name}</option>)}
+                </select></label>
+                <p className="export-hint">仅用于 GeoJSON。经度/X 在前，纬度/Y 在后；转换为 WGS84 后入库。与文件声明冲突时拒绝导入，不猜测坐标系。</p>
+              </details>}
               {activeTab === 'file' && (
                 <div
                   className="file-drop-zone"

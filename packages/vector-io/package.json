@@ -18,7 +18,8 @@
   "sideEffects": false,
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:consumer": "node examples/consumer.mjs && tsc --noEmit --strict --skipLibCheck --target es2022 --module nodenext --moduleResolution nodenext examples/consumer.ts"
   },
   "dependencies": {
     "@desktop-webgis/scene-schema": "workspace:*",

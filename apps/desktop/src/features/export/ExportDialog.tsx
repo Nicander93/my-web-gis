@@ -2,10 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import {
   inferLayerStyleKind,
-  stringifyGeoJson,
   type GisFeature
 } from '@desktop-webgis/gis-core'
-import { featuresToCsv } from '@desktop-webgis/vector-io'
+import { serializeVectorExport, type ExportFormat, type CoordinateExportCrs } from './serializeVectorExport'
 import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
 import { pickSaveFile, writeTextFile } from '@/services/files'
@@ -21,7 +20,7 @@ import {
   type ExportScope
 } from './exportScopes'
 
-export type ExportFormat = 'geojson' | 'csv'
+export type { ExportFormat } from './serializeVectorExport'
 
 interface ExportDialogProps {
   open: boolean
@@ -58,6 +57,7 @@ export function ExportDialog({ open, onClose, layerId, mode = 'export' }: Export
 
   const [scope, setScope] = useState<ExportScope>('all')
   const [format, setFormat] = useState<ExportFormat>('geojson')
+  const [coordinateCrs, setCoordinateCrs] = useState<CoordinateExportCrs>('EPSG:4326')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -65,6 +65,7 @@ export function ExportDialog({ open, onClose, layerId, mode = 'export' }: Export
     if (open) {
       setScope('all')
       setFormat('geojson')
+      setCoordinateCrs('EPSG:4326')
       setBusy(false)
       setError(null)
     }
@@ -125,8 +126,10 @@ export function ExportDialog({ open, onClose, layerId, mode = 'export' }: Export
     setBusy(true)
     setError(null)
     try {
-      const isCsv = format === 'csv'
-      const defaultName = `${layer.name || 'layer'}.${isCsv ? 'csv' : 'geojson'}`
+      const serialized = serializeVectorExport(snapshot, format, coordinateCrs)
+      const isCsv = serialized.extension === 'csv'
+      const suffix = format === 'coordinate-csv' ? `_${coordinateCrs.replace(':', '-')}` : ''
+      const defaultName = `${layer.name || 'layer'}${suffix}.${serialized.extension}`
       const path = await pickSaveFile({
         title: '导出数据',
         defaultPath: defaultName,
@@ -141,21 +144,7 @@ export function ExportDialog({ open, onClose, layerId, mode = 'export' }: Export
         return
       }
 
-      let content: string
-      if (isCsv) {
-        const csv = featuresToCsv(snapshot, { formulaGuard: true })
-        if (!csv) {
-          setError('当前导出范围为 0 个要素，未生成文件。')
-          setBusy(false)
-          return
-        }
-        content = csv
-      } else {
-        // GeoJSON keeps original property strings (no formula guard).
-        content = stringifyGeoJson(snapshot)
-      }
-
-      await writeTextFile(path, content)
+      await writeTextFile(path, serialized.content)
       emitCommandStatus(`已导出 ${snapshot.length} 个要素 → ${path}`)
       handleClose()
     } catch (err) {
@@ -241,7 +230,7 @@ export function ExportDialog({ open, onClose, layerId, mode = 'export' }: Export
                 </p>
               </fieldset>
 
-              <fieldset className="export-fieldset">
+              {mode === 'export' && <fieldset className="export-fieldset">
                 <legend>导出格式</legend>
                 <label className="export-radio">
                   <input
@@ -261,7 +250,14 @@ export function ExportDialog({ open, onClose, layerId, mode = 'export' }: Export
                   />
                   <span>属性 CSV</span>
                 </label>
-                {format === 'csv' ? (
+                {mode === 'export' && <>
+                  <label className="export-radio"><input type="radio" name="export-format" checked={format === 'coordinate-csv'} onChange={() => setFormat('coordinate-csv')} /><span>点坐标 CSV（X、Y、坐标系 + 属性）</span></label>
+                  {format === 'coordinate-csv' && <label>目标坐标系 <select value={coordinateCrs} onChange={event => setCoordinateCrs(event.target.value as CoordinateExportCrs)} disabled={busy}>
+                    <option value="EPSG:4326">WGS84 · 经度/纬度（度）</option><option value="EPSG:3857">Web Mercator · X/Y（米）</option>
+                  </select><p className="export-hint">仅支持单点；新增 id、x、y、crs 列，同名属性冲突时拒绝导出。仅转换导出快照，不更改项目；Z 不写入 CSV。重新导入时请选择相同坐标系。Web Mercator 米制坐标不代表准确地面距离。</p></label>}
+                </>}
+                {format === 'geojson' && <p className="export-hint">GeoJSON 固定输出 WGS84 经度/纬度；地图显示投影不改变导出坐标。</p>}
+                {format !== 'geojson' ? (
                   <p className="export-hint export-formula-help">
                     CSV 默认启用电子表格公式防护：以 <code>=</code> <code>+</code>{' '}
                     <code>-</code> <code>@</code> 或制表符/回车开头的单元格会加上前导{' '}
@@ -269,7 +265,7 @@ export function ExportDialog({ open, onClose, layerId, mode = 'export' }: Export
                     不受此处理，始终保留原始字符串。
                   </p>
                 ) : null}
-              </fieldset>
+              </fieldset>}
 
               {currentCount === 0 ? (
                 <p className="export-warn">当前范围无要素，不会生成文件或图层。</p>
