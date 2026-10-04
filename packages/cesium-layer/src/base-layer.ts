@@ -4,7 +4,7 @@ import type { PopupContent } from '@desktop-webgis/cesium-popup'
 import type { LayerCollection } from './index.js'
 
 export interface LayerOptions { id: string; name?: string; show?: boolean }
-export interface LayerClickEvent { layer: BaseLayer; position: Cartesian3; properties: Record<string, unknown>; picked: unknown }
+export interface LayerClickEvent { layer: BaseLayer; position: Cartesian3; properties: Record<string, unknown>; picked: unknown; selection?: 'toggle' | 'range' }
 export interface LayerEvents { click: LayerClickEvent; load: BaseLayer; error: Error }
 
 /** An explicit lifecycle for framework-independent Cesium layers. */

@@ -110,3 +110,14 @@
 .city-attribute-editor__header { display: grid; grid-template-columns: minmax(0, 1fr) 70px 24px; gap: 4px; margin-bottom: 4px; align-items: center; }
 .city-attribute-editor input, .city-attribute-editor select, .city-attribute-editor textarea { width: 100%; min-width: 0; box-sizing: border-box; padding: 6px; border: 1px solid var(--border-color, #dce2dd); border-radius: 3px; background: var(--surface, #fff); color: inherit; font: inherit; }
 .city-attribute-editor textarea { min-height: 60px; resize: vertical; }
+.city-scene-group { margin: 4px 6px; border-radius: 3px; }
+.city-scene-group__header { display: flex; align-items: center; gap: 4px; min-height: 32px; padding: 2px 4px; background: #f0f3ef; border-radius: 3px; }
+.city-scene-group--selected .city-scene-group__header { background: #dce8df; box-shadow: inset 0 0 0 1px #becdc3; }
+.city-scene-group__header button { border: 0; background: transparent; color: inherit; cursor: pointer; padding: 3px; }
+.city-scene-group__name { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; text-align: left; }
+.city-scene-group__name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; font-size: 12px; }
+.city-scene-group__name span, .city-group-empty { font-size: 11px; color: #69796f; }
+.city-layer-list--group { padding-left: 12px; }
+.city-group-empty { padding: 10px 8px; list-style: none; line-height: 1.5; }
+.city-root-drop { margin: 8px; padding: 7px; border: 1px dashed #cbd4ce; border-radius: 3px; font-size: 11px; color: #69796f; text-align: center; }
+.city-layer-row[draggable], .city-layer-row__select[draggable="true"] { cursor: grab; }

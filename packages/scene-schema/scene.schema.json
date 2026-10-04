@@ -1227,6 +1227,10 @@
         "locked": {
           "type": "boolean"
         },
+        "groupId": {
+          "type": "string",
+          "pattern": "\\S"
+        },
         "type": {
           "const": "3dtiles"
         },
@@ -1273,6 +1277,10 @@
         "locked": {
           "type": "boolean"
         },
+        "groupId": {
+          "type": "string",
+          "pattern": "\\S"
+        },
         "type": {
           "const": "model"
         },
@@ -1315,6 +1323,10 @@
         "locked": {
           "type": "boolean"
         },
+        "groupId": {
+          "type": "string",
+          "pattern": "\\S"
+        },
         "type": {
           "const": "geojson"
         },
@@ -1352,6 +1364,10 @@
         },
         "locked": {
           "type": "boolean"
+        },
+        "groupId": {
+          "type": "string",
+          "pattern": "\\S"
         },
         "type": {
           "const": "water"
@@ -1439,6 +1455,12 @@
             "$ref": "#/$defs/cityAsset"
           }
         },
+        "groups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/cityGroup"
+          }
+        },
         "nodes": {
           "type": "array",
           "items": {
@@ -1517,13 +1539,31 @@
           },
           "then": {
             "not": {
-              "required": [
-                "lighting"
+              "anyOf": [
+                {
+                  "required": [
+                    "lighting"
+                  ]
+                },
+                {
+                  "required": [
+                    "groups"
+                  ]
+                }
               ]
             },
             "properties": {
               "nodes": {
                 "items": {
+                  "allOf": [
+                    {
+                      "not": {
+                        "required": [
+                          "groupId"
+                        ]
+                      }
+                    }
+                  ],
                   "not": {
                     "properties": {
                       "type": {
@@ -1559,6 +1599,10 @@
         },
         "locked": {
           "type": "boolean"
+        },
+        "groupId": {
+          "type": "string",
+          "pattern": "\\S"
         },
         "type": {
           "const": "graphic"
@@ -1687,6 +1731,30 @@
         "geometry",
         "style",
         "properties"
+      ]
+    },
+    "cityGroup": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "locked": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "visible"
       ]
     }
   },

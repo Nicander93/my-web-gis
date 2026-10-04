@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { isCityResourceUrl } from '@desktop-webgis/cesium-scene-schema'
-import type { CityNode, CityScene, GeoPosition, GraphicNode, PopupDefinition, Transform, WaterNode } from '@desktop-webgis/cesium-scene-schema'
+import type { CityGroup, CityNode, CityScene, GeoPosition, GraphicNode, PopupDefinition, Transform, WaterNode } from '@desktop-webgis/cesium-scene-schema'
 import { GraphicAttributes } from './GraphicAttributes'
 
 export type CityInspectorSection = 'object' | 'popup' | 'source' | 'style' | 'properties'
@@ -18,16 +18,19 @@ interface CityInspectorProps {
   onDrawBoundary(): void
   onEditGeometry(): void
   geometryDisabled?: boolean
+  groups?: CityGroup[]
+  onMoveGroup(groupId?: string): void
   onDelete(): void
 }
 
-export function CityInspector({ node, section = 'object', pickedProperties = {}, assetUrl, error, onPatch, onResource, onReload, onDrawBoundary, onEditGeometry, geometryDisabled, onDelete }: CityInspectorProps) {
+export function CityInspector({ node, section = 'object', pickedProperties = {}, assetUrl, error, onPatch, onResource, onReload, onDrawBoundary, onEditGeometry, geometryDisabled, groups, onMoveGroup, onDelete }: CityInspectorProps) {
   const properties = node.type === 'graphic' ? { name: node.name, ...node.properties } : pickedProperties
   return <fieldset className="city-properties city-properties--fields" disabled={node.locked}>
     <section className="city-property-section">
       <label className="editor-field">对象名称<input key={`${node.id}:${node.name}`} name="object-name" defaultValue={node.name} onBlur={event => { if (event.target.value.trim()) onPatch({ name: event.target.value.trim() }, '重命名三维对象'); else event.target.value = node.name }} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); if (event.key === 'Escape') { event.currentTarget.value = node.name; event.currentTarget.blur() } }} /></label>
       <span className="city-type-label">{node.type === '3dtiles' ? '3D Tiles' : node.type === 'model' ? 'GLB 模型' : node.type === 'geojson' ? 'GeoJSON' : node.type === 'graphic' ? `标绘 · ${node.geometry.type}` : '水面'}{node.locked ? ' · 已锁定' : ''}</span>
     </section>
+    {section === 'object' && <section className="city-property-section"><label className="editor-field">所属分组<select value={node.groupId ?? ''} onChange={event => onMoveGroup(event.target.value || undefined)}><option value="">未分组</option>{groups?.map(group => <option key={group.id} value={group.id} disabled={group.locked}>{group.name}{group.locked ? '（已锁定）' : ''}</option>)}</select></label></section>}
     {error && <section className="city-property-section"><p className="editor-error" role="alert">{error}</p><button className="button-secondary" onClick={onReload}>重试加载</button></section>}
     {section === 'object' && node.type === 'model' && <PositionFields key={`${node.id}:${JSON.stringify(node.position)}`} position={node.position} onApply={position => onPatch({ position } as Partial<CityNode>, '设置模型地理位置')} />}
     {section === 'object' && (node.type === 'model' || node.type === '3dtiles') && <TransformFields key={`${node.id}:${JSON.stringify(node.transform)}`} transform={node.transform} onApply={transform => onPatch({ transform } as Partial<CityNode>, '输入模型变换')} />}

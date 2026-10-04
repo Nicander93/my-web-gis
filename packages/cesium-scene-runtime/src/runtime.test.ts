@@ -16,6 +16,8 @@ vi.mock('@desktop-webgis/cesium-layer', async original => {
   const actual = await original<typeof import('@desktop-webgis/cesium-layer')>()
   return { ...actual, TilesetLayer: class extends actual.TilesetLayer {
     protected async createNative(): Promise<() => void> { probe.created++; return () => { probe.released++ } }
+  }, GeoJsonLayer: class extends actual.GeoJsonLayer {
+    protected async createNative(): Promise<() => void> { return () => {} }
   } }
 })
 vi.mock('@desktop-webgis/cesium-tileset-edit', () => ({ TilesetEditor: class {
@@ -33,6 +35,33 @@ function setup() {
   return { scene, viewer, runtime: new CitySceneRuntime(viewer, { target: 'map', scene }) }
 }
 describe('incremental scene reconciliation', () => {
+  it('keeps vector selection after style updates and restores the latest scene color', async () => {
+    const s = setup()
+    s.scene.assets.roads = { type: 'geojson', url: './roads.geojson' }
+    s.scene.nodes.push({ id: 'roads', name: 'Roads', type: 'geojson', asset: 'roads', visible: true, color: '#336699' })
+    await s.runtime.updateScene(s.scene)
+    const layer = s.runtime.layers.getLayer('roads') as import('@desktop-webgis/cesium-layer').GeoJsonLayer
+    const color = vi.spyOn(layer, 'setColor')
+    s.runtime.setSelected(['roads'])
+    const node = s.scene.nodes[1]; if (node.type === 'geojson') node.color = '#ff0000'
+    await s.runtime.updateScene(s.scene)
+    expect(color).toHaveBeenLastCalledWith('#3984d7')
+    s.runtime.setSelected([]); expect(color).toHaveBeenLastCalledWith('#ff0000')
+    expect(s.runtime.layers.getLayer('roads')).toBe(layer)
+    s.runtime.destroy()
+  })
+  it('applies inherited group visibility and locking without reloading resources', async () => {
+    const s = setup(); s.scene.groups = [{ id: 'g', name: '城市', visible: true }]; s.scene.nodes[0].groupId = 'g'
+    await s.runtime.updateScene(s.scene); const layer = s.runtime.layers.getLayer('blocks')
+    s.scene.groups[0].visible = false; await s.runtime.updateScene(s.scene)
+    expect(layer?.show).toBe(false); expect(s.scene.nodes[0].visible).toBe(true)
+    expect(() => s.runtime.startEditing('blocks')).toThrow('隐藏')
+    s.scene.groups[0].visible = true; s.scene.groups[0].locked = true; await s.runtime.updateScene(s.scene)
+    expect(layer?.show).toBe(true); expect(() => s.runtime.startEditing('blocks')).toThrow('锁定')
+    s.scene.groups[0].locked = false; s.scene.nodes[0].groupId = undefined; await s.runtime.updateScene(s.scene)
+    s.runtime.startEditing('blocks'); expect(probe.created).toBe(1); expect(s.runtime.layers.getLayer('blocks')).toBe(layer)
+    s.runtime.destroy()
+  })
   it('cancels vertex previews when switching to drawing or receiving authoritative geometry', async () => {
     const s = setup()
     s.viewer.entities = new EntityCollection()

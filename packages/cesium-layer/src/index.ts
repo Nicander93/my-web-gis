@@ -1,4 +1,4 @@
-import { Cartesian2, Cartesian3, Cartographic, Cesium3DTileFeature, Cesium3DTileset, Color, ColorMaterialProperty, ConstantProperty, Entity, GeoJsonDataSource, JulianDate, Math as CesiumMath, Matrix4, Model, ScreenSpaceEventHandler, ScreenSpaceEventType, Transforms } from 'cesium'
+import { Cartesian2, Cartesian3, Cartographic, Cesium3DTileFeature, Cesium3DTileStyle, Cesium3DTileset, Color, ColorBlendMode, ColorMaterialProperty, ConstantProperty, Entity, GeoJsonDataSource, JulianDate, KeyboardEventModifier, Math as CesiumMath, Matrix4, Model, ScreenSpaceEventHandler, ScreenSpaceEventType, Transforms } from 'cesium'
 import type { BoundingSphere, Resource, Viewer } from 'cesium'
 import { createTransform, validateTransform } from '@desktop-webgis/cesium-scene-schema'
 import type { GeoPosition, Transform } from '@desktop-webgis/cesium-scene-schema'
@@ -8,7 +8,7 @@ export { composeTransform } from './transform.js'
 export { BaseLayer } from './base-layer.js'
 export type { LayerOptions, LayerClickEvent } from './base-layer.js'
 import { BaseLayer } from './base-layer.js'
-import type { LayerOptions } from './base-layer.js'
+import type { LayerClickEvent, LayerOptions } from './base-layer.js'
 export { Graphic, GraphicLayer } from './graphic-layer.js'
 export { DrawSession } from './draw.js'
 export type { DrawOptions, DrawResult } from './draw.js'
@@ -25,11 +25,15 @@ export interface TransformLayer {
 }
 
 abstract class AssetLayer extends BaseLayer implements TransformLayer {
+  protected highlighted = false
   protected originalMatrix?: Matrix4
   pivot: Cartesian3 | undefined
   protected transform: Transform = createTransform()
   abstract get boundingSphere(): BoundingSphere | undefined
   abstract get native(): Model | Cesium3DTileset | undefined
+  protected abstract applyHighlight(value: boolean): void
+  /** Transient selection feedback; restoring it never changes serialized resource options. */
+  setHighlighted(value: boolean): void { this.highlighted = value; this.applyHighlight(value); this.viewer?.scene.requestRender() }
   getTransform(): Transform { return structuredClone(this.transform) }
   setTransform(transform: Transform): void {
     if (!validateTransform(transform)) throw new Error('变换参数无效')
@@ -53,6 +57,8 @@ export interface TilesetLayerOptions extends LayerOptions {
 }
 export class TilesetLayer extends AssetLayer {
   tileset?: Cesium3DTileset
+  private highlightTarget?: Cesium3DTileset
+  private previousStyle?: Cesium3DTileStyle
   constructor(private readonly options: TilesetLayerOptions) { super(options); this.transform = structuredClone(options.transform ?? createTransform()) }
   get native(): Cesium3DTileset | undefined { return this.tileset }
   get boundingSphere(): BoundingSphere | undefined { return this.tileset?.boundingSphere }
@@ -65,14 +71,32 @@ export class TilesetLayer extends AssetLayer {
     this.pivot = Cartesian3.clone(tileset.boundingSphere.center)
     viewer.scene.primitives.add(tileset)
     this.setTransform(this.transform)
+    this.setHighlighted(this.highlighted)
     const removeFailed = tileset.tileFailed.addEventListener((failure: { message: string }) => this.emit('error',new Error(failure.message)))
-    return () => { removeFailed(); if (!viewer.isDestroyed() && !tileset.isDestroyed()) viewer.scene.primitives.remove(tileset); else if (!tileset.isDestroyed()) tileset.destroy(); if (this.tileset === tileset) this.tileset = undefined }
+    return () => {
+      removeFailed()
+      if (this.highlightTarget === tileset) { this.highlightTarget = undefined; this.previousStyle = undefined }
+      if (!viewer.isDestroyed() && !tileset.isDestroyed()) viewer.scene.primitives.remove(tileset); else if (!tileset.isDestroyed()) tileset.destroy()
+      if (this.tileset === tileset) this.tileset = undefined
+    }
+  }
+  protected applyHighlight(value: boolean): void {
+    if (!this.tileset) return
+    if (value) {
+      if (this.highlightTarget === this.tileset) return
+      this.highlightTarget = this.tileset; this.previousStyle = this.tileset.style
+      this.tileset.style = new Cesium3DTileStyle({ color: 'color("#3984d7", 1)' })
+    } else if (this.highlightTarget === this.tileset) {
+      this.tileset.style = this.previousStyle; this.highlightTarget = undefined; this.previousStyle = undefined
+    }
   }
 }
 
 export interface ModelLayerOptions extends LayerOptions { url: string | Resource; position: GeoPosition; transform?: Transform }
 export class ModelLayer extends AssetLayer {
   model?: Model
+  private highlightTarget?: Model
+  private previousColor?: { color: Color; mode: Model['colorBlendMode']; amount: number }
   constructor(private readonly options: ModelLayerOptions) { super(options); this.transform = structuredClone(options.transform ?? createTransform()) }
   get native(): Model | undefined { return this.model }
   get boundingSphere(): BoundingSphere | undefined { return this.model?.ready ? this.model.boundingSphere : undefined }
@@ -83,8 +107,13 @@ export class ModelLayer extends AssetLayer {
     const model = await Model.fromGltfAsync({ url: this.options.url, modelMatrix: composeTransform(base, pivot, this.transform), id: this.id })
     if (signal.aborted || viewer.isDestroyed()) { model.destroy(); return () => {} }
     this.model = model; this.originalMatrix = base; this.pivot = pivot
+    this.setHighlighted(this.highlighted)
     viewer.scene.primitives.add(model)
-    const release = () => { if (!viewer.isDestroyed() && !model.isDestroyed()) viewer.scene.primitives.remove(model); else if (!model.isDestroyed()) model.destroy(); if (this.model === model) this.model = undefined }
+    const release = () => {
+      if (this.highlightTarget === model) { this.highlightTarget = undefined; this.previousColor = undefined }
+      if (!viewer.isDestroyed() && !model.isDestroyed()) viewer.scene.primitives.remove(model); else if (!model.isDestroyed()) model.destroy()
+      if (this.model === model) this.model = undefined
+    }
     viewer.scene.requestRender()
     if (!model.ready) {
       try {
@@ -98,6 +127,18 @@ export class ModelLayer extends AssetLayer {
       } catch (error) { release(); throw error }
     }
     return release
+  }
+  protected applyHighlight(value: boolean): void {
+    if (!this.model) return
+    if (value) {
+      if (this.highlightTarget === this.model) return
+      this.highlightTarget = this.model
+      this.previousColor = { color: Color.clone(this.model.color), mode: this.model.colorBlendMode, amount: this.model.colorBlendAmount }
+      this.model.color = Color.fromCssColorString('#3984d7'); this.model.colorBlendMode = ColorBlendMode.MIX; this.model.colorBlendAmount = .65
+    } else if (this.highlightTarget === this.model && this.previousColor) {
+      this.model.color = this.previousColor.color; this.model.colorBlendMode = this.previousColor.mode; this.model.colorBlendAmount = this.previousColor.amount
+      this.highlightTarget = undefined; this.previousColor = undefined
+    }
   }
 }
 
@@ -141,7 +182,7 @@ export class LayerCollection {
   popupsEnabled = true
   constructor(readonly viewer: Viewer) {
     this.handler = new ScreenSpaceEventHandler(viewer.canvas)
-    this.handler.setInputAction((event: { position: Cartesian2 }) => {
+    const pick = (event: { position: Cartesian2 }, selection?: LayerClickEvent['selection']): void => {
       if (!this.pickingEnabled) return
       const picked: unknown = viewer.scene.pick(event.position)
       const layer = this.layers.find(candidate => candidate.show && candidate.contains(picked))
@@ -157,8 +198,11 @@ export class LayerCollection {
         const bag = picked.id.properties as { getValue(time: JulianDate): Record<string, unknown> } | undefined
         Object.assign(properties, bag?.getValue(viewer.clock.currentTime))
       }
-      void layer.handleClick({ layer, position, properties, picked }, this.popupsEnabled)
-    }, ScreenSpaceEventType.LEFT_CLICK)
+      void layer.handleClick({ layer, position, properties, picked, selection }, this.popupsEnabled)
+    }
+    this.handler.setInputAction((event: { position: Cartesian2 }) => pick(event), ScreenSpaceEventType.LEFT_CLICK)
+    this.handler.setInputAction((event: { position: Cartesian2 }) => pick(event, 'toggle'), ScreenSpaceEventType.LEFT_CLICK, KeyboardEventModifier.CTRL)
+    this.handler.setInputAction((event: { position: Cartesian2 }) => pick(event, 'range'), ScreenSpaceEventType.LEFT_CLICK, KeyboardEventModifier.SHIFT)
   }
   get layers(): BaseLayer[] { return [...this.registry.values()] }
   getLayer(id: string): BaseLayer | undefined { return this.registry.get(id) }

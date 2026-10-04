@@ -4,7 +4,7 @@ import type { DrawOptions, EditSession, GraphicEditOptions } from '@desktop-webg
 import { TilesetEditor } from '@desktop-webgis/cesium-tileset-edit'
 import type { EditMode, TransformEditEvent } from '@desktop-webgis/cesium-tileset-edit'
 import { CityEffects, WaterLayer } from '@desktop-webgis/cesium-effects'
-import { parseCityScene } from '@desktop-webgis/cesium-scene-schema'
+import { getCityNodeState, parseCityScene } from '@desktop-webgis/cesium-scene-schema'
 import type { CityCamera, CityNode, CityScene } from '@desktop-webgis/cesium-scene-schema'
 export type { EditMode, TransformEditEvent } from '@desktop-webgis/cesium-tileset-edit'
 export type { CityScene, CityNode, Transform } from '@desktop-webgis/cesium-scene-schema'
@@ -20,7 +20,7 @@ export interface CityRuntimeOptions {
   /** Inject credentials at runtime rather than storing tokens in scene URLs. */
   resolveResource?: (url: string) => Resource
   onEdit?: (event: TransformEditEvent) => void
-  onSelect?: (id: string | null, properties?: Record<string, unknown>) => void
+  onSelect?: (id: string | null, properties?: Record<string, unknown>, selection?: 'toggle' | 'range') => void
   onLayerState?: (id: string, state: BaseLayer['state'], error?: Error) => void
 }
 
@@ -76,7 +76,8 @@ export class CitySceneRuntime {
       if (this.editingId === id) this.stopEditing()
       this.layers.removeLayer(id); this.nodes.delete(id); this.nativeKeys.delete(id)
     }
-    for (const node of scene.nodes) {
+    for (const definition of scene.nodes) {
+      const node = { ...definition, ...getCityNodeState(scene, definition) }
       const previous = this.nodes.get(node.id)
       let layer = this.layers.getLayer(node.id)
       if (layer && previous && this.nativeKeys.get(node.id) !== nativeKey(node, scene)) {
@@ -91,22 +92,22 @@ export class CitySceneRuntime {
         layer.show = node.visible
         if ((layer instanceof TilesetLayer || layer instanceof ModelLayer) && (node.type === '3dtiles' || node.type === 'model')) layer.setTransform(node.transform)
         if (layer instanceof GraphicLayer && node.type === 'graphic') layer.getGraphic(node.id)?.setOptions(node)
-        if (layer instanceof GraphicLayer) layer.setSelected(this.selectedIds)
         if (layer instanceof GeoJsonLayer && node.type === 'geojson') layer.setColor(node.color ?? '#55a6ff')
+        this.applySelection(layer)
         if (node.popup) layer.bindPopup(node.popup); else layer.unbindPopup()
         continue
       }
       layer = this.createLayer(node, scene)
       if (node.popup) layer.bindPopup(node.popup)
       const mounted = layer
-      mounted.on('click', event => this.options.onSelect?.(node.id, event.properties))
+      mounted.on('click', event => this.options.onSelect?.(node.id, event.properties, event.selection))
       mounted.on('error', error => this.options.onLayerState?.(node.id, 'error', error))
       const pending = this.layers.addLayer(mounted).then(() => {
         if (this.destroyed || this.layers.getLayer(node.id) !== mounted) return
         const latest = this.nodes.get(node.id)
         if (latest && (latest.type === '3dtiles' || latest.type === 'model') && (mounted instanceof TilesetLayer || mounted instanceof ModelLayer)) mounted.setTransform(latest.transform)
         if (latest?.type === 'geojson' && mounted instanceof GeoJsonLayer) mounted.setColor(latest.color ?? '#55a6ff')
-        if (mounted instanceof GraphicLayer) mounted.setSelected(this.selectedIds)
+        this.applySelection(mounted)
         this.options.onLayerState?.(node.id, mounted.state)
       })
       this.options.onLayerState?.(node.id, 'loading')
@@ -143,7 +144,15 @@ export class CitySceneRuntime {
   cancelGraphicEditing(): void { const editing = this.graphicEditing; this.graphicEditing = undefined; editing?.cancel(); this.layers.pickingEnabled = true }
   setSelected(ids: readonly string[]): void {
     this.selectedIds = [...ids]
-    this.layers.layers.forEach(layer => { if (layer instanceof GraphicLayer) layer.setSelected(ids) })
+    this.layers.layers.forEach(layer => this.applySelection(layer))
+  }
+  private applySelection(layer: BaseLayer): void {
+    if (layer instanceof GraphicLayer) layer.setSelected(this.selectedIds)
+    else if (layer instanceof TilesetLayer || layer instanceof ModelLayer) layer.setHighlighted(this.selectedIds.includes(layer.id))
+    else if (layer instanceof GeoJsonLayer) {
+      const node = this.nodes.get(layer.id)
+      if (node?.type === 'geojson') layer.setColor(this.selectedIds.includes(layer.id) ? '#3984d7' : node.color ?? '#55a6ff')
+    }
   }
   startDraw(options: DrawOptions): DrawSession {
     if (this.destroyed) throw new Error('CitySceneRuntime 已销毁')
@@ -206,7 +215,7 @@ export class CitySceneRuntime {
 function nativeKey(node: CityNode, scene: CityScene): string {
   if (node.type === 'graphic') return 'graphic'
   if (node.type === 'geojson') return JSON.stringify([node.asset, scene.assets[node.asset]])
-  const { popup: _popup, visible: _visible, locked: _locked, name: _name, ...rest } = node
+  const { popup: _popup, visible: _visible, locked: _locked, name: _name, groupId: _groupId, ...rest } = node
   if (node.type === 'water') return JSON.stringify(rest)
   const { transform: _transform, ...assetNode } = rest as typeof rest & { transform?: unknown }
   return JSON.stringify([assetNode, scene.assets[node.asset]])

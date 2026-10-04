@@ -19,3 +19,18 @@ const validated = parseCityScene(JSON.stringify(city))
 JSON Schema 导出：`@desktop-webgis/cesium-scene-schema/city.schema.json`。JSON Schema 描述结构和数值范围；URL 策略、跨资源引用、ID 唯一性和边界不同点仍需调用 TypeScript 验证器。维护协议时执行 `node scripts/generate-city-schema.mjs` 同步独立 schema 和主 Scene schema。
 
 首版 0.1.0，MIT；尚未发布 npm。
+
+## 场景分组
+
+CityScene v2 的可选 `groups` 保存一层分组 `{ id, name, visible, locked? }`；节点使用可选 `groupId` 引用分组。组和对象 ID 必须唯一，引用必须存在；版本 1 不接受分组配置。分组顺序取自 `groups`，组内对象顺序取自 `nodes`，未分组对象也按 `nodes` 排列。折叠、搜索和当前选择由宿主维护，不保存到协议。
+
+```ts
+import { getCityNodeState, moveCityNodes, removeCityGroup } from '@desktop-webgis/cesium-scene-schema'
+
+city.groups = [{ id: 'buildings', name: '建筑', visible: true }]
+const grouped = moveCityNodes(city, ['blocks'], 'buildings')
+const state = getCityNodeState(grouped, grouped.nodes[0]) // 实际 visible / locked
+const ungrouped = removeCityGroup(grouped, 'buildings') // 保留对象与实际显隐
+```
+
+`moveCityNodes` 返回独立场景，不修改输入；省略分组参数表示移出分组，省略插入目标表示移到末尾。任意源对象、源组或目标组锁定时整批拒绝，避免部分移动。`removeCityGroup` 拒绝解散锁定组。实际显隐为对象与分组显隐的交集，实际锁定为两者锁定的并集；隐藏和解锁分组不会覆盖成员自身设置。宿主将返回配置接入自己的撤销和持久化系统。

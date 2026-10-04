@@ -35,6 +35,7 @@ interface NodeBase {
   visible: boolean
   popup?: PopupDefinition
   locked?: boolean
+  groupId?: string
 }
 
 export type GraphicType = 'point' | 'polyline' | 'polygon'
@@ -56,6 +57,7 @@ export function validateGraphic(value: unknown): value is GraphicNode {
   if (geometry.positions.length < minimum || (geometry.type === 'point' && geometry.positions.length !== 1)) return false
   if (new Set(geometry.positions.map(p => geometry.type === 'polygon' ? `${p[0]},${p[1]}` : JSON.stringify(p))).size < minimum) return false
   if (value.locked !== undefined && typeof value.locked !== 'boolean') return false
+  if (value.groupId !== undefined && (typeof value.groupId !== 'string' || !value.groupId.trim())) return false
   if (value.popup !== undefined && !validatePopup(value.popup)) return false
   return record(style) && typeof style.color === 'string' && /^#[\da-f]{6}([\da-f]{2})?$/i.test(style.color) && finite(style.width) && style.width > 0 && style.width <= 64 && finite(style.pointSize) && style.pointSize > 0 && style.pointSize <= 128 && (style.label === undefined || typeof style.label === 'string') && (style.labelField === undefined || typeof style.labelField === 'string' && !!style.labelField.trim()) && record(value.properties) && jsonValue(value.properties)
 }
@@ -109,6 +111,7 @@ export interface WaterNode extends NodeBase {
 }
 
 export type CityNode = TilesetNode | ModelNode | GeoJsonNode | WaterNode | GraphicNode
+export interface CityGroup { id: string; name: string; visible: boolean; locked?: boolean }
 export interface CityScene {
   version: 1 | 2
   camera: CityCamera
@@ -116,6 +119,7 @@ export interface CityScene {
   terrain?: { url: string }
   assets: Record<string, CityAsset>
   nodes: CityNode[]
+  groups?: CityGroup[]
   effects: { fog: number; bloom: boolean }
   lighting?: { sunlight: boolean; shadows: boolean; time: string }
 }
@@ -176,15 +180,27 @@ export function validateCityScene(input: unknown, root = '$'): CityValidationIss
   for (const [id, asset] of Object.entries(assets)) {
     check(Boolean(id.trim()) && record(asset) && ['3dtiles', 'glb', 'geojson'].includes(String(asset.type)) && isCityResourceUrl(asset.url), `assets.${id}`, '资源类型或 URL 无效')
   }
+  const groupIds = new Set<string>()
+  if (input.groups !== undefined) {
+    check(input.version === 2 && Array.isArray(input.groups), 'groups', '分组需要 version 2 和数组配置')
+    if (Array.isArray(input.groups)) input.groups.forEach((group: unknown, i: number) => {
+      const path = `groups[${i}]`
+      if (!record(group)) { check(false, path, '分组结构无效'); return }
+      check(typeof group.id === 'string' && !!group.id.trim() && !groupIds.has(group.id), `${path}.id`, '分组 ID 为空或重复')
+      if (typeof group.id === 'string') groupIds.add(group.id)
+      check(typeof group.name === 'string' && !!group.name.trim() && typeof group.visible === 'boolean' && (group.locked === undefined || typeof group.locked === 'boolean'), path, '分组名称、显隐或锁定状态无效')
+    })
+  }
   if (!Array.isArray(input.nodes)) { check(false, 'nodes', '对象必须是数组'); return issues }
   const ids = new Set<string>()
   input.nodes.forEach((node: unknown, i: number) => {
     const path = `nodes[${i}]`
     if (!record(node)) { check(false, path, '对象结构无效'); return }
-    check(typeof node.id === 'string' && Boolean(node.id.trim()) && !ids.has(node.id), `${path}.id`, '对象 ID 为空或重复')
+    check(typeof node.id === 'string' && Boolean(node.id.trim()) && !ids.has(node.id) && !groupIds.has(node.id), `${path}.id`, '对象 ID 为空或重复，或与分组冲突')
     if (typeof node.id === 'string') ids.add(node.id)
     check(typeof node.name === 'string' && typeof node.visible === 'boolean', path, '对象名称或显隐状态无效')
     if (node.locked !== undefined) check(typeof node.locked === 'boolean', `${path}.locked`, '锁定状态必须是布尔值')
+    if (node.groupId !== undefined) check(input.version === 2 && typeof node.groupId === 'string' && groupIds.has(node.groupId), `${path}.groupId`, '分组引用无效或场景版本不支持')
     if (node.popup !== undefined) {
       const popup = node.popup
       check(record(popup) && (popup.title === undefined || typeof popup.title === 'string') && (popup.titleField === undefined || typeof popup.titleField === 'string') && Array.isArray(popup.fields) && popup.fields.every(f => record(f) && typeof f.field === 'string' && (f.label === undefined || typeof f.label === 'string')), `${path}.popup`, 'Popup 字段结构无效')
@@ -220,3 +236,5 @@ export function parseCityScene(input: unknown): CityScene {
   // Validation establishes the complete serializable contract.
   return structuredClone(decoded) as CityScene
 }
+
+export { getCityNodeState, moveCityNodes, removeCityGroup } from './groups.js'

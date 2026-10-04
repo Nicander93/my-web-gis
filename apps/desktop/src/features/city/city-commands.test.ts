@@ -4,10 +4,45 @@ import { parseProjectSnapshot, serializeProjectSnapshot } from '@desktop-webgis/
 import { useCityLayoutStore } from './city-layout.store'
 import { compileProjectToScene } from '@desktop-webgis/scene-core'
 import { useProjectStore } from '@/stores/project.store'
-import { loadCitySample,updateCity } from './city-commands'
+import { addCityGroup, copyCityNodes, deleteCityNodes, dissolveCityGroup, loadCitySample, moveCitySelection, patchCityGroup, setCityNodesLocked, setCityNodesVisible, updateCity } from './city-commands'
 
 beforeEach(() => useProjectStore.getState().loadSnapshot({project:createProject(),featuresByDataset:{}}))
 describe('city workflow in the existing project store',() => {
+  it('groups and batch-edits one selection per command, preserving saved/published state', () => {
+    const first = loadCitySample(), second = loadCitySample(), store = useProjectStore.getState()
+    const before = store.getSnapshot(), id = addCityGroup('城市模型', [first, second])
+    const grouped = store.getSnapshot()
+    expect(grouped.project.city?.groups?.[0].name).toBe('城市模型')
+    expect(grouped.project.city?.nodes.every(node => node.groupId === id)).toBe(true)
+    store.undoEdit(); expect(store.getSnapshot()).toEqual(before)
+    store.redoEdit(); expect(store.getSnapshot()).toEqual(grouped)
+    setCityNodesVisible([first, second], false)
+    expect(store.getSnapshot().project.city?.nodes.every(node => !node.visible)).toBe(true)
+    store.undoEdit(); expect(store.getSnapshot()).toEqual(grouped)
+    setCityNodesLocked([first, second], true)
+    expect(() => deleteCityNodes([first, second])).toThrow('锁定')
+    store.undoEdit(); expect(store.getSnapshot()).toEqual(grouped)
+    const copies = copyCityNodes([first, second]); expect(copies).toHaveLength(2)
+    expect(new Set(store.getSnapshot().project.city?.nodes.filter(node => copies.includes(node.id)).map(node => node.name)).size).toBe(2)
+    expect(store.getSnapshot().project.city?.nodes).toHaveLength(4); store.undoEdit(); expect(store.getSnapshot()).toEqual(grouped)
+    deleteCityNodes([first, second]); expect(store.getSnapshot().project.city?.nodes).toHaveLength(0)
+    expect(store.getSnapshot().project.city?.assets).toEqual({}); store.undoEdit(); expect(store.getSnapshot()).toEqual(grouped)
+    const reopened = parseProjectSnapshot(serializeProjectSnapshot(grouped))
+    expect(compileProjectToScene(reopened).scene.city).toEqual(grouped.project.city)
+    store.loadSnapshot(reopened); expect(store.getSnapshot()).toEqual(grouped)
+  })
+  it('rejects a whole move when any member is locked and preserves effective visibility on dissolve', () => {
+    const first = loadCitySample(), second = loadCitySample(), id = addCityGroup('模型', [first]), store = useProjectStore.getState()
+    patchCityGroup(id, { locked: true })
+    const locked = store.getSnapshot()
+    expect(() => moveCitySelection([first, second])).toThrow('锁定'); expect(store.getSnapshot()).toEqual(locked)
+    expect(() => setCityNodesLocked([first], false)).toThrow('所属分组')
+    const copies = copyCityNodes([first]); expect(store.getSnapshot().project.city?.nodes.find(node => node.id === copies[0])?.groupId).toBeUndefined(); store.undoEdit()
+    patchCityGroup(id, { locked: false, visible: false }); dissolveCityGroup(id)
+    expect(store.getSnapshot().project.city?.nodes.find(node => node.id === first)?.visible).toBe(false)
+    expect(store.getSnapshot().project.city?.nodes.find(node => node.id === first)?.groupId).toBeUndefined()
+    store.undoEdit(); expect(store.getSnapshot().project.city?.groups?.[0].id).toBe(id)
+  })
   it('commits geometry once, undoes/redoes the entire change and reopens attributes/field labels unchanged', () => {
     updateCity('绘制面', city => { city.nodes.push({ id: 'area', name: 'Area', type: 'graphic', visible: true, geometry: { type: 'polygon', heightMode: 'ground', positions: [[116,39,0],[116.1,39,0],[116,39.1,0]] }, style: { color: '#336699', width: 3, pointSize: 10, labelField: 'zone' }, properties: { zone: '住宅区', height: 0, enabled: false }, popup: { fields: [{ field: 'zone', label: '用途' }] } }); return city })
     const store = useProjectStore.getState(), before = store.getSnapshot()

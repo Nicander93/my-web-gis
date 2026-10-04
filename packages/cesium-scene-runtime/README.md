@@ -33,4 +33,6 @@ Cesium 为 peer dependency。首版 0.1.0，MIT；尚未发布 npm。
 
 `startGraphicEditing(id, { onChange })` 返回 `EditSession`，提供点位置和线面顶点移动、增删及精确坐标输入。完成结果包含 `id/before/after/changed`，宿主确认后更新场景一次；取消恢复层内原几何。`cancelGraphicEditing()` 或 `stopEditing()` 清理会话。权威场景更新、绘制/模型工具切换、预览和销毁会取消未完成的顶点修改；迟到的取消结果不会恢复其他工具正在禁用的拾取。
 
-`setSelected(ids)` 设置临时图形高亮，不写入场景协议。图形 `style.labelField` 和属性在编辑器、只读 Viewer 共用渲染逻辑，属性更新后标签同步更新且无需重新挂载资源。
+`setSelected(ids)` 设置图形、GeoJSON、3D Tiles 和模型的临时高亮，不写入场景协议。取消选择恢复原样式；GeoJSON 更新场景颜色后取消选择恢复最新配置。`onSelect(id, properties, selection)` 透传 Ctrl/Shift 修饰信息，宿主自行决定多选语义。图形 `style.labelField` 和属性在编辑器、只读 Viewer 共用渲染逻辑，属性更新后标签同步更新且无需重新挂载资源。
+
+运行时按 `groups` / `groupId` 计算成员的实际显隐和锁定；隐藏组不覆盖对象自身的 `visible`，锁定组会禁止成员几何与模型编辑。重命名、排序和分组移动复用原生资源；持久化、批量命令和历史由宿主负责。
