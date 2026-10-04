@@ -124,6 +124,8 @@ export function Inspector() {
                   {dataset.processing.options.tool === 'summarize-location' && <p>统计：{dataset.processing.options.predicate === 'within' ? '完全位于区域内' : '相交（含边界）'}；{dataset.processing.options.field || '仅数量'}；前缀 {dataset.processing.options.prefix || '无'}</p>}
                   {dataset.processing.options.tool === 'attribute-join' && <p>连接：{dataset.processing.options.inputKey} → {dataset.processing.options.joinKey}；{dataset.processing.options.mode === 'left' ? '保留全部输入' : '仅匹配输入'}；带入 {dataset.processing.options.fields.join('、')}；前缀 {dataset.processing.options.prefix || '无'}</p>}
                   {dataset.processing.options.tool === 'spatial-join' && <p>空间连接：{dataset.processing.options.predicate === 'within' ? '完整位于其中' : '相交（含边界）'}；{dataset.processing.options.mode === 'left' ? '保留全部输入' : '仅匹配输入'}；带入 {dataset.processing.options.fields.join('、')}；前缀 {dataset.processing.options.prefix || '无'}</p>}
+                  {(dataset.processing.options.tool === 'measure-area' || dataset.processing.options.tool === 'measure-length' || dataset.processing.options.tool === 'measure-perimeter') && <p>测量字段：{dataset.processing.options.field}；单位：{dataset.processing.options.unit}；WGS84 球面 XY 模型，不含高程。</p>}
+                  {dataset.processing.options.tool === 'calculate-field' && <p>字段：{dataset.processing.options.field}；表达式：{dataset.processing.options.expression}</p>}
                   {dataset.processing.overlay && <>
                     <p>第二输入：{dataset.processing.overlay.layerName}</p>
                     <p>第二范围：{{ all: '全部要素', filtered: '图层筛选结果', selected: '当前选中要素' }[dataset.processing.overlay.scope]}（{dataset.processing.overlay.inputCount} 个要素）</p>

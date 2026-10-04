@@ -15,7 +15,7 @@ import { createId } from './id'
 import type { Geometry, GisFeature, Position, PolygonGeometry, MultiPolygonGeometry } from './types'
 
 export type OverlayTool = 'clip' | 'intersect' | 'difference'
-export type ProcessingTool = 'buffer' | 'centroid' | 'envelope' | 'explode' | OverlayTool | 'dissolve' | 'extract-location' | 'summarize-location' | 'attribute-join' | 'spatial-join' | 'clip-lines'
+export type ProcessingTool = 'buffer' | 'centroid' | 'envelope' | 'explode' | OverlayTool | 'dissolve' | 'extract-location' | 'summarize-location' | 'attribute-join' | 'spatial-join' | 'clip-lines' | 'measure-area' | 'measure-length' | 'measure-perimeter' | 'calculate-field'
 export type GeometryProcessingOptions =
   | { tool: 'buffer'; distance: number; unit: 'meters' | 'kilometers' }
   | { tool: 'centroid' }
@@ -28,6 +28,10 @@ export type GeometryProcessingOptions =
 /** Serializable application requests; statistical algorithms are implemented by the analysis extension. */
 export type ProcessingOptions = GeometryProcessingOptions
   | { tool: 'clip-lines' }
+  | { tool: 'measure-area'; field: string; unit: 'square-meters' | 'hectares' | 'square-kilometers' }
+  | { tool: 'measure-length'; field: string; unit: 'meters' | 'kilometers' }
+  | { tool: 'measure-perimeter'; field: string; unit: 'meters' | 'kilometers' }
+  | { tool: 'calculate-field'; field: string; expression: string }
   | { tool: 'summarize-location'; predicate: 'intersects' | 'within'; field?: string; prefix: string }
   | { tool: 'attribute-join'; inputKey: string; joinKey: string; fields: string[]; prefix: string; mode: 'left' | 'inner' }
   | { tool: 'spatial-join'; predicate: 'intersects' | 'within'; fields: string[]; prefix: string; mode: 'left' | 'inner' }
@@ -55,7 +59,7 @@ export function requiresOverlay(tool: ProcessingTool): boolean {
 }
 
 export function requiresPolygon(tool: ProcessingTool): boolean {
-  return tool === 'clip' || tool === 'intersect' || tool === 'difference' || tool === 'dissolve' || tool === 'summarize-location'
+  return tool === 'measure-area' || tool === 'measure-perimeter' || tool === 'clip' || tool === 'intersect' || tool === 'difference' || tool === 'dissolve' || tool === 'summarize-location'
 }
 
 function positions(geometry: Geometry): Position[] {

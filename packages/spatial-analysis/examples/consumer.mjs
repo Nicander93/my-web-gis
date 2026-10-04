@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { summarizeByLocation, joinAttributes, joinByLocation, checkGeometries, clipLines } from '@desktop-webgis/spatial-analysis'
+import { summarizeByLocation, joinAttributes, joinByLocation, checkGeometries, clipLines, addGeometryMeasurements, measureGeometry, calculateField, compileFieldExpression } from '@desktop-webgis/spatial-analysis'
 
 const areas = [{ id: 'region', geometry: { type: 'Polygon', coordinates: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]] }, properties: { code: 'A' } }]
 const sites = [{ id: 'site', geometry: { type: 'Point', coordinates: [1, 1] }, properties: { value: 10 } }]
@@ -16,4 +16,9 @@ const clipped = clipLines([{ id: 'road', geometry: { type: 'LineString', coordin
 assert.equal(clipped.length, 1)
 assert.equal(clipped[0].geometry.type, 'LineString')
 assert.equal(clipped[0].properties.road, 'A')
-console.log('Built package consumer: summaries, joins, diagnostics and line clipping passed')
+const measured = addGeometryMeasurements(areas, { measurement: 'area', field: 'area_km2', unit: 'square-kilometers' })
+assert.ok(measured[0].properties.area_km2 > 0)
+assert.ok(measureGeometry(clipped[0].geometry, { measurement: 'length', unit: 'kilometers' }) > 0)
+assert.equal(calculateField(sites, { field: 'double', expression: 'field("value") * 2' })[0].properties.double, 20)
+assert.equal(compileFieldExpression('coalesce(field("missing"), 0)').evaluate({}), 0)
+console.log('Built package consumer: summaries, joins, diagnostics, clipping, measurements and expressions passed')

@@ -451,9 +451,18 @@ importers:
 
   packages/spatial-analysis:
     dependencies:
+      '@turf/area':
+        specifier: 7.3.4
+        version: 7.3.4
+      '@turf/length':
+        specifier: 7.3.4
+        version: 7.3.4
       '@types/geojson':
         specifier: 7946.0.16
         version: 7946.0.16
+      jsep:
+        specifier: 1.4.0
+        version: 1.4.0
       jsts:
         specifier: 2.7.1
         version: 2.7.1
@@ -1113,6 +1122,9 @@ packages:
   '@tauri-apps/plugin-dialog@2.7.2':
     resolution: {integrity: sha512-pX0IGm1I3I6wc+zeKYcq1GSqogK6okCNX5fOdaNU5ab1AjGS6l1E5wFNjEb7meg7ZFSp0JUs+0jQGQNyOvLrsg==}
 
+  '@turf/area@7.3.4':
+    resolution: {integrity: sha512-UEQQFw2XwHpozSBAMEtZI3jDsAad4NnHL/poF7/S6zeDCjEBCkt3MYd6DSGH/cvgcOozxH/ky3/rIVSMZdx4vA==}
+
   '@turf/bbox-polygon@7.3.4':
     resolution: {integrity: sha512-XCDYQwCA41Bum3R1xX0Na1nR4ozoe/pCYy5bxqrzyMs87kPJUIfBrD5IWxjnZyLqFpfEpolMHJz5ed1uA2PanQ==}
 
@@ -1184,6 +1196,9 @@ packages:
 
   '@turf/kinks@7.3.4':
     resolution: {integrity: sha512-LZTKELWxvXl0vc9ZxVgi0v07fO9+2FrZOam2B10fz/eGjy3oKNazU5gjggbnc499wEIcJS4hN+VyjQZrmsJAdQ==}
+
+  '@turf/length@7.3.4':
+    resolution: {integrity: sha512-Dg1GnQ/B2go5NIWXt91N4L7XTjIgIWCftBSYIXkrpIM7QGjItzglek0Z5caytvb8ZRWXzZOGs8//+Q5we91WuQ==}
 
   '@turf/line-intersect@7.3.4':
     resolution: {integrity: sha512-XygbTvHa6A+v6l2ZKYtS8AAWxwmrPxKxfBbdH75uED1JvdytSLWYTKGlcU3soxd9sYb4x/g9sDvRIVyU6Lucrg==}
@@ -2518,6 +2533,13 @@ snapshots:
     dependencies:
       '@tauri-apps/api': 2.11.1
 
+  '@turf/area@7.3.4':
+    dependencies:
+      '@turf/helpers': 7.3.4
+      '@turf/meta': 7.3.4
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
   '@turf/bbox-polygon@7.3.4':
     dependencies:
       '@turf/helpers': 7.3.4
@@ -2706,6 +2728,14 @@ snapshots:
   '@turf/kinks@7.3.4':
     dependencies:
       '@turf/helpers': 7.3.4
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/length@7.3.4':
+    dependencies:
+      '@turf/distance': 7.3.4
+      '@turf/helpers': 7.3.4
+      '@turf/meta': 7.3.4
       '@types/geojson': 7946.0.16
       tslib: 2.8.1
 

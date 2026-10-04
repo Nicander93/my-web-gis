@@ -7,7 +7,7 @@ import { processingCommands } from '@/app/commands/processing.commands'
 import { emitCommandStatus } from '@/app/commands/status'
 import { layerCommands } from '@/app/commands/layer.commands'
 import { checkLayerGeometry, selectGeometryIssues, type GeometryCheckResult } from '@/app/commands/geometry-check.commands'
-import type { GeometryIssue } from '@desktop-webgis/spatial-analysis'
+import type { GeometryIssue, MeasurementOptions } from '@desktop-webgis/spatial-analysis'
 import { processingTools as tools, type DesktopProcessingTool as Tool } from './processing-tools'
 
 const scopeLabels: Record<ProcessingScope, string> = { all: '全部要素', filtered: '图层筛选结果', selected: '当前选中要素' }
@@ -44,16 +44,23 @@ export function ProcessingDialog({ onClose }: { onClose(): void }) {
   const [distance, setDistance] = useState('100')
   const [unit, setUnit] = useState<'meters' | 'kilometers'>('meters')
   const [name, setName] = useState('')
+  const [resultField, setResultField] = useState('area_m2')
+  const [measurementUnit, setMeasurementUnit] = useState<MeasurementOptions['unit']>('square-meters')
+  const [expression, setExpression] = useState('')
+  const [preview, setPreview] = useState<{ values: unknown[]; total: number } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState<{ text: string; layerId: string } | null>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   const controller = useRef<AbortController | null>(null)
   const mounted = useRef(true)
+  const previewVersion = useRef(0)
   const active = tools.find(item => item.id === tool)!
   const isJoin = tool === 'attribute-join' || tool === 'spatial-join'
   const isCheck = tool === 'check-geometry'
-  const candidates = tool === 'clip-lines' ? lineLayers : !isCheck && requiresPolygon(tool) ? polygonLayers : vectorLayers
+  const isMeasurement = tool === 'measure-area' || tool === 'measure-length' || tool === 'measure-perimeter'
+  const needsLine = tool === 'clip-lines' || tool === 'measure-length'
+  const candidates = needsLine ? lineLayers : !isCheck && requiresPolygon(tool) ? polygonLayers : vectorLayers
   const layer = candidates.find(item => item.id === layerId)
   const overlayCandidates = tool === 'summarize-location' || isJoin ? vectorLayers : polygonLayers
   const overlayLayer = overlayCandidates.find(item => item.id === overlayId)
@@ -71,7 +78,7 @@ export function ProcessingDialog({ onClose }: { onClose(): void }) {
   const issueNames = new Map(geometryReport?.source.map(feature => [feature.id, typeof feature.properties.name === 'string' ? feature.properties.name : '']) ?? [])
 
   function selectTool(nextTool: Tool): void {
-    const available = nextTool === 'clip-lines' ? lineLayers : nextTool !== 'check-geometry' && requiresPolygon(nextTool) ? polygonLayers : vectorLayers
+    const available = nextTool === 'clip-lines' || nextTool === 'measure-length' ? lineLayers : nextTool !== 'check-geometry' && requiresPolygon(nextTool) ? polygonLayers : vectorLayers
     const nextLayerId = available.some(item => item.id === layerId) ? layerId : available[0]?.id ?? ''
     setTool(nextTool)
     setLayerId(nextLayerId)
@@ -82,6 +89,8 @@ export function ProcessingDialog({ onClose }: { onClose(): void }) {
     setGroupField('')
     setPredicate('intersects'); setSummaryField(''); setPrefix(nextTool === 'attribute-join' || nextTool === 'spatial-join' ? 'join_' : 'stats_')
     setInputKey(''); setJoinKey(''); setJoinFields([])
+    setResultField(nextTool === 'measure-area' ? 'area_m2' : nextTool === 'measure-length' ? 'length_m' : nextTool === 'measure-perimeter' ? 'perimeter_m' : 'calculated')
+    setMeasurementUnit(nextTool === 'measure-area' ? 'square-meters' : 'meters')
     setError('')
     setSuccess(null)
   }
@@ -110,6 +119,30 @@ export function ProcessingDialog({ onClose }: { onClose(): void }) {
     catch (reason) { setError(reason instanceof Error ? reason.message : '无法选择问题要素。') }
   }
 
+  useEffect(() => { previewVersion.current++; setPreview(null) }, [tool, layerId, scope, resultField, measurementUnit, expression, featuresByDataset, selection, project.id])
+
+  function fieldOptions(): ProcessingOptions {
+    if (tool === 'measure-area') return { tool, field: resultField, unit: measurementUnit === 'hectares' || measurementUnit === 'square-kilometers' ? measurementUnit : 'square-meters' }
+    if (tool === 'measure-length' || tool === 'measure-perimeter') return { tool, field: resultField, unit: measurementUnit === 'kilometers' ? 'kilometers' : 'meters' }
+    return { tool: 'calculate-field', field: resultField, expression }
+  }
+
+  async function previewField(): Promise<void> {
+    const abort = new AbortController()
+    const version = previewVersion.current
+    controller.current = abort
+    setError(''); setPreview(null); setBusy(true)
+    try {
+      const result = await processingCommands.preview({ layerId, scope, options: fieldOptions(), signal: abort.signal })
+      if (mounted.current && !abort.signal.aborted && version === previewVersion.current) setPreview(result)
+    } catch (reason) {
+      if (mounted.current && !abort.signal.aborted) setError(reason instanceof Error ? reason.message : '预览失败。')
+    } finally {
+      if (mounted.current) setBusy(false)
+      if (controller.current === abort) controller.current = null
+    }
+  }
+
   async function run(): Promise<void> {
     setError(''); setSuccess(null)
     const abort = new AbortController()
@@ -126,6 +159,7 @@ export function ProcessingDialog({ onClose }: { onClose(): void }) {
       const resultName = (name || defaultName).trim()
       if (!resultName) throw new Error('请输入结果图层名称。')
       const options: ProcessingOptions = tool === 'buffer' ? { tool, distance: Number(distance), unit }
+        : isMeasurement || tool === 'calculate-field' ? fieldOptions()
         : tool === 'dissolve' ? { tool, field: fields.includes(groupField) ? groupField : undefined }
         : tool === 'summarize-location' ? { tool, predicate: predicate === 'within' ? 'within' : 'intersects', field: summaryField || undefined, prefix }
         : tool === 'attribute-join' ? { tool, inputKey, joinKey, fields: joinFields, prefix, mode: joinMode }
@@ -167,7 +201,7 @@ export function ProcessingDialog({ onClose }: { onClose(): void }) {
         <nav className="processing-tools" aria-label="处理工具">{tools.map(item => <button key={item.id} type="button" aria-pressed={tool === item.id} disabled={busy} onClick={() => selectTool(item.id)}>{item.name}</button>)}</nav>
         <div className="processing-form">
           <h3>{active.name}</h3><p className="processing-description">{active.description}</p>
-          {!candidates.length ? <p role="status">{tool === 'clip-lines' ? '请先添加纯线图层（LineString 或 MultiLineString）。' : !isCheck && requiresPolygon(tool) ? '请先添加面图层。此工具仅支持纯面图层，不支持点、线或混合图层。' : '请先添加矢量数据。WMS 和 WMTS 图像图层不支持空间处理。'}</p> : <>
+          {!candidates.length ? <p role="status">{needsLine ? '请先添加纯线图层（LineString 或 MultiLineString）。' : !isCheck && requiresPolygon(tool) ? '请先添加面图层。此工具仅支持纯面图层，不支持点、线或混合图层。' : '请先添加矢量数据。WMS 和 WMTS 图像图层不支持空间处理。'}</p> : <>
             <label>输入图层<select value={layerId} disabled={busy} onChange={event => { setLayerId(event.target.value); setScope('all'); setError(''); setSuccess(null) }}>{candidates.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
             <label>处理范围<select value={scope} disabled={busy} onChange={event => { setScope(event.target.value as ProcessingScope); setError(''); setSuccess(null) }}>{(Object.keys(scopeLabels) as ProcessingScope[]).map(key => <option key={key} value={key}>{scopeLabels[key]}</option>)}</select></label>
             <p className="processing-description" aria-live="polite">本次输入 {count} 个要素{scope === 'selected' ? '（仅包含通过图层筛选的选中要素）' : ''}</p>
@@ -200,12 +234,19 @@ export function ProcessingDialog({ onClose }: { onClose(): void }) {
             </>}
             {(tool === 'summarize-location' || isJoin) && <><label>新增字段前缀<input value={prefix} disabled={busy} onChange={event => { setPrefix(event.target.value); setSuccess(null) }} /></label><p className="processing-description">{tool === 'summarize-location' ? `输出：${prefix}count${summaryField ? `、${prefix}sum、${prefix}mean` : ''}` : `带入字段使用 ${prefix || '无'} 前缀`}；已有字段同名时会报错，不覆盖原属性。</p></>}
             {tool === 'buffer' && <div className="processing-distance"><label>缓冲距离<input type="number" min="0" step="any" value={distance} disabled={busy} onChange={event => setDistance(event.target.value)} /></label><label>单位<select value={unit} disabled={busy} onChange={event => setUnit(event.target.value as typeof unit)}><option value="meters">米</option><option value="kilometers">千米</option></select></label></div>}
+            {(isMeasurement || tool === 'calculate-field') && <label>新增结果字段<input value={resultField} disabled={busy} onChange={event => { setResultField(event.target.value); setError(''); setSuccess(null) }} /></label>}
+            {isMeasurement && <><label>测量单位<select value={measurementUnit} disabled={busy} onChange={event => { setMeasurementUnit(event.target.value as MeasurementOptions['unit']); setSuccess(null) }}>{tool === 'measure-area' ? <><option value="square-meters">平方米</option><option value="hectares">公顷</option><option value="square-kilometers">平方千米</option></> : <><option value="meters">米</option><option value="kilometers">千米</option></>}</select></label><p className="processing-description">输入为 WGS84 经纬度，按球面模型计算 XY；不含高程。面积扣除孔洞，周长包括孔洞边界，多部件求和。这不是投影平面或椭球测绘结果。已有字段同名时报错。</p></>}
+            {tool === 'calculate-field' && <><label>表达式<input value={expression} placeholder={'field("value") * 2'} disabled={busy} onChange={event => { setExpression(event.target.value); setSuccess(null); setError('') }} /></label><label>插入字段引用<select value="" disabled={busy} onChange={event => { if (event.target.value) setExpression(previous => `${previous}${previous ? ' ' : ''}field(${JSON.stringify(event.target.value)})`); setSuccess(null) }}><option value="">选择字段</option>{fields.map(field => <option key={field}>{field}</option>)}</select></label><p className="processing-description">支持 + − * / % **、数值比较、=== / !==、布尔条件及 ? :。函数：field、coalesce、round、abs、min、max、concat。数值不自动转换文本；空值传播，可用 coalesce 指定默认值。字段冲突、除零或任何要素错误时整个任务失败。原属性不覆盖。</p></>}
             {!isCheck && <><label>结果图层名称<input value={name} placeholder={defaultName} disabled={busy} onChange={event => setName(event.target.value)} /></label>
             <p className="processing-description">结果保存为独立本地图层，可继续处理、编辑或导出。原图层保持不变。</p></>}
             {isCheck && <p className="processing-description">按 WGS84 经纬度检查 XY 拓扑；每个要素报告首个问题。不支持的类型或跨日期变更线输入单独列出，不计为有效。选择问题后关闭窗口，返回地图查看。</p>}
             {tool === 'buffer' && <p className="processing-description">使用 WGS84 经纬度计算距离；暂不支持极区、跨日期变更线或大于 1000 千米的缓冲。</p>}
             {tool === 'clip-lines' && <p className="processing-description">保留沿面边界的线段，忽略仅单点相切；孔洞内部不保留。按二维经纬度裁剪，结果不保留 Z；部件顺序和方向可能变化。无结果不创建图层。</p>}
           </>}
+          {(isMeasurement || tool === 'calculate-field') && layer && <section className="processing-preview" aria-label="字段预览">
+            <button type="button" className="button-secondary" disabled={busy || !count || !resultField.trim() || (tool === 'calculate-field' && !expression.trim())} onClick={() => void previewField()}>预览前 5 条</button>
+            {preview && <div role="status"><p>当前范围共 {preview.total} 条，预览 {preview.values.length} 条。完整运行仍会检查其余要素。</p><ol>{preview.values.map((value, index) => <li key={index}>{value === null ? '空值' : String(value)}</li>)}</ol></div>}
+          </section>}
           {error && <p className="export-error" role="alert">{error}</p>}
           {isCheck && geometryReport && <section className="geometry-report" aria-label="几何检查报告">
             <p role="status">已检查 {geometryReport.report.checked} 个：有效 {geometryReport.report.valid}、无效 {geometryReport.report.invalid}、不支持 {geometryReport.report.unsupported}。</p>

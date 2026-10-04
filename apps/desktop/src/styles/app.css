@@ -2205,6 +2205,8 @@ button:disabled {
   color: var(--color-text-primary); background: var(--color-panel); font: inherit;
 }
 .processing-description { color: var(--color-text-secondary); font-size: 12px; line-height: 1.6; margin: 8px 0; }
+.processing-preview { margin-top: 12px; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.processing-preview ol { max-height: 160px; overflow: auto; padding-left: 24px; }
 .processing-overlay-input { border: 0; border-top: 1px solid var(--color-border); padding: 8px 0 0; margin: 18px 0 0; min-width: 0; }
 .processing-overlay-input legend { font-size: 12px; color: var(--color-text-secondary); padding-right: 8px; }
 .processing-distance { display: grid; grid-template-columns: minmax(0, 1fr) 100px; gap: 12px; }

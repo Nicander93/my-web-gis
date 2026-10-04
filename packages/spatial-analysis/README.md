@@ -12,6 +12,30 @@
 
 ## 公共 API
 
+### 测量与字段计算
+
+```ts
+import { measureGeometry, addGeometryMeasurements, calculateField, compileFieldExpression } from '@desktop-webgis/spatial-analysis'
+
+const measured = addGeometryMeasurements(regions, {
+  measurement: 'area', field: 'area_km2', unit: 'square-kilometers'
+})
+const density = calculateField(measured, {
+  field: 'density', expression: 'round(coalesce(field("population"), 0) / field("area_km2"), 2)'
+})
+// For ordinary business records, compile once and evaluate independently of GIS.
+const expression = compileFieldExpression('field("amount") * 2')
+expression.evaluate({ amount: 10 }) // 20
+```
+
+`measureGeometry(geometry, options)` 返回数值；`addGeometryMeasurements(features, { ...options, field })` 返回带新字段的独立要素。面积仅支持面，单位为 square-meters、hectares、square-kilometers；长度仅支持线，周长仅支持面，单位为 meters、kilometers。多部件累加；面积扣除孔洞，周长包含孔洞边界。输入须为有效 WGS84 经纬度，复用 [Turf area](https://turfjs.org/docs/api/area) 和 [length](https://turfjs.org/docs/api/length) 7.3.4 计算球面 XY 测量；不参与高程，不是椭球测量或投影平面测量。不支持跨日期变更线。原几何含 Z 时保留原 Z。
+
+`calculateField(features, { field, expression })` 生成新字段；表达式使用 [jsep](https://ericsmekens.github.io/jsep/) 1.4.0 解析，再由本包受限解释器执行。支持有限数值、文本、布尔、null，`+ - * / % **`、数值比较、`=== !==`、布尔 `&& || !`、三元条件。函数为 `field("字段名")`、`coalesce`、`round`、`abs`、`min`、`max`、`concat`。不支持对象/数组、成员访问、全局变量、赋值或任意函数调用；不使用 eval 或 Function。
+
+数值运算不隐式转换文本或布尔；缺失字段值按 null 处理，数值运算空值传播，coalesce 可设默认值；引用字段必须在非空输入中至少存在一次。条件只接受布尔或 null（false）；concat 将 null 视为空文本。条件、布尔运算和 coalesce 按需计算分支，但所有分支都必须符合允许的语法。除零、非有限结果、复杂属性、字段冲突或任一要素失败会使整批失败，不返回部分结果。round 采用 JavaScript Math.round，保留位数 0–12，不用于十进制财务精度。表达式最长 2048 字符、512 个节点、40 层，文本结果最长 65536 字符。
+
+两种字段工具都保留输入属性与几何，生成新 ID，metadata.sourceId 指向直接输入；字段名不能覆盖原字段或为 __proto__、constructor、prototype。开发者 API 不依赖 Worker；桌面在 Worker 中调用并生成可撤销、可保存的独立结果图层。预览仅计算当前范围前 5 条，不保证剩余输入有效。
+
 ### 线裁剪
 
 `clipLines(lines, masks)` 接受 LineString/MultiLineString 输入和 Polygon/MultiPolygon 掩膜，复用 JSTS OverlayOp：先融合掩膜，再逐个裁剪输入，避免重叠掩膜重复输出。每个输入最多输出一个独立要素；一段为 LineString，多段为 MultiLineString，无线段则不输出。保留输入属性，生成新 ID，`metadata.sourceId` 指向直接输入；不带入掩膜属性。
@@ -65,3 +89,5 @@ pnpm --filter @desktop-webgis/spatial-analysis test:consumer
 构建输出标准 ESM 和声明文件，打包 JSTS 内部模块以解决其深层 ESM 路径的扩展名兼容问题。`test:consumer` 使用包公开 exports 在 Node 中执行构建产物，并以 NodeNext 模式编译 TypeScript 消费示例；不使用源码 alias。运行环境需要 `structuredClone` 和 `crypto.randomUUID`，建议 Node 20+ 或现代安全上下文浏览器。
 
 JSTS 2.7.1 许可证为 EDL-1.0 或 EPL-1.0。正式分发时需保留第三方许可与通知；本仓库尚未选择并发布此扩展包自身的对外发行许可证。
+
+Turf 与 jsep 使用 MIT 许可证；正式分发同样需要保留其许可与版权通知。

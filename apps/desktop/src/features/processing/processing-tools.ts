@@ -4,6 +4,10 @@ export type DesktopProcessingTool = ProcessingTool | 'check-geometry'
 
 /** UI copy stays in Desktop; the complete record makes new protocol tools require a visible entry. */
 const definitions: Record<DesktopProcessingTool, { name: string; description: string }> = {
+  'measure-area': { name: '面积字段', description: '按 WGS84 球面模型计算每个面的面积，扣除孔洞；保留原几何和属性，新增测量字段。' },
+  'measure-length': { name: '长度字段', description: '计算每条线的球面长度，多部件求和；保留原几何和属性，新增测量字段。' },
+  'measure-perimeter': { name: '周长字段', description: '计算面的边界球面长度，包括外环及孔洞边界，多部件求和。' },
+  'calculate-field': { name: '字段计算', description: '用字段值和受限表达式生成新字段，支持数值、文本、布尔及空值；失败时不提交部分结果。' },
   'check-geometry': { name: '几何检查', description: '检查坐标、结构和单个要素的拓扑有效性，列出问题及可用的位置。不修改原数据，不检查要素之间的重叠或缝隙。' },
   buffer: { name: '缓冲区', description: '按距离为每个要素生成缓冲面，保留属性。重叠范围不会自动融合。' },
   centroid: { name: '顶点质心', description: '为每个要素生成顶点平均位置。结果可能落在面外，不是面积加权中心。' },

@@ -20,6 +20,22 @@ export function registerProcessingDialog(callback: (() => void) | null): void {
 export const processingCommands = {
   open(): void { openProcessingDialog?.() },
 
+  /** Preview the first five scoped inputs without adding a layer or changing project history. */
+  async preview(args: Omit<ProcessingRequest, 'name' | 'overlay'>): Promise<{ values: unknown[]; total: number }> {
+    if (!['measure-area', 'measure-length', 'measure-perimeter', 'calculate-field'].includes(args.options.tool)) throw new Error('此工具不支持字段预览。')
+    const state = useProjectStore.getState()
+    const layer = state.project.layers.find(layer => layer.id === args.layerId)
+    const input = processingInput(args.layerId, args.scope)
+    if (!input.length || !layer) throw new Error('当前范围没有要素。')
+    const source = state.featuresByDataset[layer.datasetId]
+    const result = await runProcessing(input.slice(0, 5), cloneValue(args.options), args.signal)
+    if (args.signal.aborted) throw new DOMException('已取消', 'AbortError')
+    const current = useProjectStore.getState()
+    if (current.project.id !== state.project.id || current.featuresByDataset[layer.datasetId] !== source || !current.project.layers.some(item => item.id === layer.id && item.datasetId === layer.datasetId)) throw new Error('输入数据已变化，请重新预览。')
+    const field = 'field' in args.options ? args.options.field : ''
+    return { values: result.features.map(feature => feature.properties[field ?? '']), total: input.length }
+  },
+
   /** Snapshot input and commit only after successful, uncancelled computation. */
   async run(args: ProcessingRequest): Promise<{ layerId: string; inputCount: number; outputCount: number }> {
     const projectId = useProjectStore.getState().project.id

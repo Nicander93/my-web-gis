@@ -1,8 +1,11 @@
 import { processFeatures, type GisFeature, type ProcessingOptions, type ProcessingResult } from '@desktop-webgis/gis-core'
-import { clipLines, joinAttributes, joinByLocation, summarizeByLocation } from '@desktop-webgis/spatial-analysis'
+import { addGeometryMeasurements, calculateField, clipLines, joinAttributes, joinByLocation, summarizeByLocation } from '@desktop-webgis/spatial-analysis'
 
 /** Route serializable UI requests to reusable package APIs, without project or runtime dependencies. */
 export function executeProcessing(features: GisFeature[], options: ProcessingOptions, overlay: GisFeature[] = []): ProcessingResult {
+  if (options.tool === 'calculate-field') return { inputCount: features.length, features: calculateField(features, options) }
+  if (options.tool === 'measure-area') return { inputCount: features.length, features: addGeometryMeasurements(features, { measurement: 'area', unit: options.unit, field: options.field }) }
+  if (options.tool === 'measure-length' || options.tool === 'measure-perimeter') return { inputCount: features.length, features: addGeometryMeasurements(features, { measurement: options.tool === 'measure-length' ? 'length' : 'perimeter', unit: options.unit, field: options.field }) }
   if (options.tool === 'clip-lines') return { inputCount: features.length, overlayCount: overlay.length, features: clipLines(features, overlay) }
   if (options.tool === 'summarize-location') {
     return { inputCount: features.length, overlayCount: overlay.length, features: summarizeByLocation(features, overlay, {

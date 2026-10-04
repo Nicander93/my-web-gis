@@ -9,6 +9,10 @@ import { checkGeometries } from './geometry-check.js'
 import type { Point, MultiPoint, LineString, MultiLineString, Polygon, MultiPolygon } from 'geojson'
 export { checkGeometries } from './geometry-check.js'
 export type { GeometryCheckInput, GeometryIssue, GeometryCheckReport } from './geometry-check.js'
+export { measureGeometry, addGeometryMeasurements } from './measurements.js'
+export type { MeasurementOptions, MeasurementFieldOptions } from './measurements.js'
+export { compileFieldExpression, calculateField } from './field-calculation.js'
+export type { FieldValue, FieldCalculationOptions, CompiledFieldExpression } from './field-calculation.js'
 
 export type AnalysisGeometry = Point | MultiPoint | LineString | MultiLineString | Polygon | MultiPolygon
 

@@ -68,6 +68,78 @@ describe('processing workflow', () => {
     return TestWorker
   }
 
+  it('measurement fields support selection, independent data, undo and serialized provenance', async () => {
+    const area: GisFeature = { id: 'area', properties: { population: 100 }, geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] } }
+    useProjectStore.getState().addLayer('areas', '区域', [area, { ...area, id: 'other' }], 'polygon')
+    const layerId = useProjectStore.getState().selectedLayerId!
+    useProjectStore.getState().setSelection({ layerId, featureIds: ['area'] })
+    const before = useProjectStore.getState().getSnapshot()
+    const workers = fakeWorker()
+    const options: ProcessingOptions = { tool: 'measure-area', field: 'area_km2', unit: 'square-kilometers' }
+    const pending = processingCommands.run({ layerId, scope: 'selected', options, name: '面积', signal: new AbortController().signal })
+    const worker = workers.current
+    worker.onmessage!({ data: { result: executeProcessing(worker.payload.features, worker.payload.options) } })
+    const completed = await pending
+    const snapshot = useProjectStore.getState().getSnapshot()
+    const resultLayer = snapshot.project.layers.find(layer => layer.id === completed.layerId)!
+    expect(snapshot.featuresByDataset[resultLayer.datasetId][0].properties.area_km2).toBeCloseTo(12363.718, 2)
+    expect(snapshot.featuresByDataset.areas).toEqual(before.featuresByDataset.areas)
+    const saved = parseProjectSnapshot(serializeProjectSnapshot(snapshot))
+    expect(saved.project.datasets.find(dataset => dataset.id === resultLayer.datasetId)).toMatchObject({ processing: { options, scope: 'selected', inputCount: 1 } })
+    expect(useProjectStore.getState().undoEdit()).toBe(true)
+    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
+    expect(useProjectStore.getState().redoEdit()).toBe(true)
+    expect(useProjectStore.getState().getSnapshot()).toEqual(snapshot)
+    expect(executeProcessing([area], { tool: 'measure-perimeter', field: 'perimeter', unit: 'kilometers' }).features[0].properties.perimeter).toBeGreaterThan(400)
+    expect(executeProcessing([{ ...area, geometry: { type: 'LineString', coordinates: [[0, 0], [1, 0]] } }], { tool: 'measure-length', field: 'length', unit: 'meters' }).features[0].properties.length).toBeCloseTo(111195.08, 1)
+  })
+
+  it('field previews sample scoped data without adding history or dirtying the project', async () => {
+    const workers = fakeWorker()
+    const layerId = useProjectStore.getState().selectedLayerId!
+    useProjectStore.setState({ featuresByDataset: { source: Array.from({ length: 7 }, (_, index) => ({ ...features[0], id: `sample${index}`, properties: { value: index } })) } })
+    const before = useProjectStore.getState().getSnapshot()
+    const pending = processingCommands.preview({ layerId, scope: 'all', options: { tool: 'calculate-field', field: 'double', expression: 'field("value") * 2' }, signal: new AbortController().signal })
+    const worker = workers.current
+    expect(worker.payload.features).toHaveLength(5)
+    worker.onmessage!({ data: { result: executeProcessing(worker.payload.features, worker.payload.options) } })
+    expect(await pending).toEqual({ values: [0, 2, 4, 6, 8], total: 7 })
+    expect(worker.terminated).toBe(true)
+    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
+    expect(useProjectStore.getState().dirty).toBe(false)
+  })
+
+  it('rejects a field preview when source data changes while the worker runs', async () => {
+    const workers = fakeWorker()
+    const pending = processingCommands.preview({ layerId: useProjectStore.getState().selectedLayerId!, scope: 'all', options: { tool: 'calculate-field', field: 'double', expression: 'field("value") * 2' }, signal: new AbortController().signal })
+    useProjectStore.setState({ featuresByDataset: { source: [...features] } })
+    const worker = workers.current
+    worker.onmessage!({ data: { result: executeProcessing(worker.payload.features, worker.payload.options) } })
+    await expect(pending).rejects.toThrow('输入数据已变化')
+    expect(useProjectStore.getState().project.layers).toHaveLength(1)
+  })
+
+  it('field calculation persists its expression and rolls back the whole batch on an error', async () => {
+    const workers = fakeWorker()
+    const layerId = useProjectStore.getState().selectedLayerId!
+    const options: ProcessingOptions = { tool: 'calculate-field', field: 'double', expression: 'field("value") * 2' }
+    const pending = processingCommands.run({ layerId, scope: 'all', options, name: '计算结果', signal: new AbortController().signal })
+    let worker = workers.current
+    worker.onmessage!({ data: { result: executeProcessing(worker.payload.features, worker.payload.options) } })
+    const completed = await pending
+    const snapshot = parseProjectSnapshot(serializeProjectSnapshot(useProjectStore.getState().getSnapshot()))
+    const resultLayer = snapshot.project.layers.find(layer => layer.id === completed.layerId)!
+    expect(snapshot.featuresByDataset[resultLayer.datasetId].map(row => row.properties.double)).toEqual([2, 4, 6])
+    expect(snapshot.project.datasets.find(dataset => dataset.id === resultLayer.datasetId)).toMatchObject({ processing: { options } })
+    const before = useProjectStore.getState().getSnapshot()
+    const failing = processingCommands.run({ layerId, scope: 'all', options: { ...options, expression: '1 / (field("value") - 2)' }, name: '失败结果', signal: new AbortController().signal })
+    worker = workers.current
+    try { executeProcessing(worker.payload.features, worker.payload.options) }
+    catch (error) { worker.onmessage!({ data: { error: (error as Error).message } }) }
+    await expect(failing).rejects.toThrow('f2')
+    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
+  })
+
   it('command commits worker output and processing provenance survives save/reopen', async () => {
     const workerClass = fakeWorker()
     const sourceId = useProjectStore.getState().selectedLayerId!
