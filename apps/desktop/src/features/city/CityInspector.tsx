@@ -3,6 +3,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { isCityResourceUrl } from '@desktop-webgis/cesium-scene-schema'
 import type { CityGroup, CityNode, CityScene, GeoPosition, GraphicNode, PopupDefinition, Transform, WaterNode } from '@desktop-webgis/cesium-scene-schema'
 import { GraphicAttributes } from './GraphicAttributes'
+import { CityRenderSettings } from './CityRenderSettings'
 
 export type CityInspectorSection = 'object' | 'popup' | 'source' | 'style' | 'properties'
 
@@ -34,6 +35,11 @@ export function CityInspector({ node, section = 'object', pickedProperties = {},
     {error && <section className="city-property-section"><p className="editor-error" role="alert">{error}</p><button className="button-secondary" onClick={onReload}>重试加载</button></section>}
     {section === 'object' && node.type === 'model' && <PositionFields key={`${node.id}:${JSON.stringify(node.position)}`} position={node.position} onApply={position => onPatch({ position } as Partial<CityNode>, '设置模型地理位置')} />}
     {section === 'object' && (node.type === 'model' || node.type === '3dtiles') && <TransformFields key={`${node.id}:${JSON.stringify(node.transform)}`} transform={node.transform} onApply={transform => onPatch({ transform } as Partial<CityNode>, '输入模型变换')} />}
+    {section === 'object' && node.type === '3dtiles' && <section className="city-property-section"><h3>瓦片显示质量</h3>
+      <label className="editor-field">显示精度（屏幕误差）<select value={node.maximumScreenSpaceError ?? 16} onChange={event => onPatch({ maximumScreenSpaceError: Number(event.target.value) } as Partial<CityNode>, '设置瓦片显示精度')}>{[1,2,4,8,16,32].map(value => <option key={value} value={value}>{value}{value === 1 ? ' · 最精细' : value === 16 ? ' · 默认' : value === 32 ? ' · 更流畅' : ''}</option>)}</select></label>
+      <label className="editor-field">瓦片缓存预算<select value={node.cacheBytes ?? 256 * 1024 * 1024} onChange={event => onPatch({ cacheBytes: Number(event.target.value) } as Partial<CityNode>, '设置瓦片缓存预算')}>{[128,256,512,1024].map(value => <option key={value} value={value * 1024 * 1024}>{value} MB</option>)}</select></label>
+      <p className="editor-help">误差越小，模型越精细，加载和显存开销越大。预算不是显存硬上限；可见瓦片可能超出预算。设置随项目保存，可撤销。</p>
+    </section>}
     {section === 'object' && node.type === 'water' && <WaterFields key={`${node.id}:${JSON.stringify(node)}`} node={node} onApply={patch => onPatch(patch, '修改水面材质')} onDrawBoundary={onDrawBoundary} />}
     {section === 'object' && node.type === 'graphic' && <section className="city-property-section"><h3>几何</h3><p className="editor-help">{node.geometry.positions.length} 个顶点 · {node.geometry.heightMode === 'ground' ? '贴地' : '绝对高度'}</p><button className="button-secondary" disabled={geometryDisabled} onClick={onEditGeometry}>编辑顶点与坐标</button></section>}
     {node.type === 'graphic' && (section === 'style' || section === 'object') && <GraphicFields key={`${node.id}:${JSON.stringify(node.style)}`} node={node} onPatch={onPatch} />}
@@ -138,6 +144,7 @@ export function SceneSettings({ city, onApply, onSaveCamera }: SceneSettingsProp
   const [time, setTime] = useState(new Date(city.lighting?.time ?? Date.now()).toISOString().slice(0,16))
   const [error, setError] = useState('')
   return <div className="city-properties">
+    <CityRenderSettings />
     <section className="city-property-section"><h3>初始视角</h3><p className="editor-help">场景打开时使用此视角。</p><button className="button-secondary" onClick={onSaveCamera}>使用当前视角</button></section>
     <form onSubmit={event => { event.preventDefault(); try { onApply({ effects: { fog: Number(fog), bloom }, lighting: { sunlight, shadows, time: new Date(time + 'Z').toISOString() }, basemap: basemap.trim() ? { url: basemap.trim() } : undefined, terrain: terrain.trim() ? { url: terrain.trim() } : undefined }); setError('') } catch (reason) { setError(reason instanceof Error ? reason.message : '场景参数无效') } }}>
       <section className="city-property-section"><h3>光照与时间</h3><label className="city-check"><input type="checkbox" checked={sunlight} onChange={event => setSunlight(event.target.checked)} />太阳光照</label><label className="city-check"><input type="checkbox" checked={shadows} onChange={event => setShadows(event.target.checked)} />模型阴影</label><label className="editor-field">场景时间（UTC）<input type="datetime-local" required value={time} onChange={event => setTime(event.target.value)} /></label></section>

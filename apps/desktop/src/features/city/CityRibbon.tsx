@@ -24,7 +24,7 @@ export function CityRibbon({ commands: all, target, preview, onPreview, onUndo, 
   const add = all.find(item => item.id === 'add')
   return <WorkbenchRibbon categories={[
     { id:'edit', label:'编辑', commands:commands(['select','point','line','polygon','vertices','move','rotate','scale','delete']) },
-    { id:'scene', label:'场景', commands:commands(['initial','lighting','surface','environment','camera','water']) }
+    { id:'scene', label:'场景', commands:commands(['initial','quality','lighting','surface','environment','camera','water']) }
   ]} target={category === 'scene' ? undefined : `编辑目标：${target}`} onAdd={() => add?.execute()} preview={preview}
     quickActions={<><button aria-label="撤销" disabled={!canUndo} onClick={onUndo}><Undo2 size={16} /></button><button aria-label="重做" disabled={!canRedo} onClick={onRedo}><Redo2 size={16} /></button><button aria-label="保存项目" onClick={onSave}><Save size={16} /></button></>}
     previewAction={<button className="ribbon-command" aria-pressed={preview} onClick={onPreview}><Play size={14} />{preview ? '退出预览' : '预览'}</button>}

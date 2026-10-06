@@ -6,6 +6,10 @@ import type { EditMode, TransformEditEvent } from '@desktop-webgis/cesium-tilese
 import { CityEffects, WaterLayer } from '@desktop-webgis/cesium-effects'
 import { getCityNodeState, parseCityScene } from '@desktop-webgis/cesium-scene-schema'
 import type { CityCamera, CityNode, CityScene } from '@desktop-webgis/cesium-scene-schema'
+import { applyRenderQuality, defaultRenderQuality } from './render-quality.js'
+import type { RenderQuality } from './render-quality.js'
+export { defaultRenderQuality, isRenderQuality } from './render-quality.js'
+export type { RenderQuality } from './render-quality.js'
 export type { EditMode, TransformEditEvent } from '@desktop-webgis/cesium-tileset-edit'
 export type { CityScene, CityNode, Transform } from '@desktop-webgis/cesium-scene-schema'
 export type { DrawOptions, DrawResult } from '@desktop-webgis/cesium-layer'
@@ -17,6 +21,7 @@ export interface CityRuntimeOptions {
   /** Base URL of scene.json; resolves relative asset and terrain URLs. */
   sceneUrl?: string
   cesiumBaseUrl?: string
+  renderQuality?: RenderQuality
   /** Inject credentials at runtime rather than storing tokens in scene URLs. */
   resolveResource?: (url: string) => Resource
   onEdit?: (event: TransformEditEvent) => void
@@ -91,6 +96,7 @@ export class CitySceneRuntime {
         if ((!node.visible || node.locked) && this.editingId === node.id) this.stopEditing()
         layer.show = node.visible
         if ((layer instanceof TilesetLayer || layer instanceof ModelLayer) && (node.type === '3dtiles' || node.type === 'model')) layer.setTransform(node.transform)
+        if (layer instanceof TilesetLayer && node.type === '3dtiles') layer.setQuality(node.maximumScreenSpaceError, node.cacheBytes)
         if (layer instanceof GraphicLayer && node.type === 'graphic') layer.getGraphic(node.id)?.setOptions(node)
         if (layer instanceof GeoJsonLayer && node.type === 'geojson') layer.setColor(node.color ?? '#55a6ff')
         this.applySelection(layer)
@@ -106,6 +112,7 @@ export class CitySceneRuntime {
         if (this.destroyed || this.layers.getLayer(node.id) !== mounted) return
         const latest = this.nodes.get(node.id)
         if (latest && (latest.type === '3dtiles' || latest.type === 'model') && (mounted instanceof TilesetLayer || mounted instanceof ModelLayer)) mounted.setTransform(latest.transform)
+        if (latest?.type === '3dtiles' && mounted instanceof TilesetLayer) mounted.setQuality(latest.maximumScreenSpaceError, latest.cacheBytes)
         if (latest?.type === 'geojson' && mounted instanceof GeoJsonLayer) mounted.setColor(latest.color ?? '#55a6ff')
         this.applySelection(mounted)
         this.options.onLayerState?.(node.id, mounted.state)
@@ -165,6 +172,7 @@ export class CitySceneRuntime {
   cancelDraw(): void { const drawing = this.drawing; this.drawing = undefined; drawing?.cancel(); this.layers.pickingEnabled = true }
   setPreview(enabled: boolean): void { this.stopEditing(); this.cancelDraw(); this.layers.popupsEnabled = enabled; this.layers.layers.forEach(layer => layer.closePopup()) }
   setEditMode(mode: EditMode): void { this.editor.setMode(mode) }
+  setRenderQuality(quality: RenderQuality): void { applyRenderQuality(this.viewer, quality) }
   async flyTo(id: string): Promise<void> { await this.layers.getLayer(id)?.flyTo() }
   setCamera(camera: CityCamera): void {
     this.viewer.camera.setView({ destination: Cartesian3.fromDegrees(...camera.position), orientation: { heading: CesiumMath.toRadians(camera.heading), pitch: CesiumMath.toRadians(camera.pitch), roll: CesiumMath.toRadians(camera.roll) } })
@@ -217,7 +225,7 @@ function nativeKey(node: CityNode, scene: CityScene): string {
   if (node.type === 'geojson') return JSON.stringify([node.asset, scene.assets[node.asset]])
   const { popup: _popup, visible: _visible, locked: _locked, name: _name, groupId: _groupId, ...rest } = node
   if (node.type === 'water') return JSON.stringify(rest)
-  const { transform: _transform, ...assetNode } = rest as typeof rest & { transform?: unknown }
+  const { transform: _transform, maximumScreenSpaceError: _error, cacheBytes: _cache, ...assetNode } = rest as typeof rest & { transform?: unknown; maximumScreenSpaceError?: number; cacheBytes?: number }
   return JSON.stringify([assetNode, scene.assets[node.asset]])
 }
 
@@ -226,6 +234,7 @@ export function createCityRuntime(options: CityRuntimeOptions): CitySceneRuntime
   if (options.cesiumBaseUrl) (globalThis as typeof globalThis & { CESIUM_BASE_URL: string }).CESIUM_BASE_URL = options.cesiumBaseUrl
   const viewer = new Viewer(options.target, { animation: false, timeline: false, baseLayerPicker: false, geocoder: false, homeButton: false, sceneModePicker: false, navigationHelpButton: false, fullscreenButton: false, selectionIndicator: false, infoBox: false, baseLayer: false, requestRenderMode: true, maximumRenderTimeChange: Infinity })
   const runtime = new CitySceneRuntime(viewer, { ...options, scene })
+  runtime.setRenderQuality(options.renderQuality ?? defaultRenderQuality)
   runtime.setCamera(scene.camera)
   return runtime
 }

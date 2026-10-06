@@ -34,6 +34,7 @@ import type { CityRibbonCommand } from './CityRibbon'
 import type { LucideIcon } from 'lucide-react'
 import { compileCityObjectExport } from './city-object-export'
 import type { CityInspectorSection } from './CityInspector'
+import { useCityRenderPreferences } from './CityRenderSettings'
 import 'cesium/Build/Cesium/Widgets/widgets.css'
 import './city-editor.css'
 
@@ -51,6 +52,7 @@ export function CityWorkspace() {
   const city = project.city ?? defaultScene.current
   const left = useWorkspaceStore(state => state.left)
   const right = useWorkspaceStore(state => state.right)
+  const renderQuality = useCityRenderPreferences(state => state.quality)
   const [context, setContext] = useState<{ x:number; y:number } | null>(null)
   const [renaming, setRenaming] = useState(false)
   const [renameDraft, setRenameDraft] = useState('')
@@ -98,7 +100,7 @@ export function CityWorkspace() {
     if (!target.current) return
     let active = true
     try {
-      runtime.current = createCityRuntime({ target: target.current, scene: city, cesiumBaseUrl: new URL('cesium/', document.baseURI).href,
+      runtime.current = createCityRuntime({ target: target.current, scene: city, renderQuality, cesiumBaseUrl: new URL('cesium/', document.baseURI).href,
         onSelect: (id, properties, mode) => { if (active) handlePick.current(id, properties, mode) },
         onEdit: event => { updateCity('变换三维模型', current => ({ ...current, nodes: current.nodes.map(n => n.id === event.id && (n.type === '3dtiles' || n.type === 'model') ? { ...n, transform: event.after } : n) })); notify('模型变换已应用，可撤销恢复') },
         onLayerState: (id, state, reason) => {
@@ -114,6 +116,8 @@ export function CityWorkspace() {
     } catch (reason) { report(reason) }
     return () => { active = false; runtime.current?.destroy(); runtime.current = undefined }
   }, [])
+
+  useEffect(() => { if (runtime.current) { try { runtime.current.setRenderQuality(renderQuality) } catch (reason) { report(reason) } } }, [renderQuality, ready])
 
   useEffect(() => {
     if (!runtime.current) return
@@ -188,7 +192,8 @@ export function CityWorkspace() {
   }
   function patchNode(patch: Partial<CityNode>, label = '修改三维对象'): void {
     if (!node || node.locked) return
-    drawing.cancel(); stopEditing()
+    drawing.cancel()
+    if (!Object.keys(patch).every(key => ['transform', 'maximumScreenSpaceError', 'cacheBytes'].includes(key))) stopEditing()
     updateCity(label, scene => ({ ...scene, nodes: scene.nodes.map(n => n.id === node.id ? { ...n, ...patch } as CityNode : n) }))
     notify('对象属性已应用')
   }
@@ -270,6 +275,7 @@ export function CityWorkspace() {
     command('lighting', '光照与时间', Sun, showScene),
     command('surface', '底图与地形', Globe, showScene),
     command('environment', '雾与辉光', SlidersHorizontal, showScene),
+    command('quality', '画质与性能', SlidersHorizontal, showScene),
     command('camera', '保存初始视角', Eye, saveCamera, ready ? undefined : '场景尚未就绪'),
     command('water', '水面', Waves, () => startWater(), ready ? undefined : '场景尚未就绪', drawing.kind === 'water'),
     command('new-group', '新建分组', FolderPlus, () => setCreatingGroup(true)),
@@ -330,6 +336,7 @@ export function CityWorkspace() {
         try { stopEditing(); updateCity('拖动放置模型', scene => ({ ...scene, nodes: scene.nodes.map(item => item.id === source.id ? { ...source, position } : item) })); select(source.id); notify('模型位置已更新，可撤销恢复') } catch (reason) { report(reason) }
       }}>
         <div className="city-canvas__viewport" ref={target} />
+        {editing && !preview && <div className="city-drawing-bar"><Move size={16} aria-hidden="true" /><span>{editing === 'translate' ? '移动 · 红：东向，绿：北向，蓝：高度；黄色框：水平移动' : editing === 'rotate' ? '旋转 · 拖动对象局部轴环' : '等比缩放 · 拖动白色箭头'} · 松开应用，Esc 取消本次拖动</span><button className="button-secondary" onClick={() => { stopEditing(); notify('已退出模型编辑') }}>结束编辑</button></div>}
         {graphicEditing.state && <div className="city-drawing-bar"><Shapes size={16} aria-hidden="true" /><span>编辑几何 · {graphicEditing.state.geometry.positions.length} 个顶点</span><button className="button-primary" onClick={graphicEditing.finish}><Check size={14} aria-hidden="true" />应用修改</button><button className="button-secondary" onClick={() => { stopEditing(); notify('已取消几何编辑，原几何已恢复') }}>取消编辑</button></div>}
         {!leftVisible && !preview && <button className="city-panel-restore city-panel-restore--left" aria-label="展开对象面板" onClick={() => useWorkspaceStore.getState().setLeftOpen(true)}><Layers2 size={16} aria-hidden="true" /></button>}
         {!rightVisible && !preview && <button className="city-panel-restore city-panel-restore--right" aria-label="展开属性面板" onClick={() => useWorkspaceStore.getState().setRightOpen(true)}><PanelRightClose size={16} aria-hidden="true" /></button>}

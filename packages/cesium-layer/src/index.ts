@@ -1,4 +1,4 @@
-import { Cartesian2, Cartesian3, Cartographic, Cesium3DTileFeature, Cesium3DTileStyle, Cesium3DTileset, Color, ColorBlendMode, ColorMaterialProperty, ConstantProperty, Entity, GeoJsonDataSource, JulianDate, KeyboardEventModifier, Math as CesiumMath, Matrix4, Model, ScreenSpaceEventHandler, ScreenSpaceEventType, Transforms } from 'cesium'
+import { Cartesian2, Cartesian3, Cartographic, Cesium3DTileColorBlendMode, Cesium3DTileFeature, Cesium3DTileStyle, Cesium3DTileset, Color, ColorBlendMode, ColorMaterialProperty, ConstantProperty, Entity, GeoJsonDataSource, JulianDate, KeyboardEventModifier, Math as CesiumMath, Matrix4, Model, ScreenSpaceEventHandler, ScreenSpaceEventType, Transforms } from 'cesium'
 import type { BoundingSphere, Resource, Viewer } from 'cesium'
 import { createTransform, validateTransform } from '@desktop-webgis/cesium-scene-schema'
 import type { GeoPosition, Transform } from '@desktop-webgis/cesium-scene-schema'
@@ -59,9 +59,17 @@ export class TilesetLayer extends AssetLayer {
   tileset?: Cesium3DTileset
   private highlightTarget?: Cesium3DTileset
   private previousStyle?: Cesium3DTileStyle
+  private previousBlend?: { mode: Cesium3DTileset['colorBlendMode']; amount: number }
   constructor(private readonly options: TilesetLayerOptions) { super(options); this.transform = structuredClone(options.transform ?? createTransform()) }
   get native(): Cesium3DTileset | undefined { return this.tileset }
   get boundingSphere(): BoundingSphere | undefined { return this.tileset?.boundingSphere }
+  /** Update LOD and cache without reloading the asset or interrupting editing. */
+  setQuality(maximumScreenSpaceError = 16, cacheBytes = 256 * 1024 * 1024): void {
+    if (!this.tileset) return
+    this.tileset.maximumScreenSpaceError = maximumScreenSpaceError
+    this.tileset.cacheBytes = cacheBytes
+    this.viewer?.scene.requestRender()
+  }
   contains(picked: unknown): boolean { return picked instanceof Cesium3DTileFeature ? picked.tileset === this.tileset : isPick(picked) && (picked.primitive === this.tileset || picked.tileset === this.tileset) }
   protected async createNative(viewer: Viewer, signal: AbortSignal): Promise<() => void> {
     const tileset = await Cesium3DTileset.fromUrl(this.options.url, { maximumScreenSpaceError: this.options.maximumScreenSpaceError ?? 16, cacheBytes: this.options.cacheBytes ?? 256 * 1024 * 1024 })
@@ -75,7 +83,7 @@ export class TilesetLayer extends AssetLayer {
     const removeFailed = tileset.tileFailed.addEventListener((failure: { message: string }) => this.emit('error',new Error(failure.message)))
     return () => {
       removeFailed()
-      if (this.highlightTarget === tileset) { this.highlightTarget = undefined; this.previousStyle = undefined }
+      if (this.highlightTarget === tileset) { this.highlightTarget = undefined; this.previousStyle = undefined; this.previousBlend = undefined }
       if (!viewer.isDestroyed() && !tileset.isDestroyed()) viewer.scene.primitives.remove(tileset); else if (!tileset.isDestroyed()) tileset.destroy()
       if (this.tileset === tileset) this.tileset = undefined
     }
@@ -85,9 +93,12 @@ export class TilesetLayer extends AssetLayer {
     if (value) {
       if (this.highlightTarget === this.tileset) return
       this.highlightTarget = this.tileset; this.previousStyle = this.tileset.style
+      this.previousBlend = { mode: this.tileset.colorBlendMode, amount: this.tileset.colorBlendAmount }
+      this.tileset.colorBlendMode = Cesium3DTileColorBlendMode.MIX; this.tileset.colorBlendAmount = .2
       this.tileset.style = new Cesium3DTileStyle({ color: 'color("#3984d7", 1)' })
     } else if (this.highlightTarget === this.tileset) {
       this.tileset.style = this.previousStyle; this.highlightTarget = undefined; this.previousStyle = undefined
+      if (this.previousBlend) { this.tileset.colorBlendMode = this.previousBlend.mode; this.tileset.colorBlendAmount = this.previousBlend.amount; this.previousBlend = undefined }
     }
   }
 }
@@ -134,7 +145,7 @@ export class ModelLayer extends AssetLayer {
       if (this.highlightTarget === this.model) return
       this.highlightTarget = this.model
       this.previousColor = { color: Color.clone(this.model.color), mode: this.model.colorBlendMode, amount: this.model.colorBlendAmount }
-      this.model.color = Color.fromCssColorString('#3984d7'); this.model.colorBlendMode = ColorBlendMode.MIX; this.model.colorBlendAmount = .65
+      this.model.color = Color.fromCssColorString('#3984d7'); this.model.colorBlendMode = ColorBlendMode.MIX; this.model.colorBlendAmount = .2
     } else if (this.highlightTarget === this.model && this.previousColor) {
       this.model.color = this.previousColor.color; this.model.colorBlendMode = this.previousColor.mode; this.model.colorBlendAmount = this.previousColor.amount
       this.highlightTarget = undefined; this.previousColor = undefined
