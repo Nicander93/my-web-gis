@@ -13,6 +13,7 @@
 - [UI/UX 设计指南 V0.1](specs/03-UI-UX-Design-Guidelines-V0.1.md)
 - [UI 实现设计规范 V0.1](specs/04-UI-Implementation-Design-Spec-V0.1.md)
 - [Scene Manifest 与发布 V0.1](specs/05-Scene-Manifest-and-Publishing-V0.1.md)
+- [二维与三维统一工作台](specs/06-Unified-Workbench.md) — 最新 Ribbon、对象菜单与面板交互规则
 
 
 ### 阶段计划与验收

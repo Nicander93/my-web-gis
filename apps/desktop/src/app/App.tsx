@@ -20,6 +20,7 @@ import { startWfsBoundedLoad } from '@/services/wfs-commands'
 import { useSessionStore } from '@/stores/session.store'
 import { emitCommandStatus } from './commands/status'
 import '@/styles/editor.css'
+import '@/styles/workbench.css'
 import { ProcessingDialog } from '@/features/processing/ProcessingDialog'
 import { registerProcessingDialog } from './commands/processing.commands'
 import { NewProjectDialog } from '@/features/project/NewProjectDialog'
@@ -137,7 +138,7 @@ export default function App() {
 
   return (
     <div className={`desktop-app${sceneMode === '3d' ? ' desktop-app--city' : ''}`}>
-      <Header showToolbar={hasProject} />
+      {(!hasProject || sceneMode === '2d') && <Header showToolbar={hasProject} />}
       {!hasProject ? <ProjectStartScreen /> : sceneMode === '2d' ? <Workspace key={project.id} /> : <Suspense fallback={<p role="status">正在加载三维组件…</p>}><CityWorkspace key={project.id} /></Suspense>}
       {hasProject && sceneMode === '2d' && <StatusBar message={status} />}
       {newProjectOpen && <NewProjectDialog onClose={() => setNewProjectOpen(false)} />}

@@ -2,6 +2,10 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 export interface WorkspaceState {
+  ribbonCategory: string
+  ribbonExpanded: boolean
+  setRibbonCategory(category: string): void
+  toggleRibbon(): void
   left: {
     open: boolean
     width: number
@@ -50,8 +54,12 @@ function getMinMapWidth(): number {
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
     (set, get) => ({
+      ribbonCategory: 'edit',
+      ribbonExpanded: true,
+      setRibbonCategory: (ribbonCategory) => set({ ribbonCategory, ribbonExpanded: true }),
+      toggleRibbon: () => set(state => ({ ribbonExpanded: !state.ribbonExpanded })),
       left: { open: true, width: 260 },
-      right: { open: true, width: 300 },
+      right: { open: false, width: 300 },
       bottom: { open: false, height: 240 },
       focusMode: false,
       savedLayout: null,
@@ -70,7 +78,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       resetLayout: () =>
         set({
           left: { open: true, width: 260 },
-          right: { open: true, width: 300 },
+          right: { open: false, width: 300 },
           bottom: { open: false, height: 240 }
         }),
       enterFocusMode: () => {
@@ -136,7 +144,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     }),
     {
       name: 'desktop-webgis.workspace-layout',
-      partialize: (state) => ({ left: state.left, right: state.right, bottom: state.bottom })
+      version: 1,
+      migrate: (stored) => ({ left: (stored as Partial<WorkspaceState>).left ?? { open:true, width:260 }, right: { open:false, width:300 }, bottom: { open:false, height:240 }, ribbonCategory:'edit', ribbonExpanded:true }),
+      partialize: (state) => ({ left: state.left, right: state.right, bottom: state.bottom, ribbonCategory: state.ribbonCategory, ribbonExpanded: state.ribbonExpanded })
     }
   )
 )

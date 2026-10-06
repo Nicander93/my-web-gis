@@ -9,10 +9,11 @@ import { Legend } from './Legend'
 import { getLayerCapabilities } from '@/app/commands/layer.commands'
 import { processingToolName } from '@/features/processing/processing-tools'
 
-type InspectorTab = 'layer' | 'feature' | 'style' | 'label'
-
 export function Inspector() {
-  const selectedLayerId = useProjectStore((state) => state.selectedLayerId)
+  const browsingLayerId = useProjectStore((state) => state.selectedLayerId)
+  const selection = useProjectStore(state => state.selection)
+  const tab = useSessionStore(state => state.inspectorTab)
+  const selectedLayerId = tab === 'feature' ? selection.layerId : browsingLayerId
   const project = useProjectStore((state) => state.project)
   const featuresByDataset = useProjectStore((state) => state.featuresByDataset)
   const getNormalizedLayerStyle = useProjectStore((state) => state.getNormalizedLayerStyle)
@@ -21,8 +22,6 @@ export function Inspector() {
   const setTab = useSessionStore((state) => state.setInspectorTab)
 
   const layerId = selectedLayerId || 'no-layer'
-  const session = useSessionStore((state) => state.sessions[layerId])
-  const tab: InspectorTab = session?.inspector?.activeTab ?? 'layer'
 
   const selectedLayer = selectedLayerId
     ? project.layers.find((layer) => layer.id === selectedLayerId)
@@ -35,6 +34,8 @@ export function Inspector() {
   const featureCount = selectedLayer
     ? (featuresByDataset[selectedLayer.datasetId]?.length ?? 0)
     : 0
+
+  const feature = selection.featureIds.length === 1 && selectedLayer ? featuresByDataset[selectedLayer.datasetId]?.find(item => item.id === selection.featureIds[0]) : undefined
 
   const geometryTypes = new Set(selectedLayer ? (featuresByDataset[selectedLayer.datasetId] ?? []).map(feature => feature.geometry.type) : [])
   const geometryType = geometryTypes.size === 1 ? [...geometryTypes][0] : geometryTypes.size > 1 ? 'Mixed' : '—'
@@ -49,6 +50,15 @@ export function Inspector() {
     }
   }, [selectedLayerId, getNormalizedLayerStyle, ensureStyleDraft, flags.style])
 
+  useEffect(() => {
+    if (browsingLayerId && tab === 'feature') setTab(browsingLayerId, 'layer')
+    // A layer-row click changes inspection scope; map picks keep feature scope.
+  }, [browsingLayerId, setTab])
+
+  useEffect(() => {
+    if (selection.layerId && selection.featureIds.length) setTab(selection.layerId, 'feature')
+  }, [selection, setTab])
+
   // Service tile layers have no local attributes — keep users on the layer tab.
   useEffect(() => {
     if (!selectedLayerId) return
@@ -60,6 +70,7 @@ export function Inspector() {
 
   return (
     <div className="feature-panel inspector-content">
+      <p className="inspector-target">{tab === 'feature' ? `要素属性 · ${selectedLayer?.name ?? '未选择图层'}${feature ? ` / ${feature.id}` : ''}` : `图层属性 · ${selectedLayer?.name ?? '未选择'}`}</p>
       <div className="segmented-tabs" role="tablist" aria-label="检查器标签">
         <Button
           variant={tab === 'layer' ? 'tab' : 'ghost'}
@@ -306,13 +317,7 @@ export function Inspector() {
         )
       ) : null}
 
-      {tab === 'feature' ? (
-        <div className="empty-state empty-state-box">
-          {caps.canAttributeTable
-            ? '请选择单个要素查看属性。'
-            : '当前图层没有可查询的本地要素属性（WMS/WMTS 不假装提供属性表）。'}
-        </div>
-      ) : null}
+      {tab === 'feature' && (feature ? <div className="inspector-card"><div className="card-title">要素属性</div>{Object.entries(feature.properties).map(([key, value]) => <div key={key} className="inspector-row"><span>{key}</span><strong>{value === null ? 'null' : typeof value === 'object' ? JSON.stringify(value) : String(value)}</strong></div>)}{!Object.keys(feature.properties).length && <p>此要素没有数据属性。</p>}</div> : <div className="empty-state empty-state-box">{selection.featureIds.length > 1 ? `已选择 ${selection.featureIds.length} 个要素，请选择单个要素查看属性。` : '请选择单个要素查看属性。'}</div>)}
     </div>
   )
 }

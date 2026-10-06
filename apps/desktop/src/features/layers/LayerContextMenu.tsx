@@ -1,5 +1,6 @@
 import {
   Copy,
+  SlidersHorizontal,
   Download,
   Filter,
   MapPinned,
@@ -55,6 +56,8 @@ export function LayerContextMenu({
           onClick={() => run(() => layerCommands.retryServiceLayer(layerId))}
         />
         <MenuSeparator />
+        <MenuItem icon={SlidersHorizontal} label="图层属性" onClick={() => run(() => layerCommands.openProperties(layerId))} />
+        {caps.canEditGeometry && <MenuItem icon={Pencil} label="设为编辑目标" onClick={() => run(() => layerCommands.setEditingTarget(layerId))} />}
         <MenuItem
           icon={Pencil}
           label="样式"

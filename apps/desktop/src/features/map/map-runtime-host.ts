@@ -91,11 +91,15 @@ export function mountMapRuntime(target: HTMLElement, mapState: MapState): OlMapR
       syncSelectionHighlight(state.selection)
     }
 
+    if (previous.activeEditLayerId && !state.project.layers.some(layer => layer.id === previous.activeEditLayerId)) {
+      setActiveEditTool('pan')
+      return
+    }
     if (
-      state.selectedLayerId !== previous.selectedLayerId &&
-      (activeTool === 'select' || isDrawTool(activeTool) || activeTool === 'modify' || activeTool === 'delete')
+      (activeTool === 'select' && state.selectedLayerId !== previous.selectedLayerId) ||
+      (activeTool !== 'select' && state.activeEditLayerId !== previous.activeEditLayerId)
     ) {
-      // Re-bind tools/selection to the newly selected layer.
+      // Browsing rebinds selection; geometry tools follow the explicit editing target.
       setActiveEditTool(activeTool)
     }
   })
@@ -258,7 +262,7 @@ export function setActiveEditTool(tool: EditTool): boolean {
 
   // Draw / modify / delete require a vector layer that supports geometry edits.
   selectionRuntime.deactivate()
-  const layerId = useProjectStore.getState().selectedLayerId
+  const layerId = getEditingLayerId()
   if (!layerId) {
     toolRuntime.deactivate()
     return false
@@ -271,6 +275,7 @@ export function setActiveEditTool(tool: EditTool): boolean {
     return false
   }
 
+  if (!useProjectStore.getState().activeEditLayerId) useProjectStore.getState().setActiveEditLayer(layerId)
   const resolved: EditTool = isDrawTool(tool) ? resolveDrawTool(layerId) : tool
   activeTool = resolved
   toolRuntime.activate(resolved, createToolCallbacks())
@@ -287,9 +292,14 @@ export function clearMapSelection(): boolean {
   return true
 }
 
+function getEditingLayerId(): string | null {
+  const state = useProjectStore.getState()
+  return state.activeEditLayerId ?? state.selectedLayerId
+}
+
 function createToolCallbacks(): ToolCallbacks {
   return {
-    getActiveLayerId: () => useProjectStore.getState().selectedLayerId,
+    getActiveLayerId: getEditingLayerId,
     onAddFeature: (_datasetId, _feature, command) => {
       useProjectStore.getState().executeEditCommand(command)
       syncMapFromProject()
@@ -304,7 +314,7 @@ function createToolCallbacks(): ToolCallbacks {
       syncMapFromProject()
     },
     onSelectionChange: (featureIds) => {
-      const layerId = useProjectStore.getState().selectedLayerId
+      const layerId = getEditingLayerId()
       if (!layerId) return
       applyingStoreSelection = true
       try {

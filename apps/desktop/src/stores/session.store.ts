@@ -43,6 +43,7 @@ export type MapViewExtentWgs84 = [number, number, number, number]
 const DEFAULT_MAP_VIEW_EXTENT: MapViewExtentWgs84 = [73, 18, 135, 54]
 
 interface SessionState {
+  inspectorTab: InspectorTab
   sessions: Record<string, LayerSession>
   /** Live / placeholder map view for WFS bounded load (extentMode=view). */
   mapViewExtentWgs84: MapViewExtentWgs84
@@ -78,6 +79,7 @@ function createDraftFromApplied(applied: LayerStyle): StyleDraftState {
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
+  inspectorTab: 'layer',
   sessions: {},
   mapViewExtentWgs84: DEFAULT_MAP_VIEW_EXTENT,
   wfsLoadGeneration: 0,
@@ -133,6 +135,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set((prev) => {
       const existing = prev.sessions[layerId]
       return {
+        inspectorTab: tab,
         sessions: {
           ...prev.sessions,
           [layerId]: {

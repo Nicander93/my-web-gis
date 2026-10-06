@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createProject } from '@desktop-webgis/gis-core'
 import { parseProjectSnapshot, serializeProjectSnapshot } from '@desktop-webgis/gis-core'
-import { useCityLayoutStore } from './city-layout.store'
+import { useWorkspaceStore } from '@/stores/workspace.store'
 import { compileProjectToScene } from '@desktop-webgis/scene-core'
 import { useProjectStore } from '@/stores/project.store'
 import { addCityGroup, copyCityNodes, deleteCityNodes, dissolveCityGroup, loadCitySample, moveCitySelection, patchCityGroup, setCityNodesLocked, setCityNodesVisible, updateCity } from './city-commands'
@@ -60,7 +60,7 @@ describe('city workflow in the existing project store',() => {
     updateCity('绘制面', city => { city.nodes.push({ id: 'area', name: 'Area', type: 'graphic', visible: true, geometry: { type: 'polygon', heightMode: 'ground', positions: [[116,39,0],[116.1,39,0],[116,39.1,0]] }, style: { color: '#336699', width: 3, pointSize: 10, label: 'Zone' }, properties: { name: 'Area' }, popup: { fields: [{ field: 'name', label: '名称' }] } }); return city })
     const snapshot = store.getSnapshot()
     expect(parseProjectSnapshot(serializeProjectSnapshot(snapshot)).project.city).toEqual(snapshot.project.city)
-    const layout = useCityLayoutStore.getState(); layout.setCategory('edit'); layout.toggleExpanded()
+    const layout = useWorkspaceStore.getState(); layout.setRibbonCategory('edit'); layout.toggleRibbon()
     expect(store.getSnapshot()).toEqual(snapshot)
     expect(store.undoEdit()).toBe(true)
     expect(useProjectStore.getState().project.city).toBeUndefined()

@@ -1,136 +1,56 @@
-import {
-  LocateFixed,
-  MousePointer2,
-  Move,
-  Pencil,
-  Plus,
-  Redo2,
-  RotateCcw,
-  Save,
-  Scan,
-  Trash2,
-  Undo2,
-  ZoomIn,
-  ZoomOut
-} from 'lucide-react'
-import { ToolbarButton } from './ToolbarButton'
-import { ToolbarSeparator } from './ToolbarSeparator'
-import { SnappingControl } from './SnappingControl'
-import { projectCommands } from '@/app/commands/project.commands'
-import { editCommands } from '@/app/commands/edit.commands'
-import { mapCommands } from '@/app/commands/map.commands'
+import { LocateFixed, MousePointer2, Move, Pencil, Redo2, RotateCcw, Save, Scan, Shapes, Trash2, Undo2, ZoomIn, ZoomOut } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { capabilitiesForDataset } from '@desktop-webgis/gis-core'
+import { ToolbarButton } from './ToolbarButton'
+import { SnappingControl } from './SnappingControl'
+import { WorkbenchRibbon, type RibbonCommand } from './WorkbenchRibbon'
+import { ViewMenu } from './menus/ViewMenu'
+import { MenuItem } from './menus/MenuItem'
+import { projectCommands } from '@/app/commands/project.commands'
+import { processingCommands } from '@/app/commands/processing.commands'
+import { editCommands } from '@/app/commands/edit.commands'
+import { mapCommands } from '@/app/commands/map.commands'
 import { useProjectStore } from '@/stores/project.store'
+import { useWorkspaceStore } from '@/stores/workspace.store'
 import { getActiveEditTool } from '@/features/map/map-runtime-host'
 
+/** 2D commands adapt to the same compact ribbon as the scene editor. */
 export function Toolbar() {
   const project = useProjectStore(state => state.project)
   const selectedLayerId = useProjectStore(state => state.selectedLayerId)
+  const targetId = useProjectStore(state => state.activeEditLayerId)
   const selection = useProjectStore(state => state.selection)
-  const layer = project.layers.find(item => item.id === selectedLayerId)
+  const category = useWorkspaceStore(state => state.ribbonCategory)
+  const layer = project.layers.find(item => item.id === (targetId ?? selectedLayerId))
   const editable = capabilitiesForDataset(project.datasets.find(item => item.id === layer?.datasetId)).editGeometry
-  const canUndo = useProjectStore.getState().canUndoEdit()
-  const canRedo = useProjectStore.getState().canRedoEdit()
   const [active, setActive] = useState(getActiveEditTool)
+  const [, setRevision] = useState(0)
   useEffect(() => {
-    const refresh = () => setActive(getActiveEditTool())
-    const initialRefresh = window.requestAnimationFrame(refresh)
+    const refresh = () => { setActive(getActiveEditTool()); setRevision(value => value + 1) }
+    const initial = window.requestAnimationFrame(refresh)
     window.addEventListener('desktop-webgis:command-status', refresh)
-    return () => {
-      window.cancelAnimationFrame(initialRefresh)
-      window.removeEventListener('desktop-webgis:command-status', refresh)
-    }
+    return () => { window.cancelAnimationFrame(initial); window.removeEventListener('desktop-webgis:command-status', refresh) }
   }, [project.id])
-  return (
-    <div className="toolbar">
-      <ToolbarButton
-        icon={Plus}
-        label="添加数据"
-        onClick={projectCommands.addData}
-      />
-      <ToolbarButton
-        icon={Save}
-        label="保存"
-        onClick={projectCommands.saveProject}
-      />
-      <ToolbarSeparator />
-      <ToolbarButton
-        icon={Move}
-        label="平移"
-        active={active === 'pan'}
-        onClick={mapCommands.pan}
-      />
-      <ToolbarButton
-        icon={ZoomIn}
-        label="放大"
-        onClick={mapCommands.zoomIn}
-      />
-      <ToolbarButton
-        icon={ZoomOut}
-        label="缩小"
-        onClick={mapCommands.zoomOut}
-      />
-      <ToolbarButton
-        icon={Scan}
-        label="全图"
-        onClick={mapCommands.zoomToAll}
-      />
-      <ToolbarButton
-        icon={LocateFixed}
-        label="定位"
-        onClick={mapCommands.locate}
-      />
-      <ToolbarSeparator />
-      <ToolbarButton
-        icon={MousePointer2}
-        label="选择"
-        active={active === 'select'}
-        onClick={mapCommands.select}
-      />
-      <ToolbarButton
-        icon={RotateCcw}
-        label="清除选择"
-        disabled={selection.featureIds.length === 0}
-        onClick={mapCommands.clearSelection}
-      />
-      <ToolbarSeparator />
-      <ToolbarButton
-        icon={Undo2}
-        label="撤销"
-        disabled={!canUndo}
-        onClick={editCommands.undo}
-      />
-      <ToolbarButton
-        icon={Redo2}
-        label="重做"
-        disabled={!canRedo}
-        onClick={editCommands.redo}
-      />
-      <ToolbarSeparator />
-      <ToolbarButton
-        icon={Pencil}
-        label="绘制"
-        disabled={!editable}
-        active={active.startsWith('draw-')}
-        onClick={editCommands.draw}
-      />
-      <ToolbarButton
-        icon={Pencil}
-        label="修改"
-        disabled={!editable}
-        active={active === 'modify'}
-        onClick={editCommands.modify}
-      />
-      <ToolbarButton
-        icon={Trash2}
-        label="删除"
-        disabled={!editable}
-        active={active === 'delete'}
-        onClick={editCommands.deleteSelected}
-      />
-      <ToolbarSeparator />
-      <SnappingControl />
-    </div>
-  )
+  // History changes may leave dirty=true; command-status also triggers a render.
+  const store = useProjectStore.getState()
+  const reason = editable ? undefined : '请选择可编辑的本地图层'
+  const edit: RibbonCommand[] = [
+    { id:'select', label:'选择', icon:MousePointer2, execute:mapCommands.select, active:active === 'select' },
+    { id:'clear', label:'清除选择', icon:RotateCcw, execute:mapCommands.clearSelection, disabled:selection.featureIds.length ? undefined : '未选择要素' },
+    { id:'draw', label:'绘制', icon:Pencil, execute:editCommands.draw, disabled:reason, active:active.startsWith('draw-') },
+    { id:'modify', label:'修改', icon:Pencil, execute:editCommands.modify, disabled:reason, active:active === 'modify' },
+    { id:'delete', label:'删除', icon:Trash2, execute:editCommands.deleteSelected, disabled:reason, active:active === 'delete' }
+  ]
+  const map: RibbonCommand[] = [
+    { id:'pan', label:'平移', icon:Move, execute:mapCommands.pan, active:active === 'pan' },
+    { id:'in', label:'放大', icon:ZoomIn, execute:mapCommands.zoomIn },
+    { id:'out', label:'缩小', icon:ZoomOut, execute:mapCommands.zoomOut },
+    { id:'all', label:'全图', icon:Scan, execute:mapCommands.zoomToAll },
+    { id:'locate', label:'定位', icon:LocateFixed, execute:mapCommands.locate }
+  ]
+  return <WorkbenchRibbon categories={[{ id:'edit', label:'编辑', commands:edit },{ id:'map', label:'地图', commands:map }]} onAdd={projectCommands.addData}
+    target={category === 'map' ? undefined : `编辑目标：${editable ? layer?.name : '未设置'}${editable && !targetId ? '（启动编辑后固定）' : ''}`}
+    quickActions={<><ToolbarButton icon={Undo2} label="撤销" disabled={!store.canUndoEdit()} onClick={editCommands.undo} /><ToolbarButton icon={Redo2} label="重做" disabled={!store.canRedoEdit()} onClick={editCommands.redo} /><ToolbarButton icon={Save} label="保存项目" onClick={projectCommands.saveProject} /></>}
+    extraTools={category === 'map' ? undefined : <SnappingControl />}
+    more={<><ViewMenu onClose={() => {}} /><MenuItem icon={Shapes} label="空间处理…" onClick={processingCommands.open} /></>} />
 }

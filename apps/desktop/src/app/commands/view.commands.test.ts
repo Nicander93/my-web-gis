@@ -72,7 +72,7 @@ describe('view commands', () => {
     expect(afterExit.savedLayout).toBeNull()
   })
 
-  it('resets layout to new defaults with right panel open', () => {
+  it('resets layout with left open and inspector/table closed', () => {
     useWorkspaceStore.setState({
       left: { open: false, width: 400 },
       right: { open: false, width: 500 },
@@ -83,7 +83,7 @@ describe('view commands', () => {
 
     const state = useWorkspaceStore.getState()
     expect(state.left).toEqual({ open: true, width: 260 })
-    expect(state.right).toEqual({ open: true, width: 300 })
+    expect(state.right).toEqual({ open: false, width: 300 })
     expect(state.bottom).toEqual({ open: false, height: 240 })
   })
 

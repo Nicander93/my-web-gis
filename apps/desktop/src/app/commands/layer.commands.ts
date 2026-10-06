@@ -102,6 +102,17 @@ export function getLayerCapabilities(layerId: string | null): {
 
 /** 图层相关命令，供 Header 按钮与 Layer Context Menu 共用。 */
 export const layerCommands = {
+  openProperties(layerId: string): void {
+    if (!getLayerCapabilities(layerId).exists) return
+    useProjectStore.getState().setSelectedLayer(layerId)
+    useSessionStore.getState().setInspectorTab(layerId, 'layer')
+    useWorkspaceStore.getState().setRightOpen(true)
+  },
+  setEditingTarget(layerId: string): void {
+    if (!getLayerCapabilities(layerId).canEditGeometry) return
+    useProjectStore.getState().setActiveEditLayer(layerId)
+    emitCommandStatus('已设置编辑目标')
+  },
   zoomToLayer(layerId?: string | null): void {
     const id = layerId ?? useProjectStore.getState().selectedLayerId
     if (!id) {

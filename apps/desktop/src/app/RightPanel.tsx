@@ -6,10 +6,11 @@ import { useWorkspaceStore } from '@/stores/workspace.store'
 
 interface RightPanelProps {
   children: ReactNode
+  title?: string
 }
 
 /** 右侧固定承载 Inspector，并保持面板容器与业务组件解耦。 */
-export function RightPanel({ children }: RightPanelProps) {
+export function RightPanel({ children, title = '检查器' }: RightPanelProps) {
   const right = useWorkspaceStore((state) => state.right)
   const setOpen = useWorkspaceStore((state) => state.setRightOpen)
   const setWidth = useWorkspaceStore((state) => state.setRightWidth)
@@ -23,7 +24,7 @@ export function RightPanel({ children }: RightPanelProps) {
     >
       <header className="panel-titlebar">
         <div>
-          <h2>检查器</h2>
+          <h2 title={title}>{title}</h2>
         </div>
         <Button variant="icon" title="收起检查器" aria-label="收起检查器" onClick={() => setOpen(false)}>
           <PanelRightClose size={16} />

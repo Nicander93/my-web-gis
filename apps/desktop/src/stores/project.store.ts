@@ -21,7 +21,8 @@ import {
   SetLayerOpacityCommand,
   SetLayerTreeCommand,
   AddLocalLayerCommand,
-  snapshotLayerTree
+  snapshotLayerTree,
+  capabilitiesForDataset
 } from '@desktop-webgis/gis-core'
 import type {
   Project,
@@ -47,6 +48,9 @@ interface ProjectState {
   featuresByDataset: Record<string, GisFeature[]>
   dirty: boolean
   selectedLayerId: string | null
+  /** Explicit editing target, separate from browsing selection; never serialized. */
+  activeEditLayerId: string | null
+  setActiveEditLayer(layerId: string): void
   /** Runtime selection S (by stable Feature ID). */
   selection: SelectionState
   /** Last selection count after filter convergence (for UI). */
@@ -189,6 +193,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   featuresByDataset: {},
   dirty: false,
   selectedLayerId: null,
+  activeEditLayerId: null,
   selection: { layerId: null, featureIds: [] },
   lastSelectionCountAfterFilter: null,
 
@@ -328,9 +333,16 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   },
 
   setSelectedLayer: (layerId) => set({ selectedLayerId: layerId }),
+  setActiveEditLayer: (layerId) => {
+    const state = get()
+    const layer = state.project.layers.find(item => item.id === layerId)
+    if (!layer || !capabilitiesForDataset(state.project.datasets.find(item => item.id === layer.datasetId)).editGeometry) return
+    set({ activeEditLayerId: layerId })
+  },
   setDirty: (dirty) => set({ dirty }),
 
   loadSnapshot: (snapshot) => {
+    useSessionStore.setState({ inspectorTab: 'layer' })
     editHistory.clear()
     const project = normalizeLayerTree(cloneValue(snapshot.project))
     const featuresByDataset = cloneValue(snapshot.featuresByDataset ?? {})
@@ -345,6 +357,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       featuresByDataset,
       dirty: false,
       selectedLayerId: null,
+      activeEditLayerId: null,
       selection: { layerId: null, featureIds: [] },
       lastSelectionCountAfterFilter: null
     })
@@ -793,6 +806,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       featuresByDataset,
       dirty: true,
       selectedLayerId: state.selectedLayerId === layerId ? null : state.selectedLayerId,
+      activeEditLayerId: state.activeEditLayerId === layerId ? null : state.activeEditLayerId,
       selection,
       lastSelectionCountAfterFilter:
         state.selection.layerId === layerId ? 0 : state.lastSelectionCountAfterFilter
