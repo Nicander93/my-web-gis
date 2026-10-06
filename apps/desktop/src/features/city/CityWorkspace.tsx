@@ -35,6 +35,7 @@ import type { LucideIcon } from 'lucide-react'
 import { compileCityObjectExport } from './city-object-export'
 import type { CityInspectorSection } from './CityInspector'
 import { useCityRenderPreferences } from './CityRenderSettings'
+import { CityInfo } from './CityPropertyGroup'
 import 'cesium/Build/Cesium/Widgets/widgets.css'
 import './city-editor.css'
 
@@ -336,7 +337,7 @@ export function CityWorkspace() {
         try { stopEditing(); updateCity('拖动放置模型', scene => ({ ...scene, nodes: scene.nodes.map(item => item.id === source.id ? { ...source, position } : item) })); select(source.id); notify('模型位置已更新，可撤销恢复') } catch (reason) { report(reason) }
       }}>
         <div className="city-canvas__viewport" ref={target} />
-        {editing && !preview && <div className="city-drawing-bar"><Move size={16} aria-hidden="true" /><span>{editing === 'translate' ? '移动 · 红：东向，绿：北向，蓝：高度；黄色框：水平移动' : editing === 'rotate' ? '旋转 · 拖动对象局部轴环' : '等比缩放 · 拖动白色箭头'} · 松开应用，Esc 取消本次拖动</span><button className="button-secondary" onClick={() => { stopEditing(); notify('已退出模型编辑') }}>结束编辑</button></div>}
+        {editing && !preview && <div className="city-drawing-bar"><Move size={16} aria-hidden="true" /><span>{editing === 'translate' ? '移动' : editing === 'rotate' ? '旋转' : '等比缩放'}</span><CityInfo label="变换工具">{`${editing === 'translate' ? '红：东向，绿：北向，蓝：高度；黄色框：水平移动。' : editing === 'rotate' ? '拖动对象局部轴环。' : '拖动白色箭头等比缩放。'}松开应用，Esc 取消本次拖动。`}</CityInfo><button className="button-secondary" onClick={() => { stopEditing(); notify('已退出模型编辑') }}>结束编辑</button></div>}
         {graphicEditing.state && <div className="city-drawing-bar"><Shapes size={16} aria-hidden="true" /><span>编辑几何 · {graphicEditing.state.geometry.positions.length} 个顶点</span><button className="button-primary" onClick={graphicEditing.finish}><Check size={14} aria-hidden="true" />应用修改</button><button className="button-secondary" onClick={() => { stopEditing(); notify('已取消几何编辑，原几何已恢复') }}>取消编辑</button></div>}
         {!leftVisible && !preview && <button className="city-panel-restore city-panel-restore--left" aria-label="展开对象面板" onClick={() => useWorkspaceStore.getState().setLeftOpen(true)}><Layers2 size={16} aria-hidden="true" /></button>}
         {!rightVisible && !preview && <button className="city-panel-restore city-panel-restore--right" aria-label="展开属性面板" onClick={() => useWorkspaceStore.getState().setRightOpen(true)}><PanelRightClose size={16} aria-hidden="true" /></button>}

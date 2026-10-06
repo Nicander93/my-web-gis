@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { getCityNodeState } from '@desktop-webgis/cesium-scene-schema'
 import type { CityGroup, CityNode, CityScene } from '@desktop-webgis/cesium-scene-schema'
+import { CityInfo } from './CityPropertyGroup'
 
 interface BatchProps {
   city: CityScene; nodes: CityNode[]
@@ -15,7 +16,7 @@ export function CityBatchInspector({ city, nodes, onVisible, onLock, onMove, onC
   const mixedGroups = !nodes.every(node => node.groupId === nodes[0].groupId)
   const groupId = mixedGroups ? '' : nodes[0].groupId ?? ''
   return <div className="city-properties">
-    <section className="city-property-section"><h3>已选择 {nodes.length} 个对象</h3><p className="editor-help">批量操作统一应用，可一次撤销。单对象几何和资源设置请单独选择后编辑。</p>
+    <section className="city-property-section"><h3>已选择 {nodes.length} 个对象<CityInfo label="批量操作">批量操作统一应用，可一次撤销。单对象几何和资源设置请单独选择后编辑。</CityInfo></h3>
       <dl className="city-attribute-list"><div><dt>对象类型</dt><dd>{mixed(nodes.map(node => node.type))}</dd></div><div><dt>自身显隐</dt><dd>{mixed(nodes.map(node => node.visible ? '显示' : '隐藏'))}</dd></div><div><dt>实际显隐</dt><dd>{mixed(states.map(state => state.visible ? '显示' : '隐藏'))}</dd></div><div><dt>实际锁定</dt><dd>{mixed(states.map(state => state.locked ? '锁定' : '未锁定'))}</dd></div></dl>
       <div className="city-form-actions"><button className="button-secondary" onClick={() => onVisible(true)}>全部显示</button><button className="button-secondary" onClick={() => onVisible(false)}>全部隐藏</button></div>
       {nodes.some(node => city.groups?.find(group => group.id === node.groupId)?.visible === false) && <p className="editor-help">所属分组隐藏时，显示对象不会改变分组的隐藏状态。</p>}
@@ -43,8 +44,8 @@ export function CityGroupInspector({ city, group, onPatch, onSelectMembers, onDi
   const nodes = city.nodes.filter(node => node.groupId === group.id), index = city.groups?.findIndex(item => item.id === group.id) ?? 0
   return <div className="city-properties">
     <form className="city-property-section" onSubmit={event => { event.preventDefault(); onPatch({ name: name.trim() }) }}><h3>场景分组</h3><label className="editor-field">分组名称<input value={name} required disabled={group.locked} onChange={event => setName(event.target.value)} /></label><button className="button-secondary" disabled={group.locked || !name.trim() || name.trim() === group.name}>应用名称</button><p className="editor-help">{nodes.length} 个对象 · 组内对象保留各自显隐和锁定设置。</p></form>
-    <section className="city-property-section"><h3>组状态</h3><label className="city-check"><input type="checkbox" checked={group.visible} onChange={event => onPatch({ visible: event.target.checked })} />显示分组</label><label className="city-check"><input type="checkbox" checked={!!group.locked} onChange={event => onPatch({ locked: event.target.checked })} />锁定分组</label><p className="editor-help">锁定后禁止成员编辑、移动和删除。解锁分组不会解除成员自身的锁定。</p><button className="button-secondary" disabled={!nodes.length} onClick={onSelectMembers}>选择组内全部对象</button></section>
+    <section className="city-property-section"><h3>组状态<CityInfo label="分组状态">锁定后禁止成员编辑、移动和删除。解锁分组不会解除成员自身的锁定。</CityInfo></h3><label className="city-check"><input type="checkbox" checked={group.visible} onChange={event => onPatch({ visible: event.target.checked })} />显示分组</label><label className="city-check"><input type="checkbox" checked={!!group.locked} onChange={event => onPatch({ locked: event.target.checked })} />锁定分组</label><button className="button-secondary" disabled={!nodes.length} onClick={onSelectMembers}>选择组内全部对象</button></section>
     <section className="city-property-section"><h3>顺序</h3><div className="city-form-actions"><button className="button-secondary" disabled={group.locked || index === 0} onClick={() => onReorder(-1)}>上移分组</button><button className="button-secondary" disabled={group.locked || index === (city.groups?.length ?? 0) - 1} onClick={() => onReorder(1)}>下移分组</button></div></section>
-    <section className="city-property-section"><button className="city-danger-action" disabled={group.locked} onClick={onDissolve}>解散分组</button><p className="editor-help">保留全部对象与实际显隐状态，可撤销恢复分组。</p></section>
+    <section className="city-property-section city-form-actions"><button className="city-danger-action" disabled={group.locked} onClick={onDissolve}>解散分组</button><CityInfo label="解散分组">保留全部对象与实际显隐状态，可撤销恢复分组。</CityInfo></section>
   </div>
 }
