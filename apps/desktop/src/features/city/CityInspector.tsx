@@ -5,6 +5,7 @@ import type { CityGroup, CityNode, CityScene, GeoPosition, GraphicNode, PopupDef
 import { GraphicAttributes } from './GraphicAttributes'
 import { CityRenderSettings } from './CityRenderSettings'
 import { CityInfo, CityPropertyGroup } from './CityPropertyGroup'
+import { LivePropertyInput } from './LivePropertyInput'
 
 export type CityInspectorSection = 'object' | 'popup' | 'source' | 'style' | 'properties'
 
@@ -35,7 +36,7 @@ export function CityInspector({ node, section = 'object', pickedProperties = {},
     {section === 'object' && <section className="city-property-section"><label className="editor-field">所属分组<select value={node.groupId ?? ''} onChange={event => onMoveGroup(event.target.value || undefined)}><option value="">未分组</option>{groups?.map(group => <option key={group.id} value={group.id} disabled={group.locked}>{group.name}{group.locked ? '（已锁定）' : ''}</option>)}</select></label></section>}
     {error && <section className="city-property-section"><p className="editor-error" role="alert">{error}</p><button className="button-secondary" onClick={onReload}>重试加载</button></section>}
     {section === 'object' && node.type === 'model' && <PositionFields key={`${node.id}:${JSON.stringify(node.position)}`} position={node.position} onApply={position => onPatch({ position } as Partial<CityNode>, '设置模型地理位置')} />}
-    {section === 'object' && (node.type === 'model' || node.type === '3dtiles') && <TransformFields key={`${node.id}:${JSON.stringify(node.transform)}`} transform={node.transform} onApply={transform => onPatch({ transform } as Partial<CityNode>, '输入模型变换')} />}
+    {section === 'object' && (node.type === 'model' || node.type === '3dtiles') && <TransformFields key={node.id} transform={node.transform} onApply={transform => onPatch({ transform } as Partial<CityNode>, '输入模型变换')} />}
     {section === 'object' && node.type === '3dtiles' && <CityPropertyGroup title="瓦片质量" hint="屏幕误差越小，模型越精细，加载开销越大。缓存预算不是显存硬上限；可见瓦片可能超出预算。设置随项目保存，可撤销。">
       <label className="editor-field">屏幕误差<select value={node.maximumScreenSpaceError ?? 16} onChange={event => onPatch({ maximumScreenSpaceError: Number(event.target.value) } as Partial<CityNode>, '设置瓦片显示精度')}>{[1,2,4,8,16,32].map(value => <option key={value} value={value}>{value}{value === 1 ? ' · 最精细' : value === 16 ? ' · 默认' : value === 32 ? ' · 更流畅' : ''}</option>)}</select></label>
       <label className="editor-field">缓存预算<select value={node.cacheBytes ?? 256 * 1024 * 1024} onChange={event => onPatch({ cacheBytes: Number(event.target.value) } as Partial<CityNode>, '设置瓦片缓存预算')}>{[128,256,512,1024].map(value => <option key={value} value={value * 1024 * 1024}>{value} MB</option>)}</select></label>
@@ -66,22 +67,23 @@ function GraphicFields({ node, onPatch }: { node: GraphicNode; onPatch: CityInsp
 }
 
 function TransformFields({ transform, onApply }: { transform: Transform; onApply(value: Transform): void }) {
-  const [translation, setTranslation] = useState(transform.translation.map(String))
-  const [rotation, setRotation] = useState(transform.rotation.map(String))
-  const [scale, setScale] = useState(String(transform.scale))
-  const [error, setError] = useState('')
-  const changed = JSON.stringify([translation, rotation, scale]) !== JSON.stringify([transform.translation.map(String), transform.rotation.map(String), String(transform.scale)])
-  return <form className="city-property-section" onSubmit={event => {
-    event.preventDefault(); setError('')
-    try { onApply({ translation: translation.map(Number) as Transform['translation'], rotation: rotation.map(Number) as Transform['rotation'], scale: Number(scale) }) } catch (reason) { setError(reason instanceof Error ? reason.message : '变换参数无效') }
-  }}>
-    <h3>变换<CityInfo label="模型变换">平移单位为米，相对模型原始位置；旋转单位为度。输入后按 Enter 或点击应用变换。</CityInfo></h3>
-    <div className="city-axis-fields"><span className="city-axis-title">平移 (m)</span><div className="city-triple">{['东向','北向','高度'].map((label, i) => <label key={label}><span aria-hidden="true">{['东','北','高'][i]}</span><input aria-label={label} title={translation[i]} type="number" step="any" required value={translation[i]} onChange={event => setTranslation(translation.map((value, index) => index === i ? event.target.value : value))} /></label>)}</div></div>
-    <div className="city-axis-fields"><span className="city-axis-title">旋转 (°)</span><div className="city-triple">{['航向','俯仰','翻滚'].map((label, i) => <label key={label}><span aria-hidden="true">{['航','俯','滚'][i]}</span><input aria-label={label} title={rotation[i]} type="number" step="any" required value={rotation[i]} onChange={event => setRotation(rotation.map((value, index) => index === i ? event.target.value : value))} /></label>)}</div></div>
-    <label className="editor-field">等比缩放<input type="number" min=".001" max="10000" step="any" required value={scale} onChange={event => setScale(event.target.value)} /></label>
-    {error && <p className="editor-error" role="alert">{error}</p>}
-    <div className="city-form-actions"><button className="button-primary" type="submit" disabled={!changed}>应用变换</button>{changed && <span className="city-draft-state">尚未应用</span>}</div>
-  </form>
+  function number(text: string): number {
+    if (!text.trim() || !Number.isFinite(Number(text))) throw new Error('请输入有效数值。')
+    return Number(text)
+  }
+  return <section className="city-property-section">
+    <h3>变换<CityInfo label="模型变换">平移单位为米，相对模型原始位置；旋转单位为度。有效输入稍作停顿即生效，Enter 或离开输入框可立即确认；修改可撤销。</CityInfo></h3>
+    {(['translation','rotation'] as const).map(field => <div key={field} className="city-axis-fields"><span className="city-axis-title">{field === 'translation' ? '平移 (m)' : '旋转 (°)'}</span><div className="city-triple">{(field === 'translation' ? ['东向','北向','高度'] : ['航向','俯仰','翻滚']).map((label, i) => <LivePropertyInput key={label} label={label[0]} aria-label={label} title={String(transform[field][i])} type="number" step="any" required value={String(transform[field][i])} onCommit={text => {
+      const vector = [...transform[field]] as Transform['translation']
+      vector[i] = number(text)
+      onApply({ ...transform, [field]: vector })
+    }} />)}</div></div>)}
+    <LivePropertyInput label="等比缩放" type="number" min=".001" max="10000" step="any" required value={String(transform.scale)} onCommit={text => {
+      const scale = number(text)
+      if (scale < .001 || scale > 10000) throw new Error('缩放须在 0.001–10000 之间。')
+      onApply({ ...transform, scale })
+    }} />
+  </section>
 }
 
 function PositionFields({ position, onApply }: { position: GeoPosition; onApply(value: GeoPosition): void }) {
@@ -131,25 +133,29 @@ function ResourceFields({ url, open, onApply, onReload }: { url: string; open?: 
   return <details open={open || undefined} className="city-property-section city-advanced"><summary>数据源</summary><form onSubmit={event => { event.preventDefault(); if (!isCityResourceUrl(draft.trim())) { setError('请输入有效的 HTTP(S) 地址或项目相对路径。'); return }; try { onApply(draft.trim()); setError('') } catch (reason) { setError(reason instanceof Error ? reason.message : '数据源无效') } }}><label className="editor-field">资源地址<input value={draft} autoComplete="off" spellCheck={false} onChange={event => setDraft(event.target.value)} /></label>{error && <p role="alert" className="editor-error">{error}</p>}<div className="city-form-actions"><button className="button-secondary" type="submit">更新地址</button><button className="city-text-action" type="button" onClick={onReload}>重新加载</button></div></form></details>
 }
 
-interface SceneSettingsProps { city: CityScene; onApply(value: Pick<CityScene,'effects'|'basemap'|'terrain'|'lighting'>): void; onSaveCamera(): void }
+interface SceneSettingsProps { city: CityScene; onApply(value: Partial<Pick<CityScene,'effects'|'basemap'|'terrain'|'lighting'>>): void; onSaveCamera(): void }
 
 export function SceneSettings({ city, onApply, onSaveCamera }: SceneSettingsProps) {
-  const [fog, setFog] = useState(String(city.effects.fog))
-  const [bloom, setBloom] = useState(city.effects.bloom)
-  const [basemap, setBasemap] = useState(city.basemap?.url ?? '')
-  const [terrain, setTerrain] = useState(city.terrain?.url ?? '')
-  const [sunlight, setSunlight] = useState(city.lighting?.sunlight ?? false)
-  const [shadows, setShadows] = useState(city.lighting?.shadows ?? false)
-  const [time, setTime] = useState(new Date(city.lighting?.time ?? Date.now()).toISOString().slice(0,16))
-  const [error, setError] = useState('')
+  const [initialTime] = useState(() => new Date().toISOString())
+  const lighting = city.lighting ?? { sunlight: false, shadows: false, time: initialTime }
+  function resource(type: 'basemap' | 'terrain', text: string): void {
+    const url = text.trim()
+    if (url && !isCityResourceUrl(url)) throw new Error('请输入有效的 HTTP(S) 地址或项目相对路径。')
+    onApply({ [type]: url ? { url } : undefined })
+  }
   return <div className="city-properties">
     <CityRenderSettings />
     <section className="city-property-section city-property-row"><span>初始视角</span><button className="button-secondary" onClick={onSaveCamera}>使用当前视角</button><CityInfo label="初始视角">场景打开时使用保存的初始视角。</CityInfo></section>
-    <form onSubmit={event => { event.preventDefault(); try { onApply({ effects: { fog: Number(fog), bloom }, lighting: { sunlight, shadows, time: new Date(time + 'Z').toISOString() }, basemap: basemap.trim() ? { url: basemap.trim() } : undefined, terrain: terrain.trim() ? { url: terrain.trim() } : undefined }); setError('') } catch (reason) { setError(reason instanceof Error ? reason.message : '场景参数无效') } }}>
-      <CityPropertyGroup title="光照与时间"><label className="city-check">太阳光照<input type="checkbox" checked={sunlight} onChange={event => setSunlight(event.target.checked)} /></label><label className="city-check">模型阴影<input type="checkbox" checked={shadows} onChange={event => setShadows(event.target.checked)} /></label><label className="editor-field">时间 (UTC)<input aria-label="场景时间（UTC）" type="datetime-local" required value={time} onChange={event => setTime(event.target.value)} /></label></CityPropertyGroup>
-      <CityPropertyGroup title="环境效果" open={false}><label className="editor-field">雾浓度<input type="number" min="0" max="1" step=".01" required value={fog} onChange={event => setFog(event.target.value)} /></label><label className="city-check">辉光<input aria-label="启用辉光" type="checkbox" checked={bloom} onChange={event => setBloom(event.target.checked)} /></label></CityPropertyGroup>
-      <CityPropertyGroup title="底图与地形" open={false} hint="支持 HTTP(S) 服务或项目相对路径。影像留空使用内置世界影像，地形留空使用椭球地表。"><label className="editor-field">影像地址<input aria-label="影像模板地址" value={basemap} spellCheck={false} placeholder="内置世界影像" onChange={event => setBasemap(event.target.value)} /></label><label className="editor-field">地形地址<input aria-label="地形服务地址" value={terrain} spellCheck={false} placeholder="椭球地表" onChange={event => setTerrain(event.target.value)} /></label></CityPropertyGroup>
-      <section className="city-property-section">{error && <p className="editor-error" role="alert">{error}</p>}<button type="submit" className="button-primary">应用场景设置</button></section>
-    </form>
+    <CityPropertyGroup title="光照与时间"><label className="city-check">太阳光照<input type="checkbox" checked={lighting.sunlight} onChange={event => onApply({ lighting: { ...lighting, sunlight: event.target.checked } })} /></label><label className="city-check">模型阴影<input type="checkbox" checked={lighting.shadows} onChange={event => onApply({ lighting: { ...lighting, shadows: event.target.checked } })} /></label><LivePropertyInput label="时间 (UTC)" aria-label="场景时间（UTC）" type="datetime-local" required value={new Date(lighting.time).toISOString().slice(0,16)} onCommit={text => {
+      const date = new Date(text + 'Z')
+      if (!text || !Number.isFinite(date.getTime())) throw new Error('请输入完整有效的 UTC 时间。')
+      onApply({ lighting: { ...lighting, time: date.toISOString() } })
+    }} /></CityPropertyGroup>
+    <CityPropertyGroup title="环境效果" open={false}><LivePropertyInput label="雾浓度" type="number" min="0" max="1" step=".01" required value={String(city.effects.fog)} onCommit={text => {
+      const fog = Number(text)
+      if (!text.trim() || !Number.isFinite(fog) || fog < 0 || fog > 1) throw new Error('雾浓度必须在 0–1 之间。')
+      onApply({ effects: { ...city.effects, fog } })
+    }} /><label className="city-check">辉光<input aria-label="启用辉光" type="checkbox" checked={city.effects.bloom} onChange={event => onApply({ effects: { ...city.effects, bloom: event.target.checked } })} /></label></CityPropertyGroup>
+    <CityPropertyGroup title="底图与地形" open={false} hint="支持 HTTP(S) 服务或项目相对路径。影像留空使用内置世界影像，地形留空使用椭球地表。"><LivePropertyInput label="影像地址" aria-label="影像模板地址" value={city.basemap?.url ?? ''} spellCheck={false} placeholder="内置世界影像" onCommit={text => resource('basemap', text)} /><LivePropertyInput label="地形地址" aria-label="地形服务地址" value={city.terrain?.url ?? ''} spellCheck={false} placeholder="椭球地表" onCommit={text => resource('terrain', text)} /></CityPropertyGroup>
   </div>
 }

@@ -7,10 +7,11 @@ import { useWorkspaceStore } from '@/stores/workspace.store'
 interface RightPanelProps {
   children: ReactNode
   title?: string
+  showHeader?: boolean
 }
 
 /** 右侧固定承载 Inspector，并保持面板容器与业务组件解耦。 */
-export function RightPanel({ children, title = '检查器' }: RightPanelProps) {
+export function RightPanel({ children, title = '检查器', showHeader = true }: RightPanelProps) {
   const right = useWorkspaceStore((state) => state.right)
   const setOpen = useWorkspaceStore((state) => state.setRightOpen)
   const setWidth = useWorkspaceStore((state) => state.setRightWidth)
@@ -22,14 +23,14 @@ export function RightPanel({ children, title = '检查器' }: RightPanelProps) {
       aria-label="检查器面板"
       aria-hidden={!right.open}
     >
-      <header className="panel-titlebar">
+      {showHeader && <header className="panel-titlebar">
         <div>
           <h2 title={title}>{title}</h2>
         </div>
         <Button variant="icon" title="收起检查器" aria-label="收起检查器" onClick={() => setOpen(false)}>
           <PanelRightClose size={16} />
         </Button>
-      </header>
+      </header>}
       <div className="panel-body">{children}</div>
       <ResizeHandle
         orientation="horizontal"
