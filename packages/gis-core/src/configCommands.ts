@@ -6,11 +6,13 @@ import type { LayerStyle } from '@desktop-webgis/ol-style'
 import { cloneValue } from './clone'
 import type { EditCommand, EditContext } from './editHistory'
 import type { FieldFilterCondition } from './filter'
-import type { Dataset, GisFeature, Layer, LayerGroup, LayerTreeEntry, Project } from './types'
+import type { Dataset, GisFeature, Layer, LayerGroup, LayerTreeEntry, Project, ProjectSnapshot } from './types'
 
 export interface ProjectEditContext extends EditContext {
   getProject(): Project
   replaceProject(project: Project): void
+  /** Optional atomic host path for whole-content replacement. */
+  replaceSnapshot?(snapshot: ProjectSnapshot): void
 }
 
 function isProjectEditContext(context: EditContext): context is ProjectEditContext {
@@ -31,6 +33,25 @@ function replaceLayer(project: Project, layerId: string, patch: Partial<Layer>):
   return {
     ...project,
     layers: project.layers.map((layer) => (layer.id === layerId ? { ...layer, ...patch } : layer))
+  }
+}
+
+/** Replaces project content and all feature datasets as one operation in the existing history. */
+export class ReplaceProjectSnapshotCommand implements EditCommand {
+  private readonly before: ProjectSnapshot
+  private readonly after: ProjectSnapshot
+  constructor(readonly id: string, readonly label: string, before: ProjectSnapshot, after: ProjectSnapshot) {
+    this.before = cloneValue(before); this.after = cloneValue(after)
+  }
+  execute(context: EditContext): void { this.apply(context, this.after) }
+  undo(context: EditContext): void { this.apply(context, this.before) }
+  private apply(context: EditContext, snapshot: ProjectSnapshot): void {
+    const ctx = requireProjectContext(context)
+    const retained = new Set(snapshot.project.datasets.map(dataset => dataset.id))
+    for (const id of Object.keys(ctx.featureStore.snapshot())) if (!retained.has(id)) ctx.featureStore.clear(id)
+    for (const id of retained) ctx.featureStore.setAll(id, cloneValue(snapshot.featuresByDataset[id] ?? []))
+    if (ctx.replaceSnapshot) ctx.replaceSnapshot(cloneValue(snapshot))
+    else ctx.replaceProject(cloneValue(snapshot.project))
   }
 }
 
