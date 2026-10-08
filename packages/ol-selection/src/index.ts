@@ -135,11 +135,12 @@ export function createSelectionController(options: SelectionOptions): SelectionC
       if (!target.layer.isVisible(map.getView())) continue
       const input = target.layer.getSource()
       const worldWidth = projection.canWrapX() && input?.getWrapX() && projectionExtent ? projectionExtent[2] - projectionExtent[0] : undefined
+      const clipExtent = map.getLayerGroup().getLayerStatesArray().find(state => state.layer === target.layer)?.extent ?? target.layer.getExtent()
       const candidates = input ? getBoxCandidates(input, geometry, worldWidth) : []
       for (const feature of candidates ?? []) {
         if (!(feature instanceof Feature)) continue
         const shape = feature.getGeometry(), id = idOf(feature, target)
-        if (shape && id !== undefined && intersectsSelectionBox(shape, geometry, worldWidth)) hits.push({ layerKey: target.layerKey, featureId: id })
+        if (shape && id !== undefined && intersectsSelectionBox(shape, geometry, worldWidth, clipExtent)) hits.push({ layerKey: target.layerKey, featureId: id })
       }
     }
     request(hits, pending.operation, 'box', pending.baseline)
