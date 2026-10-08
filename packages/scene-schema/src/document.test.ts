@@ -64,6 +64,12 @@ describe('unified scene document', () => {
     expect(getUnsupportedSceneExtensions(document, { 'example.custom': [1] })).toHaveLength(1)
     expect(getUnsupportedSceneExtensions(document, { 'example.custom': [2] })).toEqual([])
   })
+  it('rejects engine scope conflicts through unscoped ancestor groups', () => {
+    const document = migrateSceneDocument(legacy())
+    document.nodes.push({ type: 'group', id: 'city', name: 'City', visible: true, scope: '3d' }, { type: 'group', id: 'nested', name: 'Nested', visible: true, parentId: 'city' })
+    document.nodes[0].parentId = 'nested'
+    expect(validateSceneDocument(document).issues.some(issue => issue.code === 'group.scope')).toBe(true)
+  })
   it('rejects unknown versions, runtime objects, cyclic metadata and nonfinite JSON', () => {
     const document = migrateSceneDocument(legacy())
     expect(() => parseSceneDocument({ ...document, version: 99 })).toThrow()
@@ -78,5 +84,22 @@ describe('unified scene document', () => {
     expect(validateSceneDocument({ ...document, nodes: [{ ...node, resource: 'constructor' }] }).valid).toBe(false)
     const resources = JSON.parse('{"__proto__":{"type":"unsupported"}}')
     expect(validateSceneDocument({ ...document, resources, nodes: [] }).valid).toBe(false)
+  })
+  it('validates WFS cache identity, count and completeness before use', () => {
+    const document = migrateSceneDocument(legacy())
+    document.resources.shared = { type: 'wfs', url: 'https://example.test/wfs', version: '2.0.0', typeName: 'points', authMode: 'none', complete: false, loadedCount: 0, snapshot: { type: 'FeatureCollection', features: [] } }
+    expect(validateSceneDocument(document).valid).toBe(true)
+    expect(validateSceneDocument({ ...document, resources: { shared: { ...document.resources.shared, loadedCount: 5 } } }).issues.some(issue => issue.code === 'wfs.loadedCount')).toBe(true)
+    expect(validateSceneDocument({ ...document, resources: { shared: { ...document.resources.shared, complete: true, truncatedByLimit: true } } }).issues.some(issue => issue.code === 'wfs.completeness')).toBe(true)
+  })
+  it('rejects invalid GeoJSON shapes and duplicate typed IDs', () => {
+    const document = migrateSceneDocument(legacy())
+    const resource = document.resources.shared
+    if (resource.type !== 'geojson' || !resource.data) throw new Error('Expected local data')
+    resource.data.features[0].geometry = { type: 'Point', coordinates: [0] }
+    expect(validateSceneDocument(document).issues.some(issue => issue.code === 'geojson.geometry')).toBe(true)
+    resource.data.features[0].geometry = { type: 'Point', coordinates: [0, 0] }
+    resource.data.features[1].id = resource.data.features[0].id
+    expect(validateSceneDocument(document).issues.some(issue => issue.code === 'geojson.id')).toBe(true)
   })
 })
