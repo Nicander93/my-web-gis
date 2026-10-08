@@ -23,6 +23,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@desktop-webgis/scene-schema": "workspace:*",
     "@desktop-webgis/cesium-layer": "workspace:*",
     "@desktop-webgis/cesium-tileset-edit": "workspace:*",
     "@desktop-webgis/cesium-effects": "workspace:*",

@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EntityCollection, JulianDate } from 'cesium'
 import type { Viewer } from 'cesium'
 import { createCityScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
-import { CitySceneRuntime } from './index'
+import { CitySceneRuntime, createCesiumDocumentRuntime } from './index'
+import { migrateSceneDocument } from '@desktop-webgis/scene-schema'
 
 const probe = vi.hoisted(() => ({ created: 0, released: 0, editors: [] as Array<{ stopEditing: ReturnType<typeof vi.fn>; cancel: ReturnType<typeof vi.fn> }> }))
 vi.mock('cesium', async original => ({ ...await original<typeof import('cesium')>(),
@@ -158,5 +159,36 @@ describe('incremental scene reconciliation', () => {
     expect(probe.editors[0].stopEditing).toHaveBeenCalledOnce()
     expect(() => s.runtime.startEditing('blocks')).toThrow('隐藏')
     s.runtime.destroy(); s.runtime.destroy(); expect(s.viewer.destroy).toHaveBeenCalledOnce()
+  })
+  it('releases runtime layers but retains an explicitly caller-owned viewer', async () => {
+    const s = setup()
+    s.runtime.destroy()
+    vi.mocked(s.viewer.destroy).mockClear()
+    const runtime = new CitySceneRuntime(s.viewer, { target: 'map', scene: s.scene, ownsViewer: false })
+    await runtime.updateScene(s.scene)
+    const before = probe.released
+    runtime.destroy(); runtime.destroy()
+    expect(probe.released).toBe(before + 1)
+    expect(s.viewer.destroy).not.toHaveBeenCalled()
+  })
+  it('loads v3 content into a caller viewer, retains full definitions and restores host environment', async () => {
+    const s = setup(); s.runtime.destroy(); vi.mocked(s.viewer.destroy).mockClear()
+    s.viewer.camera = { setView: vi.fn() } as unknown as Viewer['camera']
+    s.viewer.scene.globe = { enableLighting: false } as Viewer['scene']['globe']
+    const originalTime = JulianDate.fromIso8601('2026-01-01T00:00:00Z')
+    s.viewer.clock = { currentTime: originalTime } as Viewer['clock']
+    s.scene.lighting = { sunlight: true, shadows: true, time: '2026-02-01T00:00:00Z' }
+    const document = migrateSceneDocument(s.scene)
+    document.resources.base = { type: 'xyz', url: 'https://example.test/{z}/{x}/{y}.png' }
+    document.nodes.push({ type: 'tile', id: 'map', name: 'Map', resource: 'base' })
+    const loaded = await createCesiumDocumentRuntime({ document, viewer: s.viewer })
+    expect(loaded.runtime.layers.getLayer('blocks')?.state).toBe('ready')
+    expect(loaded.getDocument()).toEqual(document)
+    expect(loaded.issues).toContainEqual(expect.objectContaining({ code: 'cesium.unsupported' }))
+    expect(s.viewer.scene.globe.enableLighting).toBe(true)
+    loaded.destroy(); loaded.destroy()
+    expect(s.viewer.scene.globe.enableLighting).toBe(false)
+    expect(JulianDate.equals(s.viewer.clock.currentTime, originalTime)).toBe(true)
+    expect(s.viewer.destroy).not.toHaveBeenCalled()
   })
 })

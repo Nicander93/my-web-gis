@@ -235,6 +235,9 @@ importers:
       '@desktop-webgis/cesium-tileset-edit':
         specifier: workspace:*
         version: link:../cesium-tileset-edit
+      '@desktop-webgis/scene-schema':
+        specifier: workspace:*
+        version: link:../scene-schema
     devDependencies:
       cesium:
         specifier: ^1.145.0

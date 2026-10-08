@@ -8,16 +8,23 @@ import { getCityNodeState, parseCityScene } from '@desktop-webgis/cesium-scene-s
 import type { CityCamera, CityNode, CityScene } from '@desktop-webgis/cesium-scene-schema'
 import { applyRenderQuality, defaultRenderQuality } from './render-quality.js'
 import type { RenderQuality } from './render-quality.js'
+import { projectCesiumDocument, type CesiumDocumentIssue } from './document.js'
+import type { SceneDocument } from '@desktop-webgis/scene-schema'
 export { defaultRenderQuality, isRenderQuality } from './render-quality.js'
 export type { RenderQuality } from './render-quality.js'
 export type { EditMode, TransformEditEvent } from '@desktop-webgis/cesium-tileset-edit'
 export type { CityScene, CityNode, Transform } from '@desktop-webgis/cesium-scene-schema'
 export type { DrawOptions, DrawResult } from '@desktop-webgis/cesium-layer'
 export type { EditState, GraphicEditOptions, GraphicEditResult } from '@desktop-webgis/cesium-layer'
+export * from './document.js'
 
 export interface CityRuntimeOptions {
-  target: HTMLElement | string
+  target?: HTMLElement | string
+  /** Existing viewer is caller-owned unless ownsViewer is explicitly true. */
+  viewer?: Viewer
   scene: CityScene
+  /** Direct constructor defaults to owning the viewer for compatibility. */
+  ownsViewer?: boolean
   /** Base URL of scene.json; resolves relative asset and terrain URLs. */
   sceneUrl?: string
   cesiumBaseUrl?: string
@@ -47,9 +54,11 @@ export class CitySceneRuntime {
   private environmentKey = ''
   private lightingKey = ''
   private readonly originalLighting: { sunlight: boolean; shadows: boolean; time: JulianDate }
+  private readonly originalTerrain: Viewer['terrainProvider']
 
   constructor(readonly viewer: Viewer, private readonly options: CityRuntimeOptions) {
     this.scene = parseCityScene(options.scene)
+    this.originalTerrain = viewer.terrainProvider
     this.originalLighting = { sunlight: viewer.scene.globe?.enableLighting ?? false, shadows: viewer.shadows ?? false, time: JulianDate.clone(viewer.clock?.currentTime ?? JulianDate.now()) }
     this.layers = new LayerCollection(viewer)
     this.effects = new CityEffects(viewer)
@@ -186,7 +195,15 @@ export class CitySceneRuntime {
     if (this.destroyed) return
     this.destroyed = true; this.environmentRevision++
     this.cancelDraw(); this.cancelGraphicEditing(); this.editor.destroy(); this.layers.destroy(); this.effects.destroy()
-    this.viewer.destroy()
+    if (this.baseLayer) this.viewer.imageryLayers.remove(this.baseLayer, true)
+    if (this.options.ownsViewer !== false) this.viewer.destroy()
+    else {
+      if (this.originalTerrain) this.viewer.terrainProvider = this.originalTerrain
+      if (this.viewer.scene.globe) this.viewer.scene.globe.enableLighting = this.originalLighting.sunlight
+      this.viewer.shadows = this.originalLighting.shadows
+      if (this.viewer.clock) this.viewer.clock.currentTime = JulianDate.clone(this.originalLighting.time)
+      this.viewer.scene.requestRender()
+    }
   }
 
   private resource(url: string): Resource {
@@ -232,9 +249,29 @@ function nativeKey(node: CityNode, scene: CityScene): string {
 export function createCityRuntime(options: CityRuntimeOptions): CitySceneRuntime {
   const scene = parseCityScene(options.scene)
   if (options.cesiumBaseUrl) (globalThis as typeof globalThis & { CESIUM_BASE_URL: string }).CESIUM_BASE_URL = options.cesiumBaseUrl
-  const viewer = new Viewer(options.target, { animation: false, timeline: false, baseLayerPicker: false, geocoder: false, homeButton: false, sceneModePicker: false, navigationHelpButton: false, fullscreenButton: false, selectionIndicator: false, infoBox: false, baseLayer: false, requestRenderMode: true, maximumRenderTimeChange: Infinity })
-  const runtime = new CitySceneRuntime(viewer, { ...options, scene })
-  runtime.setRenderQuality(options.renderQuality ?? defaultRenderQuality)
-  runtime.setCamera(scene.camera)
+  if (!options.viewer && !options.target) throw new Error('Provide a viewer or target')
+  const viewer = options.viewer ?? new Viewer(options.target!, { animation: false, timeline: false, baseLayerPicker: false, geocoder: false, homeButton: false, sceneModePicker: false, navigationHelpButton: false, fullscreenButton: false, selectionIndicator: false, infoBox: false, baseLayer: false, requestRenderMode: true, maximumRenderTimeChange: Infinity })
+  const runtime = new CitySceneRuntime(viewer, { ...options, scene, ownsViewer: options.ownsViewer ?? !options.viewer })
+  try {
+    if (options.renderQuality || !options.viewer) runtime.setRenderQuality(options.renderQuality ?? defaultRenderQuality)
+    runtime.setCamera(scene.camera)
+  } catch (error) { runtime.destroy(); throw error }
   return runtime
+}
+
+export interface CesiumDocumentRuntime {
+  readonly runtime: CitySceneRuntime
+  readonly issues: readonly CesiumDocumentIssue[]
+  /** Full input content, including definitions unsupported by the native city projection. */
+  getDocument(): SceneDocument
+  destroy(): void
+}
+
+/** Creates and loads a native projection; low-level native edits still require host document updates. */
+export async function createCesiumDocumentRuntime(options: Omit<CityRuntimeOptions, 'scene'> & { document: unknown; viewId?: string }): Promise<CesiumDocumentRuntime> {
+  const projection = projectCesiumDocument(options.document, options.viewId)
+  const runtime = createCityRuntime({ ...options, scene: projection.scene })
+  try { await runtime.updateScene(projection.scene) }
+  catch (error) { runtime.destroy(); throw error }
+  return { runtime, issues: projection.issues, getDocument: () => structuredClone(projection.document), destroy: () => runtime.destroy() }
 }
