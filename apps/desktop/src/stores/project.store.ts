@@ -21,6 +21,7 @@ import {
   SetLayerFilterCommand,
   SetLayerOpacityCommand,
   SetLayerTreeCommand,
+  ReplaceProjectSnapshotCommand,
   AddLocalLayerCommand,
   snapshotLayerTree,
   capabilitiesForDataset
@@ -84,6 +85,8 @@ interface ProjectState {
   setDirty(dirty: boolean): void
   /** Replace project + features (open / new). Clears edit history. */
   loadSnapshot(snapshot: ProjectSnapshot): void
+  /** Whole-content replacement in the shared edit history, preserving prior undo entries. */
+  replaceSnapshotAsEdit(snapshot: ProjectSnapshot, label: string): boolean
   getSnapshot(): ProjectSnapshot
   setLayerStyle(layerId: string, style: LayerStyle): void
   getNormalizedLayerStyle(layerId: string): LayerStyle | null
@@ -166,6 +169,14 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       getProject: () => get().project,
       replaceProject: (project) => {
         set({ project: normalizeLayerTree(project), dirty: true })
+      },
+      replaceSnapshot: (snapshot) => {
+        const project = normalizeLayerTree(cloneValue(snapshot.project))
+        useSessionStore.getState().bumpWfsLoadGeneration()
+        useWorkbenchStore.getState().reset()
+        for (const id of Object.keys(useSessionStore.getState().sessions)) if (!project.layers.some(layer => layer.id === id)) useSessionStore.getState().clearLayerSession(id)
+        set({ project, featuresByDataset: cloneValue(snapshot.featuresByDataset), dirty: true, selectedLayerId: null,
+          selection: { layerId: null, featureIds: [] }, lastSelectionCountAfterFilter: null })
       }
     }
   }
@@ -358,6 +369,11 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     project: cloneValue(get().project),
     featuresByDataset: cloneValue(get().featuresByDataset)
   }),
+  replaceSnapshotAsEdit: (snapshot, label) => {
+    const before = get().getSnapshot()
+    if (JSON.stringify(before) === JSON.stringify(snapshot)) return false
+    return get().executeEditCommand(new ReplaceProjectSnapshotCommand(createId('cmd'), label, before, snapshot))
+  },
 
   setLayerStyle: (layerId, style) => {
     const state = get()
