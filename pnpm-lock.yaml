@@ -421,9 +421,6 @@ importers:
 
   packages/scene-core:
     dependencies:
-      '@desktop-webgis/gis-core':
-        specifier: workspace:*
-        version: link:../gis-core
       '@desktop-webgis/scene-schema':
         specifier: workspace:*
         version: link:../scene-schema

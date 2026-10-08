@@ -95,6 +95,18 @@ test('standalone package lifecycle retains highlights and releases only owned re
     overlayReleased: true, sourceIntact: true, mapIntact: true })
 })
 
+test('real rotated box selection respects parent group clipping', async ({ page }) => {
+  await page.evaluate(async () => (await import('/e2e/selection-consumer.ts')).createClippedFixture())
+  await page.waitForTimeout(200)
+  const bounds = (await page.locator('#clipped-selection-consumer').boundingBox())!
+  await page.mouse.move(bounds.x + 50, bounds.y + 50)
+  await page.mouse.down()
+  await page.mouse.move(bounds.x + 380, bounds.y + 280, { steps: 12 })
+  await page.mouse.up()
+  await expect.poll(() => page.evaluate(async () => (await import('/e2e/selection-consumer.ts')).readClippedSelection())).toEqual(['clip-0'])
+  await page.evaluate(async () => (await import('/e2e/selection-consumer.ts')).disposeClippedFixture())
+})
+
 test('a deliberate click after a box is accepted and keeps selection on pan', async ({ page }) => {
   const initial = await mapState(page)
   const first = initial.positions[0].pixel
