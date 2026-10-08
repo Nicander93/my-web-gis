@@ -4,4 +4,10 @@ Framework-independent constructors, immutable updates and deterministic serializ
 
 This package contains domain operations rather than a miscellaneous collection of OpenLayers wrappers.
 
+`SceneController` owns one canonical v3 document. `addResource` / `addNode`, replacement, deletion, grouping, views, environment, visibility, locking, opacity and tileset transforms all update that same content. `addTileset` commits its resource and node together and supports explicit reuse of a matching resource. `getDocument()` returns a detached copy; `exportJson()` includes all API-created content.
+
+`transaction(label, draft => { ... })` batches related changes into one validated commit and one notification. Preparation must finish before the synchronous transaction: asynchronous callbacks and nested controller writes are rejected. Invalid or thrown changes leave the document intact. Identical content produces no notification. `subscribe` provides isolated before/after documents for a host history adapter; observer errors are returned in `SceneCommitResult.observerErrors` after content commits. Observers cannot synchronously write another transaction.
+
+The controller owns no Map, Viewer, selection, file IO or undo stack. Engine preparation, application Store/history binding, asynchronous import transactions and large-document performance remain separate implementation gates.
+
 The root and `./scene` entry points depend only on the scene schema. Project-specific publishing conversion lives in Desktop's `features/scene/compile-project.ts`; it is not part of this package's public API. Internal callers previously importing `compileProjectToScene` from this package must use that application adapter instead.
