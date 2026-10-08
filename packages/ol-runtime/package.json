@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@desktop-webgis/ol-selection": "workspace:*",
     "@desktop-webgis/gis-core": "workspace:*",
     "@desktop-webgis/ol-scene-runtime": "workspace:*",
     "@desktop-webgis/ol-style": "workspace:*",

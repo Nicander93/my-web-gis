@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ChevronLeft, ChevronRight, PanelBottomClose } from 'lucide-react'
+import { ChevronLeft, ChevronRight, PanelBottomClose, LocateFixed } from 'lucide-react'
 import {
   applyFieldFilter,
   computeFieldStats,
@@ -12,6 +12,7 @@ import { useWorkbenchStore } from '@/stores/workbench.store'
 import { capabilitiesForDataset } from '@desktop-webgis/gis-core'
 import { useSessionStore } from '@/stores/session.store'
 import { Button } from '@/components/ui/Button'
+import { zoomMapToFeature, zoomMapToSelected } from '@/features/map/map-runtime-host'
 
 const PAGE_SIZE = 100
 
@@ -235,7 +236,7 @@ export function AttributeTable({
   }
 
   const emptySelectedOnly = selectedOnly && selectionIds.size === 0
-  const recordStatus = `全部 ${allFeatures.length} · 过滤后 ${filteredFeatures.length} · 显示 ${viewFeatures.length}${selectionIds.size > 0 ? ` · 选中 ${selectionIds.size}` : ''}`
+  const recordStatus = `全部 ${allFeatures.length} · 过滤后 ${filteredFeatures.length} · 显示 ${viewFeatures.length}${selectionIds.size > 0 || selectedOnly ? ` · 选中 ${selectionIds.size}` : ''}`
 
   return (
     <div className="feature-panel attribute-table-content">
@@ -298,6 +299,10 @@ export function AttributeTable({
                 onClick={() => selectedLayerId && selectMatching(selectedLayerId)}
               >
                 选择匹配记录
+              </Button>
+              <Button variant="ghost" onClick={() => zoomMapToSelected()}
+                disabled={selection.layerId !== selectedLayerId || selection.featureIds.length === 0}>
+                定位选中要素
               </Button>
               <Button
                 variant="ghost"
@@ -519,13 +524,21 @@ export function AttributeTable({
                     key={feature.id}
                     data-feature-id={feature.id}
                     className={selected ? 'row-selected' : undefined}
+                    tabIndex={0}
+                    title="双击行或按 Enter 定位"
+                    onDoubleClick={(event) => {
+                      if ((event.target as HTMLElement).closest('input,button')) return
+                      if (selectedLayerId) zoomMapToFeature(selectedLayerId, feature.id, null)
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget || event.key !== 'Enter') return
+                      event.preventDefault()
+                      if (selectedLayerId) zoomMapToFeature(selectedLayerId, feature.id, null)
+                    }}
                     onClick={(event) => {
                       if (!selectedLayerId) return
-                      toggleFeatureSelection(
-                        selectedLayerId,
-                        feature.id,
-                        event.metaKey || event.ctrlKey
-                      )
+                      if (event.metaKey || event.ctrlKey) toggleFeatureSelection(selectedLayerId, feature.id, true)
+                      else if (!selected) useProjectStore.getState().setSelection({ layerId: selectedLayerId, featureIds: [feature.id] })
                     }}
                   >
                     <td>
@@ -545,7 +558,12 @@ export function AttributeTable({
                       />
                     </td>
                     <td>{(safePage - 1) * PAGE_SIZE + index + 1}</td>
-                    <td>{feature.id}</td>
+                    <td>
+                      <button className="attribute-locate" title={`定位 ${feature.id}`} aria-label={`定位 ${feature.id}`}
+                        onClick={(event) => { event.stopPropagation(); if (selectedLayerId) zoomMapToFeature(selectedLayerId, feature.id, null) }}>
+                        <LocateFixed size={12} />
+                      </button>{feature.id}
+                    </td>
                     {fieldNames.map((field) => {
                       const value = feature.properties[field]
                       const isEditing =
@@ -554,21 +572,24 @@ export function AttributeTable({
                       return (
                         <td
                           key={field}
-                          tabIndex={canEditCells ? 0 : undefined}
+                          tabIndex={0}
                           title={
                             canEditCells
                               ? '双击或按 Enter 编辑'
-                              : '只读；在编辑功能区启动此图层编辑'
+                              : '双击或按 Enter 定位'
                           }
                           onKeyDown={(event) => {
                             if (!isEditing && event.key === 'Enter') {
                               event.preventDefault()
-                              startEdit(feature.id, field, value)
+                              event.stopPropagation()
+                              if (canEditCells) startEdit(feature.id, field, value)
+                              else if (selectedLayerId) zoomMapToFeature(selectedLayerId, feature.id, null)
                             }
                           }}
                           onDoubleClick={(event) => {
                             event.stopPropagation()
-                            startEdit(feature.id, field, value)
+                            if (canEditCells) startEdit(feature.id, field, value)
+                            else if (selectedLayerId) zoomMapToFeature(selectedLayerId, feature.id, null)
                           }}
                         >
                           {isEditing ? (

@@ -31,6 +31,8 @@ vi.mock('@desktop-webgis/ol-runtime', async (importOriginal) => ({
   OlSelectionRuntime: class {
     activate() {}
     deactivate() {}
+    dispose() {}
+    cancelGesture() { return false }
     syncSelection() {}
   },
   OlToolRuntime: class {
