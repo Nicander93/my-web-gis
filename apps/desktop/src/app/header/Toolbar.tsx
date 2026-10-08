@@ -49,8 +49,7 @@ const tabs = [
 type Tab = (typeof tabs)[number][0]
 function Group({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="workbench-ribbon-group" aria-label={label}>
-      <span className="workbench-group-label">{label}</span>
+    <div className="workbench-ribbon-group" role="group" aria-label={label}>
       {children}
     </div>
   )
@@ -307,11 +306,6 @@ export function Toolbar() {
               />
               <SnappingControl />
             </Group>
-            <span className="workbench-hint">
-              {target
-                ? '编辑目标已锁定 · 修改实时记录，可撤销'
-                : '选择本地矢量图层，然后开始编辑'}
-            </span>
           </>
         )}
         {tab === 'analysis' && (
@@ -345,9 +339,6 @@ export function Toolbar() {
                 }}
               />
             </Group>
-            <span className="workbench-hint">
-              选择工具后设置输入、处理范围与输出
-            </span>
           </>
         )}
         {tab === 'view' && (

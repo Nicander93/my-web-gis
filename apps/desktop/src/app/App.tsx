@@ -30,6 +30,8 @@ import { getProjectType } from '@/services/project-type'
 import { ProjectStartScreen } from '@/features/project/ProjectStartScreen'
 import { UnsavedProjectDialog } from '@/features/project/UnsavedProjectDialog'
 import { StyleDraftDialog } from '@/features/inspector/StyleDraftDialog'
+import { HelpDialog } from '@/features/help/HelpDialog'
+import { registerHelpDialog, type HelpDialogPage } from './commands/help.commands'
 
 const CityWorkspace = lazy(() =>
   import('@/features/city/CityWorkspace').then((module) => ({
@@ -47,6 +49,7 @@ export default function App() {
     project.name !== 'Untitled Project'
   )
   const [newProjectOpen, setNewProjectOpen] = useState(false)
+  const [helpPage, setHelpPage] = useState<HelpDialogPage | null>(null)
   const [replacementOpen, setReplacementOpen] = useState(false)
   const replacementResolve = useRef<((allow: boolean) => void) | null>(null)
   const [status, setStatus] = useState('就绪')
@@ -61,6 +64,11 @@ export default function App() {
   const [exportMode, setExportMode] = useState<ExportDialogMode>('export')
   const addLayer = useProjectStore((state) => state.addLayer)
   const addServiceLayer = useProjectStore((state) => state.addServiceLayer)
+
+  useEffect(() => {
+    registerHelpDialog(setHelpPage)
+    return () => registerHelpDialog(null)
+  }, [])
 
   useEffect(() => {
     document.documentElement.dataset.theme = 'light'
@@ -239,6 +247,7 @@ export default function App() {
         />
       )}
       <StyleDraftDialog />
+      {helpPage && <HelpDialog page={helpPage} onClose={() => setHelpPage(null)} />}
       <AddDataDialog
         open={addDataOpen}
         onClose={() => setAddDataOpen(false)}

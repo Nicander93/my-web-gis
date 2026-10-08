@@ -1,12 +1,8 @@
-import { PanelBottomClose } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { Button } from '@/components/ui/Button'
 import { ResizeHandle } from '@/components/ui/ResizeHandle'
 import { useWorkspaceStore } from '@/stores/workspace.store'
 
 interface BottomPanelProps {
-  title?: string
-  actions?: ReactNode
   leftOffset: number
   rightOffset: number
   children: ReactNode
@@ -16,12 +12,9 @@ interface BottomPanelProps {
 export function BottomPanel({
   leftOffset,
   rightOffset,
-  children,
-  title = '属性表',
-  actions
+  children
 }: BottomPanelProps) {
   const bottom = useWorkspaceStore((state) => state.bottom)
-  const setOpen = useWorkspaceStore((state) => state.setBottomOpen)
   const setHeight = useWorkspaceStore((state) => state.setBottomHeight)
 
   return (
@@ -43,22 +36,6 @@ export function BottomPanel({
           setHeight(useWorkspaceStore.getState().bottom.height - delta)
         }
       />
-      <header className="panel-titlebar">
-        <div>
-          <h2 title={title}>{title}</h2>
-        </div>
-        <div className="panel-actions">
-          {actions}
-          <Button
-            variant="icon"
-            title="收起属性表"
-            aria-label="收起属性表"
-            onClick={() => setOpen(false)}
-          >
-            <PanelBottomClose size={16} />
-          </Button>
-        </div>
-      </header>
       <div className="panel-body">{children}</div>
     </aside>
   )

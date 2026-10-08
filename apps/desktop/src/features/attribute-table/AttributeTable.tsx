@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Table2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { ChevronLeft, ChevronRight, PanelBottomClose } from 'lucide-react'
 import {
   applyFieldFilter,
   computeFieldStats,
@@ -31,15 +31,20 @@ function needsValue(op: FieldFilterOp): boolean {
   return op !== 'is-empty' && op !== 'is-not-empty'
 }
 
-export function AttributeTable() {
+interface AttributeTableProps {
+  targetPicker?: ReactNode
+  onClose?: () => void
+}
+
+export function AttributeTable({
+  targetPicker,
+  onClose
+}: AttributeTableProps = {}) {
   const selectedLayerId = useWorkbenchStore((state) => state.tableLayerId)
   const editLayerId = useWorkbenchStore((state) => state.editLayerId)
   const project = useProjectStore((state) => state.project)
   const featuresByDataset = useProjectStore((state) => state.featuresByDataset)
   const selection = useProjectStore((state) => state.selection)
-  const lastSelectionCountAfterFilter = useProjectStore(
-    (state) => state.lastSelectionCountAfterFilter
-  )
   const setLayerFilter = useProjectStore((state) => state.setLayerFilter)
   const selectMatching = useProjectStore((state) => state.selectMatching)
   const toggleFeatureSelection = useProjectStore(
@@ -230,34 +235,17 @@ export function AttributeTable() {
   }
 
   const emptySelectedOnly = selectedOnly && selectionIds.size === 0
+  const recordStatus = `全部 ${allFeatures.length} · 过滤后 ${filteredFeatures.length} · 显示 ${viewFeatures.length}${selectionIds.size > 0 ? ` · 选中 ${selectionIds.size}` : ''}`
 
   return (
     <div className="feature-panel attribute-table-content">
-      <div className="table-summary">
-        <div className="table-title">
-          <Table2 size={15} />
-          <strong>{selectedLayer?.name ?? '未选择图层'}</strong>
-        </div>
-        <span>
-          全部 {allFeatures.length} · 过滤后 {filteredFeatures.length} · 选中{' '}
-          {selection.layerId === selectedLayerId
-            ? selection.featureIds.length
-            : 0}
-          {lastSelectionCountAfterFilter != null &&
-          selection.layerId === selectedLayerId
-            ? `（筛选后选中 ${lastSelectionCountAfterFilter}）`
-            : ''}
-          {selectedOnly ? ' · 仅选中' : ''}
-          {canEditCells ? ' · 双击单元格编辑' : ' · 只读查看'}
-        </span>
-      </div>
-
-      {selectedLayer && (
-        <div className="attr-toolbar" aria-label="属性表工具">
+      <div className="attr-toolbar" aria-label="属性表工具">
+        {targetPicker}
+        {selectedLayer && <>
           <label className="attr-search">
-            <span>表内搜索</span>
             <input
               type="search"
+              aria-label="表内搜索"
               value={searchQuery}
               placeholder="搜索当前表格"
               title="只影响表格显示，不改变地图过滤或要素选择"
@@ -281,24 +269,48 @@ export function AttributeTable() {
             仅选中
           </label>
 
-          <Button
-            variant="ghost"
-            title="将当前图层筛选结果 F 设为选择 S（不会由筛选自动触发）"
-            onClick={() => selectedLayerId && selectMatching(selectedLayerId)}
+          <details
+            className="attr-selection-actions"
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) {
+                event.currentTarget.open = false
+              }
+            }}
+            onClick={(event) => {
+              if (event.target instanceof HTMLElement && event.target.closest('button')) {
+                event.currentTarget.open = false
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.preventDefault()
+                event.stopPropagation()
+                event.currentTarget.open = false
+                event.currentTarget.querySelector('summary')?.focus()
+              }
+            }}
           >
-            选择匹配记录
-          </Button>
-
-          <Button
-            variant="ghost"
-            onClick={() => clearSelection()}
-            disabled={
-              selection.layerId !== selectedLayerId ||
-              selection.featureIds.length === 0
-            }
-          >
-            清除选择
-          </Button>
+            <summary>选择</summary>
+            <div>
+              <Button
+                variant="ghost"
+                title="选择图层过滤结果；表内搜索不改变此范围"
+                onClick={() => selectedLayerId && selectMatching(selectedLayerId)}
+              >
+                选择匹配记录
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => clearSelection()}
+                disabled={
+                  selection.layerId !== selectedLayerId ||
+                  selection.featureIds.length === 0
+                }
+              >
+                清除选择
+              </Button>
+            </div>
+          </details>
           <Button
             variant="ghost"
             aria-expanded={filterOpen}
@@ -313,8 +325,13 @@ export function AttributeTable() {
           >
             字段统计
           </Button>
-        </div>
-      )}
+        </>}
+        {onClose && (
+          <Button variant="icon" aria-label="收起属性表" title="收起属性表" onClick={onClose}>
+            <PanelBottomClose size={16} />
+          </Button>
+        )}
+      </div>
 
       {selectedLayer && filterOpen && (
         <div className="attr-filter-bar" aria-label="图层字段过滤">
@@ -424,10 +441,10 @@ export function AttributeTable() {
             </select>
           </label>
           <span>
-            范围：{stats.scopeLabel} · 非空 {stats.nonNull} / 空{' '}
+            范围：图层过滤结果 · 非空 {stats.nonNull} / 空{' '}
             {stats.nullCount} / 合计 {stats.total}
             {stats.numeric
-              ? ` · min ${stats.numeric.min} · max ${stats.numeric.max} · sum ${stats.numeric.sum} · mean ${formatMean(stats.numeric.mean)}`
+              ? ` · 最小 ${stats.numeric.min} · 最大 ${stats.numeric.max} · 合计 ${stats.numeric.sum} · 平均 ${formatMean(stats.numeric.mean)}`
               : ' · 无数值统计'}
           </span>
         </div>
@@ -626,25 +643,32 @@ export function AttributeTable() {
         )}
       </div>
 
-      {selectedLayer && viewFeatures.length > 0 && (
-        <div className="attr-pagination">
+      {selectedLayer && (
+        <div className="attr-pagination" aria-label="表格状态与分页">
+          <span className="attr-record-count" title={recordStatus}>{recordStatus}</span>
+          <span title={canEditCells ? '双击单元格编辑' : '当前表格只读；从图层菜单开始编辑'}>
+            {canEditCells ? '可编辑' : '只读'}
+          </span>
           <Button
-            variant="ghost"
+            variant="icon"
+            aria-label="上一页"
+            title="上一页"
             disabled={safePage <= 1}
             onClick={() => patchTable({ currentPage: safePage - 1 })}
           >
-            上一页
+            <ChevronLeft size={16} />
           </Button>
-          <span>
-            第 {safePage} / {totalPages} 页 · 本页 {pageRows.length} · 表格{' '}
-            {viewFeatures.length} 条（每页 {PAGE_SIZE}）
+          <span title={`每页 ${PAGE_SIZE} 条`}>
+            {viewFeatures.length ? safePage : 0} / {viewFeatures.length ? totalPages : 0}
           </span>
           <Button
-            variant="ghost"
-            disabled={safePage >= totalPages}
+            variant="icon"
+            aria-label="下一页"
+            title="下一页"
+            disabled={viewFeatures.length === 0 || safePage >= totalPages}
             onClick={() => patchTable({ currentPage: safePage + 1 })}
           >
-            下一页
+            <ChevronRight size={16} />
           </Button>
         </div>
       )}

@@ -39,7 +39,7 @@ export function EditorDialog({
     }
     const first = Array.from(
       element.current?.querySelectorAll<HTMLElement>(
-        'input:not(:disabled), select:not(:disabled), textarea:not(:disabled), button:not(:disabled)'
+        'input:not(:disabled), select:not(:disabled), textarea:not(:disabled), button:not(:disabled), summary'
       ) ?? []
     ).find((item) => item.getClientRects().length > 0)
     first?.focus()
@@ -71,7 +71,7 @@ export function EditorDialog({
           if (event.key !== 'Tab') return
           const items = Array.from(
             element.current?.querySelectorAll<HTMLElement>(
-              'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]'
+              'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, [tabindex="0"]'
             ) ?? []
           ).filter((item) => item.getClientRects().length > 0)
           const first = items[0],

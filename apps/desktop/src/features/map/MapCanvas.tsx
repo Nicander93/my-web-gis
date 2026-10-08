@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { Plus, Map } from 'lucide-react'
-import { projectCommands } from '@/app/commands/project.commands'
 import { useWorkbenchStore } from '@/stores/workbench.store'
 import { useProjectStore } from '@/stores/project.store'
 import { useSnappingStore } from '@/stores/snapping.store'
@@ -48,7 +46,6 @@ export function MapCanvas({
   const viewportRef = useRef<HTMLDivElement>(null)
   const snapped = useSnappingStore((s) => s.snapped)
   const snappingEnabled = useSnappingStore((s) => s.options.enabled)
-  const project = useProjectStore((state) => state.project)
   const [runtimeMounted, setRuntimeMounted] = useState(false)
   const [selectionMounted, setSelectionMounted] = useState(false)
   const [toolMounted, setToolMounted] = useState(false)
@@ -124,18 +121,6 @@ export function MapCanvas({
         className="map-canvas__viewport"
         data-testid="map-runtime-viewport"
       />
-      {project.layers.length === 0 && (
-        <div className="map-onboarding">
-          <Map size={28} />
-          <h2>地图工作区</h2>
-          <p>添加本地数据或地图服务，开始组织图层。</p>
-          <button className="button-primary" onClick={projectCommands.addData}>
-            <Plus size={15} />
-            添加数据
-          </button>
-          <small>GeoJSON · Shapefile · DXF · CSV · WMS / WMTS / WFS</small>
-        </div>
-      )}
       {!hint.startsWith('选择工具') &&
         !hint.startsWith('平移工具') &&
         hint !== '地图工具' && (

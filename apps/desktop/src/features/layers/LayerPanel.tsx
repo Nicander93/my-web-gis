@@ -444,7 +444,6 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
           <div className="workbench-empty">
             <Folder size={24} />
             <strong>尚无图层</strong>
-            <p>添加数据后，在此处管理顺序、分组与显隐。</p>
             <button
               className="button-secondary"
               onClick={projectCommands.addData}

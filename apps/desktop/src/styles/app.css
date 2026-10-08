@@ -442,7 +442,6 @@ button:disabled {
   right: 0;
   bottom: 0;
   min-height: 140px;
-  max-height: 50%;
   border-top: 1px solid var(--color-border);
 }
 

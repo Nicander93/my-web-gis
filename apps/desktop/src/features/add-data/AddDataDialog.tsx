@@ -379,7 +379,7 @@ export function AddDataDialog({
 
   return (
     <EditorDialog
-      title="添加数据"
+      title={step === 'select-csv-config' ? 'CSV 坐标' : '添加数据'}
       onClose={handleClose}
       busy={loading}
       className="data-source-dialog"

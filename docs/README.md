@@ -14,6 +14,8 @@
 - [UI 实现设计规范 V0.1](specs/04-UI-Implementation-Design-Spec-V0.1.md)
 - [Scene Manifest 与发布 V0.1](specs/05-Scene-Manifest-and-Publishing-V0.1.md)
 - [二维与三维统一工作台](specs/06-Unified-Workbench.md) — 最新 Ribbon、对象菜单与面板交互规则
+- [全产品设计原则与改进计划（2026-10-08）](design/product-design-review-2026-10-08.md) — 用户设计理念、专业产品参考、全产品目标、12 批整改与验收；待实施
+- [全量界面设计审计（2026-10-08）](design/product-interface-audit-2026-10-08.md) — 51 个界面／功能区、全部 18 个处理工具、问题证据与异常／恢复状态；源码审计，未逐项完成原生验收
 
 
 ### 阶段计划与验收

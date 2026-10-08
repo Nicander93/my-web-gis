@@ -193,35 +193,34 @@ export function Workspace({
           <PanelRight size={15} />
         </Button>
       )}
-      <BottomPanel
-        leftOffset={leftOffset}
-        rightOffset={rightOffset}
-        title="属性表"
-        actions={
-          <select
-            className="table-target-picker"
-            aria-label="属性表图层"
-            value={tableId ?? ''}
-            onChange={(event) =>
-              layerCommands.openAttributeTable(event.target.value)
-            }
-          >
-            <option value="" disabled>
-              选择图层
-            </option>
-            {project.layers
-              .filter(
-                (layer) => getLayerCapabilities(layer.id).canAttributeTable
-              )
-              .map((layer) => (
-                <option key={layer.id} value={layer.id}>
-                  {layer.name}
-                </option>
-              ))}
-          </select>
-        }
-      >
-        <AttributeTable key={tableId} />
+      <BottomPanel leftOffset={leftOffset} rightOffset={rightOffset}>
+        <AttributeTable
+          key={tableId}
+          onClose={() => useWorkspaceStore.getState().setBottomOpen(false)}
+          targetPicker={
+            <select
+              className="table-target-picker"
+              aria-label="属性表图层"
+              value={tableId ?? ''}
+              onChange={(event) =>
+                layerCommands.openAttributeTable(event.target.value)
+              }
+            >
+              <option value="" disabled>
+                选择图层
+              </option>
+              {project.layers
+                .filter(
+                  (layer) => getLayerCapabilities(layer.id).canAttributeTable
+                )
+                .map((layer) => (
+                  <option key={layer.id} value={layer.id}>
+                    {layer.name}
+                  </option>
+                ))}
+            </select>
+          }
+        />
       </BottomPanel>
       {!bottom.open && (
         <Button

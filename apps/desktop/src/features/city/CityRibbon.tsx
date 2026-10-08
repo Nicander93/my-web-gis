@@ -1,8 +1,9 @@
-import { Play, Redo2, Save, Undo2 } from 'lucide-react'
+import { HelpCircle, Play, Redo2, Save, Undo2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { WorkbenchRibbon } from '@/app/header/WorkbenchRibbon'
 import { MenuItem } from '@/app/header/menus/MenuItem'
 import { useWorkspaceStore } from '@/stores/workspace.store'
+import { helpCommands } from '@/app/commands/help.commands'
 
 export interface CityRibbonCommand { id: string; label: string; icon: LucideIcon; disabled?: string; active?: boolean; execute(): void }
 interface CityRibbonProps {
@@ -28,5 +29,5 @@ export function CityRibbon({ commands: all, target, preview, onPreview, onUndo, 
   ]} target={category === 'scene' ? undefined : `编辑目标：${target}`} onAdd={() => add?.execute()} preview={preview}
     quickActions={<><button aria-label="撤销" disabled={!canUndo} onClick={onUndo}><Undo2 size={16} /></button><button aria-label="重做" disabled={!canRedo} onClick={onRedo}><Redo2 size={16} /></button><button aria-label="保存项目" onClick={onSave}><Save size={16} /></button></>}
     previewAction={<button className="ribbon-command" aria-pressed={preview} onClick={onPreview}><Play size={14} />{preview ? '退出预览' : '预览'}</button>}
-    more={<>{commands(['left','right','reset','new-group']).map(item => <MenuItem key={item.id} icon={item.icon} label={item.label} disabled={!!item.disabled} onClick={item.execute} />)}</>} />
+    more={<>{commands(['left','right','reset','new-group']).map(item => <MenuItem key={item.id} icon={item.icon} label={item.label} disabled={!!item.disabled} onClick={item.execute} />)}<MenuItem icon={HelpCircle} label="操作帮助" onClick={helpCommands.openHelp} /><MenuItem icon={HelpCircle} label="关于" onClick={helpCommands.openAbout} /></>} />
 }
