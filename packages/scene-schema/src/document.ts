@@ -1,12 +1,42 @@
 import { createCityScene, parseCityScene, validateCityScene, type CityCamera, type CityNode, type CityScene } from '@desktop-webgis/cesium-scene-schema'
 import { parseScene, SceneValidationError } from './parse.js'
 import { validateScene } from './validate.js'
-import type { JsonValue, SceneManifest, SceneSource, SceneView, TileLayer, VectorLayer, ValidationIssue, ValidationResult } from './types.js'
+import type { GeoJsonFeatureCollection, JsonValue, SceneManifest, SceneSource, SceneView, TileLayer, VectorLayer, ValidationIssue, ValidationResult } from './types.js'
 
 export const SCENE_DOCUMENT_VERSION = 3 as const
 
 /** Resources have stable identity independently of the objects displaying them. */
-export type SceneResource = SceneSource | { type: '3dtiles' | 'glb'; url: string }
+export interface WfsSceneResource {
+  type: 'wfs'
+  url: string
+  version: string
+  typeName: string
+  outputFormat?: string
+  maxFeatures?: number
+  srsName?: string
+  bboxWgs84?: [number, number, number, number]
+  queryExtentWgs84?: [number, number, number, number]
+  extentMode?: 'view' | 'full'
+  paginationUsed?: boolean
+  loadedCount?: number
+  complete?: boolean
+  truncatedByLimit?: boolean
+  duplicateIdCount?: number
+  lastLoadedAt?: string
+  authMode: 'none' | 'runtime'
+  /** Complete local cache before node filters; does not imply the remote query was complete. */
+  snapshot: GeoJsonFeatureCollection
+}
+
+export interface SceneResourceMetadata {
+  title?: string
+  fields?: Array<{ name: string; type: 'string' | 'number' | 'boolean' | 'json'; nullable: boolean }>
+  /** Keys use `${typeof feature.id}:${feature.id}` so numeric and string IDs stay distinct. */
+  featureMetadata?: Record<string, { sourceId?: string | number; overlaySourceId?: string; sourceCrs?: string; importId?: string }>
+  authentication?: { mode: 'query-token' | 'bearer'; credential?: string; tokenParam?: string }
+}
+
+export type SceneResource = (SceneSource | WfsSceneResource | { type: '3dtiles' | 'glb'; url: string }) & SceneResourceMetadata
 
 export interface SceneFilterCondition {
   field: string
@@ -21,6 +51,7 @@ export interface SceneGroupNode {
   visible: boolean
   locked?: boolean
   parentId?: string
+  scope?: '2d' | '3d'
 }
 
 type MapNode<T> = T extends TileLayer | VectorLayer ? Omit<T, 'source'> & { resource: string; parentId?: string; locked?: boolean; filter?: SceneFilterCondition[] } : never
@@ -105,6 +136,7 @@ export function validateSceneDocument(input: unknown): ValidationResult {
     check(typeof node.name === 'string' && Boolean(node.name.trim()), `${path}.name`, 'string.empty', '节点名称必须非空')
     check(node.visible === undefined || typeof node.visible === 'boolean', `${path}.visible`, 'type.boolean', '显隐必须是布尔值')
     if (node.type === 'group') check(typeof node.visible === 'boolean', `${path}.visible`, 'type.boolean', '分组需要本地显隐状态')
+    if (node.type === 'group') check(node.scope === undefined || node.scope === '2d' || node.scope === '3d', `${path}.scope`, 'group.scope', '分组 scope 必须是 2d 或 3d')
     check(node.locked === undefined || typeof node.locked === 'boolean', `${path}.locked`, 'type.boolean', '锁定必须是布尔值')
     if (node.resource !== undefined) check(typeof node.resource === 'string' && Object.hasOwn(resources, node.resource), `${path}.resource`, 'reference.resource', '资源引用不存在')
     if (node.filter !== undefined) check((node.type === 'vector') && Array.isArray(node.filter) && node.filter.every(condition => record(condition) && typeof condition.field === 'string' && Boolean(condition.field.trim()) && FILTER_OPERATIONS.has(String(condition.op)) && (['is-empty', 'is-not-empty'].includes(String(condition.op)) || Object.hasOwn(condition, 'value'))), `${path}.filter`, 'node.filter', '过滤条件必须使用支持的字段操作和值')
@@ -117,17 +149,54 @@ export function validateSceneDocument(input: unknown): ValidationResult {
     if (node.parentId === undefined) continue
     check(typeof node.parentId === 'string' && ids.get(node.parentId)?.type === 'group', `$.nodes.${id}.parentId`, 'reference.parent', '父节点必须是存在的分组')
     const visited = new Set<string>([id])
+    const scope = node.type === 'group' ? node.scope : node.type === 'tile' || node.type === 'vector' ? '2d' : '3d'
     let parent: unknown = node.parentId
     while (typeof parent === 'string' && ids.has(parent)) {
       if (visited.has(parent)) { check(false, `$.nodes.${id}.parentId`, 'group.cycle', '分组不能形成循环'); break }
-      visited.add(parent); parent = ids.get(parent)?.parentId
+      const group = ids.get(parent)!
+      check(scope === undefined || group.scope === undefined || scope === group.scope, `$.nodes.${id}.parentId`, 'group.scope', '节点与父分组的引擎范围必须一致')
+      visited.add(parent); parent = group.parentId
     }
   }
   const mapSources: Record<string, unknown> = Object.create(null), assets: Record<string, unknown> = Object.create(null)
   for (const [id, resource] of Object.entries(resources)) {
     check(Boolean(id.trim()), `$.resources.${id}`, 'resource.id', '资源 ID 不得为空')
     if (!record(resource)) { check(false, `$.resources.${id}`, 'type.object', '资源必须是对象'); continue }
+    const path = `$.resources.${id}`
+    check(resource.title === undefined || typeof resource.title === 'string', `${path}.title`, 'type.string', '资源名称必须是字符串')
+    if (resource.featureMetadata !== undefined) check(record(resource.featureMetadata) && Object.entries(resource.featureMetadata).every(([key, metadata]) => /^(string|number):/.test(key) && record(metadata)
+      && Object.keys(metadata).every(name => ['sourceId', 'overlaySourceId', 'sourceCrs', 'importId'].includes(name))
+      && (metadata.sourceId === undefined || typeof metadata.sourceId === 'string' || typeof metadata.sourceId === 'number')
+      && ['overlaySourceId', 'sourceCrs', 'importId'].every(name => metadata[name] === undefined || typeof metadata[name] === 'string')), `${path}.featureMetadata`, 'resource.featureMetadata', '要素元数据必须使用 typed ID 键和支持的来源字段')
+    if (resource.fields !== undefined) {
+      const names = new Set<string>()
+      check(Array.isArray(resource.fields) && resource.fields.every(field => {
+        if (!record(field) || typeof field.name !== 'string' || !field.name.trim() || names.has(field.name) || !['string', 'number', 'boolean', 'json'].includes(String(field.type)) || typeof field.nullable !== 'boolean') return false
+        names.add(field.name); return true
+      }), `${path}.fields`, 'resource.fields', '字段必须有唯一名称、支持的类型与 nullable')
+    }
+    if (resource.authentication !== undefined) {
+      const authentication = resource.authentication
+      check(record(authentication) && ['query-token', 'bearer'].includes(String(authentication.mode)) && (authentication.credential === undefined || typeof authentication.credential === 'string' && record(input.credentials) && Object.hasOwn(input.credentials, authentication.credential)) && (authentication.tokenParam === undefined || typeof authentication.tokenParam === 'string'), `${path}.authentication`, 'resource.authentication', '认证方式或凭据引用无效')
+      if (['wms', 'wmts', 'wfs'].includes(String(resource.type))) check(resource.authMode === 'runtime', `${path}.authentication`, 'resource.authentication', '有认证配置时必须使用 runtime 认证模式')
+    }
     if (resource.type === '3dtiles' || resource.type === 'glb') assets[id] = resource
+    else if (resource.type === 'wfs') {
+      for (const key of ['url', 'version', 'typeName']) check(typeof resource[key] === 'string' && Boolean(resource[key].trim()), `${path}.${key}`, 'wfs.string', 'WFS 必须提供非空服务配置')
+      check(resource.authMode === 'none' || resource.authMode === 'runtime', `${path}.authMode`, 'wfs.authMode', '认证模式必须是 none 或 runtime')
+      for (const key of ['complete', 'paginationUsed', 'truncatedByLimit']) check(resource[key] === undefined || typeof resource[key] === 'boolean', `${path}.${key}`, 'type.boolean', '必须是布尔值')
+      for (const key of ['maxFeatures', 'loadedCount', 'duplicateIdCount']) check(resource[key] === undefined || Number.isInteger(resource[key]) && Number(resource[key]) >= (key === 'maxFeatures' ? 1 : 0), `${path}.${key}`, 'wfs.count', '数量必须是有效整数')
+      for (const key of ['bboxWgs84', 'queryExtentWgs84']) check(resource[key] === undefined || Array.isArray(resource[key]) && resource[key].length === 4 && resource[key].every(value => typeof value === 'number' && Number.isFinite(value)), `${path}.${key}`, 'wfs.extent', '范围必须是四个有限数值')
+      check(resource.extentMode === undefined || resource.extentMode === 'view' || resource.extentMode === 'full', `${path}.extentMode`, 'wfs.extentMode', '查询范围模式无效')
+      for (const key of ['outputFormat', 'srsName', 'lastLoadedAt']) check(resource[key] === undefined || typeof resource[key] === 'string', `${path}.${key}`, 'type.string', '必须是字符串')
+      check(resource.lastLoadedAt === undefined || typeof resource.lastLoadedAt === 'string' && Number.isFinite(Date.parse(resource.lastLoadedAt)), `${path}.lastLoadedAt`, 'wfs.timestamp', '快照时间无效')
+      check(!(resource.complete === true && resource.truncatedByLimit === true), `${path}.complete`, 'wfs.completeness', '截断快照不能标记为完整')
+      if (record(resource.snapshot) && Array.isArray(resource.snapshot.features) && resource.loadedCount !== undefined) check(resource.loadedCount === resource.snapshot.features.length, `${path}.loadedCount`, 'wfs.loadedCount', 'loadedCount 必须与本地快照实际数量一致')
+      mapSources[id] = { type: 'geojson', data: resource.snapshot, dataProjection: 'EPSG:4326' }
+      // Validate the service URL through the existing protocol URL rules as well as the snapshot.
+      const urlIssues = validateScene({ version: 2, id: 'check', title: 'Check', view: { projection: 'EPSG:3857', center: [0, 0], zoom: 2 }, sources: { service: { type: 'geojson', url: resource.url } }, layers: [] }).issues
+      issues.push(...urlIssues.map(issue => ({ ...issue, path: `${path}.url` })))
+    }
     else {
       mapSources[id] = resource
       if (resource.type === 'geojson' && resource.url !== undefined) assets[id] = { type: 'geojson', url: resource.url }
@@ -171,7 +240,7 @@ function allocateId(id: string, used: Set<string>): string {
 }
 
 /** Migrates old map manifests and standalone city scenes into one resource/node namespace. */
-export function migrateSceneDocument(input: unknown, identity = { id: 'city-scene', title: '三维场景' }): SceneDocument {
+export function migrateSceneDocument(input: unknown, identity = { id: 'city-scene', title: '三维场景' }, reserved: { nodeIds?: readonly string[]; resourceIds?: readonly string[] } = {}): SceneDocument {
   let decoded: unknown = input
   if (typeof input === 'string') {
     try { decoded = JSON.parse(input) as unknown }
@@ -183,7 +252,7 @@ export function migrateSceneDocument(input: unknown, identity = { id: 'city-scen
   const resources: Record<string, SceneResource> = manifest ? structuredClone(manifest.sources) : Object.create(null)
   const nodes: SceneNode[] = manifest ? manifest.layers.map(({ source, ...layer }) => ({ ...layer, resource: source })) : []
   const views: Record<string, SceneDocumentView> = manifest ? { map: { type: '2d', ...manifest.view } } : {}
-  const resourceIds = new Set(Object.keys(resources)), nodeIds = new Set(nodes.map(node => node.id))
+  const resourceIds = new Set([...Object.keys(resources), ...reserved.resourceIds ?? []]), nodeIds = new Set([...nodes.map(node => node.id), ...reserved.nodeIds ?? []])
   if (city) {
     const assets = new Map<string, string>(), groups = new Map<string, string>()
     for (const [id, asset] of Object.entries(city.assets)) {
@@ -191,7 +260,7 @@ export function migrateSceneDocument(input: unknown, identity = { id: 'city-scen
       resources[next] = asset.type === 'geojson' ? { type: 'geojson', url: asset.url } : { type: asset.type, url: asset.url }
     }
     for (const group of city.groups ?? []) {
-      const id = allocateId(group.id, nodeIds); groups.set(group.id, id); nodes.push({ ...group, id, type: 'group' })
+      const id = allocateId(group.id, nodeIds); groups.set(group.id, id); nodes.push({ ...group, id, type: 'group', scope: '3d' })
     }
     for (const node of city.nodes) {
       const { groupId, ...definition } = node

@@ -49,6 +49,9 @@ export interface GisFeature {
     overlaySourceId?: string
     sourceCrs?: string
     importId?: string
+    /** Host mapping for typed public scene IDs; omitted from portable feature metadata. */
+    sceneFeatureId?: string | number
+    sceneMetadataPresent?: boolean
   }
 }
 
@@ -182,10 +185,18 @@ export interface WfsServiceSource {
 
 export type ServiceSource = WmsServiceSource | WmtsServiceSource | WfsServiceSource
 
+/** Declared columns survive empty datasets and are independent of current feature values. */
+export interface DatasetField {
+  name: string
+  type: 'string' | 'number' | 'boolean' | 'json'
+  nullable: boolean
+}
+
 export type VectorDataset = {
   id: string
   name: string
   kind: 'vector'
+  fields?: DatasetField[]
   source: LocalVectorSource
   processing?: ProcessingRecord
 }
@@ -194,6 +205,7 @@ export type WmsDataset = {
   id: string
   name: string
   kind: 'wms'
+  fields?: DatasetField[]
   source: WmsServiceSource
 }
 
@@ -201,6 +213,7 @@ export type WmtsDataset = {
   id: string
   name: string
   kind: 'wmts'
+  fields?: DatasetField[]
   source: WmtsServiceSource
 }
 
@@ -208,6 +221,7 @@ export type WfsDataset = {
   id: string
   name: string
   kind: 'wfs'
+  fields?: DatasetField[]
   source: WfsServiceSource
 }
 

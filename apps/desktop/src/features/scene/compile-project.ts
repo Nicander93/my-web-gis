@@ -66,7 +66,7 @@ function layerStyleToScene(style: Layer['style']): SceneLayerStyle {
   return structuredClone(style) as SceneLayerStyle
 }
 
-function toWmsSceneSource(source: WmsServiceSource): WmsSceneSource {
+export function toWmsSceneSource(source: WmsServiceSource): WmsSceneSource {
   return {
     type: 'wms',
     url: source.url,
@@ -81,7 +81,7 @@ function toWmsSceneSource(source: WmsServiceSource): WmsSceneSource {
   }
 }
 
-function toWmtsSceneSource(source: WmtsServiceSource): WmtsSceneSource {
+export function toWmtsSceneSource(source: WmtsServiceSource): WmtsSceneSource {
   return {
     type: 'wmts',
     url: source.url,
