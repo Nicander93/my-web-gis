@@ -169,7 +169,7 @@ export function createProjectFromSceneDocument(input: unknown): ProjectSnapshot 
   }
   const basemapResources = new Set(basemaps.map(node => node.resource))
   for (const [id, resource] of Object.entries(document.resources)) {
-    if (basemapResources.has(id) || resource.type === '3dtiles' || resource.type === 'glb') continue
+    if (basemapResources.has(id) && !mapNodes.some(node => node.resource === id && !(node.type === 'tile' && node.role === 'basemap')) || resource.type === '3dtiles' || resource.type === 'glb') continue
     const isMapResource = mapNodes.some(node => node.resource === id)
     if (!isMapResource && resource.type === 'geojson' && resource.url) continue
     const name = resource.title ?? id
@@ -204,7 +204,8 @@ export function createProjectFromSceneDocument(input: unknown): ProjectSnapshot 
     if (groups.some(group => group.id === node.id)) project.rootOrder.push({ type: 'group', id: node.id })
     else if (project.layers.some(layer => layer.id === node.id) && !grouped.has(node.id)) project.rootOrder.push({ type: 'layer', id: node.id })
   }
-  if (cityViews.length || document.nodes.some(node => !['tile', 'vector', 'group'].includes(node.type))) {
+  const hasCityResources = Object.entries(document.resources).some(([id, resource]) => resource.type === '3dtiles' || resource.type === 'glb' || resource.type === 'geojson' && resource.url && !mapNodes.some(node => node.resource === id))
+  if (cityViews.length || hasCityResources || document.nodes.some(node => !['tile', 'vector'].includes(node.type) && (node.type !== 'group' || node.scope === '3d'))) {
     const city = createCityScene(), mapGroups = new Set(groups.map(group => group.id))
     if (cityViews[0]) city.camera = cityViews[0].camera
     Object.assign(city, document.environment)

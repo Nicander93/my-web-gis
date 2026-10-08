@@ -8,7 +8,7 @@
 
 | 字段 | 当前定义 |
 | --- | --- |
-| resources | 按稳定 ID 存储 GeoJSON、XYZ、Provider、WMS、WMTS、3D Tiles、glb 资源。URL GeoJSON 使用同一资源类型；多个显示节点可引用同一资源 |
+| resources | 按稳定 ID 存储 GeoJSON、XYZ、Provider、WMS、WMTS、WFS、3D Tiles、glb 资源。WFS 同时保存原始服务定义与本地 snapshot；多个显示节点可引用同一资源 |
 | nodes | 按从下至上顺序描述 vector、tile、3dtiles、model、geojson、graphic、water 或 group；资源引用统一为 resource，组织引用统一为 parentId |
 | views | 二维投影、中心、缩放、旋转，与三维相机分别定义；三维位置使用 WGS84 度和椭球米 |
 | activeView | 必须引用存在的视图；切换视图不改写另一引擎的相机 |
@@ -37,7 +37,7 @@ scene-core 提供 createSceneDocument、add/replace/removeSceneResource、add/re
 ## 尚待完成的协议门槛
 
 1. v3 JSON Schema 与 TypeScript、运行时校验的一致性；进一步完善 GeoJSON 几何、WMTS 矩阵等既有校验器的语义边界。
-2. 完整 ProjectSnapshot 双向转换、WFS 原始服务定义与本地快照、字段类型，以及二维工程分组／本地显隐与全部过滤前数据。
+2. 完整 ProjectSnapshot 双向转换已覆盖 WFS 服务与快照、字段类型、二维分组和过滤前数据；尚需支持当前工程无法表达的完整文档配置，并接入资源准备与事务式导入。
 3. 资源元数据、包内路径和依赖清单、凭据引用的完整映射、迁移问题及 ID 重映射报告。
 4. 双引擎工厂消费 v3、按视图支持能力报告、必需扩展恢复阻断、单一内容真源与历史适配。
 5. 完整 JSON／资源包往返、替换／合并事务、外部 tarball 消费及原生验收。

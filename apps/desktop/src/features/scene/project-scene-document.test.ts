@@ -32,6 +32,19 @@ function snapshot(): ProjectSnapshot {
 }
 
 describe('full project scene content', () => {
+  it('retains unused city assets and explicitly scoped empty city groups without a city view', () => {
+    const input = snapshot()
+    delete input.project.city
+    input.project.settings.workspaceType = '2d'
+    const document = createProjectSceneDocument(input)
+    document.resources.orphan = { type: 'glb', url: './models/orphan.glb' }
+    document.nodes.push({ type: 'group', id: 'city-empty', name: 'Empty city group', visible: false, scope: '3d' })
+    const restored = createProjectFromSceneDocument(document)
+    expect(restored.project.city?.assets.orphan).toEqual({ type: 'glb', url: './models/orphan.glb' })
+    expect(restored.project.city?.groups).toContainEqual({ id: 'city-empty', name: 'Empty city group', visible: false })
+    expect(restored.project.settings.workspaceType).toBe('2d')
+    expect(createProjectSceneDocument(restored).resources.orphan).toEqual(document.resources.orphan)
+  })
   it('retains all data, shared identity, filters, local visibility and unused resources', () => {
     const input = snapshot(), before = JSON.stringify(input)
     const document = createProjectSceneDocument(input)

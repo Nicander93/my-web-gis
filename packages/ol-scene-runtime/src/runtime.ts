@@ -12,10 +12,10 @@ import type BaseLayer from 'ol/layer/Base.js'
 import VectorLayer from 'ol/layer/Vector.js'
 import type VectorSource from 'ol/source/Vector.js'
 import {
-  createOlSceneLayer,
   SCENE_LAYER_ID,
   updateGoogleMapTilesAttribution
 } from './layer.js'
+import { createOlLayerHandle, type OlLayerHandle } from './layer-handle.js'
 import type {
   CreateSceneRuntimeOptions,
   SceneRuntime,
@@ -64,8 +64,11 @@ export class OlSceneRuntime implements SceneRuntime {
   private readonly credentials: Record<string, string>
   private readonly listeners = new globalThis.Map<SceneRuntimeEvent, Set<Listener>>()
   private readonly layers = new globalThis.Map<string, BaseLayer>()
+  private readonly layerHandles = new globalThis.Map<string, OlLayerHandle>()
   private scene: SceneManifest | null = null
   private selectInteraction: Select | null = null
+  private loadController: AbortController | null = null
+  private destroyed = false
 
   constructor(options: CreateSceneRuntimeOptions) {
     this.fetcher = options.fetch ?? globalThis.fetch
@@ -84,13 +87,19 @@ export class OlSceneRuntime implements SceneRuntime {
   }
 
   async loadScene(input: SceneManifest | string): Promise<void> {
+    if (this.destroyed) throw new Error('Scene runtime has been destroyed')
+    this.loadController?.abort()
+    const controller = new AbortController()
+    this.loadController = controller
     try {
-      const scene = await this.resolveScene(input)
-      await this.applyScene(scene)
+      const scene = await this.resolveScene(input, controller.signal)
+      controller.signal.throwIfAborted()
+      await this.applyScene(scene, controller.signal)
+      controller.signal.throwIfAborted()
       this.emit('scene:ready', { scene })
     } catch (error) {
       const normalized = error instanceof Error ? error : new Error(String(error))
-      this.emit('scene:error', { error: normalized })
+      if (!controller.signal.aborted) this.emit('scene:error', { error: normalized })
       throw normalized
     }
   }
@@ -149,6 +158,12 @@ export class OlSceneRuntime implements SceneRuntime {
   }
 
   destroy(): void {
+    if (this.destroyed) return
+    this.destroyed = true
+    this.loadController?.abort()
+    this.map.getLayers().clear()
+    this.layerHandles.forEach(handle => handle.dispose())
+    this.layerHandles.clear()
     this.layers.clear()
     this.listeners.clear()
     this.map.setTarget(undefined)
@@ -156,30 +171,44 @@ export class OlSceneRuntime implements SceneRuntime {
     this.scene = null
   }
 
-  private async resolveScene(input: SceneManifest | string): Promise<SceneManifest> {
+  private async resolveScene(input: SceneManifest | string, signal: AbortSignal): Promise<SceneManifest> {
     if (typeof input !== 'string') return parseScene(input)
     if (!this.fetcher) throw new Error('当前环境不支持 fetch，无法通过 URL 加载 Scene')
-    const response = await this.fetcher(input)
+    const response = await this.fetcher(input, { signal })
     if (!response.ok) throw new Error(`Scene 加载失败：HTTP ${response.status}`)
     return parseScene(await response.json())
   }
 
-  private async applyScene(scene: SceneManifest): Promise<void> {
+  private async applyScene(scene: SceneManifest, signal: AbortSignal): Promise<void> {
+    const view = createView(scene)
+    const prepared = new globalThis.Map<string, OlLayerHandle>()
+    try {
+      for (const definition of scene.layers) {
+        const handle = await createOlLayerHandle(definition, scene.sources, view, {
+          credentials: this.credentials, fetch: this.fetcher, signal
+        })
+        prepared.set(definition.id, handle)
+        signal.throwIfAborted()
+      }
+    } catch (error) {
+      prepared.forEach(handle => handle.dispose())
+      throw error
+    }
     this.scene = scene
     this.layers.clear()
     this.map.getLayers().clear()
+    this.layerHandles.forEach(handle => handle.dispose())
+    this.layerHandles.clear()
     this.map.getControls().clear()
     if (this.selectInteraction) this.map.removeInteraction(this.selectInteraction)
 
-    const view = createView(scene)
     this.map.setView(view)
     this.configureControls(scene)
 
     for (const definition of scene.layers) {
-      const layer = await createOlSceneLayer(definition, scene.sources, view, {
-        credentials: this.credentials,
-        fetch: this.fetcher
-      })
+      const handle = prepared.get(definition.id)!
+      const layer = handle.layer
+      this.layerHandles.set(definition.id, handle)
       this.layers.set(definition.id, layer)
       this.map.addLayer(layer)
       this.observeLayer(definition, layer)
@@ -325,6 +354,11 @@ function sceneSourceIsInline(scene: SceneManifest | null, sourceId: string): boo
 
 export async function createSceneRuntime(options: CreateSceneRuntimeOptions): Promise<OlSceneRuntime> {
   const runtime = new OlSceneRuntime(options)
-  if (options.scene) await runtime.loadScene(options.scene)
+  try {
+    if (options.scene) await runtime.loadScene(options.scene)
+  } catch (error) {
+    runtime.destroy()
+    throw error
+  }
   return runtime
 }
