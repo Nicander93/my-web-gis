@@ -4,6 +4,9 @@ import LineString from 'ol/geom/LineString.js'
 import Polygon, { fromExtent } from 'ol/geom/Polygon.js'
 import VectorSource from 'ol/source/Vector.js'
 import Feature from 'ol/Feature.js'
+import MultiLineString from 'ol/geom/MultiLineString.js'
+import GeometryCollection from 'ol/geom/GeometryCollection.js'
+import Circle from 'ol/geom/Circle.js'
 import { applySelection, selectionOperation } from './selection.js'
 import { getBoxCandidates, intersectsSelectionBox } from './hit-test.js'
 
@@ -26,6 +29,30 @@ describe('selection identity and operations', () => {
 })
 
 describe('box geometry', () => {
+  it('intersects the common clipped area, not two independently intersecting extents', () => {
+    const box = fromExtent([-1, -1, 1, 1]); box.rotate(Math.PI / 4, [0, 0])
+    const clip = [0.9, -2, 2, 2]
+    expect(intersectsSelectionBox(new LineString([[0.6, 0.7], [1.2, 0.7]]), box, undefined, clip)).toBe(false)
+    expect(intersectsSelectionBox(new Point([1, 0]), box, undefined, clip)).toBe(true)
+    expect(intersectsSelectionBox(new Point([0, 0]), box, undefined, clip)).toBe(false)
+    expect(intersectsSelectionBox(new Point([1, 1]), box, undefined, clip)).toBe(false)
+  })
+  it('keeps multipart paths separate and supports collections and circles', () => {
+    const box = fromExtent([-2, -2, 2, 2]), clip = [-0.5, -0.5, 0.5, 0.5]
+    const parts = new MultiLineString([[[-2, 0], [-1, 0]], [[1, 0], [2, 0]]])
+    expect(intersectsSelectionBox(parts, box, undefined, clip)).toBe(false)
+    expect(intersectsSelectionBox(new GeometryCollection([parts, new Point([0, 0])]), box, undefined, clip)).toBe(true)
+    expect(intersectsSelectionBox(new Circle([1, 0], 0.6), box, undefined, clip)).toBe(true)
+    expect(intersectsSelectionBox(new Circle([1, 1], 0.1), box, undefined, clip)).toBe(false)
+  })
+  it('preserves clipped holes, boundary contacts, empty geometries and global world clipping', () => {
+    const polygon = new Polygon([[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]], [[3, 3], [3, 7], [7, 7], [7, 3], [3, 3]]])
+    expect(intersectsSelectionBox(polygon, fromExtent([0, 0, 10, 10]), undefined, [4, 4, 6, 6])).toBe(false)
+    expect(intersectsSelectionBox(polygon, fromExtent([0, 0, 10, 10]), undefined, [3, 4, 3, 6])).toBe(true)
+    expect(intersectsSelectionBox(new LineString([]), fromExtent([0, 0, 1, 1]))).toBe(false)
+    expect(intersectsSelectionBox(new Point([-179, 0]), fromExtent([180, -1, 182, 1]), 360, [180, -1, 180.5, 1])).toBe(false)
+    expect(intersectsSelectionBox(new Point([-179, 0]), fromExtent([180, -1, 182, 1]), 360, [180, -1, 182, 1])).toBe(true)
+  })
   it('queries indexed candidates across worlds without a full-feature scan', () => {
     const near = new Feature(new Point([-179, 0]))
     const far = new Feature(new Point([0, 50]))
