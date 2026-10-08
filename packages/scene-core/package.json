@@ -25,8 +25,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@desktop-webgis/scene-schema": "workspace:*",
-    "@desktop-webgis/gis-core": "workspace:*"
+    "@desktop-webgis/scene-schema": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.9.2",
