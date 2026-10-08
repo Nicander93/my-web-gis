@@ -15,7 +15,7 @@ import {
 function toolHint(tool: string): string {
   switch (tool) {
     case 'select':
-      return '选择工具 · 单击选择要素'
+      return '单击或拖框选择 · Shift 追加 · Alt 移除 · Esc 取消'
     case 'draw-point':
       return '绘制点 · 单击地图添加'
     case 'draw-line':

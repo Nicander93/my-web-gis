@@ -18,6 +18,7 @@ import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
 import { useSnappingStore } from '@/stores/snapping.store'
 import { useWorkbenchStore } from '@/stores/workbench.store'
+import { useWorkspaceStore } from '@/stores/workspace.store'
 
 let runtime: OlMapRuntime | null = null
 let selectionRuntime: OlSelectionRuntime | null = null
@@ -64,6 +65,7 @@ export function getActiveEditTool(): EditTool {
 
 /** Esc 优先取消绘制草稿；再次使用时切回浏览，保持编辑目标。 */
 export function cancelMapOperation(): boolean {
+  if (selectionRuntime?.cancelGesture()) return true
   if (toolRuntime?.cancelSketch()) return true
   return setActiveEditTool('pan')
 }
@@ -149,7 +151,7 @@ export function unmountMapRuntime(): void {
   storeUnsub = null
   moveEndKey?.()
   moveEndKey = null
-  selectionRuntime?.deactivate()
+  selectionRuntime?.dispose()
   toolRuntime?.deactivate()
   selectionRuntime = null
   toolRuntime = null
@@ -241,6 +243,23 @@ export function zoomMapToFeature(
     })
     return true
   }
+  return zoomMapToFeatures(layerId, [featureId])
+}
+
+/** Fit the complete selected collection, independent of table paging or search. */
+export function zoomMapToSelected(): boolean {
+  const selection = useProjectStore.getState().selection
+  return selection.layerId ? zoomMapToFeatures(selection.layerId, selection.featureIds) : false
+}
+
+export function zoomMapToFeatures(layerId: string, featureIds: readonly string[]): boolean {
+  if (!runtime || !mounted) return false
+  const state = useProjectStore.getState()
+  const layer = state.project.layers.find(item => item.id === layerId)
+  if (!layer) return false
+  const ids = new Set(featureIds)
+  const features = (state.featuresByDataset[layer.datasetId] ?? []).filter(feature => ids.has(feature.id))
+  const view = runtime.getMap().getView()
   const extent = [Infinity, Infinity, -Infinity, -Infinity]
   const visit = (value: unknown): void => {
     if (!Array.isArray(value)) return
@@ -259,7 +278,7 @@ export function zoomMapToFeature(
       extent[3] = Math.max(extent[3], y)
     } else value.forEach(visit)
   }
-  visit(feature.geometry.coordinates)
+  features.forEach(feature => visit(feature.geometry.coordinates))
   if (!extent.every(Number.isFinite)) return false
   view.fit(transformExtent(extent, 'EPSG:4326', view.getProjection()), {
     padding: [60, 60, 60, 60],
@@ -307,12 +326,20 @@ export function setActiveEditTool(tool: EditTool): boolean {
   if (tool === 'select') {
     toolRuntime.deactivate()
     const layerId = useProjectStore.getState().selectedLayerId
-    selectionRuntime.activate(layerId, (state) => {
+    selectionRuntime.activate(layerId, (state, request) => {
       applyingStoreSelection = true
       try {
         useProjectStore.getState().setSelection(state)
       } finally {
         applyingStoreSelection = false
+      }
+      selectionRuntime?.syncSelection(useProjectStore.getState().selection)
+      if (request.source === 'box' && state.layerId) {
+        useWorkbenchStore.getState().bindTable(state.layerId)
+        useSessionStore.getState().setAttributeTableState(state.layerId, {
+          selectedOnly: true, searchQuery: '', currentPage: 1
+        })
+        useWorkspaceStore.getState().setBottomOpen(true)
       }
     })
     syncSelectionHighlight(useProjectStore.getState().selection)
@@ -391,7 +418,6 @@ function createToolCallbacks(): ToolCallbacks {
 
 function syncSelectionHighlight(selection: SelectionState): void {
   if (!selectionRuntime || applyingStoreSelection) return
-  if (activeTool !== 'select') return
   selectionRuntime.syncSelection(selection)
 }
 
@@ -454,7 +480,7 @@ export function _setMapRuntimeForTests(
   storeUnsub = null
   moveEndKey?.()
   moveEndKey = null
-  selectionRuntime?.deactivate()
+  selectionRuntime?.dispose()
   toolRuntime?.deactivate()
   selectionRuntime = null
   toolRuntime = null
@@ -472,7 +498,9 @@ export function _setMapRuntimeForTests(
       activate: () => undefined,
       deactivate: () => undefined,
       syncSelection: () => undefined,
-      clear: () => undefined
+      clear: () => undefined,
+      dispose: () => undefined,
+      cancelGesture: () => false
     } as unknown as OlSelectionRuntime
     toolRuntime = {
       activate: () => undefined,

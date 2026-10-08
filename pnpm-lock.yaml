@@ -84,6 +84,9 @@ importers:
         specifier: ^5.0.15
         version: 5.0.15(@types/react@19.2.18)(react@19.2.8)
     devDependencies:
+      '@desktop-webgis/ol-selection':
+        specifier: workspace:*
+        version: link:../../packages/ol-selection
       '@playwright/test':
         specifier: ^1.63.0
         version: 1.63.0
@@ -337,6 +340,9 @@ importers:
       '@desktop-webgis/ol-scene-runtime':
         specifier: workspace:*
         version: link:../ol-scene-runtime
+      '@desktop-webgis/ol-selection':
+        specifier: workspace:*
+        version: link:../ol-selection
       '@desktop-webgis/ol-style':
         specifier: workspace:*
         version: link:../ol-style
@@ -366,6 +372,18 @@ importers:
         specifier: ^10.6.1
         version: 10.10.0
     devDependencies:
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)
+
+  packages/ol-selection:
+    devDependencies:
+      ol:
+        specifier: ^10.10.0
+        version: 10.10.0
       typescript:
         specifier: ^5.9.2
         version: 5.9.2

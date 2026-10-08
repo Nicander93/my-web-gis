@@ -501,6 +501,23 @@
 .attribute-table-content tr.row-selected {
   background: var(--color-accent-soft);
 }
+.attribute-locate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.attribute-locate:hover, .attribute-locate:focus-visible {
+  color: var(--color-accent);
+  background: var(--color-hover);
+}
 .status-bar {
   height: 26px;
   min-height: 26px;
