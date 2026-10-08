@@ -12,7 +12,8 @@
 | S01 | 独立 ol-selection、框选、真实几何精筛、旋转／孔洞／世界副本、空间索引、宿主确认、持续高亮、源变动／Esc／失焦取消、释放；独立生命周期与 tarball JS／类型检查；图层及父分组 extent 精确裁剪、多部件／集合／圆的纯几何回归；三个窗口尺寸的旋转地图父分组裁剪真实拖框 | 更多复杂／坏几何、目标切换／晚到事件、浏览器大数据与原生验收；当前为 private 候选，未通过完整公开门槛 |
 | S02 | OlSelectionRuntime 成为薄适配；Store 过滤后的集合反馈高亮；框选绑定属性表、清搜索／页码、只看选中；工具停用保留高亮，销毁显式释放 | 全量过滤／刷新／删除和绘制／修改互斥组合、异步 WFS／隐藏分组及中途切目标交互证据 |
 | S03 | 只读双击／Enter／单条按钮定位；可编辑单元格仍用于编辑；选择菜单批量定位全部选中；零结果状态／分页 | 表格行菜单、选中集合跨页定位、键盘编辑冲突、样式草稿保护的新增针对性证据；原生路径 |
-| S04–S10 | 原有 schema／runtime／IO 与消费脚本保留 | 统一协议 RFC 与实际迁移、OL／Cesium 工厂收敛、内容真源、完整场景／资源包导入导出、Viewer 一致性、各候选包的签收门槛 |
+| S04 | v3 SceneDocument 资源／节点／视图、分组引用与循环校验；旧 Manifest v1/v2 和 CityScene v1/v2 迁移、跨引擎 ID 冲突重映射；纯资源／节点／视图／环境操作；扩展保留与不支持版本报告 | 完整 ProjectSnapshot 双向适配、字段／WFS 原始定义、JSON Schema 一致性、完整迁移报告、复杂真实文件往返及语义边界；尚未完成阶段签收 |
+| S05–S10 | 原有 runtime／IO 与消费脚本保留；scene-core 已移除工程依赖 | OL／Cesium 工厂收敛、内容真源、完整场景／资源包导入导出、Viewer 一致性、各候选包的签收门槛 |
 
 现有公共包候选审查已经写在计划第 10 节。不能因选择包 tarball 检查通过，就将 ogc-io、vector-io、spatial-analysis 或其他场景包标为可公开消费。
 
@@ -58,3 +59,11 @@
 - ProjectSnapshot 到发布场景的编译器及其原有测试移入 Desktop features/scene；scene-core 根入口、package dependencies 和 lockfile 不再依赖 gis-core。既有调用迁移到应用适配器，发布转换语义保持原状。
 - 本批验证：scene-core 构建、5 个测试；Desktop 151 个测试通过、5 个既有跳过；Desktop 构建通过（既有大块与动态导入警告）；裁剪 E2E 3 个通过。
 - 这项拆分仅解决公共包的工程依赖边界。完整场景协议、全量保存与发布快照区分、资源包、双引擎工厂、独立 tarball 消费及原生验收仍按 S04–S10 推进。
+
+## 后续批次：统一文档 v3 与纯操作
+
+- 在既有 scene-schema 包内增加 SceneDocument v3 和明确迁移入口；旧 parseScene v1/v2 兼容入口不变。实际资源、节点、视图使用判别联合，父分组使用统一 parentId，跨引擎资源／节点冲突 ID 同步重映射。
+- 保留已有二维样式／Popup、全量内嵌数据、三维分组／变换／相机／环境；vector 保存过滤定义而不删数据。扩展 JSON 保留并报告未知必需版本；拒绝不合法引用、循环分组、原生实例、循环及非有限 JSON。
+- scene-core 提供纯资源／节点增删改、显式级联删除、分组移动、视图／环境更新及文档序列化。输入不变，结果校验；暂未优化大文档深复制。
+- [协议规范](../specs/scene-document-v3.md)列出已实施约束和缺口。当前尚无 v3 JSON Schema、完整 ProjectSnapshot 双向适配或引擎消费，不代表 S04–S10 完成。
+- 验证：scene-schema 构建与 22 个测试、scene-core 构建与 8 个测试；scene-publisher 和 ol-scene-runtime 各 8 个既有测试通过；Desktop TypeScript noEmit 通过。未增加原生或渲染验收声明。
