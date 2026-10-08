@@ -14,7 +14,7 @@
 - [UI 实现设计规范 V0.1](specs/04-UI-Implementation-Design-Spec-V0.1.md)
 - [Scene Manifest 与发布 V0.1](specs/05-Scene-Manifest-and-Publishing-V0.1.md)
 - [二维与三维统一工作台](specs/06-Unified-Workbench.md) — 最新 Ribbon、对象菜单与面板交互规则
-- [全产品设计原则与改进计划（2026-10-08）](design/product-design-review-2026-10-08.md) — 用户设计理念、专业产品参考、全产品目标、12 批整改与验收；待实施
+- [全产品设计原则与改进计划（2026-10-08）](design/product-design-review-2026-10-08.md) — 用户设计理念、全产品目标、12 批整改与验收；A–C 和 D 部分已实施，见实施记录
 - [全量界面设计审计（2026-10-08）](design/product-interface-audit-2026-10-08.md) — 51 个界面／功能区、全部 18 个处理工具、问题证据与异常／恢复状态；源码审计，未逐项完成原生验收
 
 
@@ -26,6 +26,8 @@
 - [第一阶段进度交接](plans/phase-1-progress.md)
 - [第二阶段：空间处理工作流](plans/phase-2-spatial-processing.md)
 - [二维编辑捕捉](plans/editing-snapping.md)
+- [选择、图层与统一场景 API 实施计划](plans/selection-layer-scene-public-api.md) — Select／框选、公共包提取审查、图层工厂、二维／三维场景往返；实施中
+- [选择、图层与场景 API 实施记录](plans/selection-layer-scene-implementation.md) — 逐阶段代码、验证证据及尚未完成的验收
 - [GeoLibre 对标与下一阶段建议](plans/geolibre-gap-review-2026-10-03.md)
 - [城市编辑器产品与核心能力演进](plans/city-editor-product-and-core.md) — 功能区交互、Mars3D 风格 API 与绘制/编辑/可视化路线讨论稿
 - [P21 全阶段验收证据（受阻）](plans/p21-phase-acceptance-evidence.md) — 绑定 SHA "d310b\；**不**表示阶段已完成
