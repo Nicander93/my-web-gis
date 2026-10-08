@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { Plus, Map } from 'lucide-react'
+import { projectCommands } from '@/app/commands/project.commands'
+import { useWorkbenchStore } from '@/stores/workbench.store'
 import { useProjectStore } from '@/stores/project.store'
 import { useSnappingStore } from '@/stores/snapping.store'
 import {
@@ -18,9 +21,9 @@ function toolHint(tool: string): string {
     case 'draw-point':
       return '绘制点 · 单击地图添加'
     case 'draw-line':
-      return '绘制线 · 单击添加节点，双击结束'
+      return '绘制线 · 单击添加节点，双击完成 · Esc 取消草稿'
     case 'draw-polygon':
-      return '绘制面 · 单击添加节点，双击结束'
+      return '绘制面 · 单击添加节点，双击完成 · Esc 取消草稿'
     case 'modify':
       return '修改工具 · 选中后拖动节点'
     case 'delete':
@@ -33,15 +36,19 @@ function toolHint(tool: string): string {
 }
 
 /** Workspace map surface: mounts OlMapRuntime + selection/tool runtimes and keeps project layers in sync. */
-export function MapCanvas({ leftOffset = 0, rightOffset = 0, bottomOffset = 0 }: {
+export function MapCanvas({
+  leftOffset = 0,
+  rightOffset = 0,
+  bottomOffset = 0
+}: {
   leftOffset?: number
   rightOffset?: number
   bottomOffset?: number
 }) {
   const viewportRef = useRef<HTMLDivElement>(null)
-  const snapped = useSnappingStore(s => s.snapped)
-  const snappingEnabled = useSnappingStore(s => s.options.enabled)
-  const [readout, setReadout] = useState('')
+  const snapped = useSnappingStore((s) => s.snapped)
+  const snappingEnabled = useSnappingStore((s) => s.options.enabled)
+  const project = useProjectStore((state) => state.project)
   const [runtimeMounted, setRuntimeMounted] = useState(false)
   const [selectionMounted, setSelectionMounted] = useState(false)
   const [toolMounted, setToolMounted] = useState(false)
@@ -55,7 +62,9 @@ export function MapCanvas({ leftOffset = 0, rightOffset = 0, bottomOffset = 0 }:
     const runtime = mountMapRuntime(target, mapState)
     runtime.onPointerMove((info) => {
       const [x, y] = info.coordinate
-      setReadout(`${x.toFixed(2)}, ${y.toFixed(2)}  ·  ${info.scaleText}`)
+      useWorkbenchStore
+        .getState()
+        .setMapReadout(`${x.toFixed(2)}, ${y.toFixed(2)}  ·  ${info.scaleText}`)
     })
     syncMapFromProject()
     setRuntimeMounted(true)
@@ -115,10 +124,32 @@ export function MapCanvas({ leftOffset = 0, rightOffset = 0, bottomOffset = 0 }:
         className="map-canvas__viewport"
         data-testid="map-runtime-viewport"
       />
-      {readout && <div className="map-readout">{readout}</div>}
-      {!hint.startsWith('选择工具') && !hint.startsWith('平移工具') && hint !== '地图工具' && (
-        <div className="map-tool-hint">{hint}{(hint.startsWith('绘制') || hint.startsWith('修改')) && <span> · {snapped ? '已捕捉' : snappingEnabled ? '捕捉开启' : '捕捉关闭'}</span>}</div>
+      {project.layers.length === 0 && (
+        <div className="map-onboarding">
+          <Map size={28} />
+          <h2>地图工作区</h2>
+          <p>添加本地数据或地图服务，开始组织图层。</p>
+          <button className="button-primary" onClick={projectCommands.addData}>
+            <Plus size={15} />
+            添加数据
+          </button>
+          <small>GeoJSON · Shapefile · DXF · CSV · WMS / WMTS / WFS</small>
+        </div>
       )}
+      {!hint.startsWith('选择工具') &&
+        !hint.startsWith('平移工具') &&
+        hint !== '地图工具' && (
+          <div className="map-tool-hint">
+            {hint}
+            {(hint.startsWith('绘制') || hint.startsWith('修改')) && (
+              <span>
+                {' '}
+                ·{' '}
+                {snapped ? '已捕捉' : snappingEnabled ? '捕捉开启' : '捕捉关闭'}
+              </span>
+            )}
+          </div>
+        )}
     </section>
   )
 }

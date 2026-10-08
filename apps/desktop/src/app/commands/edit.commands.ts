@@ -1,5 +1,7 @@
 import { emitCommandStatus } from './status'
 import { useProjectStore } from '@/stores/project.store'
+import { useWorkbenchStore } from '@/stores/workbench.store'
+import { capabilitiesForDataset } from '@desktop-webgis/gis-core'
 import {
   isToolRuntimeMounted,
   setActiveEditTool
@@ -7,6 +9,34 @@ import {
 
 /** 编辑命令：撤销/重做走 EditHistory；绘制/修改/删除接入 OlToolRuntime。 */
 export const editCommands = {
+  begin(): void {
+    const state = useProjectStore.getState()
+    const locked = useWorkbenchStore.getState().editLayerId
+    if (locked) {
+      emitCommandStatus('请先结束当前图层编辑，再切换编辑目标')
+      return
+    }
+    const layer = state.project.layers.find(
+      (item) => item.id === state.selectedLayerId
+    )
+    if (
+      !layer ||
+      !capabilitiesForDataset(
+        state.project.datasets.find((item) => item.id === layer.datasetId)
+      ).editGeometry
+    ) {
+      emitCommandStatus('请选择可编辑的本地矢量图层')
+      return
+    }
+    useWorkbenchStore.getState().setEditLayer(layer.id)
+    setActiveEditTool('pan')
+    emitCommandStatus(`编辑目标已锁定：${layer.name}`)
+  },
+  end(): void {
+    setActiveEditTool('select')
+    useWorkbenchStore.getState().setEditLayer(null)
+    emitCommandStatus('已结束编辑；修改已记录，可撤销，请保存项目')
+  },
   undo(): void {
     if (useProjectStore.getState().undoEdit()) {
       emitCommandStatus('已撤销')

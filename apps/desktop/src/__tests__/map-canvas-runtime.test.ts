@@ -7,6 +7,7 @@ import { mapCommands } from '@/app/commands/map.commands'
 import { editCommands } from '@/app/commands/edit.commands'
 import { layerCommands } from '@/app/commands/layer.commands'
 import { useProjectStore } from '@/stores/project.store'
+import { useWorkbenchStore } from '@/stores/workbench.store'
 import { useSessionStore } from '@/stores/session.store'
 import {
   _setMapRuntimeForTests,
@@ -179,7 +180,7 @@ describe('MapCanvas OlMapRuntime selection tool wiring', () => {
     store.addLayer('target', 'Lines', [{ id:'line', geometry:{ type:'LineString', coordinates:[[0,0],[1,1]] }, properties:{} }], 'line')
     const targetId = useProjectStore.getState().selectedLayerId!
     store.addLayer('browse', 'Points', [{ id:'point', geometry:{ type:'Point', coordinates:[0,0] }, properties:{} }], 'point')
-    store.setActiveEditLayer(targetId)
+    useWorkbenchStore.getState().setEditLayer(targetId)
     const activate = vi.spyOn(getToolRuntime()!, 'activate')
     expect(setActiveEditTool('draw-point')).toBe(true)
     expect(getActiveEditTool()).toBe('draw-line')

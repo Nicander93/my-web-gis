@@ -47,6 +47,7 @@ export class OlToolRuntime {
   private snap: Snap | null = null
   private snapKeys: EventsKey[] = []
   private editSource: VectorSource | null = null
+  private drawing = false
   private onSnapChange: (snapped: boolean) => void = () => undefined
 
   constructor(private readonly mapRuntime: OlMapRuntime) {}
@@ -121,6 +122,7 @@ export class OlToolRuntime {
   }
 
   deactivate(): void {
+    this.drawing = false
     this.clearSnapping()
     this.editSource = null
     const map = this.mapRuntime.getMap()
@@ -133,7 +135,10 @@ export class OlToolRuntime {
   private activateDraw(tool: EditTool, source: VectorSource, callbacks: ToolCallbacks): void {
     const type = tool === 'draw-point' ? 'Point' : tool === 'draw-line' ? 'LineString' : 'Polygon'
     const draw = new Draw({ source, type })
+    draw.on('drawstart', () => { this.drawing = true })
+    draw.on('drawabort', () => { this.drawing = false })
     draw.on('drawend', (event) => {
+      this.drawing = false
       const datasetId = this.getActiveDatasetId(callbacks)
       if (!datasetId) return
       const feature = fromOlFeature(event.feature as Feature<Geometry>)
@@ -146,6 +151,15 @@ export class OlToolRuntime {
     this.addInteractions(draw)
     this.editSource = source
     this.refreshSnapping()
+  }
+
+  /** 只取消未完成的绘制，不回滚已进入历史的修改。 */
+  cancelSketch(): boolean {
+    if (!this.drawing) return false
+    const draw = this.interactions.find((interaction): interaction is Draw => interaction instanceof Draw)
+    draw?.abortDrawing()
+    this.drawing = false
+    return Boolean(draw)
   }
 
   private activateModify(source: VectorSource, callbacks: ToolCallbacks): void {

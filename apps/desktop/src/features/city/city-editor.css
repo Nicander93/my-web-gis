@@ -153,3 +153,8 @@
 .city-group-empty { padding: 10px 8px; list-style: none; line-height: 1.5; }
 .city-root-drop { margin: 8px; padding: 7px; border: 1px dashed #cbd4ce; border-radius: 3px; font-size: 11px; color: #69796f; text-align: center; }
 .city-layer-row[draggable], .city-layer-row__select[draggable="true"] { cursor: grab; }
+
+.city-ribbon__commands { flex-wrap: nowrap; overflow-x: auto; padding: 4px 8px; min-height: 44px; }
+.city-ribbon__group { flex-direction: row; gap: 6px; flex-shrink: 0; }
+.city-ribbon__command { flex-direction: row; gap: 5px; padding: 5px 8px; white-space: nowrap; }
+.city-ribbon__group-label { order: -1; margin-top: 0; font-size: 10px; }
