@@ -98,3 +98,11 @@
 - URL GeoJSON 下载一次、校验后创建；WFS 保存缓存直接显示，返回缓存提示并保留完整性标记。OL 不支持的三维节点／分组返回能力问题，原文档保留；未知必需扩展及暂未实现的认证瓦片请求明确阻断。
 - ol-scene-runtime 构建及 22 个测试通过（含 7 个 v3 工厂测试），Desktop 生产构建通过。工厂测试使用实际 OL View／Source／Layer，未启动浏览器绘制；Map 生命周期测试继续使用替代表面。
 - 仍需接入编辑器及发布 Viewer、节点增量更新、认证请求与 WFS 刷新、双引擎能力报告统一格式、v3 JSON Schema、独立 tarball 消费及真实渲染验证。此批不代表 S04–S10 完成。
+
+## 后续批次：v3 Cesium 投影与外部 Viewer
+
+- Cesium Runtime 依赖统一 scene-schema 协议。`projectCesiumDocument` 校验文档并投影既有原生城市对象、资源、相机与环境；原始完整文档保留。嵌套三维分组状态仅在投影中派生，不覆写源节点；未知必需扩展阻断，未实现共享二维节点返回能力问题。
+- `createCesiumDocumentRuntime` 接入既有 CitySceneRuntime，并等待图层及环境加载后返回。当前底层编辑仍由宿主回写文档，不能将此创建入口视为 S07 单一内容真源门面。
+- `createCityRuntime` 支持调用方 Viewer，默认不拥有；释放自有图层和底图并恢复原地形／光照／时间，保留外部 Viewer。旧直接构造行为兼容，调用方可显式 `ownsViewer: false`。创建后相机或质量初始化失败会释放 Runtime。
+- Cesium Runtime 构建和 16 个测试通过；Desktop 生产构建通过（既有大 chunk 与混合导入提示仍在）。新增 3 个纯投影测试及运行时所有权／环境恢复测试使用替代原生加载，不代表真实 GPU、模型、水面、原生窗口验收通过。
+- S06 尚需共享二维 GeoJSON／服务能力、完整资源准备、失败／取消事务、原生变换及水面回归；S07–S10 与协议 JSON Schema 门槛继续保留。

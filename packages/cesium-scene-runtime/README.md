@@ -36,3 +36,10 @@ Cesium 为 peer dependency。首版 0.1.0，MIT；尚未发布 npm。
 `setSelected(ids)` 设置图形、GeoJSON、3D Tiles 和模型的临时高亮，不写入场景协议。取消选择恢复原样式；GeoJSON 更新场景颜色后取消选择恢复最新配置。`onSelect(id, properties, selection)` 透传 Ctrl/Shift 修饰信息，宿主自行决定多选语义。图形 `style.labelField` 和属性在编辑器、只读 Viewer 共用渲染逻辑，属性更新后标签同步更新且无需重新挂载资源。
 
 运行时按 `groups` / `groupId` 计算成员的实际显隐和锁定；隐藏组不覆盖对象自身的 `visible`，锁定组会禁止成员几何与模型编辑。重命名、排序和分组移动复用原生资源；持久化、批量命令和历史由宿主负责。
+# v3 文档适配（实施中的 API）
+
+`projectCesiumDocument(document, viewId?)` 校验 v3 文档并生成现有 CitySceneRuntime 可消费的投影。它保留完整文档，二维 tile/vector 节点返回 `cesium.unsupported` 问题；嵌套三维分组的显隐和锁定仅在投影中派生，原始本地状态不改写。未知必需扩展阻止投影，无法准备的原生资源明确报错。
+
+`createCesiumDocumentRuntime({ document, viewId, viewer?, target?, ...options })` 创建并等待原生图层与环境加载后返回 `{ runtime, issues, getDocument, destroy }`。`getDocument()` 是完整输入的隔离副本，原生底层编辑仍需宿主更新文档；此入口尚不是带历史的统一场景控制门面。
+
+`createCityRuntime` 支持已有 `viewer`，默认由调用方拥有，销毁时保留 Viewer 并移除自有图层、恢复原地形、光照和时间。自行通过 target 创建的 Viewer 随 Runtime 销毁。直接 `new CitySceneRuntime(viewer, options)` 延续旧的拥有 Viewer 行为，接入外部 Viewer 时显式传 `ownsViewer: false`。
