@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { Check, Copy, Download, Eye, FolderPlus, Globe, Layers2, LocateFixed, LockKeyhole, Maximize2, MessageSquare, MousePointer2, Move, Palette, PanelLeftClose, PanelRightClose, Plus, RefreshCw, RotateCw, Search, Shapes, SlidersHorizontal, Sun, Table2, Trash2, Waves } from 'lucide-react'
 import { createCityRuntime } from '@desktop-webgis/cesium-scene-runtime'
 import type { CitySceneRuntime, EditMode } from '@desktop-webgis/cesium-scene-runtime'
-import { createCityScene, getCityNodeState, parseCityScene } from '@desktop-webgis/cesium-scene-schema'
+import { createCityScene, getCityNodeState } from '@desktop-webgis/cesium-scene-schema'
 import type { CityNode, GeoPosition } from '@desktop-webgis/cesium-scene-schema'
 import { serializeScene } from '@desktop-webgis/scene-core'
-import { compileProjectToScene } from '../scene/compile-project'
+import { registerCityCameraReader } from './city-runtime-host'
 import { Cartesian2, Cartographic, Math as CesiumMath } from 'cesium'
 import { useProjectStore } from '@/stores/project.store'
 import { useWorkspaceStore } from '@/stores/workspace.store'
@@ -48,7 +48,6 @@ export function CityWorkspace() {
   const target = useRef<HTMLDivElement>(null)
   const runtime = useRef<CitySceneRuntime | undefined>(undefined)
   const pendingFocus = useRef<string | undefined>(undefined)
-  const importInput = useRef<HTMLInputElement>(null)
   const defaultScene = useRef(createCityScene())
   const project = useProjectStore(state => state.project)
   const city = project.city ?? defaultScene.current
@@ -101,6 +100,7 @@ export function CityWorkspace() {
   useEffect(() => {
     if (!target.current) return
     let active = true
+    let unregisterCamera: (() => void) | undefined
     try {
       runtime.current = createCityRuntime({ target: target.current, scene: city, renderQuality, cesiumBaseUrl: new URL('cesium/', document.baseURI).href,
         onSelect: (id, properties, mode) => { if (active) handlePick.current(id, properties, mode) },
@@ -113,10 +113,12 @@ export function CityWorkspace() {
           if (state === 'ready' && pendingFocus.current === id) { pendingFocus.current = undefined; void runtime.current?.flyTo(id).catch(report); notify('资源已加载') }
         }
       })
+      const mountedRuntime = runtime.current
+      unregisterCamera = registerCityCameraReader(() => mountedRuntime.getCamera())
       runtime.current.layers.popupsEnabled = false
       setReady(true); notify('就绪')
     } catch (reason) { report(reason) }
-    return () => { active = false; runtime.current?.destroy(); runtime.current = undefined }
+    return () => { active = false; unregisterCamera?.(); runtime.current?.destroy(); runtime.current = undefined }
   }, [])
 
   useEffect(() => { if (runtime.current) { try { runtime.current.setRenderQuality(renderQuality) } catch (reason) { report(reason) } } }, [renderQuality, ready])
@@ -223,27 +225,11 @@ export function CityWorkspace() {
   function sample(): void {
     try { const id = loadCitySample(); pendingFocus.current = id; select(id); notify('正在加载城市示例…') } catch (reason) { report(reason) }
   }
-  async function exportScene(): Promise<void> {
-    try {
-      const scene = compileProjectToScene(useProjectStore.getState().getSnapshot()).scene
-      if (scene.city && runtime.current) scene.city.camera = runtime.current.getCamera()
-      const result = await exportCityScene(serializeScene(scene), project.name)
-      notify(result.kind === 'saved' ? `场景已导出：${result.path}` : result.kind === 'cancelled' ? '已取消场景导出' : '场景导出已发起；资源地址保留在文件中')
-    } catch (reason) { report(reason) }
-  }
   async function exportObjects(): Promise<void> {
     try {
       const scene = compileCityObjectExport(useProjectStore.getState().getSnapshot(), liveIds)
       const result = await exportCityScene(serializeScene(scene), node?.name ?? '所选对象')
       notify(result.kind === 'cancelled' ? '已取消导出' : '对象已导出为场景文件，资源地址保留')
-    } catch (reason) { report(reason) }
-  }
-  async function importScene(file: File | undefined): Promise<void> {
-    if (!file) return
-    try {
-      const value: unknown = JSON.parse(await file.text())
-      const scene = parseCityScene(value && typeof value === 'object' && 'city' in value ? value.city : value)
-      drawing.cancel(); stopEditing(); updateCity('导入三维场景', () => scene); select(scene.nodes[0]?.id ?? ''); notify('场景已导入，可撤销恢复原场景')
     } catch (reason) { report(reason) }
   }
   function saveCamera(): void {
@@ -289,8 +275,8 @@ export function CityWorkspace() {
   handleAction.current = action => {
     if (preview && action !== 'export-scene') return
     if (action === 'add-resource') setAdding(true)
-    else if (action === 'import-scene') importInput.current?.click()
-    else if (action === 'export-scene') void exportScene()
+    else if (action === 'import-scene') void projectCommands.importScene()
+    else if (action === 'export-scene') void projectCommands.exportScene()
     else if (action === 'sample') sample()
     else if (action === 'draw-water') startWater()
     else if (action === 'undo') history()
@@ -320,7 +306,6 @@ export function CityWorkspace() {
   const DrawingIcon = drawing.kind === 'water' ? Waves : Shapes
   return <main className="city-workspace" aria-label="三维场景编辑器">
     <CityRibbon target={group?.name ?? (liveIds.length > 1 ? `${liveIds.length} 个对象` : node?.name ?? '未设置')} commands={commands} preview={preview} onPreview={togglePreview} onUndo={() => history()} onRedo={() => history(true)} onSave={() => { void projectCommands.saveProject() }} canUndo={canUndo} canRedo={canRedo} />
-      <input ref={importInput} className="city-file-input" type="file" accept=".json" aria-label="导入三维场景文件" onChange={event => { void importScene(event.target.files?.[0]); event.target.value = '' }} />
     <div className="city-workspace__body">
       {leftVisible && <LeftPanel title="场景对象" actions={<><button aria-label="新建场景分组" onClick={() => setCreatingGroup(true)}><FolderPlus size={15} /></button><button aria-label="搜索对象" aria-expanded={searchOpen} onClick={() => { setSearchOpen(!searchOpen); setSearch('') }}><Search size={15} /></button></>} footer={<footer className="city-panel-footer">Ctrl 多选 · Shift 范围 · 拖动整理</footer>}>
         {searchOpen && <label className="city-search"><Search size={14} aria-hidden="true" /><input aria-label="搜索场景对象" placeholder="搜索对象名称…" value={search} onChange={event => setSearch(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') { setSearchOpen(false); setSearch('') } }} /></label>}

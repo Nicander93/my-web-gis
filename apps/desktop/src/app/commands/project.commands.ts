@@ -1,6 +1,10 @@
 import { createEditorProject } from '@/services/project-type'
 import { isTauri } from '@tauri-apps/api/core'
 import type { ProjectType } from '@/services/project-type'
+import { openSceneDocument, saveSceneDocument } from '@/services/scene-document-io'
+import { createProjectSceneDocument } from '@/features/scene/project-scene-document'
+import { replaceSceneDocumentAsEdit } from '@/features/scene/scene-document.commands'
+import { getLiveCityCamera } from '@/features/city/city-runtime-host'
 import { emitCommandStatus } from './status'
 import { useSessionStore } from '@/stores/session.store'
 import { useProjectStore } from '@/stores/project.store'
@@ -55,6 +59,28 @@ function bumpProjectGeneration(): void {
 }
 
 export const projectCommands = {
+  async importScene(): Promise<void> {
+    try {
+      if (useProjectStore.getState().dirty && replacementGuard && !await replacementGuard()) return
+      if (Object.values(useSessionStore.getState().sessions).some(session => session.styleDraft?.dirty)) throw new Error('请先应用或放弃样式草稿，再导入场景')
+      const before = JSON.stringify(useProjectStore.getState().getSnapshot())
+      const opened = await openSceneDocument()
+      if (!opened) { emitCommandStatus('已取消导入场景'); return }
+      if (JSON.stringify(useProjectStore.getState().getSnapshot()) !== before) throw new Error('选择文件期间项目已改变，请重新导入')
+      replaceSceneDocumentAsEdit(opened.document)
+      emitCommandStatus(`已导入完整场景：${opened.path}，可撤销恢复`)
+    } catch (error) { emitCommandStatus(error instanceof Error ? `导入失败：${error.message}` : '导入失败') }
+  },
+  async exportScene(): Promise<void> {
+    try {
+      const state = useProjectStore.getState()
+      const snapshot = createSnapshotFromState(state.project, state.featuresByDataset)
+      const camera = getLiveCityCamera()
+      if (snapshot.project.city && camera) snapshot.project.city.camera = camera
+      const result = await saveSceneDocument(createProjectSceneDocument(snapshot), state.project.name)
+      emitCommandStatus(result.kind === 'saved' ? `已导出完整场景：${result.path}` : result.kind === 'cancelled' ? '已取消导出场景' : `完整场景下载已发起：${result.name}`)
+    } catch (error) { emitCommandStatus(error instanceof Error ? `导出失败：${error.message}` : '导出失败') }
+  },
   newProject(): void {
     if (newProjectCallback) { newProjectCallback(); return }
     projectCommands.createWorkspace('2d', '')
