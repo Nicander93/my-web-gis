@@ -11,11 +11,13 @@ import Select from 'ol/interaction/Select.js'
 import type BaseLayer from 'ol/layer/Base.js'
 import VectorLayer from 'ol/layer/Vector.js'
 import type VectorSource from 'ol/source/Vector.js'
+import type { EventsKey } from 'ol/events.js'
 import {
   SCENE_LAYER_ID,
   updateGoogleMapTilesAttribution
 } from './layer.js'
 import { createOlLayerHandle, type OlLayerHandle } from './layer-handle.js'
+import { createOlStyleFunction } from './style.js'
 import type {
   CreateSceneRuntimeOptions,
   SceneRuntime,
@@ -60,6 +62,8 @@ function createView(scene: SceneManifest): View {
 
 export class OlSceneRuntime implements SceneRuntime {
   private readonly map: Map
+  private readonly ownsMap: boolean
+  private readonly mapEventKeys: EventsKey[] = []
   private readonly fetcher: typeof globalThis.fetch | undefined
   private readonly credentials: Record<string, string>
   private readonly listeners = new globalThis.Map<SceneRuntimeEvent, Set<Listener>>()
@@ -73,17 +77,19 @@ export class OlSceneRuntime implements SceneRuntime {
   constructor(options: CreateSceneRuntimeOptions) {
     this.fetcher = options.fetch ?? globalThis.fetch
     this.credentials = { ...(options.credentials ?? {}) }
-    this.map = new Map({
+    this.ownsMap = !options.map
+    if (!options.map && !options.target) throw new Error('Provide a map or target')
+    this.map = options.map ?? new Map({
       target: options.target,
       layers: [],
       controls: [],
       view: new View({ projection: 'EPSG:3857', center: [0, 0], zoom: 2 })
     })
-    this.map.on('moveend', () => {
+    this.mapEventKeys.push(this.map.on('moveend', () => {
       this.emit('view:change', { view: toSceneView(this.map.getView()) })
       void this.refreshProviderAttributions()
-    })
-    this.map.on('singleclick', (event) => this.handleFeatureClick(event.pixel, event.coordinate))
+    }))
+    this.mapEventKeys.push(this.map.on('singleclick', (event) => this.handleFeatureClick(event.pixel, event.coordinate)))
   }
 
   async loadScene(input: SceneManifest | string): Promise<void> {
@@ -96,7 +102,7 @@ export class OlSceneRuntime implements SceneRuntime {
       controller.signal.throwIfAborted()
       await this.applyScene(scene, controller.signal)
       controller.signal.throwIfAborted()
-      this.emit('scene:ready', { scene })
+      this.emit('scene:ready', { scene: structuredClone(scene) })
     } catch (error) {
       const normalized = error instanceof Error ? error : new Error(String(error))
       if (!controller.signal.aborted) this.emit('scene:error', { error: normalized })
@@ -104,12 +110,33 @@ export class OlSceneRuntime implements SceneRuntime {
     }
   }
 
-  async updateScene(scene: SceneManifest): Promise<void> {
-    await this.loadScene(scene)
+  async updateScene(input: SceneManifest): Promise<void> {
+    if (this.destroyed) throw new Error('Scene runtime has been destroyed')
+    const scene = parseScene(input), current = this.scene
+    const canReuse = current && JSON.stringify(current.sources) === JSON.stringify(scene.sources)
+      && JSON.stringify(current.view) === JSON.stringify(scene.view) && JSON.stringify(current.widgets) === JSON.stringify(scene.widgets)
+      && scene.layers.length === current.layers.length && scene.layers.every(next => {
+        const previous = current.layers.find(layer => layer.id === next.id)
+        return previous?.type === next.type && previous.source === next.source
+      })
+    if (!canReuse) { await this.loadScene(scene); return }
+    // Compile all styles before touching native objects so an unsupported style cannot partially apply.
+    scene.layers.forEach(layer => { if (layer.type === 'vector') createOlStyleFunction(layer.style) })
+    this.loadController?.abort()
+    scene.layers.forEach(layer => this.layerHandles.get(layer.id)!.update(layer))
+    this.layers.forEach(layer => this.map.removeLayer(layer))
+    scene.layers.forEach(layer => this.map.addLayer(this.layers.get(layer.id)!))
+    this.scene = scene
+    this.emit('scene:ready', { scene: structuredClone(scene) })
   }
+
+  /** Returns declarative content; caller changes never mutate the runtime's scene. */
+  getScene(): SceneManifest | null { return this.scene ? structuredClone(this.scene) : null }
 
   setLayerVisible(layerId: string, visible: boolean): void {
     this.requireLayer(layerId).setVisible(visible)
+    const definition = this.findDefinition(layerId)
+    if (definition) definition.visible = visible
   }
 
   setLayerOpacity(layerId: string, opacity: number): void {
@@ -117,6 +144,8 @@ export class OlSceneRuntime implements SceneRuntime {
       throw new RangeError('opacity 必须处于 0..1')
     }
     this.requireLayer(layerId).setOpacity(opacity)
+    const definition = this.findDefinition(layerId)
+    if (definition) definition.opacity = opacity
   }
 
   async fitToLayer(layerId: string): Promise<void> {
@@ -161,13 +190,17 @@ export class OlSceneRuntime implements SceneRuntime {
     if (this.destroyed) return
     this.destroyed = true
     this.loadController?.abort()
-    this.map.getLayers().clear()
+    this.layers.forEach(layer => this.map.removeLayer(layer))
+    unByKey(this.mapEventKeys.filter(Boolean))
+    if (this.selectInteraction) this.map.removeInteraction(this.selectInteraction)
     this.layerHandles.forEach(handle => handle.dispose())
     this.layerHandles.clear()
     this.layers.clear()
     this.listeners.clear()
-    this.map.setTarget(undefined)
-    this.map.dispose()
+    if (this.ownsMap) {
+      this.map.setTarget(undefined)
+      this.map.dispose()
+    }
     this.scene = null
   }
 
@@ -195,15 +228,15 @@ export class OlSceneRuntime implements SceneRuntime {
       throw error
     }
     this.scene = scene
+    this.layers.forEach(layer => this.map.removeLayer(layer))
     this.layers.clear()
-    this.map.getLayers().clear()
     this.layerHandles.forEach(handle => handle.dispose())
     this.layerHandles.clear()
-    this.map.getControls().clear()
+    if (this.ownsMap) this.map.getControls().clear()
     if (this.selectInteraction) this.map.removeInteraction(this.selectInteraction)
 
     this.map.setView(view)
-    this.configureControls(scene)
+    if (this.ownsMap) this.configureControls(scene)
 
     for (const definition of scene.layers) {
       const handle = prepared.get(definition.id)!
