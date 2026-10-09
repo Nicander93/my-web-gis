@@ -1,4 +1,4 @@
-import { getUnsupportedSceneExtensions, parseSceneDocument, type SceneDocument, type SceneFilterCondition, type SceneLayer, type SceneSource } from '@desktop-webgis/scene-schema'
+import { getUnsupportedSceneExtensions, parseSceneDocument, type SceneDocument, type SceneFilterCondition, type SceneLayer, type SceneSource, type SceneResource } from '@desktop-webgis/scene-schema'
 import type Feature from 'ol/Feature.js'
 import GeoJSON from 'ol/format/GeoJSON.js'
 import type Geometry from 'ol/geom/Geometry.js'
@@ -17,6 +17,8 @@ export interface OlDocumentOptions extends Omit<CreateOlSceneLayerOptions, 'vect
   viewId?: string
   /** Sources already projected for the selected view, owned and synchronized by the host. */
   vectorSources?: Readonly<Record<string, VectorSource<Feature<Geometry>>>>
+  /** Install host request handling without storing secret values in the document. Return request cleanup. */
+  configureServiceLayer?: (layer: BaseLayer, resource: Extract<SceneResource, { type: 'wms' | 'wmts' }>, resourceId: string) => void | (() => void)
 }
 export interface OlDocumentLayers {
   readonly view: View
@@ -89,12 +91,15 @@ export async function createOlDocumentLayers(input: unknown, options: OlDocument
   const sources: Record<string, SceneSource> = Object.create(null)
   const shared = new Map<string, VectorSource<Feature<Geometry>>>()
   const ownedSources = new Set<VectorSource<Feature<Geometry>>>()
+  const requestCleanup: Array<() => void> = []
   const handles = new Map<string, OlLayerHandle>(), layers = new Map<string, BaseLayer>()
   const format = new GeoJSON({ featureProjection: view.getProjection() })
   let disposed = false
   function dispose(): void {
     if (disposed) return
     disposed = true
+    requestCleanup.forEach(cleanup => cleanup())
+    requestCleanup.length = 0
     handles.forEach(handle => handle.dispose())
     layers.forEach(layer => { if (layer instanceof LayerGroup) layer.dispose() })
     ownedSources.forEach(source => source.dispose())
@@ -115,7 +120,7 @@ export async function createOlDocumentLayers(input: unknown, options: OlDocument
         continue
       }
       const resource = document.resources[node.resource]
-      if ((resource.type === 'wms' || resource.type === 'wmts') && resource.authMode === 'runtime') throw new Error(`Authenticated service ${node.resource} requires an OL request adapter`)
+      if ((resource.type === 'wms' || resource.type === 'wmts') && resource.authMode === 'runtime' && !options.configureServiceLayer) throw new Error(`Authenticated service ${node.resource} requires an OL request adapter`)
       if (resource.type === '3dtiles' || resource.type === 'glb') throw new Error(`Unsupported map resource ${node.resource}`)
       sources[node.resource] = resource.type === 'wfs' ? { type: 'geojson', data: resource.snapshot, dataProjection: 'EPSG:4326' } : resource as SceneSource
       if (node.type === 'vector' && !shared.has(node.resource)) {
@@ -162,6 +167,10 @@ export async function createOlDocumentLayers(input: unknown, options: OlDocument
       const { resource: resourceId, parentId, locked, filter, ...presentation } = node
       const handle = await createOlLayerHandle({ ...presentation, source: resourceId } as SceneLayer, sources, view, { ...options, vectorSource: shared.get(resourceId) })
       handles.set(node.id, handle); layers.set(node.id, handle.layer)
+      if (resource.type === 'wms' || resource.type === 'wmts') {
+        const cleanup = options.configureServiceLayer?.(handle.layer, resource, resourceId)
+        if (cleanup) requestCleanup.push(cleanup)
+      }
       if (node.type === 'vector' && node.filter?.length && handle.layer instanceof VectorLayer) {
         const style = handle.layer.getStyleFunction()!
         handle.layer.setStyle((feature, resolution) => node.filter!.every(condition => matches(feature.get(condition.field), condition)) ? style(feature, resolution) : undefined)

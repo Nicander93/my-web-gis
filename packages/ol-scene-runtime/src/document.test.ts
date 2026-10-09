@@ -17,6 +17,25 @@ function document(): SceneDocument {
 }
 
 describe('v3 OL document factory', () => {
+  it('requires explicit authenticated tile handling and cleans installed requests on failure', async () => {
+    const input = document()
+    input.resources.service = { type: 'wms', url: 'https://example.test/wms', version: '1.3.0', layerNames: ['roads'], authMode: 'runtime', authentication: { mode: 'bearer', credential: 'service' } }
+    input.credentials = { service: { type: 'runtime-reference', key: 'service' } }
+    input.nodes.unshift({ type: 'tile', id: 'service', name: 'Service', resource: 'service', visible: true })
+    await expect(createOlDocumentLayers(input)).rejects.toThrow('request adapter')
+    const cleanup = vi.fn(), adapter = vi.fn(() => cleanup)
+    const result = await createOlDocumentLayers(input, { configureServiceLayer: adapter })
+    expect(adapter).toHaveBeenCalledWith(result.getLayer('service'), input.resources.service, 'service')
+    expect(result.getDocument()).toEqual(input)
+    result.dispose(); result.dispose()
+    expect(cleanup).toHaveBeenCalledOnce()
+    input.resources.remote = { type: 'geojson', url: './failed.geojson' }
+    const node = input.nodes.find(node => node.id === 'second')!
+    if (node.type !== 'vector') throw new Error('Expected vector')
+    node.resource = 'remote'
+    await expect(createOlDocumentLayers(input, { configureServiceLayer: adapter, fetch: async () => new Response('', { status: 503 }) })).rejects.toThrow('503')
+    expect(cleanup).toHaveBeenCalledTimes(2)
+  })
   it('shares caller-owned editable sources without rewriting IDs, data or ownership', async () => {
     const input = document(), feature = new Feature({ geometry: new Point([100, 200]), value: 1 })
     feature.setId('host-identity')
