@@ -32,6 +32,22 @@ function document(id: string, remote = false): SceneDocument {
 }
 
 describe('v3 document runtime lifecycle', () => {
+  it('notifies host bindings synchronously before releasing previous content', async () => {
+    const runtime = new OlDocumentRuntime({ map: new Map({ view: new View() }) })
+    await runtime.loadDocument(document('first'))
+    const previous = runtime.getLayer('first')!, dispose = vi.spyOn(previous, 'dispose'), installed = vi.fn(() => {
+      expect(runtime.getDocument()?.id).toBe('second')
+      expect(runtime.getNativeMap().getLayers().getArray()).toEqual([runtime.getLayer('second')])
+      expect(dispose).not.toHaveBeenCalled()
+    })
+    await runtime.loadDocument(document('second'), undefined, { onInstalled: installed })
+    expect(installed).toHaveBeenCalledOnce(); expect(dispose).toHaveBeenCalledOnce()
+    const update = document('second'); update.nodes[0].visible = false
+    const presentation = vi.fn(() => expect(runtime.getLayer('second')?.getVisible()).toBe(false))
+    await runtime.updateDocument(update, undefined, { onInstalled: presentation })
+    expect(presentation).toHaveBeenCalledOnce()
+    runtime.destroy()
+  })
   it('retains host feature objects through document replacement and teardown', async () => {
     const feature = new Feature({ geometry: new Point([10, 20]) })
     feature.setId('editable')

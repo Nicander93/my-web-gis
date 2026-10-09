@@ -82,12 +82,7 @@ export function MapCanvas({
       if (!isMapRuntimeMounted()) return
 
       const projectChanged =
-        state.project.id !== previous.project.id ||
-        state.project.layers !== previous.project.layers ||
-        state.project.datasets !== previous.project.datasets ||
-        state.project.groups !== previous.project.groups ||
-        state.project.rootOrder !== previous.project.rootOrder ||
-        state.project.basemap !== previous.project.basemap ||
+        state.project !== previous.project ||
         state.featuresByDataset !== previous.featuresByDataset
 
       if (projectChanged) syncMapFromProject()

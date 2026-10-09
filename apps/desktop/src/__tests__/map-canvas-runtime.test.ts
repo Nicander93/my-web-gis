@@ -102,6 +102,11 @@ function createMockRuntime(initialZoom = 2): OlMapRuntime {
     syncBasemap: vi.fn(async () => undefined),
     getMapState: (): MapState => ({ center, zoom, rotation }),
     syncLayers: vi.fn(),
+    syncDocument: vi.fn(async document => {
+      const definition = document.views.map
+      center = definition.center; zoom = definition.zoom; rotation = definition.rotation ?? 0
+      return true
+    }),
     retryWmsLayer: vi.fn(() => true),
     retryWmtsLayer: vi.fn(() => false),
     zoomToLayer: vi.fn(),
@@ -144,7 +149,7 @@ describe('MapCanvas OlMapRuntime selection tool wiring', () => {
     expect(isToolRuntimeMounted()).toBe(true)
   })
 
-  it('host reports mounted and syncs layers through OlMapRuntime.syncLayers', () => {
+  it('host reports mounted and syncs the complete document through the public runtime', () => {
     const runtime = createMockRuntime(4)
     _setMapRuntimeForTests(runtime, true)
     expect(isMapRuntimeMounted()).toBe(true)
@@ -164,12 +169,12 @@ describe('MapCanvas OlMapRuntime selection tool wiring', () => {
 
     syncMapFromProject()
 
-    expect(runtime.syncLayers).toHaveBeenCalled()
-    const [layers, featuresByDataset, datasets] = (runtime.syncLayers as ReturnType<typeof vi.fn>).mock
+    expect(runtime.syncDocument).toHaveBeenCalled()
+    const [document, featuresByDataset] = (runtime.syncDocument as ReturnType<typeof vi.fn>).mock
       .calls.at(-1)!
-    expect(layers).toHaveLength(1)
+    expect(document.nodes.filter((node: { type: string }) => node.type === 'vector')).toHaveLength(1)
     expect(Object.keys(featuresByDataset)).toContain('ds-1')
-    expect(datasets).toHaveLength(1)
+    expect(document.resources['ds-1'].type).toBe('geojson')
     expect(getLiveMapState()?.zoom).toBe(useProjectStore.getState().project.mapState.zoom)
   })
 

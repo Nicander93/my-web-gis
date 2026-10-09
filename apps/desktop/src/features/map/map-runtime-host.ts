@@ -29,14 +29,11 @@ let mounted = false
 let selectionMounted = false
 let toolMounted = false
 let activeTool: EditTool = 'none'
-let lastSyncedProjectId: string | null = null
-let lastBasemapKey = ''
 let moveEndKey: (() => void) | null = null
 let storeUnsub: (() => void) | null = null
 let snappingUnsub: (() => void) | null = null
 /** Avoid echoing map?store?map selection sync loops. */
 let applyingStoreSelection = false
-const serviceRequests = new Map<string, { layer: unknown; resource: string; cleanup?: () => void }>()
 
 export function getMapRuntime(): OlMapRuntime | null {
   return runtime
@@ -100,8 +97,6 @@ export function mountMapRuntime(
   mounted = true
   selectionMounted = true
   toolMounted = true
-  lastSyncedProjectId = null
-  lastBasemapKey = ''
   activeTool = 'none'
 
   const map = runtime.getMap()
@@ -148,8 +143,6 @@ export function mountMapRuntime(
 }
 
 export function unmountMapRuntime(): void {
-  serviceRequests.forEach(request => request.cleanup?.())
-  serviceRequests.clear()
   snappingUnsub?.()
   snappingUnsub = null
   storeUnsub?.()
@@ -168,8 +161,6 @@ export function unmountMapRuntime(): void {
   runtime?.unmount()
   runtime = null
   mounted = false
-  lastSyncedProjectId = null
-  lastBasemapKey = ''
 }
 
 /** Pull layers / view / basemap from the project store into the mounted runtime. */
@@ -179,53 +170,22 @@ export function syncMapFromProject(): void {
   const state = useProjectStore.getState()
   const { project, featuresByDataset } = state
 
-  if (project.id !== lastSyncedProjectId) {
-    lastSyncedProjectId = project.id
-    const view = runtime.getMap().getView()
-    view.setCenter(project.mapState.center)
-    view.setZoom(project.mapState.zoom)
-    view.setRotation(project.mapState.rotation)
-    lastBasemapKey = ''
-  }
-
-  const basemapKey = JSON.stringify(project.basemap)
-  if (basemapKey !== lastBasemapKey) {
-    lastBasemapKey = basemapKey
-    void runtime.syncBasemap(
-      project.basemap,
-      collectBasemapCredentials(project.basemap)
-    )
-  }
-
-  runtime.syncLayers(state.getMapLayers(), featuresByDataset, project.datasets)
-  syncServiceRequests()
-  toolRuntime?.refreshSnapping()
-  syncSessionViewExtent()
-  syncSelectionHighlight(state.selection)
-}
-
-/** Keeps request handlers attached to the installed source rather than persisting credential values. */
-function syncServiceRequests(): void {
-  if (!runtime) return
-  const state = useProjectStore.getState()
-  const authenticated = state.project.datasets.filter(dataset => (dataset.kind === 'wms' || dataset.kind === 'wmts') && dataset.source.authMode !== 'none')
-  const document = authenticated.length ? createProjectSceneDocument(state.getSnapshot()) : undefined
-  const live = new Set<string>()
-  for (const definition of state.project.layers) {
-    const resource = document?.resources[definition.datasetId]
-    if (resource?.type !== 'wms' && resource?.type !== 'wmts' || resource.authMode !== 'runtime') continue
-    const layer = runtime.registry.get(definition.id)
-    if (!layer) continue
-    live.add(definition.id)
-    const key = JSON.stringify(resource), previous = serviceRequests.get(definition.id)
-    if (previous?.layer === layer && previous.resource === key) continue
-    previous?.cleanup?.()
-    serviceRequests.set(definition.id, { layer, resource: key, cleanup: configureMapServiceLayer(layer, resource) })
-  }
-  for (const [id, request] of serviceRequests) {
-    if (live.has(id)) continue
-    request.cleanup?.(); serviceRequests.delete(id)
-  }
+  const current = runtime
+  const target = useWorkbenchStore.getState().editLayerId
+  const previousSource = target ? current.registry.getVector(target)?.getSource() : undefined
+  void current.syncDocument(createProjectSceneDocument(state.getSnapshot()), featuresByDataset, {
+    credentials: collectBasemapCredentials(project.basemap), configureServiceLayer: (layer, resource) => configureMapServiceLayer(layer, resource)
+  }).then(applied => {
+    if (!applied || runtime !== current) return
+    const nextSource = target ? current.registry.getVector(target)?.getSource() : undefined
+    if (previousSource !== nextSource && activeTool !== 'select') setActiveEditTool(activeTool)
+    toolRuntime?.refreshSnapping()
+    syncSessionViewExtent()
+    syncSelectionHighlight(useProjectStore.getState().selection)
+  }).catch(() => {
+    if (runtime !== current) return
+    window.dispatchEvent(new CustomEvent('desktop-webgis:command-status', { detail: '地图资源加载失败，已显示的内容保留。' }))
+  })
 }
 
 export function zoomMapBy(delta: number): boolean {
@@ -504,8 +464,6 @@ export function _setMapRuntimeForTests(
   isMounted = Boolean(next),
   options?: { selection?: boolean; tool?: boolean; activeTool?: EditTool }
 ): void {
-  serviceRequests.forEach(request => request.cleanup?.())
-  serviceRequests.clear()
   snappingUnsub?.()
   snappingUnsub = null
   storeUnsub?.()
@@ -521,8 +479,6 @@ export function _setMapRuntimeForTests(
   selectionMounted = Boolean(options?.selection ?? (isMounted && next))
   toolMounted = Boolean(options?.tool ?? (isMounted && next))
   activeTool = options?.activeTool ?? (isMounted ? 'select' : 'none')
-  lastSyncedProjectId = null
-  lastBasemapKey = ''
 
   if (next && isMounted) {
     // Lightweight stand-ins so getSelectionRuntime/getToolRuntime are non-null in unit tests.

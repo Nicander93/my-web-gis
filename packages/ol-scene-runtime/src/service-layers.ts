@@ -19,7 +19,9 @@ export function buildSceneWmtsTileGrid(source: WmtsSceneSource): {
   tileGrid: WMTSTileGrid
   projectionCode: string
 } {
-  const projectionCode = source.projection || source.supportedCrs || 'EPSG:3857'
+  const declared = source.projection || source.supportedCrs || 'EPSG:3857'
+  const epsg = declared.match(/EPSG(?::|\/)(?:[^:\/]*[:\/])?(\d+)$/i)
+  const projectionCode = epsg ? `EPSG:${epsg[1]}` : declared
   const projection = getProjection(projectionCode)
   if (!projection) {
     throw new Error(`WMTS 投影 “${projectionCode}” 不受支持`)
@@ -29,7 +31,7 @@ export function buildSceneWmtsTileGrid(source: WmtsSceneSource): {
   }
 
   const metersPerUnit = projection.getMetersPerUnit() ?? 1
-  const scaleToResolution = (scaleDenominator: number, tileWidth: number): number => {
+  const scaleToResolution = (scaleDenominator: number): number => {
     // OGC: resolution = scaleDenominator * 0.00028 / metersPerUnit (0.28 mm pixel)
     return (assertFinite(scaleDenominator, 'scaleDenominator') * 0.00028) / metersPerUnit
   }
@@ -37,16 +39,17 @@ export function buildSceneWmtsTileGrid(source: WmtsSceneSource): {
   const sorted = [...source.tileMatrices].sort(
     (a, b) => b.scaleDenominator - a.scaleDenominator
   )
-  const resolutions = sorted.map((m) => scaleToResolution(m.scaleDenominator, m.tileWidth))
+  const resolutions = sorted.map((m) => scaleToResolution(m.scaleDenominator))
   const matrixIds = sorted.map((m) => m.identifier)
-  const origin = sorted[0]!.topLeftCorner
-  const tileSize = [sorted[0]!.tileWidth, sorted[0]!.tileHeight] as [number, number]
+  const swap = projection.getAxisOrientation().startsWith('ne')
+  const origins = sorted.map(matrix => swap ? [matrix.topLeftCorner[1], matrix.topLeftCorner[0]] : [...matrix.topLeftCorner])
+  const tileSizes = sorted.map(matrix => [matrix.tileWidth, matrix.tileHeight] as [number, number])
 
   const tileGrid = new WMTSTileGrid({
-    origin,
+    origins,
     resolutions,
     matrixIds,
-    tileSize
+    tileSizes
   })
   return { tileGrid, projectionCode }
 }
