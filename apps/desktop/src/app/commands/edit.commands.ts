@@ -42,14 +42,14 @@ export const editCommands = {
       emitCommandStatus('已撤销')
       return
     }
-    emitCommandStatus('撤销（无可撤销操作）')
+    emitCommandStatus(useProjectStore.getState().getHistoryBlockReason('undo') ?? '撤销（无可撤销操作）')
   },
   redo(): void {
     if (useProjectStore.getState().redoEdit()) {
       emitCommandStatus('已重做')
       return
     }
-    emitCommandStatus('重做（无可重做操作）')
+    emitCommandStatus(useProjectStore.getState().getHistoryBlockReason('redo') ?? '重做（无可重做操作）')
   },
   draw(): void {
     if (!isToolRuntimeMounted()) {

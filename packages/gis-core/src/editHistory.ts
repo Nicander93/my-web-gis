@@ -126,6 +126,10 @@ export class EditHistory {
     return this.redoStack.length
   }
 
+  /** Inspect the next command for host preflight without consuming history. */
+  peekUndo(): EditCommand | undefined { return this.undoStack.at(-1) }
+  peekRedo(): EditCommand | undefined { return this.redoStack.at(-1) }
+
   execute(command: EditCommand, context: EditContext): void {
     const top = this.undoStack[this.undoStack.length - 1]
     if (

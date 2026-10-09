@@ -193,6 +193,7 @@ export function CityWorkspace() {
     drawing.cancel(); stopEditing()
     const store = useProjectStore.getState()
     if (redo ? store.redoEdit() : store.undoEdit()) notify(redo ? '已重做' : '已撤销')
+    else { const reason = store.getHistoryBlockReason(redo ? 'redo' : 'undo'); if (reason) notify(reason) }
   }
   function patchNode(patch: Partial<CityNode>, label = '修改三维对象'): void {
     if (!node || node.locked) return

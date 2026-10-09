@@ -113,6 +113,7 @@ interface ProjectState {
   /** Unified EditCommand undo (style/filter/opacity/tree + attributes). */
   undoEdit(): boolean
   redoEdit(): boolean
+  getHistoryBlockReason(direction: 'undo' | 'redo'): string | null
   canUndoEdit(): boolean
   canRedoEdit(): boolean
   /** Apply a feature/geometry EditCommand (draw / modify / delete from OlToolRuntime). */
@@ -367,6 +368,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     featuresByDataset: cloneValue(get().featuresByDataset)
   }),
   replaceSnapshotAsEdit: (snapshot, label) => {
+    if (Object.values(useSessionStore.getState().sessions).some(session => session.styleDraft?.dirty)) throw new Error('请先应用或放弃样式草稿，再替换场景')
     const before = get().getSnapshot()
     if (JSON.stringify(before) === JSON.stringify(snapshot)) return false
     return get().executeEditCommand(new ReplaceProjectSnapshotCommand(createId('cmd'), label, before, snapshot))
@@ -501,6 +503,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   },
 
   undoEdit: () => {
+    if (get().getHistoryBlockReason('undo')) return false
     const state = get()
     syncStoreFromState(state.featuresByDataset)
     const command = editHistory.undo(projectEditContext())
@@ -517,6 +520,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   },
 
   redoEdit: () => {
+    if (get().getHistoryBlockReason('redo')) return false
     const state = get()
     syncStoreFromState(state.featuresByDataset)
     const command = editHistory.redo(projectEditContext())
@@ -533,6 +537,11 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   },
 
   canUndoEdit: () => editHistory.canUndo,
+  getHistoryBlockReason: (direction) => {
+    const command = direction === 'undo' ? editHistory.peekUndo() : editHistory.peekRedo()
+    return command instanceof ReplaceProjectSnapshotCommand && Object.values(useSessionStore.getState().sessions).some(session => session.styleDraft?.dirty)
+      ? '请先应用或放弃样式草稿，再恢复场景内容' : null
+  },
   canRedoEdit: () => editHistory.canRedo,
 
   executeEditCommand: (command) => {
