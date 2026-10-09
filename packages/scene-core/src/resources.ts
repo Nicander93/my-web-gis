@@ -1,4 +1,4 @@
-import { parseSceneDocument, type SceneDocument } from '@desktop-webgis/scene-schema'
+import { parseSceneDocument, type GeoJsonFeatureCollection, type SceneDocument, type SceneResource } from '@desktop-webgis/scene-schema'
 
 export interface SceneResourceReference {
   path: string
@@ -41,5 +41,37 @@ export function resolveSceneResourceReferences(input: SceneDocument, documentUrl
   }
   if (document.environment?.basemap) document.environment.basemap.url = resolve(document.environment.basemap.url)
   if (document.environment?.terrain) document.environment.terrain.url = resolve(document.environment.terrain.url)
+  return parseSceneDocument(document)
+}
+
+export interface PrepareSceneResourcesOptions {
+  /** Host controls transport, credentials, file access and response size limits. */
+  loadGeoJson: (url: string, context: { resourceId: string; signal?: AbortSignal; resource: SceneResource }) => Promise<unknown>
+  signal?: AbortSignal
+  /** Omit to prepare all URL GeoJSON resources; hosts may prepare only their engine's resources. */
+  resourceIds?: readonly string[]
+}
+
+/** Prepare complete GeoJSON data atomically; no partial document escapes on failure or cancellation. */
+export async function prepareSceneGeoJsonResources(input: SceneDocument, options: PrepareSceneResourcesOptions): Promise<SceneDocument> {
+  const document = parseSceneDocument(input)
+  const checkCancelled = (): void => {
+    if (options.signal?.aborted) throw new DOMException('Scene resource preparation cancelled', 'AbortError')
+  }
+  checkCancelled()
+  const ids = options.resourceIds ?? Object.keys(document.resources)
+  for (const id of new Set(ids)) {
+    if (!Object.hasOwn(document.resources, id)) throw new Error(`Scene resource does not exist: ${id}`)
+    const resource = document.resources[id]
+    if (resource.type !== 'geojson' || !resource.url) continue
+    checkCancelled()
+    const data = await options.loadGeoJson(resource.url, { resourceId: id, signal: options.signal, resource: structuredClone(resource) })
+    checkCancelled()
+    const { url: _url, ...definition } = resource
+    document.resources[id] = { ...definition, data: data as GeoJsonFeatureCollection }
+    // Validate each result before asking the host to load the next resource.
+    parseSceneDocument(document)
+  }
+  checkCancelled()
   return parseSceneDocument(document)
 }

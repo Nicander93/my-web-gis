@@ -35,4 +35,20 @@ describe('full scene JSON IO', () => {
     expect(probe.write).toHaveBeenCalledWith('D:/City.scene.json', serializeSceneDocument(document()))
     expect(getCurrentProjectPath()).toBe('original.webgis.json')
   })
+  it('prepares relative native vector data before returning a scene and refuses browser path guessing', async () => {
+    const input = document()
+    input.resources.points = { type: 'geojson', url: './data/points.geojson' }
+    input.nodes = [{ type: 'vector', id: 'points', name: 'Points', resource: 'points', style: { mode: 'single', symbol: { type: 'circle', radius: 4 } } }]
+    const data = { type: 'FeatureCollection', features: [] }
+    probe.native = true
+    probe.nativePick.mockResolvedValue('D:/scenes/project.scene.json')
+    probe.read.mockImplementation(async (path: string) => path.endsWith('project.scene.json') ? serializeSceneDocument(input) : JSON.stringify(data))
+    const opened = await openSceneDocument()
+    expect(opened?.document.resources.points).toMatchObject({ data })
+    expect(probe.read).toHaveBeenCalledWith('D:/scenes/data/points.geojson')
+    probe.native = false
+    probe.pick.mockResolvedValue({ name: 'project.scene.json', text: async () => serializeSceneDocument(input) })
+    await expect(openSceneDocument()).rejects.toThrow('相对资源')
+    expect(getCurrentProjectPath()).toBe('original.webgis.json')
+  })
 })

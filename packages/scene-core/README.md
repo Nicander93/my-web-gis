@@ -13,6 +13,13 @@ The controller owns no Map, Viewer, selection, file IO or undo stack. Engine pre
 The root and `./scene` entry points depend only on the scene schema. Project-specific publishing conversion lives in Desktop's `features/scene/compile-project.ts`; it is not part of this package's public API. Internal callers previously importing `compileProjectToScene` from this package must use that application adapter instead.
 # Resource references
 
+`prepareSceneGeoJsonResources(document, { loadGeoJson, signal, resourceIds })`
+prepares URL GeoJSON into complete inline data on a detached document. The host
+supplies transport and response limits. Duplicate resource IDs load once;
+validation failures and cancellation reject without exposing partial results.
+`resourceIds` allows engine-specific preparation; omission prepares all URL
+GeoJSON. This is content preparation, not fetching model/tileset dependencies.
+
 `collectSceneResourceReferences(document)` lists declared resource URLs, WMTS
 alternate URLs, basemap and terrain references with field paths. It does not
 fetch resources or discover dependencies inside model or tileset files.
