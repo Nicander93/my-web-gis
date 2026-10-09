@@ -62,3 +62,22 @@ The target implements `updateDocument(document, signal)`. The binding projects i
 `getState()` exposes requested/applied revisions and loading/ready/error/disposed status. `settled()` follows replacements even when an obsolete request never settles. Rendering failures keep committed controller content authoritative and report the last applied revision; they do not automatically undo user edits. `refresh()` retries the current document without changing content or history. Hosts own error UI and native staging/rollback when atomic imports are required.
 
 Disposal cancels only the binding's signal and subscription. It does not destroy the controller, map or runtime. This API remains framework/engine-independent and can be imported and used without DOM.
+
+# Host-owned content
+
+`createHostedSceneController(host)` exposes the same declarative and convenience
+APIs while reading content directly from an authoritative application host. It
+does not keep another writable document. The host supplies `read()`, synchronous
+atomic `commit(document, label)` and `subscribe(observer)` with complete
+`{ label, before, after }` changes, including external commands and undo/redo.
+Host validation and draft guards must run before publishing content. Host
+commits own history; the controller publishes successful API commits once and
+does not add a second undo stack.
+
+Reads and exports reflect current host content. External edits invalidate
+pending preparation, and a transaction rejects its draft if its callback changes
+the host directly. Observer snapshots are isolated; external changes made during
+notification are delivered after the current change. Disposing the controller
+unsubscribes without disposing the host. `bindSceneRuntime` works with owned and
+hosted controllers alike. Engine copies remain projections, and native edits
+still need to be translated into host content commands.
