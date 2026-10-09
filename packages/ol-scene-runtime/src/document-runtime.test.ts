@@ -28,6 +28,23 @@ function document(id: string, remote = false): SceneDocument {
 }
 
 describe('v3 document runtime lifecycle', () => {
+  it('reuses presentation layers but prepares replacements for changed resources', async () => {
+    const runtime = new OlDocumentRuntime({ map: new Map({ view: new View() }) })
+    const input = document('first')
+    await runtime.loadDocument(input)
+    const layer = runtime.getLayer('first'), view = runtime.getNativeMap().getView()
+    input.nodes[0].visible = false
+    await runtime.updateDocument(input)
+    expect(runtime.getLayer('first')).toBe(layer)
+    expect(layer?.getVisible()).toBe(false)
+    expect(runtime.getNativeMap().getView()).toBe(view)
+    expect(runtime.getDocument()).toEqual(input)
+    input.resources.data = { type: 'geojson', data: { type: 'FeatureCollection', features: [{ type: 'Feature', id: 1, properties: {}, geometry: { type: 'Point', coordinates: [0, 0] } }] } }
+    await runtime.updateDocument(input)
+    expect(runtime.getLayer('first')).not.toBe(layer)
+    expect(runtime.getFilteredFeatures('first')).toHaveLength(1)
+    runtime.destroy()
+  })
   it('retains host layers and restores its view without disposing the external map', async () => {
     const view = new View(), map = new Map({ view }), host = new TileLayer()
     map.addLayer(host)

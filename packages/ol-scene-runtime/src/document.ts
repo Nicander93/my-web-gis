@@ -10,6 +10,7 @@ import View from 'ol/View.js'
 import { get as getProjection } from 'ol/proj.js'
 import { createOlLayerHandle, type OlLayerHandle } from './layer-handle.js'
 import type { CreateOlSceneLayerOptions } from './layer.js'
+import { createOlStyleFunction } from './style.js'
 
 export interface OlDocumentIssue { path: string; code: string; message: string }
 export interface OlDocumentLayers {
@@ -20,6 +21,8 @@ export interface OlDocumentLayers {
   /** Node-filtered records for selection/query; local and ancestor visibility remain host policy. */
   getFilteredFeatures(id: string): readonly Feature<Geometry>[]
   getDocument(): SceneDocument
+  /** Returns false when resources, views or hierarchy require preparing new layers. */
+  updatePresentation(input: SceneDocument): boolean
   /** Remove root layers from the map first. Owns created layers and shared sources, not the map. */
   dispose(): void
 }
@@ -50,7 +53,8 @@ function matches(value: unknown, condition: SceneFilterCondition): boolean {
 
 /** Shares resource sources without baking node filters into data. Reports unsupported content explicitly. */
 export async function createOlDocumentLayers(input: unknown, options: Omit<CreateOlSceneLayerOptions, 'vectorSource'> & { viewId?: string } = {}): Promise<OlDocumentLayers> {
-  const document = parseSceneDocument(input), viewId = options.viewId ?? document.activeView
+  let document = parseSceneDocument(input)
+  const viewId = options.viewId ?? document.activeView
   const definition = document.views[viewId]
   if (!definition || definition.type !== '2d') throw new Error(`OL requires a two-dimensional view: ${viewId}`)
   if (!getProjection(definition.projection)) throw new Error(`OL projection is not registered: ${definition.projection}`)
@@ -143,6 +147,35 @@ export async function createOlDocumentLayers(input: unknown, options: Omit<Creat
     options.signal?.throwIfAborted()
     return {
       view, rootLayers: roots, issues, getLayer: id => layers.get(id),
+      updatePresentation(input) {
+        if (disposed) throw new Error('Document layers have been disposed')
+        const next = parseSceneDocument(input)
+        const { nodes: previousNodes, ...previousContent } = document
+        const { nodes: nextNodes, ...nextContent } = next
+        if (JSON.stringify(previousContent) !== JSON.stringify(nextContent) || previousNodes.length !== nextNodes.length) return false
+        const identity = (node: SceneDocument['nodes'][number]): unknown => ({
+          id: node.id, type: node.type, parentId: node.parentId,
+          resource: 'resource' in node ? node.resource : undefined,
+          scope: node.type === 'group' ? node.scope : undefined
+        })
+        if (nextNodes.some((node, index) => JSON.stringify(identity(node)) !== JSON.stringify(identity(previousNodes[index])))) return false
+        // Compile every style before writing to any native object.
+        nextNodes.forEach(node => { if (node.type === 'vector') createOlStyleFunction(node.style) })
+        nextNodes.forEach(node => {
+          if (node.type === 'group') { layers.get(node.id)?.setVisible(node.visible); return }
+          if (node.type !== 'tile' && node.type !== 'vector') return
+          const { resource, parentId, locked, filter, ...presentation } = node
+          const handle = handles.get(node.id)
+          if (!handle) throw new Error(`Missing layer handle ${node.id}`)
+          handle.update({ ...presentation, source: resource } as SceneLayer)
+          if (node.type === 'vector' && node.filter?.length && handle.layer instanceof VectorLayer) {
+            const style = handle.layer.getStyleFunction()!
+            handle.layer.setStyle((feature, resolution) => node.filter!.every(condition => matches(feature.get(condition.field), condition)) ? style(feature, resolution) : undefined)
+          }
+        })
+        document = next
+        return true
+      },
       getFilteredFeatures(id) {
         const layer = layers.get(id), node = document.nodes.find(node => node.id === id)
         if (!(layer instanceof VectorLayer) || node?.type !== 'vector') return []

@@ -212,3 +212,10 @@
 - 外部 Map、无关图层、控件与交互由宿主持有；销毁只移除所属图层，在视图仍为本运行时设置时恢复原视图。内部 Map 销毁，重复销毁幂等。
 - 验证：OL package 构建、26 个测试（新增生命周期 4 项）、Desktop TypeScript／生产构建通过。测试使用 Map mock 与真实 OL 图层／Source，不作为浏览器、原生 Windows 或 DPI 验收。Desktop 构建仍有既有动态／静态混合导入和大 chunk 警告。
 - 范围：这是 S05 的挂载基础，尚未完成增量更新、SceneController 绑定、Desktop／Viewer 路径迁移；`getDocument()` 不捕获原生改动或实时相机。不据此签收 S05、S07 或 S09。
+
+## 2026-10-09：v3 OL 节点显示属性增量更新
+
+- `OlDocumentLayers.updatePresentation` 与 `OlDocumentRuntime.updateDocument` 原位更新显隐、透明度、缩放限制、样式、过滤；保留原生图层、共享完整 Source 和当前地图 View。过滤清除后恢复完整绘制，不累积旧过滤包装。
+- 资源、视图、节点顺序／身份／分组结构或文档其他顶层内容变化走准备替换；无效文档在任何 setter 前拒绝，全部样式先编译。宿主监听器在原生 setter 中抛错尚不提供事务保证。
+- 验证：OL 构建、28 个测试通过。新增过滤修改／清除、共享源与实例保持、资源变化替换和无效透明度拒绝证据。测试仍为 Node 中的 Map mock 与真实 OL 图层／Source；未新增浏览器或 Windows 原生验收。
+- 仍需 SceneController 绑定、编辑器／Viewer 创建路径收敛与更完整的增量差异处理；本批不签收 S05／S07／S09。

@@ -15,6 +15,39 @@ function document(): SceneDocument {
 }
 
 describe('v3 OL document factory', () => {
+  it('updates styles and filters while preserving shared data and layer identity', async () => {
+    const input = document(), result = await createOlDocumentLayers(input)
+    const layer = result.getLayer('first') as VectorLayer, source = layer.getSource()!
+    const next = structuredClone(input), node = next.nodes[1]
+    if (node.type !== 'vector') throw new Error('Expected vector')
+    node.filter = [{ field: 'value', op: 'eq', value: 0 }]
+    node.opacity = 0.3
+    next.nodes[0].visible = true
+    expect(result.updatePresentation(next)).toBe(true)
+    expect(result.getLayer('first')).toBe(layer)
+    expect(layer.getSource()).toBe(source)
+    expect(source.getFeatures()).toHaveLength(3)
+    expect(layer.getOpacity()).toBe(0.3)
+    expect(result.getFilteredFeatures('first').map(getSceneFeatureId)).toEqual([1])
+    expect(layer.getStyleFunction()!(source.getFeatures()[0], 1)).toBeDefined()
+    expect(layer.getStyleFunction()!(source.getFeatures()[1], 1)).toBeUndefined()
+    delete node.filter
+    expect(result.updatePresentation(next)).toBe(true)
+    expect(result.getFilteredFeatures('first')).toHaveLength(3)
+    expect(layer.getStyleFunction()!(source.getFeatures()[1], 1)).toBeDefined()
+    expect(result.getDocument()).toEqual(next)
+    const invalid = structuredClone(next)
+    const invalidNode = invalid.nodes[1]
+    if (invalidNode.type !== 'vector') throw new Error('Expected vector')
+    invalidNode.opacity = 2
+    expect(() => result.updatePresentation(invalid)).toThrow()
+    expect(layer.getOpacity()).toBe(0.3)
+    expect(result.getDocument()).toEqual(next)
+    next.resources.extra = { type: 'xyz', url: 'https://example.test/{z}/{x}/{y}.png' }
+    expect(result.updatePresentation(next)).toBe(false)
+    expect(result.getDocument().resources.extra).toBeUndefined()
+    result.dispose()
+  })
   it('shares full data, retains typed identities and applies independent node filters', async () => {
     const input = document(), before = JSON.stringify(input), result = await createOlDocumentLayers(input)
     const first = result.getLayer('first') as VectorLayer, second = result.getLayer('second') as VectorLayer
