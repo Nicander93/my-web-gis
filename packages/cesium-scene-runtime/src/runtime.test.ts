@@ -38,6 +38,48 @@ function setup() {
   return { scene, viewer, runtime: new CitySceneRuntime(viewer, { target: 'map', scene }) }
 }
 describe('v3 document updates', () => {
+  it('retains native interaction when content outside the city projection changes', async () => {
+    const s = setup(), input = migrateSceneDocument(s.scene)
+    const loaded = await createCesiumDocumentRuntime({ viewer: s.viewer, document: input })
+    const editor = probe.editors.at(-1)!
+    editor.cancel.mockClear()
+    const next = structuredClone(input); next.title = 'New title'
+    next.resources.points = { type: 'geojson', data: { type: 'FeatureCollection', features: [] } }
+    next.nodes.push({ type: 'vector', id: 'points', name: 'Map points', visible: true, resource: 'points', style: { mode: 'single', symbol: { type: 'circle', radius: 3 } } })
+    await loaded.updateDocument(next)
+    expect(editor.cancel).not.toHaveBeenCalled()
+    expect(probe.created).toBe(1)
+    expect(loaded.getDocument()).toEqual(next)
+    expect(loaded.issues).toContainEqual(expect.objectContaining({ code: 'cesium.unsupported' }))
+    loaded.destroy(); s.runtime.destroy()
+  })
+  it('keeps navigated camera through resource replacement and explicit reload, but applies a new project camera', async () => {
+    const s = setup(), input = migrateSceneDocument(s.scene)
+    const loaded = await createCesiumDocumentRuntime({ viewer: s.viewer, document: input })
+    const original = loaded.runtime.layers.getLayer('blocks')
+    vi.mocked(s.viewer.camera.setView).mockClear()
+    const next = structuredClone(input)
+    next.resources.blocks = { type: '3dtiles', url: './updated/tileset.json' }
+    await loaded.updateDocument(next)
+    expect(loaded.runtime.layers.getLayer('blocks')).not.toBe(original)
+    expect(s.viewer.camera.setView).not.toHaveBeenCalled()
+    const replacement = loaded.runtime.layers.getLayer('blocks')
+    await loaded.updateDocument(next, undefined, { reload: true })
+    expect(loaded.runtime.layers.getLayer('blocks')).not.toBe(replacement)
+    expect(s.viewer.camera.setView).not.toHaveBeenCalled()
+    const editor = probe.editors.at(-1)!; editor.stopEditing.mockClear()
+    next.id = 'another-project'
+    await loaded.updateDocument(next)
+    expect(s.viewer.camera.setView).toHaveBeenCalledOnce()
+    expect(editor.stopEditing).toHaveBeenCalledOnce()
+    vi.mocked(s.viewer.camera.setView).mockClear()
+    if (next.views.city.type !== '3d') throw new Error('Unexpected view')
+    next.views.city.camera.position[2] += 100
+    next.resources.blocks = { type: '3dtiles', url: './next/tileset.json' }
+    await loaded.updateDocument(next)
+    expect(s.viewer.camera.setView).toHaveBeenCalledOnce()
+    loaded.destroy(); s.runtime.destroy()
+  })
   it('retains native instances and navigated camera for visibility, transform and quality edits', async () => {
     const s = setup(), input = migrateSceneDocument(s.scene)
     const loaded = await createCesiumDocumentRuntime({ viewer: s.viewer, document: input })

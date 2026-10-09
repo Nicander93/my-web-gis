@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, Copy, Download, Eye, FolderPlus, Globe, Layers2, LocateFixed, LockKeyhole, Maximize2, MessageSquare, MousePointer2, Move, Palette, PanelLeftClose, PanelRightClose, Plus, RefreshCw, RotateCw, Search, Shapes, SlidersHorizontal, Sun, Table2, Trash2, Waves } from 'lucide-react'
-import { createCityRuntime } from '@desktop-webgis/cesium-scene-runtime'
 import type { CitySceneRuntime, EditMode } from '@desktop-webgis/cesium-scene-runtime'
 import { createCityScene, getCityNodeState } from '@desktop-webgis/cesium-scene-schema'
 import type { CityNode, GeoPosition } from '@desktop-webgis/cesium-scene-schema'
 import { serializeScene } from '@desktop-webgis/scene-core'
 import { registerCityCameraReader } from './city-runtime-host'
+import { createCityDocumentSession } from './city-document-session'
+import { createProjectSceneController } from '../scene/project-scene-controller'
 import { Cartesian2, Cartographic, Math as CesiumMath } from 'cesium'
 import { useProjectStore } from '@/stores/project.store'
 import { useWorkspaceStore } from '@/stores/workspace.store'
@@ -47,6 +48,7 @@ const drawLabels = { point: '点', polyline: '线', polygon: '面', water: '水�
 export function CityWorkspace() {
   const target = useRef<HTMLDivElement>(null)
   const runtime = useRef<CitySceneRuntime | undefined>(undefined)
+  const documentSession = useRef<ReturnType<typeof createCityDocumentSession> | undefined>(undefined)
   const pendingFocus = useRef<string | undefined>(undefined)
   const defaultScene = useRef(createCityScene())
   const project = useProjectStore(state => state.project)
@@ -76,7 +78,6 @@ export function CityWorkspace() {
   const [preview, setPreview] = useState(false)
   const [inspectorSection, setInspectorSection] = useState<CityInspectorSection>('object')
   const leftVisible = left.open && !preview, rightVisible = right.open && !preview
-  const cameraKey = useRef('')
   const selectedNodes = city.nodes.filter(candidate => selectedIds.includes(candidate.id))
   const liveIds = selectedNodes.map(node => node.id)
   const definition = selectedNodes.length === 1 ? selectedNodes[0] : undefined
@@ -93,7 +94,8 @@ export function CityWorkspace() {
   function report(reason: unknown): void { setError(reason instanceof Error ? reason.message : '操作失败，请检查输入或资源地址。') }
   function notify(text: string): void { setError(''); setStatus(text) }
   const graphicEditing = useCityGraphicEditing(runtime.current, result => {
-    if (result.changed) updateCity('编辑图形几何', scene => ({ ...scene, nodes: scene.nodes.map(item => item.id === result.id && item.type === 'graphic' ? { ...item, geometry: result.after } : item) }))
+    const id = documentSession.current?.getHostNodeId(result.id)
+    if (result.changed && id) updateCity('编辑图形几何', scene => ({ ...scene, nodes: scene.nodes.map(item => item.id === id && item.type === 'graphic' ? { ...item, geometry: result.after } : item) }))
     notify(result.changed ? '几何修改已应用，可一次撤销恢复' : '几何未发生变化')
   }, report, () => notify('已取消几何编辑，原几何已恢复'))
 
@@ -101,35 +103,35 @@ export function CityWorkspace() {
     if (!target.current) return
     let active = true
     let unregisterCamera: (() => void) | undefined
+    const controller = createProjectSceneController()
     try {
-      runtime.current = createCityRuntime({ target: target.current, scene: city, renderQuality, cesiumBaseUrl: new URL('cesium/', document.baseURI).href,
+      documentSession.current = createCityDocumentSession({ target: target.current, controller, readSnapshot: () => useProjectStore.getState().getSnapshot(), renderQuality, cesiumBaseUrl: new URL('cesium/', document.baseURI).href,
         onSelect: (id, properties, mode) => { if (active) handlePick.current(id, properties, mode) },
         onEdit: event => { updateCity('变换三维模型', current => ({ ...current, nodes: current.nodes.map(n => n.id === event.id && (n.type === '3dtiles' || n.type === 'model') ? { ...n, transform: event.after } : n) })); notify('模型变换已应用，可撤销恢复') },
-        onLayerState: (id, state, reason) => {
+        onState: state => {
           if (!active) return
-          const next: LayerState = state === 'error' ? { state: 'error', error: '资源加载失败。请检查资源地址、服务响应和跨域设置，然后重试。' } : { state: state === 'ready' ? 'ready' : 'loading' }
-          setStates(current => ({ ...current, [id]: next }))
-          if (state === 'error') { setError('资源加载失败；选择对象可更新地址或重试。'); console.warn('City resource failed', reason) }
-          if (state === 'ready' && pendingFocus.current === id) { pendingFocus.current = undefined; void runtime.current?.flyTo(id).catch(report); notify('资源已加载') }
+          if (state.runtime && runtime.current !== state.runtime) {
+            runtime.current = state.runtime; state.runtime.layers.popupsEnabled = false
+            unregisterCamera?.(); unregisterCamera = registerCityCameraReader(() => state.runtime!.getCamera())
+          }
+          setReady(!!state.runtime); setStates(state.states)
+          if (state.status === 'error') { report(state.error); return }
+          if (state.status === 'ready') {
+            const id = pendingFocus.current
+            if (id && state.states[id]?.state === 'ready') { pendingFocus.current = undefined; locate(id); notify('资源已加载') }
+            else setStatus('就绪')
+            setError('')
+          }
         }
       })
-      const mountedRuntime = runtime.current
-      unregisterCamera = registerCityCameraReader(() => mountedRuntime.getCamera())
-      runtime.current.layers.popupsEnabled = false
-      setReady(true); notify('就绪')
     } catch (reason) { report(reason) }
-    return () => { active = false; unregisterCamera?.(); runtime.current?.destroy(); runtime.current = undefined }
+    return () => { active = false; unregisterCamera?.(); documentSession.current?.destroy(); documentSession.current = undefined; controller.dispose(); runtime.current = undefined }
   }, [])
 
   useEffect(() => { if (runtime.current) { try { runtime.current.setRenderQuality(renderQuality) } catch (reason) { report(reason) } } }, [renderQuality, ready])
 
-  useEffect(() => {
-    if (!runtime.current) return
-    const key = JSON.stringify([project.id, city.camera])
-    if (key !== cameraKey.current) { runtime.current.stopEditing(); setEditing(null); runtime.current.setCamera(city.camera); cameraKey.current = key }
-    void runtime.current.updateScene(city).catch(() => { setError('部分资源未能加载，其他对象仍可使用。请选择失败对象检查数据源。') })
-  }, [city, project.id, ready])
-  useEffect(() => { runtime.current?.setSelected(preview ? [] : JSON.parse(highlightKey) as string[]) }, [highlightKey, preview, ready])
+  useEffect(() => { setEditing(null) }, [project.id, city.camera])
+  useEffect(() => { runtime.current?.setSelected(preview ? [] : (JSON.parse(highlightKey) as string[]).flatMap(id => documentSession.current?.getRuntimeNodeId(id) ?? [])) }, [highlightKey, preview, ready, states])
   useEffect(() => { setSelectedIds([]); setSelectedGroup(null); anchor.current = null }, [project.id])
 
   const drawing = useCityDrawing(runtime.current, (graphic, kind, id) => {
@@ -153,6 +155,10 @@ export function CityWorkspace() {
   }, report, () => notify('已取消绘制'))
 
   function stopEditing(): void { graphicEditing.cancel(); runtime.current?.stopEditing(); setEditing(null) }
+  function locate(id: string): void {
+    const nativeId = documentSession.current?.getRuntimeNodeId(id)
+    if (nativeId) void runtime.current?.flyTo(nativeId).catch(report)
+  }
   function select(id: string, mode?: CitySelectionMode, order = city.nodes.map(node => node.id)): void {
     drawing.cancel(); stopEditing(); setSelectedGroup(null)
     setSelectedIds(selectCityIds(liveIds, id, mode, order, anchor.current))
@@ -176,13 +182,17 @@ export function CityWorkspace() {
   function startEditing(mode: EditMode): void {
     if (!node || !canEdit || !runtime.current) return
     drawing.cancel(); graphicEditing.cancel()
-    try { runtime.current.startEditing(node.id, mode); setEditing(mode); notify('拖动彩色手柄调整模型；松手应用，Esc 取消当前拖动') } catch (reason) { report(reason) }
+    const id = documentSession.current?.getRuntimeNodeId(node.id)
+    if (!id) return
+    try { runtime.current.startEditing(id, mode); setEditing(mode); notify('拖动彩色手柄调整模型；松手应用，Esc 取消当前拖动') } catch (reason) { report(reason) }
   }
   function startWater(id?: string): void { startDraw('water', id) }
   function startGraphicEditing(): void {
     if (!node || node.type !== 'graphic' || node.locked || !node.visible || states[node.id]?.state !== 'ready') return
     drawing.cancel(); stopEditing(); setInspectorTab('object'); useWorkspaceStore.getState().setRightOpen(true)
-    graphicEditing.start(node.id); notify('编辑顶点：拖动调整 · 白色中点插入 · Enter 应用 · Esc 取消')
+    const id = documentSession.current?.getRuntimeNodeId(node.id)
+    if (!id) return
+    graphicEditing.start(id); notify('编辑顶点：拖动调整 · 白色中点插入 · Enter 应用 · Esc 取消')
   }
   function startDraw(kind: CityDrawKind, id?: string): void {
     if (!ready) return
@@ -218,10 +228,9 @@ export function CityWorkspace() {
     pendingFocus.current = id; select(id); notify('正在加载资源…')
   }
   function reload(): void {
-    if (!node || !runtime.current) return
-    drawing.cancel(); stopEditing(); runtime.current.layers.removeLayer(node.id)
-    setStates(current => ({ ...current, [node.id]: { state: 'loading' } }))
-    notify('正在重新加载资源…'); void runtime.current.updateScene(city).catch(() => setError('资源仍未能加载，请更新数据源地址后重试。'))
+    if (!node || !documentSession.current) return
+    drawing.cancel(); stopEditing()
+    notify('正在重新加载资源…'); documentSession.current.refresh()
   }
   function sample(): void {
     try { const id = loadCitySample(); pendingFocus.current = id; select(id); notify('正在加载城市示例…') } catch (reason) { report(reason) }
@@ -312,7 +321,7 @@ export function CityWorkspace() {
         {searchOpen && <label className="city-search"><Search size={14} aria-hidden="true" /><input aria-label="搜索场景对象" placeholder="搜索对象名称…" value={search} onChange={event => setSearch(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') { setSearchOpen(false); setSearch('') } }} /></label>}
         <div className="city-panel__scroll">
           {!city.nodes.length && <div className="city-empty"><Layers2 size={28} aria-hidden="true" /><strong>还没有场景对象</strong><p>添加城市模型或地理数据，开始搭建场景。</p><button className="button-secondary" onClick={() => setAdding(true)}>添加资源</button><button className="city-text-action" onClick={sample}>使用城市示例</button></div>}
-          <CitySceneTree onContext={openContext} city={city} search={search} selectedIds={liveIds} selectedGroup={group?.id ?? null} states={states} onSelect={select} onGroup={selectGroup} onLocate={id => { void runtime.current?.flyTo(id).catch(report) }} onVisible={(ids, visible) => organize(() => setCityNodesVisible(ids, visible), '对象显隐已应用')} onGroupVisible={(id, visible) => organize(() => patchCityGroup(id, { visible }), '分组显隐已应用')} onMove={(ids, groupId, beforeId) => organize(() => moveCitySelection(ids, groupId, beforeId), '对象顺序与分组已更新，可撤销')} />
+          <CitySceneTree onContext={openContext} city={city} search={search} selectedIds={liveIds} selectedGroup={group?.id ?? null} states={states} onSelect={select} onGroup={selectGroup} onLocate={locate} onVisible={(ids, visible) => organize(() => setCityNodesVisible(ids, visible), '对象显隐已应用')} onGroupVisible={(id, visible) => organize(() => patchCityGroup(id, { visible }), '分组显隐已应用')} onMove={(ids, groupId, beforeId) => organize(() => moveCitySelection(ids, groupId, beforeId), '对象顺序与分组已更新，可撤销')} />
         </div>
       </LeftPanel>}
       <section className={`city-canvas${drawing.drawing || graphicEditing.active ? ' city-canvas--drawing' : ''}`} aria-label="三维视图" onDragOver={event => event.preventDefault()} onDrop={event => {
@@ -342,7 +351,7 @@ export function CityWorkspace() {
       <div className="city-context-title">{group?.name ?? (liveIds.length > 1 ? `${liveIds.length} 个对象` : node?.name)}</div>
       <MenuItem icon={Table2} label="对象属性" onClick={() => { showProperties('object'); setContext(null) }} />
       {node && <>
-        <MenuItem icon={LocateFixed} label="定位" disabled={states[node.id]?.state !== 'ready'} onClick={() => { void runtime.current?.flyTo(node.id).catch(report); setContext(null) }} />
+        <MenuItem icon={LocateFixed} label="定位" disabled={states[node.id]?.state !== 'ready'} onClick={() => { locate(node.id); setContext(null) }} />
         {(node.type === 'graphic' || node.type === 'geojson') && <MenuItem icon={Palette} label="样式与标注" onClick={() => { showProperties('style'); setContext(null) }} />}
         <MenuItem icon={MessageSquare} label="属性弹窗" onClick={() => { showProperties('popup'); setContext(null) }} />
         <MenuItem icon={Table2} label="数据属性" onClick={() => { showProperties('properties'); setContext(null) }} />

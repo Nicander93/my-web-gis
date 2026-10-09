@@ -273,3 +273,13 @@
 - Mapping prevents map/city ID collisions from directing selection or transform callbacks to the wrong host object. It does not mutate Project content or create another writable content source.
 - Verification: 9 project scene document tests passed; Desktop TypeScript and production build passed. Existing mixed static/dynamic import and large bundle warnings remain.
 - Desktop CityWorkspace still uses the legacy runtime entry. Wiring the new document runtime, startup cancellation, retry/error state and mapped editing callbacks remains pending; this entry does not complete S06/S07 or the full plan. No push, package publication, native acceptance or shutdown was performed.
+
+## 2026-10-09：Desktop 三维工作区接入公共文档运行时
+
+- CityWorkspace 不再直接创建旧 CityRuntime 或调用 updateScene。通过 Project-owned SceneController、bindSceneRuntime 和 createCesiumDocumentRuntime 投影，现有 Project、绘制/编辑命令及 EditHistory 继续保存权威内容。
+- city-document-session 处理启动期间内容变化、取消、迟到工厂结果、过期原生回调、运行时更新错误和资源重试。销毁解除订阅并释放拥有的运行时；失败保留成功投影和已显示图层，重试不产生内容历史。新项目加载应用其初始相机。
+- 投影提供三维对象/分组及资源的双向 ID 映射。拾取、定位、模型变换和图形编辑回写原宿主 ID；公共 API 同项目提交恢复已有宿主 ID，避免二维/三维同名对象导致选择失效，新增碰撞 ID 单独分配。
+- 像素验收发现重试成功会重置用户相机；修复公共运行时，使资源替换和显式 updateDocument(..., { reload: true }) 保留用户视角。文档相机声明变化或切换文档 ID 仍应用初始视角，用户导航不自动写入内容。
+- 非三维投影内容的标题或二维节点变化只更新完整文档及能力报告，不额外调用原生属性设置或取消三维交互；旧的异步准备仍会失效。
+- 证据：Desktop 三个相关单测文件共 24 项通过；全套 191 项通过、5 项既有平台测试跳过；公共 Cesium runtime 31 项通过及构建。Desktop 与独立 Viewer 生产构建通过，既有混合导入与大体积 bundle 警告保留。三个窗口尺寸 1024×680、1440×900、1920×1080 的既有场景实时设置/撤销交互通过；新增真实 GLB 流程验证定位后的实际模型像素、隐藏后消失、显隐与缩放不重复下载、撤销/重做与完整 JSON 导出、503 失败保留旧模型像素及重试恢复视角。测试使用安装的 Chrome/SwiftShader，不等同 Windows Tauri、DPI 或硬件 GPU 验收。
+- 剩余：Desktop 二维运行时创建路径收敛、完整元数据/嵌套组/多个视图、Desktop 合并及资源归档依赖、完整能力/性能/pack/原生矩阵。未推送、未发布 npm、未关机；本批不签收 S06/S07/S10 或完整计划。

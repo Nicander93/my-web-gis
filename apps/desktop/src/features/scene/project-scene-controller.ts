@@ -2,7 +2,7 @@ import { createHostedSceneController, type SceneController } from '@desktop-webg
 import type { ProjectSnapshot } from '@desktop-webgis/gis-core'
 import type { SceneDocument } from '@desktop-webgis/scene-schema'
 import { useProjectStore } from '@/stores/project.store'
-import { createProjectFromSceneDocument, createProjectSceneDocument } from './project-scene-document'
+import { createProjectFromSceneDocument, createProjectSceneDocument, createProjectSceneProjection } from './project-scene-document'
 
 function sameDefinition(left: unknown, right: unknown): boolean {
   if (Object.is(left, right)) return true
@@ -17,7 +17,17 @@ function sameDefinition(left: unknown, right: unknown): boolean {
 function prepareProjectEdit(before: ProjectSnapshot, next: SceneDocument): ProjectSnapshot {
   const candidate = createProjectFromSceneDocument(next)
   if (candidate.project.id !== before.project.id) return candidate
-  const previous = createProjectSceneDocument(before)
+  const projection = createProjectSceneProjection(before), previous = projection.document
+  const city = candidate.project.city
+  if (city) {
+    // Existing host identities win; allocate only new IDs that collide with a restored identity.
+    const nodeIds = restoreHostIds([...(city.groups ?? []).map(group => group.id), ...city.nodes.map(node => node.id)], projection.hostCityNodeIds)
+    const resourceIds = restoreHostIds(Object.keys(city.assets), projection.hostCityResourceIds)
+    city.groups = city.groups?.map(group => ({ ...group, id: nodeIds.get(group.id)! }))
+    city.nodes = city.nodes.map(node => ({ ...node, id: nodeIds.get(node.id)!,
+      ...('asset' in node ? { asset: resourceIds.get(node.asset)! } : {}), ...(node.groupId ? { groupId: nodeIds.get(node.groupId)! } : {}) }))
+    city.assets = Object.fromEntries(Object.entries(city.assets).map(([id, asset]) => [resourceIds.get(id)!, asset]))
+  }
   candidate.project.settings = { ...structuredClone(before.project.settings), ...candidate.project.settings }
   if (previous.activeView === next.activeView && previous.views[previous.activeView]?.type === next.views[next.activeView]?.type) {
     if (Object.hasOwn(before.project.settings, 'workspaceType')) candidate.project.settings.workspaceType = structuredClone(before.project.settings.workspaceType)
@@ -42,6 +52,21 @@ function prepareProjectEdit(before: ProjectSnapshot, next: SceneDocument): Proje
     candidate.project.basemap = structuredClone(before.project.basemap)
   }
   return candidate
+}
+
+function restoreHostIds(ids: readonly string[], aliases: ReadonlyMap<string, string>): Map<string, string> {
+  const restored = new Map<string, string>(), used = new Set<string>()
+  for (const id of ids) {
+    const hostId = aliases.get(id)
+    if (hostId !== undefined) { restored.set(id, hostId); used.add(hostId) }
+  }
+  for (const id of ids) {
+    if (restored.has(id)) continue
+    let hostId = id, suffix = 2
+    while (used.has(hostId)) hostId = `${id}-${suffix++}`
+    restored.set(id, hostId); used.add(hostId)
+  }
+  return restored
 }
 
 /** Attaches public scene APIs to the existing Project and shared edit history, without a content mirror. */
