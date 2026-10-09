@@ -5,7 +5,7 @@ import { createCityScene, createTransform } from '@desktop-webgis/cesium-scene-s
 import { CitySceneRuntime, createCesiumDocumentRuntime } from './index'
 import { migrateSceneDocument } from '@desktop-webgis/scene-schema'
 
-const probe = vi.hoisted(() => ({ created: 0, released: 0, editors: [] as Array<{ stopEditing: ReturnType<typeof vi.fn>; cancel: ReturnType<typeof vi.fn> }> }))
+const probe = vi.hoisted(() => ({ created: 0, released: 0, nativeGate: undefined as Promise<void> | undefined, editors: [] as Array<{ stopEditing: ReturnType<typeof vi.fn>; cancel: ReturnType<typeof vi.fn> }> }))
 vi.mock('cesium', async original => ({ ...await original<typeof import('cesium')>(),
   ScreenSpaceEventHandler: class { setInputAction(): void {} destroy(): void {} },
   Resource: class { constructor(readonly options: { url: string }) {} },
@@ -16,7 +16,7 @@ vi.mock('cesium', async original => ({ ...await original<typeof import('cesium')
 vi.mock('@desktop-webgis/cesium-layer', async original => {
   const actual = await original<typeof import('@desktop-webgis/cesium-layer')>()
   return { ...actual, TilesetLayer: class extends actual.TilesetLayer {
-    protected async createNative(): Promise<() => void> { probe.created++; return () => { probe.released++ } }
+    protected async createNative(): Promise<() => void> { probe.created++; await probe.nativeGate; return () => { probe.released++ } }
   }, GeoJsonLayer: class extends actual.GeoJsonLayer {
     protected async createNative(): Promise<() => void> { return () => {} }
   } }
@@ -26,7 +26,7 @@ vi.mock('@desktop-webgis/cesium-tileset-edit', () => ({ TilesetEditor: class {
   constructor(_viewer: Viewer, private options: { onStart(): void }) { probe.editors.push(this) }
   startEditing(): void { this.options.onStart() } setMode(): void {} refresh(): void {} destroy(): void {}
 } }))
-beforeEach(() => { probe.created = 0; probe.released = 0; probe.editors = []; vi.stubGlobal('document', { baseURI: 'https://local.test/' }); vi.stubGlobal('CESIUM_BASE_URL', 'https://local.test/cesium/') })
+beforeEach(() => { probe.created = 0; probe.released = 0; probe.nativeGate = undefined; probe.editors = []; vi.stubGlobal('document', { baseURI: 'https://local.test/' }); vi.stubGlobal('CESIUM_BASE_URL', 'https://local.test/cesium/') })
 afterEach(() => vi.unstubAllGlobals())
 function setup() {
   const scene = createCityScene()
@@ -36,6 +36,38 @@ function setup() {
   return { scene, viewer, runtime: new CitySceneRuntime(viewer, { target: 'map', scene }) }
 }
 describe('incremental scene reconciliation', () => {
+  it('awaits a reused loading resource and applies latest visibility without loading twice', async () => {
+    let release!: () => void
+    probe.nativeGate = new Promise(resolve => { release = resolve })
+    const s = setup()
+    const first = s.runtime.updateScene(s.scene)
+    s.scene.nodes[0].visible = false
+    let settled = false
+    const second = s.runtime.updateScene(s.scene).then(() => { settled = true })
+    await Promise.resolve(); await Promise.resolve()
+    expect(settled).toBe(false)
+    expect(probe.created).toBe(1)
+    release(); await Promise.all([first, second])
+    expect(s.runtime.layers.getLayer('blocks')?.show).toBe(false)
+    s.runtime.destroy()
+  })
+  it('ignores a removed resource failure and allows a failed current resource to retry', async () => {
+    let reject!: (error: Error) => void
+    probe.nativeGate = new Promise((_resolve, fail) => { reject = fail })
+    const s = setup()
+    const first = s.runtime.updateScene(s.scene)
+    const empty = { ...s.scene, nodes: [] }
+    await s.runtime.updateScene(empty)
+    reject(new Error('late removed request'))
+    await expect(first).resolves.toBeUndefined()
+    expect(s.runtime.layers.getLayer('blocks')).toBeUndefined()
+    probe.nativeGate = Promise.reject(new Error('current request'))
+    await expect(s.runtime.updateScene(s.scene)).rejects.toThrow('current request')
+    probe.nativeGate = undefined
+    await s.runtime.updateScene(s.scene)
+    expect(s.runtime.layers.getLayer('blocks')?.state).toBe('ready')
+    s.runtime.destroy()
+  })
   it('updates tileset quality in place without downloading a new resource', async () => {
     const s = setup(); await s.runtime.updateScene(s.scene)
     const layer = s.runtime.layers.getLayer('blocks') as import('@desktop-webgis/cesium-layer').TilesetLayer
