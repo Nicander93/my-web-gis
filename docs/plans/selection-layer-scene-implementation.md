@@ -244,3 +244,10 @@
 - 图层集合在移除原有图层前校验候选 ID 唯一、已就绪且属于同一个 Viewer；保留仍在候选中的自定义图层。原生模型、瓦片、GeoJSON、图形和水面在加入 Viewer 前设置初始显隐。
 - 通过：Cesium runtime 24 项单测、layer 23 项单测、七包依赖链构建；真实 tower.glb 在隐藏准备阶段完成加载，Viewer 三个窗口尺寸的浏览器测试通过并支持显隐切换。
 - 浏览器使用 Chrome/SwiftShader；此证据验证真实模型加载就绪，不代表硬件渲染、原生 Windows 或 DPI 验收。准备式替换不保证同步原生 setter 抛错或重入时的完整回滚；尚需 v3 增量适配、三维 Viewer/controller 绑定及 Desktop 迁移，本批不签收 S06/S07。
+
+## 2026-10-09：三维文档更新与 Viewer 控制器绑定
+
+- Cesium v3 适配器新增 `updateDocument`；就绪对象的显示属性、变换、质量、Popup 和图形修改复用原生实例，资源/环境来源变化走隐藏准备式替换。完整文档和能力问题只在成功投影后更新；无效文档、取消和失败不改写最近应用的文档副本。相机声明不变时保留用户导航。
+- 准备式替换取消后立即拒绝，不等待忽略信号的原生加载器；迟到资源仍清理。三维 Viewer 显隐统一提交到 SceneController，通过 bindSceneRuntime 投影；不再直接调用旧 updateScene 或维护第二份可写场景。页面离开取消启动和投影，释放绑定、运行时及控制器。
+- 通过：Cesium runtime 29 项单测、运行时构建、Viewer 类型与生产构建、三种窗口尺寸共 15 个 Viewer 浏览器用例。真实 GLB 的显隐切换只产生一次模型下载。构建仍有既有 Cesium 大 chunk 提示。
+- 浏览器为 Chrome/SwiftShader，未新增原生 Windows、DPI 或硬件 GPU 证据。同步原生 setter 异常/重入完整回滚、共享二维节点三维渲染、Desktop 控制器迁移和公共包完整发布门槛仍待完成；不据此签收整个 S06/S07/S09。
