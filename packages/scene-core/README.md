@@ -13,6 +13,13 @@ The controller owns no Map, Viewer, selection, file IO or undo stack. Engine pre
 The root and `./scene` entry points depend only on the scene schema. Project-specific publishing conversion lives in Desktop's `features/scene/compile-project.ts`; it is not part of this package's public API. Internal callers previously importing `compileProjectToScene` from this package must use that application adapter instead.
 # Resource references
 
+`SceneController.prepareAndReplaceDocument(input, { prepare, signal, label })`
+validates a detached candidate, awaits host preparation and commits once. New
+loads, content writes, cancellation or disposal invalidate pending results even
+if the loader ignores its signal. Failed preparation leaves current content and
+observers untouched. Hosts still own native engine staging and rollback;
+post-commit observers are not a native preparation transaction.
+
 `mergeSceneDocuments(target, incoming)` returns a validated merged document and
 incoming-to-result ID maps for nodes, resources, views and credential references.
 The target identity and active view remain selected. Incoming display order is

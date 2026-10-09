@@ -22,6 +22,12 @@ export interface AddTilesetOptions {
   cacheBytes?: number
 }
 
+export interface PrepareSceneReplacementOptions {
+  prepare(document: SceneDocument, signal: AbortSignal): Promise<SceneDocument>
+  signal?: AbortSignal
+  label?: string
+}
+
 /** Owns one declarative document; hosts retain selection, undo history, file IO and native engines. */
 export class SceneController {
   private document: SceneDocument
@@ -29,6 +35,7 @@ export class SceneController {
   private notifying = false
   private mutating = false
   private disposed = false
+  private preparation: AbortController | null = null
 
   constructor(input: unknown) { this.document = parseSceneDocument(input) }
 
@@ -57,6 +64,30 @@ export class SceneController {
     this.requireActive()
     return this.commit(label, parseSceneDocument(input))
   }
+  /** Prepare off-state, then publish once; newer loads or content edits invalidate late results. */
+  async prepareAndReplaceDocument(input: unknown, options: PrepareSceneReplacementOptions): Promise<SceneCommitResult> {
+    this.requireActive()
+    const candidate = parseSceneDocument(input)
+    this.preparation?.abort()
+    const operation = new AbortController()
+    this.preparation = operation
+    const abort = (): void => operation.abort()
+    options.signal?.addEventListener('abort', abort, { once: true })
+    if (options.signal?.aborted) abort()
+    try {
+      operation.signal.throwIfAborted()
+      const prepared = await options.prepare(candidate, operation.signal)
+      operation.signal.throwIfAborted()
+      this.requireActive()
+      const next = parseSceneDocument(prepared)
+      this.preparation = null
+      return this.commit(options.label ?? 'Load scene', next)
+    } finally {
+      options.signal?.removeEventListener('abort', abort)
+      if (this.preparation === operation) this.preparation = null
+    }
+  }
+  cancelPreparation(): void { this.preparation?.abort(); this.preparation = null }
   addResource(id: string, resource: SceneResource): SceneCommitResult { return this.update('Add resource', document => addSceneResource(document, id, resource)) }
   replaceResource(id: string, resource: SceneResource): SceneCommitResult { return this.update('Replace resource', document => replaceSceneResource(document, id, resource)) }
   removeResource(id: string, cascade = false): SceneCommitResult { return this.update('Remove resource', document => removeSceneResource(document, id, cascade)) }
@@ -100,7 +131,7 @@ export class SceneController {
   }
   setView(id: string, view: SceneDocumentView, activate = false): SceneCommitResult { return this.update('Set view', document => setSceneDocumentView(document, id, view, activate)) }
   setEnvironment(environment: NonNullable<SceneDocument['environment']>): SceneCommitResult { return this.update('Set environment', document => setSceneEnvironment(document, environment)) }
-  dispose(): void { this.disposed = true; this.observers.clear() }
+  dispose(): void { this.cancelPreparation(); this.disposed = true; this.observers.clear() }
 
   private requireActive(): void {
     if (this.disposed) throw new Error('Scene controller has been disposed')
@@ -119,6 +150,7 @@ export class SceneController {
   private commit(label: string, next: SceneDocument): SceneCommitResult {
     const before = this.document
     if (JSON.stringify(before) === JSON.stringify(next)) return { document: this.getDocument(), observerErrors: [] }
+    this.cancelPreparation()
     this.document = next
     const observerErrors: unknown[] = []
     this.notifying = true
