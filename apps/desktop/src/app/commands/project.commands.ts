@@ -36,6 +36,7 @@ let addDataCallback: AddDataCallback | null = null
 let exportDataCallback: ExportDataCallback | null = null
 let newProjectCallback: (() => void) | null = null
 let replacementGuard: (() => Promise<boolean>) | null = null
+let sceneImport: AbortController | null = null
 
 export function registerProjectReplacementGuard(guard: (() => Promise<boolean>) | null): void {
   replacementGuard = guard
@@ -59,17 +60,31 @@ function bumpProjectGeneration(): void {
 }
 
 export const projectCommands = {
+  isImportingScene(): boolean { return sceneImport !== null },
+  cancelSceneImport(): void {
+    sceneImport?.abort()
+    sceneImport = null
+    emitCommandStatus('已取消场景导入，原项目保持不变')
+  },
   async importScene(): Promise<void> {
+    sceneImport?.abort()
+    const operation = new AbortController()
+    sceneImport = operation
     try {
       if (useProjectStore.getState().dirty && replacementGuard && !await replacementGuard()) return
+      operation.signal.throwIfAborted()
       if (Object.values(useSessionStore.getState().sessions).some(session => session.styleDraft?.dirty)) throw new Error('请先应用或放弃样式草稿，再导入场景')
       const before = JSON.stringify(useProjectStore.getState().getSnapshot())
-      const opened = await openSceneDocument()
+      const opened = await openSceneDocument(operation.signal)
+      operation.signal.throwIfAborted()
       if (!opened) { emitCommandStatus('已取消导入场景'); return }
       if (JSON.stringify(useProjectStore.getState().getSnapshot()) !== before) throw new Error('选择文件期间项目已改变，请重新导入')
       replaceSceneDocumentAsEdit(opened.document)
       emitCommandStatus(`已导入完整场景：${opened.path}，可撤销恢复`)
-    } catch (error) { emitCommandStatus(error instanceof Error ? `导入失败：${error.message}` : '导入失败') }
+    } catch (error) {
+      if (operation.signal.aborted) return
+      emitCommandStatus(error instanceof Error ? `导入失败：${error.message}` : '导入失败')
+    } finally { if (sceneImport === operation) sceneImport = null }
   },
   async exportScene(): Promise<void> {
     try {
