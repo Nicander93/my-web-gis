@@ -26,6 +26,15 @@ describe('full scene JSON IO', () => {
     await expect(openSceneDocument()).rejects.toThrow()
     expect(getCurrentProjectPath()).toBe('original.webgis.json')
   })
+  it('rejects a cancelled import even when the file picker returns late', async () => {
+    const controller = new AbortController()
+    probe.pick.mockImplementation(async () => {
+      controller.abort()
+      return { name: 'scene.json', text: async () => serializeSceneDocument(document()) }
+    })
+    await expect(openSceneDocument(controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
+    expect(getCurrentProjectPath()).toBe('original.webgis.json')
+  })
   it('uses native dialogs and file writer, with cancellation leaving files untouched', async () => {
     probe.native = true; probe.savePick.mockResolvedValue(null)
     expect(await saveSceneDocument(document(), 'City')).toEqual({ kind: 'cancelled' })
