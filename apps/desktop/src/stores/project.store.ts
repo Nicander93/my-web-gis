@@ -174,7 +174,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         const project = normalizeLayerTree(cloneValue(snapshot.project))
         useSessionStore.getState().bumpWfsLoadGeneration()
         useWorkbenchStore.getState().reset()
-        for (const id of Object.keys(useSessionStore.getState().sessions)) if (!project.layers.some(layer => layer.id === id)) useSessionStore.getState().clearLayerSession(id)
+        // Layer IDs can be reused by another scene; cached inspectors belong to the old content.
+        useSessionStore.setState({ sessions: {}, inspectorTab: 'layer' })
         set({ project, featuresByDataset: cloneValue(snapshot.featuresByDataset), dirty: true, selectedLayerId: null,
           selection: { layerId: null, featureIds: [] }, lastSelectionCountAfterFilter: null })
       }
@@ -350,11 +351,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     const project = normalizeLayerTree(cloneValue(snapshot.project))
     const featuresByDataset = cloneValue(snapshot.featuresByDataset ?? {})
     syncStoreFromState(featuresByDataset)
-    for (const layerId of Object.keys(useSessionStore.getState().sessions)) {
-      if (!project.layers.some((l) => l.id === layerId)) {
-        useSessionStore.getState().clearLayerSession(layerId)
-      }
-    }
+    useSessionStore.setState({ sessions: {} })
     set({
       project,
       featuresByDataset,
