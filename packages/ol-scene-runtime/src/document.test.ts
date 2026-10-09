@@ -3,6 +3,8 @@ import type { SceneDocument } from '@desktop-webgis/scene-schema'
 import VectorLayer from 'ol/layer/Vector.js'
 import LayerGroup from 'ol/layer/Group.js'
 import VectorSource from 'ol/source/Vector.js'
+import Feature from 'ol/Feature.js'
+import Point from 'ol/geom/Point.js'
 import { createOlDocumentLayers, getSceneFeatureId } from './document.js'
 
 function document(): SceneDocument {
@@ -15,6 +17,37 @@ function document(): SceneDocument {
 }
 
 describe('v3 OL document factory', () => {
+  it('shares caller-owned editable sources without rewriting IDs, data or ownership', async () => {
+    const input = document(), feature = new Feature({ geometry: new Point([100, 200]), value: 1 })
+    feature.setId('host-identity')
+    const source = new VectorSource({ features: [feature] }), dispose = vi.spyOn(source, 'dispose')
+    input.resources.data = { type: 'geojson', url: './host-snapshot.geojson' }
+    const fetcher = vi.fn(), result = await createOlDocumentLayers(input, { vectorSources: { data: source }, fetch: fetcher })
+    expect(fetcher).not.toHaveBeenCalled()
+    expect((result.getLayer('first') as VectorLayer).getSource()).toBe(source)
+    expect((result.getLayer('second') as VectorLayer).getSource()).toBe(source)
+    expect(result.getFilteredFeatures('first')).toEqual([feature])
+    expect(result.getFilteredFeatures('second')).toEqual([])
+    expect(feature.getId()).toBe('host-identity')
+    const added = new Feature({ geometry: new Point([300, 400]), value: 2 })
+    source.addFeature(added)
+    expect(result.getFilteredFeatures('first')).toEqual([feature, added])
+    expect(result.getDocument()).toEqual(input)
+    result.dispose(); result.dispose()
+    expect(dispose).not.toHaveBeenCalled()
+    expect(source.getFeatures()).toEqual([feature, added])
+    source.dispose()
+  })
+  it('keeps supplied sources alive when later document preparation fails', async () => {
+    const input = document(), source = new VectorSource(), dispose = vi.spyOn(source, 'dispose')
+    input.resources.remote = { type: 'geojson', url: './failed.geojson' }
+    const node = input.nodes[2]
+    if (node.type !== 'vector') throw new Error('Expected vector')
+    node.resource = 'remote'
+    await expect(createOlDocumentLayers(input, { vectorSources: { data: source }, fetch: async () => new Response('', { status: 503 }) })).rejects.toThrow('503')
+    expect(dispose).not.toHaveBeenCalled()
+    source.dispose()
+  })
   it('releases already prepared shared sources on abort before a later fetch returns', async () => {
     const input = document(), operation = new AbortController()
     input.resources.remote = { type: 'geojson', url: './remote.geojson' }

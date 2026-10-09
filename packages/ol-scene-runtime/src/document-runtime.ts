@@ -1,10 +1,9 @@
 import type { SceneDocument } from '@desktop-webgis/scene-schema'
 import Map from 'ol/Map.js'
 import View from 'ol/View.js'
-import { createOlDocumentLayers, type OlDocumentLayers } from './document.js'
-import type { CreateOlSceneLayerOptions } from './layer.js'
+import { createOlDocumentLayers, type OlDocumentLayers, type OlDocumentOptions } from './document.js'
 
-export interface OlDocumentRuntimeOptions extends Omit<CreateOlSceneLayerOptions, 'vectorSource' | 'signal'> {
+export interface OlDocumentRuntimeOptions extends Omit<OlDocumentOptions, 'signal'> {
   map?: Map
   target?: HTMLElement | string
   viewId?: string
