@@ -18,6 +18,25 @@ fn write_binary_path(path: String, content: Vec<u8>) -> Result<(), String> {
     std::fs::write(path, content).map_err(|error| error.to_string())
 }
 
+/// Resolve resources under a user-selected directory, including symlink containment.
+#[tauri::command]
+fn read_scene_resource(directory: String, path: String) -> Result<Vec<u8>, String> {
+    let root = std::fs::canonicalize(directory).map_err(|error| error.to_string())?;
+    let relative = std::path::Path::new(&path);
+    if path.contains([':', '\\']) || relative.is_absolute() || relative.components().any(|part| !matches!(part, std::path::Component::Normal(_) | std::path::Component::CurDir)) {
+        return Err("invalid scene resource path".into());
+    }
+    let file = std::fs::canonicalize(root.join(relative)).map_err(|error| error.to_string())?;
+    if !file.starts_with(&root) || !file.is_file() {
+        return Err("scene resource escapes selected directory".into());
+    }
+    let metadata = std::fs::metadata(&file).map_err(|error| error.to_string())?;
+    if metadata.len() > 512 * 1024 * 1024 {
+        return Err("scene resource exceeds byte limit".into());
+    }
+    std::fs::read(file).map_err(|error| error.to_string())
+}
+
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct HttpGetArgs {
@@ -137,6 +156,7 @@ pub fn run() {
             write_text_path,
             read_binary_path,
             write_binary_path,
+            read_scene_resource,
             http_get_text,
             secure_credential_set,
             secure_credential_get,
@@ -144,6 +164,26 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running Desktop WebGIS");
+}
+
+#[cfg(test)]
+mod scene_resource_tests {
+    #[test]
+    fn reads_only_files_under_selected_directory() {
+        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let root = std::env::temp_dir().join(format!("webgis-scene-{}-{}", std::process::id(), stamp));
+        std::fs::create_dir(&root).unwrap();
+        let file = root.join("buffer.bin");
+        std::fs::write(&file, [1u8, 2, 3]).unwrap();
+        let directory = root.to_string_lossy().into_owned();
+        assert_eq!(super::read_scene_resource(directory.clone(), "buffer.bin".into()).unwrap(), vec![1, 2, 3]);
+        for path in ["../outside.bin", "C:/outside.bin", "buffer.bin:stream", "folder\\buffer.bin"] {
+            assert!(super::read_scene_resource(directory.clone(), path.into()).is_err());
+        }
+        assert!(super::read_scene_resource(directory, "missing.bin".into()).is_err());
+        std::fs::remove_file(file).unwrap();
+        std::fs::remove_dir(root).unwrap();
+    }
 }
 
 #[cfg(test)]

@@ -2,6 +2,7 @@ import { createEditorProject } from '@/services/project-type'
 import { isTauri } from '@tauri-apps/api/core'
 import type { ProjectType } from '@/services/project-type'
 import { openSceneDocument, saveSceneDocument } from '@/services/scene-document-io'
+import { saveSceneArchive } from '@/services/scene-archive-io'
 import { createProjectSceneDocument } from '@/features/scene/project-scene-document'
 import { replaceSceneDocumentAsEdit } from '@/features/scene/scene-document.commands'
 import { getLiveCityCamera } from '@/features/city/city-runtime-host'
@@ -98,6 +99,16 @@ export const projectCommands = {
       const result = await saveSceneDocument(createProjectSceneDocument(snapshot), state.project.name)
       emitCommandStatus(result.kind === 'saved' ? `已导出完整场景：${result.path}` : result.kind === 'cancelled' ? '已取消导出场景' : `完整场景下载已发起：${result.name}`)
     } catch (error) { emitCommandStatus(error instanceof Error ? `导出失败：${error.message}` : '导出失败') }
+  },
+  async exportSceneArchive(): Promise<void> {
+    try {
+      const state = useProjectStore.getState()
+      const snapshot = createSnapshotFromState(state.project, state.featuresByDataset)
+      const camera = getLiveCityCamera()
+      if (snapshot.project.city && camera) snapshot.project.city.camera = camera
+      const result = await saveSceneArchive(createProjectSceneDocument(snapshot), state.project.name)
+      emitCommandStatus(result.kind === 'saved' ? `已导出场景资源包：${result.path}` : result.kind === 'cancelled' ? '已取消导出资源包' : `场景资源包下载已发起：${result.name}`)
+    } catch (error) { emitCommandStatus(error instanceof Error ? `资源包导出失败：${error.message}` : '资源包导出失败') }
   },
   newProject(): void {
     if (newProjectCallback) { newProjectCallback(); return }
