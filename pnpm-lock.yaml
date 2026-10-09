@@ -291,6 +291,9 @@ importers:
       '@desktop-webgis/ol-style':
         specifier: workspace:*
         version: link:../ol-style
+      '@desktop-webgis/scene-schema':
+        specifier: workspace:*
+        version: link:../scene-schema
       '@turf/boolean-valid':
         specifier: 7.3.4
         version: 7.3.4

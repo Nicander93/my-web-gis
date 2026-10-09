@@ -25,6 +25,12 @@
 
 ## 首批实现：163d688（历史记录）
 
+### 无损往返补充：描述、元数据与展示配置
+
+- Project 明确保留场景 description、JSON metadata 和 Viewer widgets／theme／presentation；不与桌面布局设置混用。工程保存／解析后重新导出保留空值、嵌套数组、主题和章节。
+- 工程模型使用纯 scene-schema 的公开类型，依赖方向仍为应用内容模型到协议；协议不依赖工程或引擎。未知必需扩展仍拒绝，嵌套分组和多视图仍未完成。
+- 26 项转换／控制器／导入命令测试通过，覆盖真实工程序列化与解析、克隆隔离、公开 API 提交及 Undo／Redo；gis-core 和 Desktop 生产构建通过。未新增 Windows 原生验收。
+
 代码提交：`163d688`（`feat: extract controlled OL selection and link box selection to table`）。未推送。
 
 | 阶段 | 当前证据 | 尚需完成 |

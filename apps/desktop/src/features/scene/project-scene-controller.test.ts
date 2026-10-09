@@ -166,9 +166,25 @@ describe('Project-owned public scene controller', () => {
     })).toThrow('样式草稿')
     expect(useProjectStore.getState().getSnapshot()).toEqual(before)
     useSessionStore.getState().patchStyleDraft(id, { dirty: false })
-    const document = controller.getDocument(); document.metadata = { unsupported: true }
-    expect(() => controller.replaceDocument(document)).toThrow('元数据')
+    const document = controller.getDocument(); document.extensions = { future: { version: 1, required: true, data: {} } }
+    expect(() => controller.replaceDocument(document)).toThrow('扩展')
     expect(useProjectStore.getState().getSnapshot()).toEqual(before)
     expect(useProjectStore.getState().canUndoEdit()).toBe(false)
+  })
+  it('commits scene metadata and display content through project history', () => {
+    const controller = attach()
+    controller.transaction('Configure scene presentation', document => {
+      document.description = 'Survey workspace'
+      document.metadata = { revision: 0, tags: ['survey'] }
+      document.widgets = { legend: false }
+      document.theme = { colorScheme: 'dark' }
+    })
+    expect(useProjectStore.getState().project).toMatchObject({ description: 'Survey workspace', metadata: { revision: 0 }, sceneDisplay: { widgets: { legend: false }, theme: { colorScheme: 'dark' } } })
+    useProjectStore.getState().undoEdit()
+    expect(controller.getDocument().metadata).toBeUndefined()
+    expect(controller.getDocument().widgets).toBeUndefined()
+    useProjectStore.getState().redoEdit()
+    expect(controller.getDocument().metadata).toEqual({ revision: 0, tags: ['survey'] })
+    expect(controller.getDocument().theme).toEqual({ colorScheme: 'dark' })
   })
 })

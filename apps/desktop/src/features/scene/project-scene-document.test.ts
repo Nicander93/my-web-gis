@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createDefaultLayerStyle, createProject, type ProjectSnapshot } from '@desktop-webgis/gis-core'
+import { createDefaultLayerStyle, createProject, parseProjectSnapshot, serializeProjectSnapshot, type ProjectSnapshot } from '@desktop-webgis/gis-core'
 import { createCityScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
 import { parseSceneDocument } from '@desktop-webgis/scene-schema'
 import { createProjectFromSceneDocument, createProjectSceneDocument, createProjectSceneProjection } from './project-scene-document'
@@ -32,6 +32,28 @@ function snapshot(): ProjectSnapshot {
 }
 
 describe('full project scene content', () => {
+  it('retains description and nested JSON metadata across project serialization and scene edits', () => {
+    const document = createProjectSceneDocument(snapshot())
+    document.description = ''
+    document.metadata = { author: 'survey', options: { tags: ['city', null], enabled: false, revision: 0 } }
+    document.widgets = { legend: false, scaleLine: true }
+    document.theme = { colorScheme: 'dark', accent: '#123456' }
+    document.presentation = { chapters: [{ id: 'overview', title: 'Overview', view: { projection: 'EPSG:3857', center: [0, 0], zoom: 3 }, visibleLayers: ['a'] }] }
+    const restored = createProjectFromSceneDocument(document)
+    const saved = parseProjectSnapshot(serializeProjectSnapshot(restored))
+    saved.project.name = 'Renamed project'
+    const exported = createProjectSceneDocument(saved)
+    expect(exported.description).toBe('')
+    expect(exported.metadata).toEqual(document.metadata)
+    expect(exported.widgets).toEqual(document.widgets)
+    expect(exported.theme).toEqual(document.theme)
+    expect(exported.presentation).toEqual(document.presentation)
+    expect(exported.title).toBe('Renamed project')
+    restored.project.metadata!.author = 'changed'
+    expect(document.metadata.author).toBe('survey')
+    expect(exported.metadata!.author).toBe('survey')
+  })
+
   it('maps city selection and edit identities without confusing colliding map nodes', () => {
     const input = snapshot(), before = structuredClone(input)
     const projection = createProjectSceneProjection(input)

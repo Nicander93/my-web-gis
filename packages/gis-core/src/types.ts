@@ -1,4 +1,5 @@
 import type { ProcessingRecord } from './processing'
+import type { SceneDocument } from '@desktop-webgis/scene-schema'
 
 export type Position = [number, number] | [number, number, number]
 
@@ -299,6 +300,11 @@ export interface Project {
   version: number
   name: string
   crs: string
+  /** Portable scene description and JSON metadata, retained in project snapshots. */
+  description?: string
+  metadata?: SceneDocument['metadata']
+  /** Viewer presentation is content; desktop layout preferences remain separate. */
+  sceneDisplay?: Pick<SceneDocument, 'widgets' | 'theme' | 'presentation'>
   datasets: Dataset[]
   layers: Layer[]
   /** Single-level groups. Absent/empty on legacy projects until normalizeLayerTree. */
