@@ -9,7 +9,7 @@ const dependencies = Object.fromEntries(names.map(name => [`@desktop-webgis/${na
 await writeFile(new URL('package.json', target), JSON.stringify({ name: 'scene-packed-consumer', private: true, type: 'module', dependencies }, null, 2))
 await writeFile(new URL('pnpm-workspace.yaml', target), `packages:\n  - .\noverrides:\n${Object.entries(dependencies).map(([name, url]) => `  ${JSON.stringify(name)}: ${JSON.stringify(url)}`).join('\n')}\n`)
 await writeFile(new URL('consumer.ts', target), `
-import { bindSceneRuntime, SceneController, createSceneDocument, mergeSceneDocuments, prepareSceneGeoJsonResources, type SceneMergeResult, type SceneRuntimeBinding, type SceneRuntimeSyncState } from '@desktop-webgis/scene-core'
+import { bindSceneRuntime, SceneController, createHostedSceneController, createSceneDocument, mergeSceneDocuments, prepareSceneGeoJsonResources, type SceneDocumentHost, type SceneMergeResult, type SceneRuntimeBinding, type SceneRuntimeSyncState } from '@desktop-webgis/scene-core'
 import { parseSceneDocument, type SceneDocument } from '@desktop-webgis/scene-schema'
 const scene: SceneDocument = createSceneDocument({ id: 'consumer', title: 'Consumer', viewId: 'map', view: { type: '2d', projection: 'EPSG:3857', center: [0, 0], zoom: 2 } })
 const result: SceneMergeResult = mergeSceneDocuments(scene, scene)
@@ -21,11 +21,14 @@ const binding: SceneRuntimeBinding = bindSceneRuntime(controller, { updateDocume
 const state: SceneRuntimeSyncState = await binding.settled()
 void state
 binding.dispose()
+const host: SceneDocumentHost = { read: () => parsed, commit(document, label) { void document; void label }, subscribe(_observer) { return () => {} } }
+const hosted: SceneController = createHostedSceneController(host)
+hosted.dispose()
 `)
 await writeFile(new URL('smoke.mjs', target), `
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { bindSceneRuntime, SceneController, createSceneDocument, mergeSceneDocuments, prepareSceneGeoJsonResources, serializeSceneDocument } from '@desktop-webgis/scene-core'
+import { bindSceneRuntime, SceneController, createHostedSceneController, createSceneDocument, mergeSceneDocuments, prepareSceneGeoJsonResources, serializeSceneDocument } from '@desktop-webgis/scene-core'
 import { parseSceneDocument } from '@desktop-webgis/scene-schema'
 const schema = JSON.parse(await readFile(new URL(import.meta.resolve('@desktop-webgis/scene-schema/scene-document.schema.json')), 'utf8'))
 assert.equal(schema.properties.version.const, 3)
@@ -46,6 +49,23 @@ assert.deepEqual(rendered, ['Consumer', 'Controller content'])
 assert.equal(JSON.parse(controller.exportJson()).title, 'Controller content')
 binding.dispose()
 controller.dispose()
+let hostContent = structuredClone(merged.document)
+const listeners = new Set(), history = []
+const hosted = createHostedSceneController({
+  read: () => structuredClone(hostContent),
+  commit(document, label) {
+    const before = structuredClone(hostContent); history.push(before); hostContent = structuredClone(document)
+    listeners.forEach(observer => observer({ label, before, after: structuredClone(hostContent) }))
+  },
+  subscribe(observer) { listeners.add(observer); return () => { listeners.delete(observer) } }
+})
+hosted.transaction('Host API rename', document => { document.title = 'Host-owned content' })
+assert.equal(hostContent.title, 'Host-owned content')
+assert.deepEqual(JSON.parse(hosted.exportJson()), hostContent)
+const beforeUndo = hostContent; hostContent = history.pop()
+listeners.forEach(observer => observer({ label: 'Undo', before: beforeUndo, after: hostContent }))
+assert.deepEqual(hosted.getDocument(), hostContent)
+hosted.dispose(); assert.equal(listeners.size, 0)
 for (const name of ${JSON.stringify(names)}) {
   const manifest = JSON.parse(await readFile(new URL('./node_modules/@desktop-webgis/' + name + '/package.json', import.meta.url), 'utf8'))
   for (const section of ['dependencies', 'peerDependencies', 'optionalDependencies']) {

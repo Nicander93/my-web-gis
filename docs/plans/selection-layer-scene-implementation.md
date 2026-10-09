@@ -251,3 +251,10 @@
 - 准备式替换取消后立即拒绝，不等待忽略信号的原生加载器；迟到资源仍清理。三维 Viewer 显隐统一提交到 SceneController，通过 bindSceneRuntime 投影；不再直接调用旧 updateScene 或维护第二份可写场景。页面离开取消启动和投影，释放绑定、运行时及控制器。
 - 通过：Cesium runtime 29 项单测、运行时构建、Viewer 类型与生产构建、三种窗口尺寸共 15 个 Viewer 浏览器用例。真实 GLB 的显隐切换只产生一次模型下载。构建仍有既有 Cesium 大 chunk 提示。
 - 浏览器为 Chrome/SwiftShader，未新增原生 Windows、DPI 或硬件 GPU 证据。同步原生 setter 异常/重入完整回滚、共享二维节点三维渲染、Desktop 控制器迁移和公共包完整发布门槛仍待完成；不据此签收整个 S06/S07/S09。
+
+## 2026-10-09：宿主持有的场景控制器与 Project API 适配
+
+- scene-core 新增 `SceneDocumentHost` 和 `createHostedSceneController`：读取、导出直接取宿主；便捷/声明 API 通过宿主同步原子提交与历史。外部命令、撤销/重做通知控制器并使旧准备失效；UI 状态不属于内容通知。API 提交不重复通知，观察者收到隔离的前后快照；销毁解除宿主订阅。
+- Desktop 提供 `createProjectSceneController`，Project 和现有编辑历史仍是权威存储，不保留可独立修改的场景镜像。API 新增 Tileset 进入 Project 并被完整导出；同项目编辑保留未变化资源的本地来源和处理记录、项目设置及原底图配置。资源 JSON 键顺序变化不误判为来源变化。
+- 通过：core 32 项单测及三包依赖链构建；Desktop 场景适配、控制器和导入历史共 18 项单测，Desktop 生产构建。新 tarball 的独立 Node 实际调用及严格 NodeNext 声明消费通过；声明检查使用 Node 24 平台类型提供 AbortSignal，未启用 DOM，也不使用源码 alias。
+- 该 Desktop 门面目前通过既有整场景快照命令提交，沿用草稿保护及会话重置；尚未接入面板/引擎宿主的细粒度同步。完整可携带元数据、嵌套组/多个视图、资源改动时的来源策略、选择/草稿保留优化和性能门槛仍待完成。无新增浏览器、Windows 原生或 DPI 验收，不签收 S07/S10 全项。

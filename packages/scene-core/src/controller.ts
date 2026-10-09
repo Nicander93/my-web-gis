@@ -11,6 +11,13 @@ export interface SceneCommitResult {
   /** Content is committed even when a host observer fails; observers cannot roll back the document. */
   observerErrors: unknown[]
 }
+/** Host remains the content owner; commits are synchronous and atomic, including validation/history. */
+export interface SceneDocumentHost {
+  read(): unknown
+  commit(document: SceneDocument, label: string): void
+  /** Emits every completed host content change, including undo/redo; excludes UI-only changes. */
+  subscribe(observer: (change: SceneChange) => void): () => void
+}
 export interface AddTilesetOptions {
   id: string
   name: string
@@ -28,19 +35,33 @@ export interface PrepareSceneReplacementOptions {
   label?: string
 }
 
-/** Owns one declarative document; hosts retain selection, undo history, file IO and native engines. */
+/** Controls one document, either owned here or read directly from an authoritative host. */
 export class SceneController {
-  private document: SceneDocument
+  private document?: SceneDocument
   private readonly observers = new Set<(change: SceneChange) => void>()
   private notifying = false
   private mutating = false
   private disposed = false
   private preparation: AbortController | null = null
+  private publishing = false
+  private readonly hostChanges: SceneChange[] = []
+  private readonly unsubscribeHost?: () => void
 
-  constructor(input: unknown) { this.document = parseSceneDocument(input) }
+  constructor(input: unknown, private readonly host?: SceneDocumentHost) {
+    const initial = parseSceneDocument(input)
+    if (!host) this.document = initial
+    else this.unsubscribeHost = host.subscribe(change => {
+      if (this.disposed || this.publishing) return
+      const validated = { label: change.label, before: parseSceneDocument(change.before), after: parseSceneDocument(change.after) }
+      if (JSON.stringify(validated.before) === JSON.stringify(validated.after)) return
+      this.cancelPreparation()
+      if (this.notifying) this.hostChanges.push(validated)
+      else this.notify(validated)
+    })
+  }
 
-  getDocument(): SceneDocument { return structuredClone(this.document) }
-  exportJson(space = 2): string { return serializeSceneDocument(this.document, space) }
+  getDocument(): SceneDocument { return this.host ? parseSceneDocument(this.host.read()) : structuredClone(this.document!) }
+  exportJson(space = 2): string { return serializeSceneDocument(this.getDocument(), space) }
   subscribe(observer: (change: SceneChange) => void): () => void {
     this.requireActive()
     this.observers.add(observer)
@@ -49,7 +70,7 @@ export class SceneController {
   /** A batch validates once, publishes once and never exposes its draft before commit. */
   transaction(label: string, change: (draft: SceneDocument) => void): SceneCommitResult {
     this.requireActive()
-    const draft = this.getDocument()
+    const before = this.getDocument(), draft = structuredClone(before)
     this.mutating = true
     try {
       const result: unknown = change(draft)
@@ -58,6 +79,7 @@ export class SceneController {
         throw new Error('Scene transactions must be synchronous; prepare asynchronous resources before committing')
       }
     } finally { this.mutating = false }
+    if (JSON.stringify(before) !== JSON.stringify(this.getDocument())) throw new Error('Host content changed during the scene transaction')
     return this.commit(label, parseSceneDocument(draft))
   }
   replaceDocument(input: unknown, label = 'Replace scene'): SceneCommitResult {
@@ -131,12 +153,16 @@ export class SceneController {
   }
   setView(id: string, view: SceneDocumentView, activate = false): SceneCommitResult { return this.update('Set view', document => setSceneDocumentView(document, id, view, activate)) }
   setEnvironment(environment: NonNullable<SceneDocument['environment']>): SceneCommitResult { return this.update('Set environment', document => setSceneEnvironment(document, environment)) }
-  dispose(): void { this.cancelPreparation(); this.disposed = true; this.observers.clear() }
+  dispose(): void {
+    if (this.disposed) return
+    this.cancelPreparation(); this.disposed = true; this.unsubscribeHost?.(); this.observers.clear(); this.hostChanges.length = 0
+  }
 
   private requireActive(): void {
     if (this.disposed) throw new Error('Scene controller has been disposed')
     if (this.notifying) throw new Error('Scene observers cannot synchronously mutate the document')
     if (this.mutating) throw new Error('Scene transactions cannot perform nested controller writes')
+    if (this.publishing) throw new Error('Host commits cannot perform nested controller writes')
   }
   private requireNode(document: SceneDocument, id: string): SceneNode {
     const node = document.nodes.find(entry => entry.id === id)
@@ -145,21 +171,36 @@ export class SceneController {
   }
   private update(label: string, operation: (document: SceneDocument) => SceneDocument): SceneCommitResult {
     this.requireActive()
-    return this.commit(label, operation(this.document))
+    return this.commit(label, operation(this.getDocument()))
   }
   private commit(label: string, next: SceneDocument): SceneCommitResult {
-    const before = this.document
+    const before = this.getDocument()
     if (JSON.stringify(before) === JSON.stringify(next)) return { document: this.getDocument(), observerErrors: [] }
     this.cancelPreparation()
-    this.document = next
+    if (this.host) {
+      this.publishing = true
+      try { this.host.commit(structuredClone(next), label) }
+      finally { this.publishing = false }
+    } else this.document = next
+    const after = this.getDocument()
+    const observerErrors = JSON.stringify(before) === JSON.stringify(after) ? [] : this.notify({ label, before, after })
+    return { document: this.getDocument(), observerErrors }
+  }
+  private notify(change: SceneChange): unknown[] {
     const observerErrors: unknown[] = []
     this.notifying = true
     try {
       for (const observer of [...this.observers]) {
-        try { observer({ label, before: structuredClone(before), after: this.getDocument() }) }
+        try { observer(structuredClone(change)) }
         catch (error) { observerErrors.push(error) }
       }
     } finally { this.notifying = false }
-    return { document: this.getDocument(), observerErrors }
+    while (this.hostChanges.length && !this.disposed) observerErrors.push(...this.notify(this.hostChanges.shift()!))
+    return observerErrors
   }
+}
+
+/** Attaches without keeping a second writable document; the host owns content and history. */
+export function createHostedSceneController(host: SceneDocumentHost): SceneController {
+  return new SceneController(host.read(), host)
 }
