@@ -42,3 +42,7 @@ Regenerate the v3 artifact with `python generate-document-schema.py` from this
 package directory after changing the shared structural contracts. The generator
 uses the existing style/city definitions and adds v3 resources, nodes, views and
 extensions; it has no runtime Python dependency for consumers.
+
+Run `python verify-document-schema.py` with Python `jsonschema` installed to
+exercise the actual Draft 2020-12 validator against resource/geometry examples
+and invalid documents. This supplements the TypeScript runtime tests.

@@ -6,6 +6,7 @@ from pathlib import Path
 root = Path(__file__).parent
 legacy = json.loads((root / 'scene.schema.json').read_text(encoding='utf-8'))
 defs = copy.deepcopy(legacy['$defs'])
+defs['cityAsset']['properties']['type'] = {'enum': ['3dtiles', 'glb']}
 
 def ref(name):
     return {'$ref': '#/$defs/' + name}
@@ -19,6 +20,17 @@ number = {'type': 'number'}
 text = ref('nonEmptyString')
 array = lambda item: {'type': 'array', 'items': item}
 count = {'type': 'integer', 'minimum': 0}
+defs['geoJsonPosition'] = {**array(number), 'minItems': 2}
+defs['geoJsonLine'] = {**array(ref('geoJsonPosition')), 'minItems': 2}
+defs['geoJsonRing'] = {**array(ref('geoJsonPosition')), 'minItems': 4}
+defs['geoJsonPolygon'] = {**array(ref('geoJsonRing')), 'minItems': 1}
+geometries = []
+for kind, coordinates in [('Point', ref('geoJsonPosition')), ('MultiPoint', array(ref('geoJsonPosition'))), ('LineString', ref('geoJsonLine')), ('MultiLineString', array(ref('geoJsonLine'))), ('Polygon', ref('geoJsonPolygon')), ('MultiPolygon', array(ref('geoJsonPolygon')))]:
+    geometries.append(obj(dict(type={'const': kind}, coordinates=coordinates), ['type', 'coordinates'], closed=False))
+geometries.append(obj(dict(type={'const': 'GeometryCollection'}, geometries=array(ref('geoJsonGeometry'))), ['type', 'geometries'], closed=False))
+defs['geoJsonGeometry'] = {'oneOf': geometries}
+defs['geoJsonFeature'] = obj(dict(type={'const': 'Feature'}, id={'type': ['string', 'number']}, geometry={'oneOf': [ref('geoJsonGeometry'), {'type': 'null'}]}, properties={'type': ['object', 'null']}), ['type', 'geometry', 'properties'], closed=False)
+defs['geoJsonFeatureCollection']['properties']['features']['items'] = ref('geoJsonFeature')
 auth = {'enum': ['none', 'runtime']}
 defs['wmsSource'] = obj(dict(type={'const': 'wms'}, url=text, version=text, layerNames=array(text), styleNames=array(string), format=string, transparent=boolean, crs=string, bboxWgs84=ref('extent'), authMode=auth), ['type', 'url', 'version', 'layerNames', 'authMode'])
 defs['wmtsMatrix'] = obj(dict(identifier=text, scaleDenominator={'type': 'number', 'exclusiveMinimum': 0}, topLeftCorner=ref('numberPair'), tileWidth={'type': 'integer', 'minimum': 1}, tileHeight={'type': 'integer', 'minimum': 1}, matrixWidth={'type': 'integer', 'minimum': 1}, matrixHeight={'type': 'integer', 'minimum': 1}), ['identifier', 'scaleDenominator', 'topLeftCorner', 'tileWidth', 'tileHeight'])
@@ -43,6 +55,7 @@ for name in node_names:
     props.pop('groupId', None)
     props.update(parentId=text, locked=boolean)
 defs['vectorLayer']['properties']['filter'] = array(ref('filter'))
+defs['vectorLayer']['properties']['style'] = ref('layerStyle')
 defs['group'] = obj(dict(type={'const': 'group'}, id=text, name=text, visible=boolean, locked=boolean, parentId=text, scope={'enum': ['2d', '3d']}), ['type', 'id', 'name', 'visible'])
 defs['node'] = {'oneOf': [ref(name) for name in [*node_names, 'group']]}
 defs['view2d'] = copy.deepcopy(defs['view'])
@@ -52,4 +65,6 @@ defs['view3d'] = obj(dict(type={'const': '3d'}, camera=ref('cityCamera'), height
 environment = {key: defs['cityScene']['properties'][key] for key in ['basemap', 'terrain', 'effects', 'lighting']}
 document = obj(dict(version={'const': 3}, id=text, title=text, description=string, resources={'type': 'object', 'propertyNames': text, 'additionalProperties': ref('resource')}, nodes=array(ref('node')), views={'type': 'object', 'minProperties': 1, 'additionalProperties': {'oneOf': [ref('view2d'), ref('view3d')]}}, activeView=text, environment=obj(environment), credentials=legacy['properties']['credentials'], widgets=ref('widgets'), theme=ref('theme'), presentation=ref('presentation'), metadata={'type': 'object'}, extensions={'type': 'object', 'additionalProperties': obj(dict(version={'type': 'integer', 'minimum': 1}, required=boolean, data={}), ['version', 'required', 'data'])}), ['version', 'id', 'title', 'resources', 'nodes', 'views', 'activeView'])
 document.update({'$schema': legacy['$schema'], '$id': 'https://desktop-webgis.dev/schemas/scene-document-v3.json', 'title': 'Desktop WebGIS SceneDocument v3', '$comment': 'Structural validation only. Use validateSceneDocument for reference integrity, cycles, resource compatibility and cross-field constraints.', '$defs': defs})
+document['properties']['views']['propertyNames'] = text
+document['properties']['extensions']['propertyNames'] = {'pattern': '^[a-zA-Z][a-zA-Z0-9-]*(\\.[a-zA-Z][a-zA-Z0-9-]*)+$'}
 (root / 'scene-document.schema.json').write_text(json.dumps(document, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')

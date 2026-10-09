@@ -40,6 +40,9 @@
             "$ref": "#/$defs/view3d"
           }
         ]
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/nonEmptyString"
       }
     },
     "activeView": {
@@ -152,6 +155,9 @@
           "data"
         ],
         "additionalProperties": false
+      },
+      "propertyNames": {
+        "pattern": "^[a-zA-Z][a-zA-Z0-9-]*(\\.[a-zA-Z][a-zA-Z0-9-]*)+$"
       }
     }
   },
@@ -252,7 +258,10 @@
           "const": "FeatureCollection"
         },
         "features": {
-          "type": "array"
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/geoJsonFeature"
+          }
         }
       }
     },
@@ -828,14 +837,7 @@
           "const": "vector"
         },
         "style": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/legacyStyle"
-            },
-            {
-              "$ref": "#/$defs/layerStyle"
-            }
-          ]
+          "$ref": "#/$defs/layerStyle"
         },
         "label": {
           "$ref": "#/$defs/label"
@@ -1626,8 +1628,7 @@
         "type": {
           "enum": [
             "3dtiles",
-            "glb",
-            "geojson"
+            "glb"
           ]
         },
         "url": {
@@ -2263,6 +2264,198 @@
         "name",
         "visible"
       ]
+    },
+    "geoJsonPosition": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 2
+    },
+    "geoJsonLine": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/geoJsonPosition"
+      },
+      "minItems": 2
+    },
+    "geoJsonRing": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/geoJsonPosition"
+      },
+      "minItems": 4
+    },
+    "geoJsonPolygon": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/geoJsonRing"
+      },
+      "minItems": 1
+    },
+    "geoJsonGeometry": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "Point"
+            },
+            "coordinates": {
+              "$ref": "#/$defs/geoJsonPosition"
+            }
+          },
+          "required": [
+            "type",
+            "coordinates"
+          ],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "MultiPoint"
+            },
+            "coordinates": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/geoJsonPosition"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "coordinates"
+          ],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "LineString"
+            },
+            "coordinates": {
+              "$ref": "#/$defs/geoJsonLine"
+            }
+          },
+          "required": [
+            "type",
+            "coordinates"
+          ],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "MultiLineString"
+            },
+            "coordinates": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/geoJsonLine"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "coordinates"
+          ],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "Polygon"
+            },
+            "coordinates": {
+              "$ref": "#/$defs/geoJsonPolygon"
+            }
+          },
+          "required": [
+            "type",
+            "coordinates"
+          ],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "MultiPolygon"
+            },
+            "coordinates": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/geoJsonPolygon"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "coordinates"
+          ],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "GeometryCollection"
+            },
+            "geometries": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/geoJsonGeometry"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "geometries"
+          ],
+          "additionalProperties": true
+        }
+      ]
+    },
+    "geoJsonFeature": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "Feature"
+        },
+        "id": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "geometry": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/geoJsonGeometry"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "properties": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "geometry",
+        "properties"
+      ],
+      "additionalProperties": true
     },
     "wmsSource": {
       "type": "object",

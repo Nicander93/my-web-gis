@@ -5,6 +5,9 @@ it('ships a self-contained v3 schema with resolvable references for both engines
   const schema = JSON.parse(readFileSync(new URL('../scene-document.schema.json', import.meta.url), 'utf8'))
   expect(schema.properties.version.const).toBe(3)
   expect(schema.additionalProperties).toBe(false)
+  expect(schema.$defs.cityAsset.properties.type.enum).toEqual(['3dtiles', 'glb'])
+  expect(schema.$defs.vectorLayer.properties.style).toEqual({ $ref: '#/$defs/layerStyle' })
+  expect(schema.$defs.geoJsonFeatureCollection.properties.features.items).toEqual({ $ref: '#/$defs/geoJsonFeature' })
   const walk = (value: unknown): void => {
     if (!value || typeof value !== 'object') return
     if ('$ref' in value) {
