@@ -391,6 +391,7 @@ export const layerCommands = {
     if (!useProjectStore.getState().canUndoEdit()) return false
     const ok = useProjectStore.getState().undoEdit()
     if (ok) emitCommandStatus('已撤销')
+    else { const reason = useProjectStore.getState().getHistoryBlockReason('undo'); if (reason) emitCommandStatus(reason) }
     return ok
   },
 
@@ -398,6 +399,7 @@ export const layerCommands = {
     if (!useProjectStore.getState().canRedoEdit()) return false
     const ok = useProjectStore.getState().redoEdit()
     if (ok) emitCommandStatus('已重做')
+    else { const reason = useProjectStore.getState().getHistoryBlockReason('redo'); if (reason) emitCommandStatus(reason) }
     return ok
   },
 
