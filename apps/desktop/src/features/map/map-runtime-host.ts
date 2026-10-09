@@ -19,6 +19,8 @@ import { useSessionStore } from '@/stores/session.store'
 import { useSnappingStore } from '@/stores/snapping.store'
 import { useWorkbenchStore } from '@/stores/workbench.store'
 import { useWorkspaceStore } from '@/stores/workspace.store'
+import { createProjectSceneDocument } from '../scene/project-scene-document'
+import { configureMapServiceLayer } from './map-service-requests'
 
 let runtime: OlMapRuntime | null = null
 let selectionRuntime: OlSelectionRuntime | null = null
@@ -34,6 +36,7 @@ let storeUnsub: (() => void) | null = null
 let snappingUnsub: (() => void) | null = null
 /** Avoid echoing map?store?map selection sync loops. */
 let applyingStoreSelection = false
+const serviceRequests = new Map<string, { layer: unknown; resource: string; cleanup?: () => void }>()
 
 export function getMapRuntime(): OlMapRuntime | null {
   return runtime
@@ -145,6 +148,8 @@ export function mountMapRuntime(
 }
 
 export function unmountMapRuntime(): void {
+  serviceRequests.forEach(request => request.cleanup?.())
+  serviceRequests.clear()
   snappingUnsub?.()
   snappingUnsub = null
   storeUnsub?.()
@@ -193,9 +198,34 @@ export function syncMapFromProject(): void {
   }
 
   runtime.syncLayers(state.getMapLayers(), featuresByDataset, project.datasets)
+  syncServiceRequests()
   toolRuntime?.refreshSnapping()
   syncSessionViewExtent()
   syncSelectionHighlight(state.selection)
+}
+
+/** Keeps request handlers attached to the installed source rather than persisting credential values. */
+function syncServiceRequests(): void {
+  if (!runtime) return
+  const state = useProjectStore.getState()
+  const authenticated = state.project.datasets.filter(dataset => (dataset.kind === 'wms' || dataset.kind === 'wmts') && dataset.source.authMode !== 'none')
+  const document = authenticated.length ? createProjectSceneDocument(state.getSnapshot()) : undefined
+  const live = new Set<string>()
+  for (const definition of state.project.layers) {
+    const resource = document?.resources[definition.datasetId]
+    if (resource?.type !== 'wms' && resource?.type !== 'wmts' || resource.authMode !== 'runtime') continue
+    const layer = runtime.registry.get(definition.id)
+    if (!layer) continue
+    live.add(definition.id)
+    const key = JSON.stringify(resource), previous = serviceRequests.get(definition.id)
+    if (previous?.layer === layer && previous.resource === key) continue
+    previous?.cleanup?.()
+    serviceRequests.set(definition.id, { layer, resource: key, cleanup: configureMapServiceLayer(layer, resource) })
+  }
+  for (const [id, request] of serviceRequests) {
+    if (live.has(id)) continue
+    request.cleanup?.(); serviceRequests.delete(id)
+  }
 }
 
 export function zoomMapBy(delta: number): boolean {
@@ -474,6 +504,8 @@ export function _setMapRuntimeForTests(
   isMounted = Boolean(next),
   options?: { selection?: boolean; tool?: boolean; activeTool?: EditTool }
 ): void {
+  serviceRequests.forEach(request => request.cleanup?.())
+  serviceRequests.clear()
   snappingUnsub?.()
   snappingUnsub = null
   storeUnsub?.()
