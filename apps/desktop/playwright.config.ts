@@ -3,6 +3,7 @@ import { defineConfig } from '@playwright/test'
 export default defineConfig({
   testDir: './e2e',
   testMatch: '**/*.e2e.ts',
+  testIgnore: '**/viewer-document.e2e.ts',
   workers: 1,
   timeout: 45_000,
   use: {

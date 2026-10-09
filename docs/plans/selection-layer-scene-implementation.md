@@ -219,3 +219,12 @@
 - 资源、视图、节点顺序／身份／分组结构或文档其他顶层内容变化走准备替换；无效文档在任何 setter 前拒绝，全部样式先编译。宿主监听器在原生 setter 中抛错尚不提供事务保证。
 - 验证：OL 构建、28 个测试通过。新增过滤修改／清除、共享源与实例保持、资源变化替换和无效透明度拒绝证据。测试仍为 Node 中的 Map mock 与真实 OL 图层／Source；未新增浏览器或 Windows 原生验收。
 - 仍需 SceneController 绑定、编辑器／Viewer 创建路径收敛与更完整的增量差异处理；本批不签收 S05／S07／S09。
+
+## 2026-10-09：Viewer 使用 v3 公共运行时与选择包
+
+- Viewer 读取 v3；旧 SceneManifest／CityScene 先通过共享迁移。二维改用 `OlDocumentRuntime`，三维改用 `createCesiumDocumentRuntime`；声明式显隐更新经过文档／投影而非直接写原生层。v3 尊重 activeView，旧混合场景保留默认三维行为，支持显式 mode 和返回二维。
+- 复用 scene-core URL 解析：以最终 HTTP 响应 URL 为资源基准，覆盖真正 302 跳转。新增可直接打开的 public v3 点／Popup 样例。保留图例、控件、Theme、Popup、图层／组开关；不支持对象返回状态问题而非静默省略。页面离开取消读取并销毁所属资源。
+- 旧 Viewer 的可选择交互迁移到公共 `ol-selection`。新增可选 `boxSelection: false`，Viewer 保留拖动平移；默认框选行为不变。宿主接收集合并按完整数据、过滤、显隐／锁定确认，不改文档或历史。
+- 已通过：Viewer TypeScript／生产构建、ol-selection 构建与 9 项单测；独立 Viewer 浏览器 12 用例，三种窗口尺寸。证据包含 v2/v3、资源加载一次、Popup、实际黄色高亮像素、拖动平移、显隐、未支持内容报告、503、重定向、实际 Cesium canvas 启动和切回二维。Desktop 默认框选 15 个浏览器回归通过，包括属性表联动、修饰键、Esc、独立消费者、旋转与父组裁剪、框选后单击和平移。
+- 测试为安装的 Chrome＋SwiftShader，网络样例受控；Cesium 此批只验证空场景启动，不证明模型／tileset、水面、三维 Popup／环境和硬件渲染的完整一致性。生产构建仍有既有 Cesium 大 chunk 警告。
+- 仍未签收 S09：完整发布格式／资源打包、能力矩阵逐项一致、controller 绑定、Desktop 创建路径收敛、独立 engine tarball 与原生／DPI 门槛仍需完成。本批未推送或 npm 发布。

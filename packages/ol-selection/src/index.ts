@@ -36,6 +36,8 @@ export interface SelectionOptions {
   resolveSelectedFeature?: (ref: FeatureRef) => Feature<Geometry> | undefined
   style?: StyleLike
   hitTolerance?: number
+  /** Disable primary drag selection for consumers that retain drag-to-pan and click selection. */
+  boxSelection?: boolean
   /** The host accepts/rejects the request and feeds the accepted state back via setSelection. */
   onSelectionRequest: (request: SelectionRequest) => void
 }
@@ -160,7 +162,7 @@ export function createSelectionController(options: SelectionOptions): SelectionC
   })
   const cancelGesture = (): boolean => {
     if (!gesture) return false
-    gesture = null; box.setActive(false); box.setActive(active)
+    gesture = null; box.setActive(false); box.setActive(active && options.boxSelection !== false)
     suppressClick = true
     return true
   }
@@ -175,7 +177,7 @@ export function createSelectionController(options: SelectionOptions): SelectionC
   viewport.ownerDocument.defaultView?.addEventListener('blur', onBlur)
   bindTargets()
   return {
-    setActive(value) { if (disposed) return; cancelGesture(); active = value; box.setActive(value) },
+    setActive(value) { if (disposed) return; cancelGesture(); active = value; box.setActive(value && options.boxSelection !== false) },
     setTargets(value) { if (disposed) return; validateTargets(value); cancelGesture(); revision++; targets = [...value]; bindTargets() },
     setSelection(value) { if (disposed) return; cancelGesture(); selection = uniqueSelection(value); refresh() },
     cancelGesture,
