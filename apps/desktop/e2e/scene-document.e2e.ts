@@ -66,6 +66,43 @@ test('cancel menu prevents a delayed resource from replacing the project', async
   await expect(page.locator('.layer-name-button')).toHaveCount(0)
 })
 
+for (const decision of ['放弃草稿并继续', '应用草稿并继续']) {
+  test(`scene import draft decision preserves cancellation and supports ${decision}`, async ({ page }) => {
+    await page.route('https://scene-fixture.test/points.geojson', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ type: 'FeatureCollection', features: [] }) }))
+    await startMap(page)
+    await importScene(page, remoteScene())
+    await page.locator('.layer-name-button').click()
+    await page.getByRole('tab', { name: '数据', exact: true }).click()
+    await page.getByRole('button', { name: '样式', exact: true }).click()
+    await page.getByLabel('符号颜色', { exact: true }).fill('#ff0000')
+    await page.getByRole('button', { name: '项目', exact: true }).click()
+    await page.getByRole('menuitem', { name: '导入场景', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: '处理未应用样式', exact: true })
+    await expect(dialog).toBeVisible()
+    await dialog.getByRole('button', { name: '取消导入', exact: true }).click()
+    await expect(page.getByLabel('符号颜色', { exact: true })).toHaveValue('#ff0000')
+    await page.getByRole('button', { name: '项目', exact: true }).click()
+    await page.getByRole('menuitem', { name: '导入场景', exact: true }).click()
+    await dialog.getByRole('button', { name: decision, exact: true }).click()
+    const chooser = page.waitForEvent('filechooser')
+    await page.getByRole('dialog', { name: '保存当前项目？', exact: true }).getByRole('button', { name: '放弃修改并打开', exact: true }).click()
+    const replacement = remoteScene()
+    replacement.title = 'Replacement'
+    replacement.nodes[0].name = 'Replacement points'
+    await (await chooser).setFiles({ name: 'replacement.scene.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(replacement)) })
+    await expect(page.locator('.layer-name-button')).toContainText('Replacement points')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await page.getByRole('button', { name: '撤销', exact: true }).click()
+    await expect(page.locator('.layer-name-button')).toContainText('Remote points')
+    if (decision === '应用草稿并继续') {
+      await page.locator('.layer-name-button').click()
+      await page.getByRole('tab', { name: '数据', exact: true }).click()
+      await page.getByRole('button', { name: '样式', exact: true }).click()
+      await expect(page.getByLabel('符号颜色', { exact: true })).toHaveValue('#ff0000')
+    }
+  })
+}
+
 test('full scene menu preserves filtered-out data and imports through shared undo history', async ({ page }, testInfo) => {
   await page.route('**/*tile.openstreetmap.org/**', route => route.abort())
   await page.goto('/')
