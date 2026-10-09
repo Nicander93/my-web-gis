@@ -5,6 +5,7 @@ import { openSceneDocument, saveSceneDocument } from '@/services/scene-document-
 import { createProjectSceneDocument } from '@/features/scene/project-scene-document'
 import { replaceSceneDocumentAsEdit } from '@/features/scene/scene-document.commands'
 import { getLiveCityCamera } from '@/features/city/city-runtime-host'
+import { resolveSceneDrafts } from '@/features/inspector/scene-draft-guard'
 import { emitCommandStatus } from './status'
 import { useSessionStore } from '@/stores/session.store'
 import { useProjectStore } from '@/stores/project.store'
@@ -71,6 +72,8 @@ export const projectCommands = {
     const operation = new AbortController()
     sceneImport = operation
     try {
+      if (!await resolveSceneDrafts()) return
+      operation.signal.throwIfAborted()
       if (useProjectStore.getState().dirty && replacementGuard && !await replacementGuard()) return
       operation.signal.throwIfAborted()
       if (Object.values(useSessionStore.getState().sessions).some(session => session.styleDraft?.dirty)) throw new Error('请先应用或放弃样式草稿，再导入场景')
