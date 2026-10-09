@@ -1,4 +1,5 @@
-import { createCesiumDocumentRuntime, projectCesiumDocument, type CesiumDocumentRuntime } from '@desktop-webgis/cesium-scene-runtime'
+import { createCesiumDocumentRuntime, type CesiumDocumentRuntime } from '@desktop-webgis/cesium-scene-runtime'
+import { bindSceneRuntime, SceneController, type SceneRuntimeBinding } from '@desktop-webgis/scene-core'
 import type { SceneDocument } from '@desktop-webgis/scene-schema'
 import 'cesium/Build/Cesium/Widgets/widgets.css'
 
@@ -7,15 +8,20 @@ export async function renderCityViewer(scene: SceneDocument, sceneUrl: string, v
   const target = document.getElementById('map')
   if (!target) throw new Error('Viewer 缺少地图容器')
   target.setAttribute('aria-label', '城市三维场景')
-  let hidden = false, mounted: CesiumDocumentRuntime | undefined
-  const destroy = (): void => { hidden = true; mounted?.destroy() }
+  const controller = new SceneController(scene), startup = new AbortController()
+  let mounted: CesiumDocumentRuntime | undefined, binding: SceneRuntimeBinding | undefined
+  const destroy = (): void => { startup.abort(); binding?.dispose(); mounted?.destroy(); controller.dispose() }
   window.addEventListener('pagehide', destroy, { once: true })
   let loaded: CesiumDocumentRuntime
-  try { loaded = await createCesiumDocumentRuntime({ target, document: scene, viewId, sceneUrl, cesiumBaseUrl: new URL('cesium/', document.baseURI).href }) }
-  catch (error) { window.removeEventListener('pagehide', destroy); throw error }
-  mounted = loaded
-  if (hidden) { loaded.destroy(); return }
-  const runtime = loaded.runtime
+  try {
+    loaded = await createCesiumDocumentRuntime({ target, document: controller.getDocument(), viewId, sceneUrl, signal: startup.signal, cesiumBaseUrl: new URL('cesium/', document.baseURI).href })
+    mounted = loaded
+    startup.signal.throwIfAborted()
+    binding = bindSceneRuntime(controller, loaded)
+    const state = await binding.settled()
+    startup.signal.throwIfAborted()
+    if (state.status === 'error') throw state.error
+  } catch (error) { destroy(); window.removeEventListener('pagehide', destroy); throw error }
   const list = document.getElementById('layer-list'), panel = document.getElementById('layer-panel')
   if (list && panel) {
     panel.hidden = false
@@ -23,20 +29,13 @@ export async function renderCityViewer(scene: SceneDocument, sceneUrl: string, v
       const label = document.createElement('label'); label.className = 'layer-row'
       const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = node.visible ?? true
       checkbox.addEventListener('change', () => {
-        const next = structuredClone(scene)
-        const definition = next.nodes.find(candidate => candidate.id === node.id)
-        if (!definition) return
-        definition.visible = checkbox.checked
-        const projection = projectCesiumDocument(next, viewId)
-        const previous = scene
-        scene = next
-        void runtime.updateScene(projection.scene).catch(error => {
-          if (scene !== next) return
-          scene = previous
-          checkbox.checked = !checkbox.checked
+        const report = (error: unknown): void => {
           const status = document.getElementById('scene-status')
           if (status) { status.classList.remove('scene-status--quiet'); status.textContent = String(error) }
-        })
+        }
+        try { controller.setNodeVisible(node.id, checkbox.checked) }
+        catch (error) { report(error); return }
+        void binding!.settled().then(state => { if (state.status === 'error') report(state.error) })
       })
       const name = document.createElement('span'); name.textContent = node.name
       label.append(checkbox,name); return label

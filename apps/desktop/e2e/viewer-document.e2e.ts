@@ -73,6 +73,8 @@ test('Viewer prepares a real GLB while hidden before publishing the city scene',
     city: { type: '3d', heightReference: 'ellipsoid', camera: { position: [116.391, 39.907, 2500], heading: 0, pitch: -45, roll: 0 } }
   } }
   await page.route('**/scene-model.json', route => route.request().isNavigationRequest() ? route.continue() : route.fulfill({ json: scene }))
+  let modelRequests = 0
+  page.on('response', response => { if (response.url().endsWith('/city-sample/tower.glb')) modelRequests++ })
   const modelResponse = page.waitForResponse(response => response.url().endsWith('/city-sample/tower.glb'))
   await page.goto('/?scene=./scene-model.json')
   expect((await modelResponse).ok()).toBe(true)
@@ -84,6 +86,8 @@ test('Viewer prepares a real GLB while hidden before publishing the city scene',
   await expect(toggle).not.toBeChecked()
   await toggle.check()
   await expect(toggle).toBeChecked()
+  await expect(page.locator('#scene-status')).toHaveText('三维场景已加载')
+  expect(modelRequests).toBe(1)
 })
 
 test('Viewer reports retained unsupported objects and load failures', async ({ page }) => {

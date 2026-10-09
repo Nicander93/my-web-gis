@@ -167,8 +167,14 @@ export class CitySceneRuntime {
     let committed = false, committing = false
     const abort = (): void => operation.abort(signal?.reason)
     const release = (): void => { if (!committed && !committing) prepared.forEach(layer => layer.destroy()) }
+    let rejectCancellation!: (reason: unknown) => void
+    const canceled = new Promise<never>((_resolve, reject) => { rejectCancellation = reject })
+    const rejectAborted = (): void => rejectCancellation(operation.signal.reason)
+    // Observe cancellation even when a native provider ignores its own abort signal.
+    void canceled.catch(() => {})
     signal?.addEventListener('abort', abort, { once: true })
     operation.signal.addEventListener('abort', release, { once: true })
+    operation.signal.addEventListener('abort', rejectAborted, { once: true })
     if (signal?.aborted) abort()
     try {
       operation.signal.throwIfAborted()
@@ -183,7 +189,7 @@ export class CitySceneRuntime {
       const loads = [...prepared.values()].map(layer => layer.mount(this.viewer))
       // Prepare even an equal environment: a pending legacy update may still change the installed one.
       const environment = this.prepareEnvironment(scene)
-      const [nextEnvironment] = await Promise.all([environment, ...loads])
+      const [nextEnvironment] = await Promise.race([Promise.all([environment, ...loads]), canceled])
       operation.signal.throwIfAborted()
       if (this.destroyed || this.viewer.isDestroyed()) throw new Error('CitySceneRuntime 已销毁')
       const custom = this.layers.layers.filter(layer => !this.nodes.has(layer.id))
@@ -225,9 +231,49 @@ export class CitySceneRuntime {
       committing = false
       release()
       operation.signal.removeEventListener('abort', release)
+      operation.signal.removeEventListener('abort', rejectAborted)
       signal?.removeEventListener('abort', abort)
       if (this.preparation === operation) this.preparation = null
     }
+  }
+
+  /** Updates ready native objects without reloading resources or resetting an unchanged camera. */
+  updatePresentation(input: CityScene): boolean {
+    if (this.destroyed) throw new Error('CitySceneRuntime 已销毁')
+    const scene = parseCityScene(input)
+    if (JSON.stringify([scene.basemap, scene.terrain]) !== this.environmentKey) return false
+    if (scene.nodes.length !== this.nodes.size || scene.nodes.some(node => {
+      const layer = this.layers.getLayer(node.id)
+      return !layer?.isMountedOn(this.viewer) || this.nativeKeys.get(node.id) !== nativeKey(node, scene)
+    })) return false
+    const cameraChanged = JSON.stringify(scene.camera) !== JSON.stringify(this.scene.camera)
+    const time = scene.lighting ? JulianDate.fromIso8601(scene.lighting.time) : JulianDate.clone(this.originalLighting.time)
+    this.cancelPreparation(); this.sceneRevision++
+    this.cancelDraw(); this.cancelGraphicEditing(); this.editor.cancel()
+    for (const definition of scene.nodes) {
+      const node = { ...definition, ...getCityNodeState(scene, definition) }, layer = this.layers.getLayer(node.id)!
+      this.nodes.set(node.id, structuredClone(node))
+      layer.name = node.name; layer.show = node.visible
+      if ((!node.visible || node.locked) && this.editingId === node.id) this.stopEditing()
+      if ((layer instanceof TilesetLayer || layer instanceof ModelLayer) && (node.type === '3dtiles' || node.type === 'model')) layer.setTransform(node.transform)
+      if (layer instanceof TilesetLayer && node.type === '3dtiles') layer.setQuality(node.maximumScreenSpaceError, node.cacheBytes)
+      if (layer instanceof GraphicLayer && node.type === 'graphic') layer.getGraphic(node.id)?.setOptions(node)
+      if (layer instanceof GeoJsonLayer && node.type === 'geojson') layer.setColor(node.color ?? '#55a6ff')
+      if (node.popup) layer.bindPopup(node.popup); else layer.unbindPopup()
+      this.applySelection(layer)
+    }
+    this.effects.update(scene.effects)
+    const lightingKey = JSON.stringify(scene.lighting ?? null)
+    if (lightingKey !== this.lightingKey) {
+      if (this.viewer.scene.globe) this.viewer.scene.globe.enableLighting = scene.lighting?.sunlight ?? this.originalLighting.sunlight
+      this.viewer.shadows = scene.lighting?.shadows ?? this.originalLighting.shadows
+      if (this.viewer.clock) this.viewer.clock.currentTime = time
+      this.lightingKey = lightingKey
+    }
+    this.scene = scene
+    if (cameraChanged) this.setCamera(scene.camera)
+    this.editor.refresh(); this.viewer.scene.requestRender()
+    return true
   }
 
   cancelPreparation(): void { this.preparation?.abort(); this.preparation = null }
@@ -374,14 +420,33 @@ export interface CesiumDocumentRuntime {
   readonly issues: readonly CesiumDocumentIssue[]
   /** Full input content, including definitions unsupported by the native city projection. */
   getDocument(): SceneDocument
+  /** Applies a validated snapshot; aborted preparation cannot publish obsolete native content. */
+  updateDocument(document: unknown, signal?: AbortSignal): Promise<void>
   destroy(): void
 }
 
 /** Creates and loads a native projection; low-level native edits still require host document updates. */
 export async function createCesiumDocumentRuntime(options: Omit<CityRuntimeOptions, 'scene'> & { document: unknown; viewId?: string; signal?: AbortSignal }): Promise<CesiumDocumentRuntime> {
-  const projection = projectCesiumDocument(options.document, options.viewId)
+  let projection = projectCesiumDocument(options.document, options.viewId)
   const runtime = createRuntime({ ...options, scene: projection.scene }, false)
   try { await runtime.replaceScene(projection.scene, options.signal) }
   catch (error) { runtime.destroy(); throw error }
-  return { runtime, issues: projection.issues, getDocument: () => structuredClone(projection.document), destroy: () => runtime.destroy() }
+  let revision = 0, destroyed = false
+  return {
+    runtime,
+    get issues() { return structuredClone(projection.issues) },
+    getDocument: () => structuredClone(projection.document),
+    async updateDocument(document, signal) {
+      if (destroyed) throw new Error('CesiumDocumentRuntime 已销毁')
+      signal?.throwIfAborted()
+      const next = projectCesiumDocument(document, options.viewId)
+      const current = ++revision
+      runtime.cancelPreparation()
+      if (!runtime.updatePresentation(next.scene)) await runtime.replaceScene(next.scene, signal)
+      signal?.throwIfAborted()
+      if (destroyed || revision !== current) throw new DOMException('Scene projection superseded', 'AbortError')
+      projection = next
+    },
+    destroy() { if (destroyed) return; destroyed = true; revision++; runtime.destroy() }
+  }
 }

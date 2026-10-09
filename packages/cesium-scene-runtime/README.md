@@ -40,6 +40,10 @@ Cesium 为 peer dependency。首版 0.1.0，MIT；尚未发布 npm。
 
 `projectCesiumDocument(document, viewId?)` 校验 v3 文档并生成现有 CitySceneRuntime 可消费的投影。它保留完整文档，二维 tile/vector 节点返回 `cesium.unsupported` 问题；嵌套三维分组的显隐和锁定仅在投影中派生，原始本地状态不改写。未知必需扩展阻止投影，无法准备的原生资源明确报错。
 
-`createCesiumDocumentRuntime({ document, viewId, viewer?, target?, ...options })` 创建并等待原生图层与环境加载后返回 `{ runtime, issues, getDocument, destroy }`。`getDocument()` 是完整输入的隔离副本，原生底层编辑仍需宿主更新文档；此入口尚不是带历史的统一场景控制门面。
+`createCesiumDocumentRuntime({ document, viewId, viewer?, target?, signal?, ...options })` 创建并等待原生图层与环境加载后返回 `{ runtime, issues, getDocument, updateDocument, destroy }`。`getDocument()` 是最近成功投影的完整文档隔离副本，`issues` 随成功更新变化。原生底层编辑仍需宿主更新文档，运行时不持有编辑历史。
+
+`updateDocument(document, signal?)` 校验后原位更新已就绪对象的显隐、变换、质量、Popup、图形和环境显示属性；相机声明不变时保留用户导航。资源或环境来源变化走 `replaceScene`：隐藏准备候选资源，成功后替换，准备失败保留上一投影。取消立即结束等待，即使加载器未响应取消；后续更新及销毁使旧准备失效并清理迟到资源。可作为 scene-core 的 `bindSceneRuntime` 目标，权威文档和历史由宿主持有。低层 `updateScene` 保留既有增量行为，不能替代这个支持取消的适配器。
+
+准备阶段的保护不等于同步原生 setter 抛错或重入时的完整事务回滚。外部 Viewer 中的自定义图层由宿主拥有；文档内管理图层由运行时负责释放。三维共享二维节点仍返回能力问题，不静默改写文档。
 
 `createCityRuntime` 支持已有 `viewer`，默认由调用方拥有，销毁时保留 Viewer 并移除自有图层、恢复原地形、光照和时间。自行通过 target 创建的 Viewer 随 Runtime 销毁。直接 `new CitySceneRuntime(viewer, options)` 延续旧的拥有 Viewer 行为，接入外部 Viewer 时显式传 `ownsViewer: false`。
