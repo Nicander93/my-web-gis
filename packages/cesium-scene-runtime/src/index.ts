@@ -49,6 +49,9 @@ export class CitySceneRuntime {
   private graphicEditing?: EditSession
   private selectedIds: readonly string[] = []
   private destroyed = false
+  private sceneRevision = 0
+  private readonly layerReady = new Map<BaseLayer, Promise<unknown>>()
+  private readonly currentLayers = new Map<string, BaseLayer>()
   private baseLayer?: ImageryLayer
   private environmentRevision = 0
   private environmentKey = ''
@@ -73,6 +76,7 @@ export class CitySceneRuntime {
   async updateScene(input: CityScene): Promise<void> {
     if (this.destroyed) throw new Error('CitySceneRuntime 已销毁')
     const scene = parseCityScene(input)
+    const revision = ++this.sceneRevision
     // Cancel an in-flight gesture before applying authoritative state (undo/import/hide).
     this.cancelDraw(); this.cancelGraphicEditing(); this.editor.cancel()
     this.scene = scene
@@ -88,19 +92,21 @@ export class CitySceneRuntime {
     for (const id of this.nodes.keys()) {
       if (scene.nodes.some(node => node.id === id)) continue
       if (this.editingId === id) this.stopEditing()
-      this.layers.removeLayer(id); this.nodes.delete(id); this.nativeKeys.delete(id)
+      this.layers.removeLayer(id); this.nodes.delete(id); this.nativeKeys.delete(id); this.currentLayers.delete(id)
     }
     for (const definition of scene.nodes) {
       const node = { ...definition, ...getCityNodeState(scene, definition) }
       const previous = this.nodes.get(node.id)
       let layer = this.layers.getLayer(node.id)
-      if (layer && previous && this.nativeKeys.get(node.id) !== nativeKey(node, scene)) {
+      if (layer && previous && (layer.state === 'error' || this.nativeKeys.get(node.id) !== nativeKey(node, scene))) {
         if (this.editingId === node.id) this.stopEditing()
         this.layers.removeLayer(node.id); layer = undefined
       }
       this.nodes.set(node.id, structuredClone(node))
       this.nativeKeys.set(node.id, nativeKey(node, scene))
       if (layer) {
+        const ready = this.layerReady.get(layer)
+        if (ready) promises.push(ready)
         layer.name = node.name
         if ((!node.visible || node.locked) && this.editingId === node.id) this.stopEditing()
         layer.show = node.visible
@@ -115,8 +121,11 @@ export class CitySceneRuntime {
       layer = this.createLayer(node, scene)
       if (node.popup) layer.bindPopup(node.popup)
       const mounted = layer
+      this.currentLayers.set(node.id, mounted)
       mounted.on('click', event => this.options.onSelect?.(node.id, event.properties, event.selection))
-      mounted.on('error', error => this.options.onLayerState?.(node.id, 'error', error))
+      mounted.on('error', error => {
+        if (!this.destroyed && this.currentLayers.get(node.id) === mounted) this.options.onLayerState?.(node.id, 'error', error)
+      })
       const pending = this.layers.addLayer(mounted).then(() => {
         if (this.destroyed || this.layers.getLayer(node.id) !== mounted) return
         const latest = this.nodes.get(node.id)
@@ -125,7 +134,12 @@ export class CitySceneRuntime {
         if (latest?.type === 'geojson' && mounted instanceof GeoJsonLayer) mounted.setColor(latest.color ?? '#55a6ff')
         this.applySelection(mounted)
         this.options.onLayerState?.(node.id, mounted.state)
+      }).catch(error => {
+        if (this.destroyed || this.currentLayers.get(node.id) !== mounted) return
+        throw error
       })
+      this.layerReady.set(mounted, pending)
+      void pending.then(() => this.layerReady.delete(mounted), () => this.layerReady.delete(mounted))
       this.options.onLayerState?.(node.id, 'loading')
       promises.push(pending)
     }
@@ -133,7 +147,7 @@ export class CitySceneRuntime {
     promises.push(this.updateEnvironment(scene))
     const results = await Promise.allSettled(promises)
     const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
-    if (failures.length && !this.destroyed) throw new Error(failures.map(f => f.reason instanceof Error ? f.reason.message : String(f.reason)).join('\n'))
+    if (failures.length && !this.destroyed && revision === this.sceneRevision) throw new Error(failures.map(f => f.reason instanceof Error ? f.reason.message : String(f.reason)).join('\n'))
   }
 
   startEditing(id: string, mode: EditMode = 'translate'): void {
@@ -193,7 +207,7 @@ export class CitySceneRuntime {
   getNativeViewer(): Viewer { return this.viewer }
   destroy(): void {
     if (this.destroyed) return
-    this.destroyed = true; this.environmentRevision++
+    this.destroyed = true; this.environmentRevision++; this.sceneRevision++; this.layerReady.clear(); this.currentLayers.clear()
     this.cancelDraw(); this.cancelGraphicEditing(); this.editor.destroy(); this.layers.destroy(); this.effects.destroy()
     if (this.baseLayer) this.viewer.imageryLayers.remove(this.baseLayer, true)
     if (this.options.ownsViewer !== false) this.viewer.destroy()
