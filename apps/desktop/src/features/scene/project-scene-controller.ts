@@ -19,11 +19,21 @@ function prepareProjectEdit(before: ProjectSnapshot, next: SceneDocument): Proje
   if (candidate.project.id !== before.project.id) return candidate
   const previous = createProjectSceneDocument(before)
   candidate.project.settings = { ...structuredClone(before.project.settings), ...candidate.project.settings }
+  if (previous.activeView === next.activeView && previous.views[previous.activeView]?.type === next.views[next.activeView]?.type) {
+    if (Object.hasOwn(before.project.settings, 'workspaceType')) candidate.project.settings.workspaceType = structuredClone(before.project.settings.workspaceType)
+    else delete candidate.project.settings.workspaceType
+  }
   candidate.project.datasets = candidate.project.datasets.map(dataset => {
     const existing = before.project.datasets.find(entry => entry.id === dataset.id)
     if (!existing || !sameDefinition(previous.resources[dataset.id], next.resources[dataset.id])) return dataset
     if (before.featuresByDataset[dataset.id]) candidate.featuresByDataset[dataset.id] = structuredClone(before.featuresByDataset[dataset.id])
     return structuredClone(existing)
+  })
+  candidate.project.layers = candidate.project.layers.map(layer => {
+    const existing = before.project.layers.find(entry => entry.id === layer.id)
+    const previousNode = previous.nodes.find(node => node.id === layer.id), nextNode = next.nodes.find(node => node.id === layer.id)
+    return existing && (previousNode?.type === 'tile' && nextNode?.type === 'tile' || previousNode?.type === 'vector' && nextNode?.type === 'vector' && sameDefinition(previousNode.style, nextNode.style))
+      ? { ...layer, style: structuredClone(existing.style) } : layer
   })
   const oldBase = previous.nodes.find(node => node.type === 'tile' && node.role === 'basemap')
   const newBase = next.nodes.find(node => node.type === 'tile' && node.role === 'basemap')
@@ -41,7 +51,9 @@ export function createProjectSceneController(): SceneController {
     commit(document, label) {
       const state = useProjectStore.getState()
       const candidate = prepareProjectEdit(state.getSnapshot(), document)
-      state.replaceSnapshotAsEdit(candidate, label)
+      if (sameDefinition(state.getSnapshot(), candidate)) return
+      if (candidate.project.id === state.project.id) state.applySnapshotAsEdit(candidate, label)
+      else state.replaceSnapshotAsEdit(candidate, label)
     },
     subscribe(observer) {
       return useProjectStore.subscribe((state, previous) => {

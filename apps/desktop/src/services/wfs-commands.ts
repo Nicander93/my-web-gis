@@ -48,6 +48,8 @@ export async function startWfsBoundedLoad(input: StartWfsLoadInput): Promise<voi
       parseGml: (body, opts) => parseWfsGmlFeatures(body, opts)
     })
 
+    // A resource edit can replace this same-ID layer without switching the whole project.
+    if (controller.signal.aborted || useSessionStore.getState().wfsAbortByLayer[input.layerId] !== controller) return
     // Stale if project switched or layer removed.
     if (useSessionStore.getState().wfsLoadGeneration !== loadGeneration) {
       return
@@ -116,8 +118,10 @@ export async function startWfsBoundedLoad(input: StartWfsLoadInput): Promise<voi
       result.duplicateIdCount > 0 ? `，去重 ${result.duplicateIdCount}` : ''
     emitCommandStatus(`WFS 快照已加载 ${result.loadedCount} 个要素${trunc}${dup}`)
   } finally {
-    useSessionStore.getState().setLayerLoading(input.layerId, false)
-    useSessionStore.getState().setWfsAbort(input.layerId, null)
+    if (useSessionStore.getState().wfsAbortByLayer[input.layerId] === controller) {
+      useSessionStore.getState().setLayerLoading(input.layerId, false)
+      useSessionStore.getState().setWfsAbort(input.layerId, null)
+    }
     // Silence unused previousFeatures when refresh succeeded — kept for clarity.
     void previousFeatures
   }

@@ -12,7 +12,7 @@ async function mapState(page: Page) {
     const positions = layer.getSource()!.getFeatures().map(feature => ({
       id: String(feature.getId()), pixel: map.getPixelFromCoordinate(feature.getGeometry()!.getExtent().slice(0, 2))
     })).sort((a, b) => a.pixel[0] - b.pixel[0])
-    return { positions, selection: state.selection.featureIds, center: map.getView().getCenter(), dirty: state.dirty }
+    return { positions, selection: state.selection.featureIds, center: map.getView().getCenter(), dirty: state.dirty, opacity: layer.getOpacity() }
   })
 }
 
@@ -68,6 +68,33 @@ test('box selection links the accepted rows; modifiers, empty selection and row 
   await expect(page.getByLabel('表格状态与分页')).toContainText('选中 0')
   await expect(page.getByLabel('表格状态与分页')).toContainText('0 / 0')
   await page.screenshot({ path: info.outputPath('selection-empty.png') })
+})
+
+test('public scene display edits preserve selection and table through toolbar undo and redo', async ({ page }) => {
+  const initial = await mapState(page), first = initial.positions[0].pixel
+  await drag(page, [first[0] - 12, first[1] - 12], [first[0] + 12, first[1] + 12])
+  await expect(page.getByRole('complementary', { name: '属性表面板' })).toBeVisible()
+  await page.getByRole('searchbox', { name: '表内搜索' }).fill('Point')
+  const selected = (await mapState(page)).selection
+  const exported = await page.evaluate(async () => {
+    const { createProjectSceneController } = await import('/src/features/scene/project-scene-controller.ts')
+    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const controller = createProjectSceneController(), id = useProjectStore.getState().selectedLayerId!
+    try { controller.setNodeOpacity(id, 0.4); return controller.getDocument().nodes.find(node => node.id === id) }
+    finally { controller.dispose() }
+  })
+  expect(exported).toMatchObject({ opacity: 0.4 })
+  await expect.poll(async () => (await mapState(page)).opacity).toBe(0.4)
+  await expect(page.locator('.table-scroll tbody tr')).toHaveCount(1)
+  await expect(page.getByRole('searchbox', { name: '表内搜索' })).toHaveValue('Point')
+  await expect.poll(async () => (await mapState(page)).selection).toEqual(selected)
+  await page.getByRole('button', { name: '撤销', exact: true }).first().click()
+  await expect.poll(async () => (await mapState(page)).opacity).toBe(1)
+  await expect(page.locator('.table-scroll tbody tr')).toHaveCount(1)
+  await expect(page.getByRole('searchbox', { name: '表内搜索' })).toHaveValue('Point')
+  await page.getByRole('button', { name: '重做', exact: true }).first().click()
+  await expect.poll(async () => (await mapState(page)).opacity).toBe(0.4)
+  await expect.poll(async () => (await mapState(page)).selection).toEqual(selected)
 })
 
 test('escape cancels a live drag and preserves selection and camera', async ({ page }) => {
