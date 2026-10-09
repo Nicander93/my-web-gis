@@ -81,3 +81,12 @@ notification are delivered after the current change. Disposing the controller
 unsubscribes without disposing the host. `bindSceneRuntime` works with owned and
 hosted controllers alike. Engine copies remain projections, and native edits
 still need to be translated into host content commands.
+# Full-scene archive entries
+
+`createSceneArchive(document, { readFile, signal, maxFiles, maxBytes })` returns binary entries for a platform ZIP writer. It preserves the full v3 document in `scene.json` and emits `archive.json` with format `webgis-scene-archive`, version `1`, included paths, external references and an explicit `selfContained` flag. This API does not perform filesystem or network access itself.
+
+The host reads normalized paths relative to a selected scene directory and must enforce its access boundary. Local JSON tilesets and glTF, GLB and B3DM embedded GLB dependencies are collected recursively, including shared buffers and textures. HTTP/provider/template URLs remain external; data URIs are embedded. Missing files, root traversal, reserved-name collisions, invalid headers and file/byte limits fail the entire preparation. Cancellation completes promptly even if the reader ignores its signal.
+
+`readSceneArchive(entries, limits)` checks normalized duplicate paths, version, inventory, nested dependency existence and external-reference accuracy before exposing cloned bytes. A ZIP decoder must also enforce its own compressed/uncompressed limits while decoding; the core cannot prevent allocations already made by that decoder. Platform code is responsible for serving relative resources or extracting to a scoped directory.
+
+Composite/I3DM/implicit-subtree dependencies currently fail explicitly rather than produce an archive claiming to contain all resources. Local terrain directories and tile templates need a platform-specific enumeration policy. Desktop ZIP import/export and those formats remain unfinished acceptance gates.
