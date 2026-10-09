@@ -25,3 +25,23 @@ Runtime 可通过 `map` 接入调用方现有的 OpenLayers Map，或通过 `tar
 内嵌／URL GeoJSON 与 WFS 缓存均保持数字和字符串身份，使用 `getSceneFeatureId(feature)` 读取原身份。URL GeoJSON 准备完成并校验后才创建源；WFS 只显示缓存并返回提示，不自动刷新服务。三维对象返回能力问题并保留定义；未知必需扩展阻止创建。认证 WMS／WMTS 暂需请求适配器，当前明确拒绝。创建成功只表示对象与矢量准备完成，不表示瓦片已经加载。
 
 `updateScene` 在资源、视图、控件配置以及图层身份／类型不变时原位更新显示、样式与顺序，保持图层和源实例。其余变化走准备成功后替换路径。`getScene()` 返回隔离的声明式副本；便捷显隐／透明度 API 同步此内容。直接改原生对象仍不会自动写回文档。
+# v3 document mounting
+
+`OlDocumentRuntime` mounts the shared v3 document factory on an existing OL map:
+
+```ts
+import { OlDocumentRuntime } from '@desktop-webgis/ol-scene-runtime'
+
+const runtime = new OlDocumentRuntime({ map })
+await runtime.loadDocument(document, abortController.signal)
+runtime.getLayer('roads')
+runtime.getFilteredFeatures('roads')
+runtime.getIssues()
+runtime.destroy()
+```
+
+Loading prepares all document layers before replacing the previous content. Failed preparation preserves the previous document, layers and view. A newer load, `cancelPreparation()` or `destroy()` aborts pending work; a late response cannot replace current content even if the fetch implementation ignores its signal. Callers should handle rejected load promises, including `AbortError`.
+
+An external map, its controls, interactions and unrelated layers remain caller-owned. Destruction removes only runtime layers and restores the original view if the host has not installed another view. A runtime-created map is disposed. `getDocument()` returns a detached copy of the loaded definition; live camera movement and direct native layer mutations are not written back. Unsupported objects remain in the document and appear in `getIssues()`.
+
+This entry currently replaces all owned layers on document updates. Incremental presentation updates, controller binding, Desktop migration and Viewer migration remain separate work. It does not add selection interactions or recreate host widgets.
