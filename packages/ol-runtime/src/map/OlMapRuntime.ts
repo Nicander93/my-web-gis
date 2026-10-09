@@ -1,13 +1,13 @@
 import { applyFieldFilter,
+  isLegacyStyle, migrateLegacyStyle,
   isTileServiceKind,
   layerListZIndex, type BasemapConfig, type Dataset, type GisFeature, type Layer, type MapState, type WmsDataset, type WmtsDataset } from '@desktop-webgis/gis-core'
-import { createOlSceneLayer, updateGoogleMapTilesAttribution } from '@desktop-webgis/ol-scene-runtime'
+import { createOlSceneLayer, createOlVectorLayer, updateGoogleMapTilesAttribution } from '@desktop-webgis/ol-scene-runtime'
 import type { SceneSource } from '@desktop-webgis/scene-schema'
 import OlMap from 'ol/Map'
 import View from 'ol/View'
 import TileLayer from 'ol/layer/Tile'
 import type BaseLayer from 'ol/layer/Base'
-import VectorLayer from 'ol/layer/Vector'
 import OSM from 'ol/source/OSM'
 import TileWMS from 'ol/source/TileWMS'
 import VectorSource from 'ol/source/Vector'
@@ -196,13 +196,13 @@ export class OlMapRuntime {
       const source = new VectorSource({
         features: features.map(toOlFeature)
       })
-      const vectorLayer = new VectorLayer({
-        source,
+      const vectorLayer = createOlVectorLayer({
+        type: 'vector', id: layer.id, name: layer.name, source: layer.datasetId,
         visible: layer.visible,
         opacity: layer.opacity,
-        style: createLayerStyle(layer),
-        zIndex
-      })
+        style: isLegacyStyle(layer.style) ? migrateLegacyStyle(layer.style) : layer.style
+      }, source)
+      vectorLayer.setZIndex(zIndex)
       map.addLayer(vectorLayer)
       this.registry.register(layer.id, layer.datasetId, vectorLayer)
     })

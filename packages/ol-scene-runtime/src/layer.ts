@@ -302,6 +302,14 @@ export async function createOlSceneLayer(
     throw new Error(`Vector Layer “${definition.id}” 必须引用 GeoJSON Source`)
   }
   const source = options.vectorSource ?? createVectorSource(sourceDefinition, view)
+  return createOlVectorLayer(definition, source)
+}
+
+/** Creates a display layer around caller-owned vector data; usable by editors and document viewers. */
+export function createOlVectorLayer(
+  definition: Extract<SceneLayer, { type: 'vector' }>,
+  source: VectorSource<Feature<Geometry>>
+): VectorLayer<VectorSource<Feature<Geometry>>> {
   const layer = new VectorLayer({
     visible: definition.visible,
     opacity: definition.opacity,

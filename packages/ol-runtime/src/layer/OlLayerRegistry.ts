@@ -8,18 +8,25 @@ export type RuntimeMapLayer = BaseLayer
 
 export class OlLayerRegistry {
   private readonly layers = new Map<string, RuntimeMapLayer>()
-  private readonly datasetToLayer = new Map<string, string>()
+  private readonly datasetLayers = new Map<string, Set<string>>()
+  private readonly layerDatasets = new Map<string, string>()
 
   register(layerId: string, datasetId: string, layer: RuntimeMapLayer): void {
+    this.unregister(layerId)
     this.layers.set(layerId, layer)
-    this.datasetToLayer.set(datasetId, layerId)
+    this.layerDatasets.set(layerId, datasetId)
+    const ids = this.datasetLayers.get(datasetId) ?? new Set<string>()
+    ids.add(layerId); this.datasetLayers.set(datasetId, ids)
   }
 
   unregister(layerId: string): void {
     this.layers.delete(layerId)
-    for (const [datasetId, registeredLayerId] of this.datasetToLayer.entries()) {
-      if (registeredLayerId === layerId) this.datasetToLayer.delete(datasetId)
-    }
+    const datasetId = this.layerDatasets.get(layerId)
+    if (datasetId === undefined) return
+    this.layerDatasets.delete(layerId)
+    const ids = this.datasetLayers.get(datasetId)
+    ids?.delete(layerId)
+    if (!ids?.size) this.datasetLayers.delete(datasetId)
   }
 
   get(layerId: string): RuntimeMapLayer | undefined {
@@ -38,15 +45,17 @@ export class OlLayerRegistry {
   }
 
   getByDataset(datasetId: string): RuntimeMapLayer | undefined {
-    const layerId = this.datasetToLayer.get(datasetId)
+    const layerId = [...this.datasetLayers.get(datasetId) ?? []].at(-1)
     return layerId ? this.layers.get(layerId) : undefined
   }
 
+  /** A resource may have several display nodes; query them without losing their host identities. */
+  getAllByDataset(datasetId: string): RuntimeMapLayer[] {
+    return [...this.datasetLayers.get(datasetId) ?? []].flatMap(id => this.layers.get(id) ?? [])
+  }
+
   getDatasetIdForLayer(layerId: string): string | undefined {
-    for (const [datasetId, registeredLayerId] of this.datasetToLayer.entries()) {
-      if (registeredLayerId === layerId) return datasetId
-    }
-    return undefined
+    return this.layerDatasets.get(layerId)
   }
 
   entries(): Array<[string, RuntimeMapLayer]> {
@@ -55,6 +64,6 @@ export class OlLayerRegistry {
 
   clear(): void {
     this.layers.clear()
-    this.datasetToLayer.clear()
+    this.datasetLayers.clear(); this.layerDatasets.clear()
   }
 }
