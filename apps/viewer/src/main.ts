@@ -1,4 +1,5 @@
 import { OlDocumentRuntime } from '@desktop-webgis/ol-scene-runtime'
+import { bindSceneRuntime, SceneController } from '@desktop-webgis/scene-core'
 import {
   type PopupField,
   type SceneColor,
@@ -33,7 +34,7 @@ const statusElement = requireElement<HTMLElement>('scene-status')
 
 type MapNode = Extract<SceneNode, { type: 'tile' | 'vector' }>
 type VectorNode = Extract<SceneNode, { type: 'vector' }>
-let scene: SceneDocument
+let sceneController: SceneController
 
 function mapNodes(document: SceneDocument): MapNode[] {
   return document.nodes.filter((node): node is MapNode => node.type === 'tile' || node.type === 'vector')
@@ -46,7 +47,7 @@ async function start(): Promise<void> {
   window.addEventListener('pagehide', () => startup.abort(), { once: true })
   try {
     const sceneUrl = new URL(new URLSearchParams(window.location.search).get('scene') ?? './scene.json', document.baseURI).href
-    scene = await loadViewerDocument(sceneUrl, fetch, startup.signal)
+    const scene = await loadViewerDocument(sceneUrl, fetch, startup.signal)
     const runtimeConfig = await loadRuntimeConfig()
     startup.signal.throwIfAborted()
 
@@ -66,14 +67,20 @@ async function start(): Promise<void> {
       return
     }
     if (!mapView) throw new Error('场景没有二维视图')
+    sceneController = new SceneController(scene)
     const runtime = new OlDocumentRuntime({
       target: mapTarget,
       viewId: mapView,
       credentials: runtimeConfig.credentials
     })
     let selection: ReturnType<typeof createViewerSelection> | undefined
-    window.addEventListener('pagehide', () => { selection?.dispose(); runtime.destroy() }, { once: true })
-    try { await runtime.loadDocument(scene, startup.signal) } catch (error) { runtime.destroy(); throw error }
+    const binding = bindSceneRuntime(sceneController, runtime)
+    window.addEventListener('pagehide', () => { binding.dispose(); selection?.dispose(); runtime.destroy(); sceneController.dispose() }, { once: true })
+    try {
+      const synchronized = await binding.settled()
+      startup.signal.throwIfAborted()
+      if (synchronized.status === 'error') throw synchronized.error
+    } catch (error) { binding.dispose(); runtime.destroy(); sceneController.dispose(); throw error }
     const map = runtime.getNativeMap()
     selection = createViewerSelection(runtime)
     const widgets = scene.widgets ?? {}
@@ -90,7 +97,7 @@ async function start(): Promise<void> {
     map.addOverlay(popupOverlay)
 
     map.on('singleclick', event => map.forEachFeatureAtPixel(event.pixel, (feature, layer) => {
-      const node = mapNodes(scene).find(node => runtime.getLayer(node.id) === layer)
+      const node = mapNodes(sceneController.getDocument()).find(node => runtime.getLayer(node.id) === layer)
       if (node?.type !== 'vector' || !node.interaction?.popup) return undefined
       showPopup({ layerId: node.id, properties: feature.getProperties(), coordinate: event.coordinate }, popupOverlay)
       return feature
@@ -102,11 +109,12 @@ async function start(): Promise<void> {
     })
 
     renderLayerSwitcher(scene, (id, visible) => {
-      const next = runtime.getDocument()!
-      const node = next.nodes.find(node => node.id === id)
-      if (!node) return
-      node.visible = visible
-      void runtime.updateDocument(next).then(() => { scene = runtime.getDocument()!; selection?.refresh() }).catch(error => showError(String(error)))
+      try { sceneController.setNodeVisible(id, visible) }
+      catch (error) { showError(String(error)); return }
+      void binding.settled().then(state => {
+        if (state.status === 'error') showError(String(state.error))
+        if (state.status === 'ready') selection?.refresh()
+      })
     })
     renderLegend(scene)
     const issues = runtime.getIssues()
@@ -244,7 +252,7 @@ function renderLegend(manifest: SceneDocument): void {
 }
 
 function showPopup(event: { layerId: string; properties: Record<string, unknown>; coordinate: number[] }, overlay: Overlay): void {
-  const layer = scene.nodes.find(
+  const layer = sceneController.getDocument().nodes.find(
     (candidate): candidate is VectorNode => candidate.id === event.layerId && candidate.type === 'vector'
   )
   const popup = layer?.interaction?.popup

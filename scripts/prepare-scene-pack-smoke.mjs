@@ -9,18 +9,23 @@ const dependencies = Object.fromEntries(names.map(name => [`@desktop-webgis/${na
 await writeFile(new URL('package.json', target), JSON.stringify({ name: 'scene-packed-consumer', private: true, type: 'module', dependencies }, null, 2))
 await writeFile(new URL('pnpm-workspace.yaml', target), `packages:\n  - .\noverrides:\n${Object.entries(dependencies).map(([name, url]) => `  ${JSON.stringify(name)}: ${JSON.stringify(url)}`).join('\n')}\n`)
 await writeFile(new URL('consumer.ts', target), `
-import { createSceneDocument, mergeSceneDocuments, prepareSceneGeoJsonResources, type SceneMergeResult } from '@desktop-webgis/scene-core'
+import { bindSceneRuntime, SceneController, createSceneDocument, mergeSceneDocuments, prepareSceneGeoJsonResources, type SceneMergeResult, type SceneRuntimeBinding, type SceneRuntimeSyncState } from '@desktop-webgis/scene-core'
 import { parseSceneDocument, type SceneDocument } from '@desktop-webgis/scene-schema'
 const scene: SceneDocument = createSceneDocument({ id: 'consumer', title: 'Consumer', viewId: 'map', view: { type: '2d', projection: 'EPSG:3857', center: [0, 0], zoom: 2 } })
 const result: SceneMergeResult = mergeSceneDocuments(scene, scene)
 const parsed: SceneDocument = parseSceneDocument(result.document)
 const prepared: Promise<SceneDocument> = prepareSceneGeoJsonResources(parsed, { loadGeoJson: async (_url, context) => { context.signal?.throwIfAborted(); return { type: 'FeatureCollection', features: [] } } })
 void prepared
+const controller = new SceneController(parsed)
+const binding: SceneRuntimeBinding = bindSceneRuntime(controller, { updateDocument(document, signal) { signal.throwIfAborted(); void document.nodes } })
+const state: SceneRuntimeSyncState = await binding.settled()
+void state
+binding.dispose()
 `)
 await writeFile(new URL('smoke.mjs', target), `
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { createSceneDocument, mergeSceneDocuments, prepareSceneGeoJsonResources, serializeSceneDocument } from '@desktop-webgis/scene-core'
+import { bindSceneRuntime, SceneController, createSceneDocument, mergeSceneDocuments, prepareSceneGeoJsonResources, serializeSceneDocument } from '@desktop-webgis/scene-core'
 import { parseSceneDocument } from '@desktop-webgis/scene-schema'
 const schema = JSON.parse(await readFile(new URL(import.meta.resolve('@desktop-webgis/scene-schema/scene-document.schema.json')), 'utf8'))
 assert.equal(schema.properties.version.const, 3)
@@ -32,11 +37,20 @@ const merged = mergeSceneDocuments(prepared, prepared)
 assert.equal(merged.ids.resources.points, 'points-2')
 assert.equal(merged.ids.views.map, 'map-2')
 assert.deepEqual(parseSceneDocument(serializeSceneDocument(merged.document)), merged.document)
+const controller = new SceneController(merged.document), rendered = []
+const binding = bindSceneRuntime(controller, { updateDocument(document, signal) { signal.throwIfAborted(); rendered.push(document.title) } })
+assert.equal((await binding.settled()).status, 'ready')
+controller.transaction('Rename', document => { document.title = 'Controller content' })
+assert.equal((await binding.settled()).status, 'ready')
+assert.deepEqual(rendered, ['Consumer', 'Controller content'])
+assert.equal(JSON.parse(controller.exportJson()).title, 'Controller content')
+binding.dispose()
+controller.dispose()
 for (const name of ${JSON.stringify(names)}) {
   const manifest = JSON.parse(await readFile(new URL('./node_modules/@desktop-webgis/' + name + '/package.json', import.meta.url), 'utf8'))
   for (const section of ['dependencies', 'peerDependencies', 'optionalDependencies']) {
     for (const value of Object.values(manifest[section] ?? {})) assert.ok(!value.startsWith('workspace:'), name + ' leaked workspace protocol')
   }
 }
-console.log('Packed v3 schema, resource preparation and merge APIs passed without source aliases.')
+console.log('Packed v3 schema, resources, merge and controller binding APIs passed without source aliases or DOM.')
 `)

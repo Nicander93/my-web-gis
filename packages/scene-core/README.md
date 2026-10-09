@@ -44,3 +44,21 @@ file URL. XYZ template braces are preserved. Inputs must satisfy the current
 scene protocol, including its restrictions on local relative resource paths.
 Local file directories require a host resource adapter; this function does not
 convert private filesystem paths into public URLs.
+# Runtime projection binding
+
+```ts
+import { SceneController, bindSceneRuntime } from '@desktop-webgis/scene-core'
+
+const controller = new SceneController(document)
+const binding = bindSceneRuntime(controller, runtime)
+const initial = await binding.settled()
+controller.setNodeVisible('roads', false)
+const updated = await binding.settled()
+binding.dispose()
+```
+
+The target implements `updateDocument(document, signal)`. The binding projects initial content and subsequent controller commits, coalesces obsolete work before it starts, aborts older revisions and ignores their late success/error status. A target must prevent native publication after abort; binding status alone cannot undo a non-cooperative target's native side effects. `OlDocumentRuntime` satisfies this transport cancellation contract. A raw legacy Cesium `updateScene` is not an adapter for this interface.
+
+`getState()` exposes requested/applied revisions and loading/ready/error/disposed status. `settled()` follows replacements even when an obsolete request never settles. Rendering failures keep committed controller content authoritative and report the last applied revision; they do not automatically undo user edits. `refresh()` retries the current document without changing content or history. Hosts own error UI and native staging/rollback when atomic imports are required.
+
+Disposal cancels only the binding's signal and subscription. It does not destroy the controller, map or runtime. This API remains framework/engine-independent and can be imported and used without DOM.
