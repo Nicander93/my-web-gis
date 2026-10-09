@@ -161,3 +161,8 @@
 - 共享环境、主题、演示或元数据冲突明确拒绝；不透明扩展存在 ID 冲突时要求扩展适配器，防止无法识别的内部引用失效。
 - 验证：scene-core 18 项测试及构建通过，包括原文档不变、失败原子性和特殊 JSON 字典键。
 - Desktop 现有 Project 适配器不能表达同引擎多视图，合并菜单仍未接入；该纯 API 不代表应用合并导入和 T16 已完成。
+# 三包真实 tarball 消费
+
+- 构建并 pack cesium-scene-schema、scene-schema、scene-core，在独立 workspace 从 tarball 离线安装完整依赖链。
+- Node 运行验证 Schema 文件导出、资源准备、合并、完整文档重新解析及无 workspace 协议泄漏；严格 NodeNext TypeScript 声明消费通过。
+- 新增可重复生成消费者的脚本和执行文档。仅证明这三个包的内容 API 消费，不代替 OL/Cesium 渲染、其他候选包、兼容矩阵或许可证门槛。
