@@ -83,6 +83,8 @@ hosted controllers alike. Engine copies remain projections, and native edits
 still need to be translated into host content commands.
 # Full-scene archive entries
 
+`encodeSceneArchiveZip(entries, options)` and `decodeSceneArchiveZip(bytes, options)` provide actual ZIP transport through fflate. Decode scans the complete directory without extracting before starting asynchronous decompression, checking normalized duplicates, unsafe paths, entry count and declared expanded size; `readSceneArchive` then validates actual byte counts and dependencies. Both operations accept cancellation, and `maxCompressedBytes` limits ZIP input/output. Platform selection, scoped extraction or URL serving remain host responsibilities.
+
 `createSceneArchive(document, { readFile, signal, maxFiles, maxBytes })` returns binary entries for a platform ZIP writer. It preserves the full v3 document in `scene.json` and emits `archive.json` with format `webgis-scene-archive`, version `1`, included paths, external references and an explicit `selfContained` flag. This API does not perform filesystem or network access itself.
 
 The host reads normalized paths relative to a selected scene directory and must enforce its access boundary. Local JSON tilesets and glTF, GLB and B3DM embedded GLB dependencies are collected recursively, including shared buffers and textures. HTTP/provider/template URLs remain external; data URIs are embedded. Missing files, root traversal, reserved-name collisions, invalid headers and file/byte limits fail the entire preparation. Cancellation completes promptly even if the reader ignores its signal.

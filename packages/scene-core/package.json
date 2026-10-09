@@ -25,7 +25,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@desktop-webgis/scene-schema": "workspace:*"
+    "@desktop-webgis/scene-schema": "workspace:*",
+    "fflate": "0.8.3"
   },
   "devDependencies": {
     "typescript": "^5.9.2",
