@@ -11,3 +11,15 @@ This package contains domain operations rather than a miscellaneous collection o
 The controller owns no Map, Viewer, selection, file IO or undo stack. Engine preparation, application Store/history binding, asynchronous import transactions and large-document performance remain separate implementation gates.
 
 The root and `./scene` entry points depend only on the scene schema. Project-specific publishing conversion lives in Desktop's `features/scene/compile-project.ts`; it is not part of this package's public API. Internal callers previously importing `compileProjectToScene` from this package must use that application adapter instead.
+# Resource references
+
+`collectSceneResourceReferences(document)` lists declared resource URLs, WMTS
+alternate URLs, basemap and terrain references with field paths. It does not
+fetch resources or discover dependencies inside model or tileset files.
+
+`resolveSceneResourceReferences(document, documentUrl)` returns a detached,
+validated document with relative references resolved against an HTTP(S) scene
+file URL. XYZ template braces are preserved. Inputs must satisfy the current
+scene protocol, including its restrictions on local relative resource paths.
+Local file directories require a host resource adapter; this function does not
+convert private filesystem paths into public URLs.
