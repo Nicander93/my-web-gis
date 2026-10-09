@@ -27,6 +27,7 @@ export interface OlDocumentLayers {
   getLayer(id: string): BaseLayer | undefined
   /** Node-filtered records for selection/query; local and ancestor visibility remain host policy. */
   getFilteredFeatures(id: string): readonly Feature<Geometry>[]
+  isFeatureIncluded(id: string, feature: Feature<Geometry>): boolean
   getDocument(): SceneDocument
   /** Returns false when resources, views or hierarchy require preparing new layers. */
   updatePresentation(input: SceneDocument): boolean
@@ -189,6 +190,10 @@ export async function createOlDocumentLayers(input: unknown, options: OlDocument
     options.signal?.throwIfAborted()
     return {
       view, rootLayers: roots, issues, getLayer: id => layers.get(id),
+      isFeatureIncluded(id, feature) {
+        const node = document.nodes.find(node => node.id === id)
+        return node?.type === 'vector' && (node.filter?.every(condition => matches(feature.get(condition.field), condition)) ?? true)
+      },
       updatePresentation(input) {
         if (disposed) throw new Error('Document layers have been disposed')
         const next = parseSceneDocument(input)

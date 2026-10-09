@@ -2,8 +2,10 @@ import { applyFieldFilter,
   isLegacyStyle, migrateLegacyStyle,
   isTileServiceKind,
   layerListZIndex, type BasemapConfig, type Dataset, type GisFeature, type Layer, type MapState, type WmsDataset, type WmtsDataset } from '@desktop-webgis/gis-core'
-import { createOlSceneLayer, createOlVectorLayer, updateGoogleMapTilesAttribution } from '@desktop-webgis/ol-scene-runtime'
-import type { SceneSource } from '@desktop-webgis/scene-schema'
+import { createOlSceneLayer, createOlVectorLayer, updateGoogleMapTilesAttribution, OlDocumentRuntime, type OlDocumentOptions } from '@desktop-webgis/ol-scene-runtime'
+import type { SceneSource, SceneDocument } from '@desktop-webgis/scene-schema'
+import type Feature from 'ol/Feature'
+import type Geometry from 'ol/geom/Geometry'
 import OlMap from 'ol/Map'
 import View from 'ol/View'
 import TileLayer from 'ol/layer/Tile'
@@ -43,6 +45,13 @@ export class OlMapRuntime {
   private basemapRevision = 0
   private fetcher: typeof globalThis.fetch | undefined = globalThis.fetch
   private pointerMove?: (info: PointerInfo) => void
+  private documentRuntime: OlDocumentRuntime | null = null
+  private documentRevision = 0
+  private readonly documentSources: Record<string, VectorSource<Feature<Geometry>>> = Object.create(null)
+  private readonly documentCredentials: Record<string, string> = Object.create(null)
+  private readonly ownedDocumentSources = new Set<VectorSource<Feature<Geometry>>>()
+  private configureServiceLayer?: OlDocumentOptions['configureServiceLayer']
+  private readonly sourceSnapshots = new Map<string, { features: GisFeature[]; projection: string; source: VectorSource<Feature<Geometry>> }>()
 
   mount(target: HTMLElement, mapState: MapState): OlMap {
     this.map = new OlMap({
@@ -70,9 +79,12 @@ export class OlMapRuntime {
     })
 
     this.map.on('moveend', () => {
-      if (!this.basemapLayer || !this.map) return
+      if (!this.map) return
+      const base = this.documentRuntime?.getDocument()?.nodes.find(node => node.type === 'tile' && node.role === 'basemap')
+      const layer = base ? this.documentRuntime?.getLayer(base.id) : this.basemapLayer
+      if (!layer) return
       void updateGoogleMapTilesAttribution(
-        this.basemapLayer,
+        layer,
         this.map.getView(),
         this.map.getSize(),
         this.fetcher
@@ -83,6 +95,12 @@ export class OlMapRuntime {
   }
 
   unmount(): void {
+    this.documentRevision++
+    this.documentRuntime?.destroy()
+    this.documentRuntime = null
+    this.ownedDocumentSources.forEach(source => this.releaseDocumentSource(source))
+    Object.keys(this.documentSources).forEach(id => delete this.documentSources[id])
+    this.sourceSnapshots.clear()
     this.registry.clear()
     this.map?.setTarget(undefined)
     this.map = null
@@ -95,6 +113,84 @@ export class OlMapRuntime {
 
   onPointerMove(callback: (info: PointerInfo) => void): void {
     this.pointerMove = callback
+  }
+
+  /** Prepares portable content around host feature identities; commits registry bindings only on success. */
+  async syncDocument(document: SceneDocument, featuresByDataset: Record<string, GisFeature[]>, options: Pick<OlDocumentOptions, 'credentials' | 'configureServiceLayer'> = {}): Promise<boolean> {
+    const map = this.getMap(), revision = ++this.documentRevision
+    this.documentRuntime?.cancelPreparation()
+    const definition = document.views.map
+    if (definition?.type !== '2d') throw new Error('Desktop map requires a map view')
+    const candidates = new Map<string, { features: GisFeature[]; projection: string; source: VectorSource<Feature<Geometry>> }>()
+    const created = new Set<VectorSource<Feature<Geometry>>>()
+    try {
+      for (const node of document.nodes) {
+        if (node.type !== 'vector' || candidates.has(node.resource)) continue
+        const features = featuresByDataset[node.resource] ?? [], previous = this.sourceSnapshots.get(node.resource)
+        const source = previous?.features === features && previous.projection === definition.projection ? previous.source : new VectorSource({ features: features.map(feature => toOlFeature(feature, definition.projection)) })
+        if (source !== previous?.source) { created.add(source); this.ownedDocumentSources.add(source) }
+        candidates.set(node.resource, { features, projection: definition.projection, source })
+      }
+      Object.keys(this.documentSources).forEach(id => delete this.documentSources[id])
+      candidates.forEach((value, id) => { this.documentSources[id] = value.source })
+      const credentialsChanged = Object.keys(this.documentCredentials).length !== Object.keys(options.credentials ?? {}).length ||
+        Object.entries(this.documentCredentials).some(([key, value]) => options.credentials?.[key] !== value)
+      this.configureServiceLayer = options.configureServiceLayer
+      Object.keys(this.documentCredentials).forEach(id => delete this.documentCredentials[id])
+      Object.assign(this.documentCredentials, options.credentials)
+      if (!this.documentRuntime) this.documentRuntime = new OlDocumentRuntime({ map, viewId: 'map', vectorSources: this.documentSources, credentials: this.documentCredentials,
+        configureServiceLayer: (layer, resource, id) => {
+          if (resource.authMode === 'runtime' && !this.configureServiceLayer) throw new Error(`Authenticated service ${id} requires an OL request adapter`)
+          return this.configureServiceLayer?.(layer, resource, id)
+        }
+      })
+      const mounted = this.documentRuntime
+      const onInstalled = () => {
+        const installed = new Set<VectorSource<Feature<Geometry>>>()
+        this.registry.clear()
+        for (const node of document.nodes) {
+          if (node.type !== 'vector' && node.type !== 'tile') continue
+          const layer = mounted.getLayer(node.id)
+          if (!layer) continue
+          const resource = document.resources[node.resource]
+          if ((resource.type === 'wms' || resource.type === 'wmts') && resource.bboxWgs84) layer.set(GIS_WMS_EXTENT_KEY, [...resource.bboxWgs84])
+          if (node.type !== 'tile' || node.role !== 'basemap') this.registry.register(node.id, node.resource, layer)
+          const source = this.registry.getVector(node.id)?.getSource() as VectorSource<Feature<Geometry>> | undefined
+          const candidate = candidates.get(node.resource)
+          if (source && candidate) { installed.add(source); candidate.source = source }
+        }
+        this.sourceSnapshots.forEach(entry => { if (!installed.has(entry.source)) this.releaseDocumentSource(entry.source) })
+        this.sourceSnapshots.clear()
+        candidates.forEach((entry, id) => { if (installed.has(entry.source)) this.sourceSnapshots.set(id, entry) })
+        created.forEach(source => { if (!installed.has(source)) this.releaseDocumentSource(source) })
+        Object.keys(this.documentSources).forEach(id => delete this.documentSources[id])
+        this.sourceSnapshots.forEach((entry, id) => { this.documentSources[id] = entry.source })
+        if (this.basemapLayer) { map.removeLayer(this.basemapLayer); this.basemapLayer.dispose(); this.basemapLayer = null }
+      }
+      if (credentialsChanged) await mounted.loadDocument(document, undefined, { onInstalled })
+      else await mounted.updateDocument(document, undefined, { onInstalled })
+      return revision === this.documentRevision && this.map === map
+    } catch (error) {
+      created.forEach(source => this.releaseDocumentSource(source))
+      if (revision !== this.documentRevision) return false
+      Object.keys(this.documentSources).forEach(id => delete this.documentSources[id])
+      this.sourceSnapshots.forEach((entry, id) => { this.documentSources[id] = entry.source })
+      throw error
+    }
+  }
+
+  private releaseDocumentSource(source: VectorSource<Feature<Geometry>>): void {
+    if (this.ownedDocumentSources.delete(source)) source.dispose()
+  }
+
+  isFeatureIncluded(layerId: string, feature: Feature<Geometry>): boolean {
+    return this.documentRuntime?.isFeatureIncluded(layerId, feature) ?? true
+  }
+
+  isLayerVisible(layerId: string): boolean {
+    const layer = this.registry.getVector(layerId), map = this.getMap()
+    if (!layer || !layer.isVisible(map.getView())) return false
+    return map.getLayerGroup().getLayerStatesArray().find(state => state.layer === layer)?.visible ?? false
   }
 
   async syncBasemap(
@@ -182,7 +278,7 @@ export class OlMapRuntime {
         existing.setZIndex(zIndex)
         const source = existing.getSource()
         source?.clear()
-        source?.addFeatures(features.map(toOlFeature))
+        source?.addFeatures(features.map(feature => toOlFeature(feature)))
         return
       }
 
@@ -194,7 +290,7 @@ export class OlMapRuntime {
       }
 
       const source = new VectorSource({
-        features: features.map(toOlFeature)
+        features: features.map(feature => toOlFeature(feature))
       })
       const vectorLayer = createOlVectorLayer({
         type: 'vector', id: layer.id, name: layer.name, source: layer.datasetId,

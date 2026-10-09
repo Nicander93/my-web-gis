@@ -14,11 +14,11 @@ export class OlSelectionRuntime {
   constructor(private readonly mapRuntime: OlMapRuntime) {
     this.controller = createSelectionController({
       map: mapRuntime.getMap(), targets: [], style: createSelectionStyle(),
-      getFeatureId: feature => feature.get('domainFeatureId') ?? feature.getId(),
+      getFeatureId: (feature, target) => mapRuntime.isLayerVisible(target.layerKey) && mapRuntime.isFeatureIncluded(target.layerKey, feature) ? feature.get('domainFeatureId') ?? feature.getId() : undefined,
       resolveSelectedFeature: ref => {
         const layer = mapRuntime.registry.getVector(ref.layerKey)
-        const feature = layer?.isVisible(mapRuntime.getMap().getView()) ? layer.getSource()?.getFeatureById(ref.featureId) : undefined
-        return feature instanceof Feature ? feature : undefined
+        const feature = mapRuntime.isLayerVisible(ref.layerKey) ? layer?.getSource()?.getFeatureById(ref.featureId) : undefined
+        return feature instanceof Feature && mapRuntime.isFeatureIncluded(ref.layerKey, feature) ? feature : undefined
       },
       onSelectionRequest: request => {
         this.callback?.({ layerId: this.activeLayerId, featureIds: request.selection.map(ref => String(ref.featureId)) }, request)

@@ -9,6 +9,11 @@ export interface OlDocumentRuntimeOptions extends Omit<OlDocumentOptions, 'signa
   viewId?: string
 }
 
+export interface OlDocumentUpdateOptions {
+  /** Synchronize host bindings in the same turn as native installation, before previous content is disposed. */
+  onInstalled?: () => void
+}
+
 /** Mounts prepared v3 content while retaining caller-owned map objects. */
 export class OlDocumentRuntime {
   private readonly map: Map
@@ -26,7 +31,7 @@ export class OlDocumentRuntime {
     this.initialView = this.map.getView()
   }
 
-  async loadDocument(input: SceneDocument, signal?: AbortSignal): Promise<void> {
+  async loadDocument(input: SceneDocument, signal?: AbortSignal, options: OlDocumentUpdateOptions = {}): Promise<void> {
     if (this.destroyed) throw new Error('Scene runtime has been destroyed')
     this.cancelPreparation()
     const operation = new AbortController()
@@ -68,7 +73,8 @@ export class OlDocumentRuntime {
       this.content = prepared
       this.installedView = nextView
       prepared = null
-      previous?.dispose()
+      try { options.onInstalled?.() }
+      finally { previous?.dispose() }
     } finally {
       prepared?.dispose()
       signal?.removeEventListener('abort', abort)
@@ -79,14 +85,15 @@ export class OlDocumentRuntime {
 
   getDocument(): SceneDocument | null { return this.content?.getDocument() ?? null }
   /** Reuses layers and full sources for presentation-only edits. */
-  async updateDocument(input: SceneDocument, signal?: AbortSignal): Promise<void> {
+  async updateDocument(input: SceneDocument, signal?: AbortSignal, options: OlDocumentUpdateOptions = {}): Promise<void> {
     if (this.destroyed) throw new Error('Scene runtime has been destroyed')
     signal?.throwIfAborted()
-    if (this.content?.updatePresentation(input)) { this.cancelPreparation(); return }
-    await this.loadDocument(input, signal)
+    if (this.content?.updatePresentation(input)) { this.cancelPreparation(); options.onInstalled?.(); return }
+    await this.loadDocument(input, signal, options)
   }
   getLayer(id: string): ReturnType<OlDocumentLayers['getLayer']> { return this.content?.getLayer(id) }
   getFilteredFeatures(id: string): ReturnType<OlDocumentLayers['getFilteredFeatures']> { return this.content?.getFilteredFeatures(id) ?? [] }
+  isFeatureIncluded(...args: Parameters<OlDocumentLayers['isFeatureIncluded']>): boolean { return this.content?.isFeatureIncluded(...args) ?? false }
   getIssues(): OlDocumentLayers['issues'] { return this.content ? structuredClone(this.content.issues) : [] }
   getNativeMap(): Map { return this.map }
 

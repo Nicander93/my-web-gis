@@ -7,7 +7,7 @@ import {
   type EditTool,
   type GisFeature
 } from '@desktop-webgis/gis-core'
-import type Feature from 'ol/Feature'
+import Feature from 'ol/Feature'
 import Collection from 'ol/Collection'
 import { unByKey } from 'ol/Observable'
 import type { EventsKey } from 'ol/events'
@@ -47,6 +47,7 @@ export class OlToolRuntime {
   private snap: Snap | null = null
   private snapKeys: EventsKey[] = []
   private editSource: VectorSource | null = null
+  private editLayerId: string | null = null
   private drawing = false
   private onSnapChange: (snapped: boolean) => void = () => undefined
 
@@ -66,21 +67,20 @@ export class OlToolRuntime {
     const sources = this.snapping.scope === 'active' ? [this.editSource] : this.mapRuntime.registry.entries()
       .flatMap(([id]) => {
         const layer = this.mapRuntime.registry.getVector(id)
-        return layer?.isVisible(this.mapRuntime.getMap().getView()) && layer.getSource() ? [layer.getSource() as VectorSource] : []
+        return this.mapRuntime.isLayerVisible(id) && layer?.getSource() ? [layer.getSource() as VectorSource] : []
       })
     const targets = new Collection<Feature<Geometry>>()
     const refreshTargets = () => {
       targets.clear()
-      targets.extend([...new Set(sources.flatMap(source => source.getFeatures()))])
+      const layers = this.mapRuntime.registry.entries().filter(([id]) => this.snapping.scope === 'visible' || id === this.editLayerId)
+      targets.extend([...new Set(layers.flatMap(([id]) => {
+        const layer = this.mapRuntime.registry.getVector(id)
+        return this.mapRuntime.isLayerVisible(id) ? layer?.getSource()?.getFeatures().filter(feature => feature instanceof Feature && this.mapRuntime.isFeatureIncluded(id, feature)) as Feature<Geometry>[] ?? [] : []
+      }))])
     }
     refreshTargets()
     for (const source of new Set(sources)) {
-      this.snapKeys.push(source.on('addfeature', event => {
-        if (event.feature && !targets.getArray().includes(event.feature)) targets.push(event.feature)
-      }), source.on('removefeature', event => {
-        const feature = event.feature
-        if (feature && !sources.some(item => item.hasFeature(feature))) targets.remove(feature)
-      }), source.on('clear', refreshTargets))
+      this.snapKeys.push(...source.on(['addfeature', 'removefeature', 'changefeature', 'clear'], refreshTargets))
     }
     this.snap = new Snap({ features: targets, vertex: this.snapping.vertex, edge: this.snapping.edge, pixelTolerance: this.snapping.pixelTolerance })
     this.snapKeys.push(this.snap.on('snap', () => this.onSnapChange(true)), this.snap.on('unsnap', () => this.onSnapChange(false)))
@@ -105,6 +105,7 @@ export class OlToolRuntime {
     const layer = this.mapRuntime.registry.getVector(layerId)
     const source = layer?.getSource() as VectorSource | undefined
     if (!source) return
+    this.editLayerId = layerId
 
     if (tool === 'draw-point' || tool === 'draw-line' || tool === 'draw-polygon') {
       this.activateDraw(tool, source, callbacks)
@@ -125,6 +126,7 @@ export class OlToolRuntime {
     this.drawing = false
     this.clearSnapping()
     this.editSource = null
+    this.editLayerId = null
     const map = this.mapRuntime.getMap()
     for (const interaction of this.interactions) {
       map.removeInteraction(interaction)
@@ -141,7 +143,7 @@ export class OlToolRuntime {
       this.drawing = false
       const datasetId = this.getActiveDatasetId(callbacks)
       if (!datasetId) return
-      const feature = fromOlFeature(event.feature as Feature<Geometry>)
+      const feature = fromOlFeature(event.feature as Feature<Geometry>, this.mapRuntime.getMap().getView().getProjection().getCode())
       feature.id = createId('feature')
       event.feature.setId(feature.id)
       event.feature.set('domainFeatureId', feature.id)
@@ -163,7 +165,7 @@ export class OlToolRuntime {
   }
 
   private activateModify(source: VectorSource, callbacks: ToolCallbacks): void {
-    const select = new Select({ style: createSelectionStyle(), layers: layer => layer.getSource() === source })
+    const select = this.createEditSelection(callbacks)
     const modify = new Modify({ features: select.getFeatures() })
     const beforeByFeature = new Map<string, GisFeature['geometry']>()
 
@@ -180,7 +182,7 @@ export class OlToolRuntime {
 
     modify.on('modifystart', (event) => {
       event.features.forEach((feature) => {
-        const domainFeature = fromOlFeature(feature as Feature<Geometry>)
+        const domainFeature = fromOlFeature(feature as Feature<Geometry>, this.mapRuntime.getMap().getView().getProjection().getCode())
         beforeByFeature.set(domainFeature.id, cloneValue(domainFeature.geometry))
       })
     })
@@ -189,7 +191,7 @@ export class OlToolRuntime {
       const datasetId = this.getActiveDatasetId(callbacks)
       if (!datasetId) return
       event.features.forEach((feature) => {
-        const after = fromOlFeature(feature as Feature<Geometry>)
+        const after = fromOlFeature(feature as Feature<Geometry>, this.mapRuntime.getMap().getView().getProjection().getCode())
         const before = beforeByFeature.get(after.id)
         if (!before) return
         const command = new UpdateGeometryCommand(createId('cmd'), datasetId, after.id, before, after.geometry)
@@ -204,13 +206,13 @@ export class OlToolRuntime {
   }
 
   private activateDelete(source: VectorSource, callbacks: ToolCallbacks): void {
-    const select = new Select({ style: createSelectionStyle(), layers: layer => layer.getSource() === source })
+    const select = this.createEditSelection(callbacks)
     select.on('select', () => {
       const selected = select.getFeatures().getArray()
       if (selected.length === 0) return
       const datasetId = this.getActiveDatasetId(callbacks)
       if (!datasetId) return
-      const features = selected.map((feature) => fromOlFeature(feature as Feature<Geometry>))
+      const features = selected.map((feature) => fromOlFeature(feature as Feature<Geometry>, this.mapRuntime.getMap().getView().getProjection().getCode()))
       const commands = features.map((feature) => new DeleteFeatureCommand(createId('cmd'), datasetId, feature))
       for (const feature of selected) source.removeFeature(feature as Feature<Geometry>)
       select.getFeatures().clear()
@@ -225,6 +227,13 @@ export class OlToolRuntime {
     for (const interaction of interactions) {
       map.addInteraction(interaction)
     }
+  }
+
+  private createEditSelection(callbacks: ToolCallbacks): Select {
+    return new Select({ style: createSelectionStyle(),
+      layers: layer => layer === this.mapRuntime.registry.getVector(callbacks.getActiveLayerId() ?? ''),
+      filter: feature => feature instanceof Feature && this.mapRuntime.isFeatureIncluded(callbacks.getActiveLayerId() ?? '', feature)
+    })
   }
 
   private getActiveDatasetId(callbacks: ToolCallbacks): string | null {

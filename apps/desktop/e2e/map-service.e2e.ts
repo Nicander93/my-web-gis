@@ -15,12 +15,21 @@ for (const mode of ['bearer', 'query-token'] as const) {
       const { useProjectStore } = await import('/src/stores/project.store.ts')
       const { getMapRuntime } = await import('/src/features/map/map-runtime-host.ts')
       const key = putSessionCredential({ kind: mode, value: 'fixture-secret', key: 'tile-fixture', param: 'access' })
+      const map = getMapRuntime()!.getMap()
+      const loaded = new Promise<void>(resolve => {
+        const observe = (event: { element: { getSource?(): { getParams?(): { LAYERS?: string }; once(event: string, callback: () => void): void } } }) => {
+          const source = event.element.getSource?.()
+          if (source?.getParams?.().LAYERS !== 'roads') return
+          map.getLayers().un('add', observe)
+          source.once('tileloadend', resolve)
+        }
+        map.getLayers().on('add', observe)
+      })
       useProjectStore.getState().addServiceLayer({ name: 'Authenticated WMS', kind: 'wms', source: {
         type: 'wms', url: `${location.origin}/auth-wms`, version: '1.3.0', layerNames: ['roads'], crs: 'EPSG:3857',
         authMode: mode, tokenParam: 'access', credentialRef: { key }
       } })
-      const state = useProjectStore.getState(), layer = getMapRuntime()!.registry.get(state.selectedLayerId!)!
-      await new Promise<void>(resolve => (layer as { getSource(): { once(event: string, callback: () => void): void } }).getSource().once('tileloadend', resolve))
+      await loaded
       return JSON.stringify(useProjectStore.getState().getSnapshot())
     }, mode)
     expect(requests.length).toBeGreaterThan(0)

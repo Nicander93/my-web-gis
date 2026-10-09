@@ -113,6 +113,53 @@ test('public scene display edits preserve selection and table through toolbar un
   await expect.poll(async () => (await mapState(page)).selection).toEqual(selected)
 })
 
+test('drawing commits through document replacement and toolbar undo preserves the active edit target', async ({ page }) => {
+  await page.getByRole('tab', { name: '编辑', exact: true }).click()
+  await page.getByRole('button', { name: '开始编辑', exact: true }).click()
+  await page.getByRole('button', { name: '绘制要素', exact: true }).click()
+  const bounds = (await page.locator('.ol-viewport').boundingBox())!
+  await page.mouse.click(bounds.x + 120, bounds.y + 100)
+  await expect.poll(async () => (await mapState(page)).positions.length).toBe(4)
+  const snapshot = () => page.evaluate(async () => {
+    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const { useWorkbenchStore } = await import('/src/stores/workbench.store.ts')
+    const state = useProjectStore.getState(), layer = state.project.layers.find(item => item.id === state.selectedLayerId)!
+    return { count: state.featuresByDataset[layer.datasetId].length, target: useWorkbenchStore.getState().editLayerId, layer: layer.id }
+  })
+  const drawn = await snapshot()
+  expect(drawn.count).toBe(4); expect(drawn.target).toBe(drawn.layer)
+  await page.getByRole('button', { name: '撤销', exact: true }).first().click()
+  await expect.poll(async () => (await mapState(page)).positions.length).toBe(3)
+  expect((await snapshot()).target).toBe(drawn.target)
+  await page.getByRole('button', { name: '重做', exact: true }).first().click()
+  await expect.poll(async () => (await mapState(page)).positions.length).toBe(4)
+  expect((await snapshot()).count).toBe(4)
+  await page.keyboard.press('Escape')
+})
+
+test('public view edits reproject native features and toolbar undo restores the declared view', async ({ page }) => {
+  await page.evaluate(async () => {
+    const { createProjectSceneController } = await import('/src/features/scene/project-scene-controller.ts')
+    const controller = createProjectSceneController()
+    try { controller.setView('map', { type: '2d', projection: 'EPSG:4326', center: [116.4, 39.9], zoom: 8 }) }
+    finally { controller.dispose() }
+  })
+  const read = () => page.evaluate(async () => {
+    const { getMapRuntime } = await import('/src/features/map/map-runtime-host.ts')
+    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const runtime = getMapRuntime()!, view = runtime.getMap().getView()
+    const layer = runtime.registry.getVector(useProjectStore.getState().selectedLayerId!)!
+    const point = layer.getSource()!.getFeatureById('point-0')!
+    return { projection: view.getProjection().getCode(), center: view.getCenter(), extent: point.getGeometry()!.getExtent() }
+  })
+  await expect.poll(async () => (await read()).projection).toBe('EPSG:4326')
+  expect((await read()).extent).toEqual([116.4, 39.9, 116.4, 39.9])
+  expect((await read()).center).toEqual([116.4, 39.9])
+  await page.getByRole('button', { name: '撤销', exact: true }).first().click()
+  await expect.poll(async () => (await read()).projection).toBe('EPSG:3857')
+  expect((await read()).extent[0]).toBeGreaterThan(1_000_000)
+})
+
 test('escape cancels a live drag and preserves selection and camera', async ({ page }) => {
   const initial = await mapState(page)
   const first = initial.positions[0].pixel
