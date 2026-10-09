@@ -156,7 +156,7 @@ export class CitySceneRuntime {
   }
 
   /** Load hidden candidates before replacing owned content; failed preparation preserves the current scene. */
-  async replaceScene(input: CityScene, signal?: AbortSignal): Promise<void> {
+  async replaceScene(input: CityScene, signal?: AbortSignal, options: { preserveCamera?: boolean } = {}): Promise<void> {
     if (this.destroyed) throw new Error('CitySceneRuntime 已销毁')
     const scene = parseCityScene(input)
     this.cancelPreparation()
@@ -222,7 +222,7 @@ export class CitySceneRuntime {
       this.viewer.shadows = scene.lighting?.shadows ?? this.originalLighting.shadows
       if (this.viewer.clock) this.viewer.clock.currentTime = time
       this.lightingKey = JSON.stringify(scene.lighting ?? null)
-      this.setCamera(scene.camera)
+      if (!options.preserveCamera) this.setCamera(scene.camera)
       this.editor.refresh()
       committed = true
       prepared.clear()
@@ -421,7 +421,7 @@ export interface CesiumDocumentRuntime {
   /** Full input content, including definitions unsupported by the native city projection. */
   getDocument(): SceneDocument
   /** Applies a validated snapshot; aborted preparation cannot publish obsolete native content. */
-  updateDocument(document: unknown, signal?: AbortSignal): Promise<void>
+  updateDocument(document: unknown, signal?: AbortSignal, options?: { reload?: boolean }): Promise<void>
   destroy(): void
 }
 
@@ -436,13 +436,16 @@ export async function createCesiumDocumentRuntime(options: Omit<CityRuntimeOptio
     runtime,
     get issues() { return structuredClone(projection.issues) },
     getDocument: () => structuredClone(projection.document),
-    async updateDocument(document, signal) {
+    async updateDocument(document, signal, updateOptions) {
       if (destroyed) throw new Error('CesiumDocumentRuntime 已销毁')
       signal?.throwIfAborted()
       const next = projectCesiumDocument(document, options.viewId)
+      const cameraChanged = projection.document.id !== next.document.id || JSON.stringify(projection.scene.camera) !== JSON.stringify(next.scene.camera)
+      const nativeChanged = JSON.stringify(projection.scene) !== JSON.stringify(next.scene)
       const current = ++revision
       runtime.cancelPreparation()
-      if (!runtime.updatePresentation(next.scene)) await runtime.replaceScene(next.scene, signal)
+      if (updateOptions?.reload || nativeChanged && !runtime.updatePresentation(next.scene)) await runtime.replaceScene(next.scene, signal, { preserveCamera: !cameraChanged })
+      else if (projection.document.id !== next.document.id) { runtime.cancelDraw(); runtime.stopEditing(); runtime.setCamera(next.scene.camera) }
       signal?.throwIfAborted()
       if (destroyed || revision !== current) throw new DOMException('Scene projection superseded', 'AbortError')
       projection = next

@@ -18,7 +18,7 @@ runtime.stopEditing()
 runtime.destroy() // 也销毁由 createCityRuntime 创建的 Viewer
 ```
 
-也可 `new CitySceneRuntime(viewer, options)` 使用已有 Viewer；同样由 runtime.destroy 销毁该 Viewer。若宿主需要保留 Viewer，请直接使用底层独立包。
+也可 `new CitySceneRuntime(viewer, options)` 使用已有 Viewer；直接构造默认销毁该 Viewer，可设置 `ownsViewer: false` 保留宿主实例。工厂接收已有 Viewer 时默认由宿主持有，使用 target 创建时由运行时持有。
 
 `createCityRuntime` 同步创建 Viewer，资源挂载由 `updateScene` 驱动，须捕获异步错误。相同资源的显隐/变换/Popup 更新复用图层；资源变化、删除及销毁清理旧实例。`setCamera/getCamera/flyTo/getNativeViewer/layers` 提供常见能力及 Cesium 原生出口。没有自动二三维相机联动或二维样式转换。
 
@@ -41,6 +41,8 @@ Cesium 为 peer dependency。首版 0.1.0，MIT；尚未发布 npm。
 `projectCesiumDocument(document, viewId?)` 校验 v3 文档并生成现有 CitySceneRuntime 可消费的投影。它保留完整文档，二维 tile/vector 节点返回 `cesium.unsupported` 问题；嵌套三维分组的显隐和锁定仅在投影中派生，原始本地状态不改写。未知必需扩展阻止投影，无法准备的原生资源明确报错。
 
 `createCesiumDocumentRuntime({ document, viewId, viewer?, target?, signal?, ...options })` 创建并等待原生图层与环境加载后返回 `{ runtime, issues, getDocument, updateDocument, destroy }`。`getDocument()` 是最近成功投影的完整文档隔离副本，`issues` 随成功更新变化。原生底层编辑仍需宿主更新文档，运行时不持有编辑历史。
+
+`updateDocument(document, signal, { reload: true })` 强制准备新的图层后替换，可用于资源重试；失败保留已显示内容和最后成功文档。普通资源替换和强制重载都保留用户当前相机，只有文档初始相机变化或切换到不同文档 ID 才应用声明的相机。用户导航不自动写回文档；宿主完整保存可显式读取当前相机。
 
 `updateDocument(document, signal?)` 校验后原位更新已就绪对象的显隐、变换、质量、Popup、图形和环境显示属性；相机声明不变时保留用户导航。资源或环境来源变化走 `replaceScene`：隐藏准备候选资源，成功后替换，准备失败保留上一投影。取消立即结束等待，即使加载器未响应取消；后续更新及销毁使旧准备失效并清理迟到资源。可作为 scene-core 的 `bindSceneRuntime` 目标，权威文档和历史由宿主持有。低层 `updateScene` 保留既有增量行为，不能替代这个支持取消的适配器。
 

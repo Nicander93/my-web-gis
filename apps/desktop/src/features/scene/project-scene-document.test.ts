@@ -40,6 +40,9 @@ describe('full project scene content', () => {
     expect(projection.hostCityNodeIds.get('a-2')).toBe('a')
     expect(projection.hostCityNodeIds.get('a')).toBeUndefined()
     expect(projection.hostCityNodeIds.get('group-2')).toBe('group')
+    expect(projection.cityResourceIds.get('shared')).toBe('shared-2')
+    expect(projection.hostCityResourceIds.get('shared-2')).toBe('shared')
+    expect(projection.hostCityResourceIds.get('shared')).toBeUndefined()
     expect(projection.document.nodes.find(node => node.id === 'a-2')).toMatchObject({ type: '3dtiles', parentId: 'group-2' })
     expect(projection.document).toEqual(createProjectSceneDocument(input))
     expect(input).toEqual(before)
@@ -47,6 +50,8 @@ describe('full project scene content', () => {
     const mapOnly = createProjectSceneProjection(input)
     expect(mapOnly.cityNodeIds.size).toBe(0)
     expect(mapOnly.hostCityNodeIds.size).toBe(0)
+    expect(mapOnly.cityResourceIds.size).toBe(0)
+    expect(mapOnly.hostCityResourceIds.size).toBe(0)
   })
   it('retains unused city assets and explicitly scoped empty city groups without a city view', () => {
     const input = snapshot()

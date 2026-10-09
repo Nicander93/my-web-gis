@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createProject } from '@desktop-webgis/gis-core'
+import { createCityScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
 import type { SceneController } from '@desktop-webgis/scene-core'
 import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
@@ -12,6 +13,29 @@ beforeEach(() => useProjectStore.getState().loadSnapshot({ project: createProjec
 afterEach(() => { attached.splice(0).forEach(controller => controller.dispose()) })
 
 describe('Project-owned public scene controller', () => {
+  it('keeps original city object, group and asset identities when an API edits a mixed project', () => {
+    useProjectStore.getState().addLayer('data', 'Map', [], 'point')
+    const before = useProjectStore.getState().getSnapshot(), id = before.project.layers[0].id
+    before.project.city = createCityScene()
+    before.project.city.assets.data = { type: 'glb', url: './model.glb' }
+    before.project.city.groups = [{ id: 'group', name: 'City group', visible: true }]
+    before.project.groups = [{ id: 'group', name: 'Map group', visible: true, layerIds: [id] }]
+    before.project.rootOrder = [{ type: 'group', id: 'group' }]
+    before.project.city.nodes = [{ id, type: 'model', name: 'City object', visible: true, asset: 'data', groupId: 'group', position: [0, 0, 0], transform: createTransform() }]
+    useProjectStore.getState().loadSnapshot(before)
+    const controller = attach(), document = controller.getDocument()
+    const model = document.nodes.find(node => node.type === 'model')!
+    controller.setNodeVisible(model.id, false)
+    expect(useProjectStore.getState().project.city?.nodes[0]).toMatchObject({ id, asset: 'data', groupId: 'group', visible: false })
+    expect(useProjectStore.getState().project.city?.groups?.[0].id).toBe('group')
+    expect(Object.keys(useProjectStore.getState().project.city!.assets)).toEqual(['data'])
+    expect(controller.getDocument().nodes.find(node => node.type === 'model')?.id).toBe(model.id)
+    expect(useProjectStore.getState().project.layers[0].id).toBe(id)
+    expect(useProjectStore.getState().undoEdit()).toBe(true)
+    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
+    expect(useProjectStore.getState().redoEdit()).toBe(true)
+    expect(useProjectStore.getState().project.city?.nodes[0].id).toBe(id)
+  })
   it('invalidates only changed style drafts, keeps the table and guards history against a newer dirty draft', () => {
     useProjectStore.getState().addLayer('points', 'Points', [], 'point')
     const id = useProjectStore.getState().project.layers[0].id, controller = attach(), session = useSessionStore.getState()

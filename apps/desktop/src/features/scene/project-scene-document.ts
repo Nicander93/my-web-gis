@@ -56,6 +56,8 @@ export interface ProjectSceneProjection {
   /** Host city IDs and portable document IDs may differ when the two engines share an ID. */
   cityNodeIds: ReadonlyMap<string, string>
   hostCityNodeIds: ReadonlyMap<string, string>
+  cityResourceIds: ReadonlyMap<string, string>
+  hostCityResourceIds: ReadonlyMap<string, string>
 }
 
 /** Builds the document and its host identity mapping together, without changing the project. */
@@ -115,6 +117,12 @@ export function createProjectSceneProjection(snapshot: ProjectSnapshot): Project
   const city = project.city ? migrateSceneDocument(project.city, { id: project.id, title: project.name }, { resourceIds: [...usedResources], nodeIds: [...usedNodes] }) : undefined
   Object.assign(resources, city?.resources)
   const cityNodeIds = new Map<string, string>(), hostCityNodeIds = new Map<string, string>()
+  const cityResourceIds = new Map<string, string>(), hostCityResourceIds = new Map<string, string>()
+  const migratedResourceIds = Object.keys(city?.resources ?? {})
+  Object.keys(project.city?.assets ?? {}).forEach((id, index) => {
+    const documentId = migratedResourceIds[index]
+    cityResourceIds.set(id, documentId); hostCityResourceIds.set(documentId, id)
+  })
   // City migration emits groups first and then objects in their original order.
   const hostCityNodes = [...project.city?.groups ?? [], ...project.city?.nodes ?? []]
   hostCityNodes.forEach((node, index) => {
@@ -125,7 +133,7 @@ export function createProjectSceneProjection(snapshot: ProjectSnapshot): Project
   const document = parseSceneDocument({ version: 3, id: project.id, title: project.name, resources, nodes: [...nodes, ...city?.nodes ?? []],
     views: { map: { type: '2d', projection: project.crs, ...project.mapState }, ...city?.views }, activeView: city && getProjectType(project) === '3d' ? 'city' : 'map',
     ...(city?.environment ? { environment: city.environment } : {}), ...(Object.keys(credentials).length ? { credentials } : {}) })
-  return { document, cityNodeIds, hostCityNodeIds }
+  return { document, cityNodeIds, hostCityNodeIds, cityResourceIds, hostCityResourceIds }
 }
 
 function restoreAuthentication(resource: SceneResource, document: SceneDocument): Pick<ServiceSource, 'authMode' | 'tokenParam' | 'credentialRef'> {
