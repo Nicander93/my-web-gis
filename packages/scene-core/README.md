@@ -13,6 +13,13 @@ The controller owns no Map, Viewer, selection, file IO or undo stack. Engine pre
 The root and `./scene` entry points depend only on the scene schema. Project-specific publishing conversion lives in Desktop's `features/scene/compile-project.ts`; it is not part of this package's public API. Internal callers previously importing `compileProjectToScene` from this package must use that application adapter instead.
 # Resource references
 
+`mergeSceneDocuments(target, incoming)` returns a validated merged document and
+incoming-to-result ID maps for nodes, resources, views and credential references.
+The target identity and active view remain selected. Incoming display order is
+appended; shared settings that disagree cause an atomic rejection. Opaque
+extensions with ID collisions require a host extension merge adapter. This pure
+operation does not modify a mounted engine, project store or undo history.
+
 `prepareSceneGeoJsonResources(document, { loadGeoJson, signal, resourceIds })`
 prepares URL GeoJSON into complete inline data on a detached document. The host
 supplies transport and response limits. Duplicate resource IDs load once;
