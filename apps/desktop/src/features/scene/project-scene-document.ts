@@ -48,6 +48,18 @@ function authentication(source: ServiceSource, credentials: NonNullable<SceneDoc
 
 /** Converts full project content, including all cached data, independently of publishing filters. */
 export function createProjectSceneDocument(snapshot: ProjectSnapshot): SceneDocument {
+  return createProjectSceneProjection(snapshot).document
+}
+
+export interface ProjectSceneProjection {
+  document: SceneDocument
+  /** Host city IDs and portable document IDs may differ when the two engines share an ID. */
+  cityNodeIds: ReadonlyMap<string, string>
+  hostCityNodeIds: ReadonlyMap<string, string>
+}
+
+/** Builds the document and its host identity mapping together, without changing the project. */
+export function createProjectSceneProjection(snapshot: ProjectSnapshot): ProjectSceneProjection {
   const project = normalizeLayerTree(snapshot.project)
   const resources: Record<string, SceneResource> = Object.create(null)
   const credentials: NonNullable<SceneDocument['credentials']> = Object.create(null)
@@ -102,9 +114,18 @@ export function createProjectSceneDocument(snapshot: ProjectSnapshot): SceneDocu
   }
   const city = project.city ? migrateSceneDocument(project.city, { id: project.id, title: project.name }, { resourceIds: [...usedResources], nodeIds: [...usedNodes] }) : undefined
   Object.assign(resources, city?.resources)
-  return parseSceneDocument({ version: 3, id: project.id, title: project.name, resources, nodes: [...nodes, ...city?.nodes ?? []],
+  const cityNodeIds = new Map<string, string>(), hostCityNodeIds = new Map<string, string>()
+  // City migration emits groups first and then objects in their original order.
+  const hostCityNodes = [...project.city?.groups ?? [], ...project.city?.nodes ?? []]
+  hostCityNodes.forEach((node, index) => {
+    const documentId = city!.nodes[index].id
+    cityNodeIds.set(node.id, documentId)
+    hostCityNodeIds.set(documentId, node.id)
+  })
+  const document = parseSceneDocument({ version: 3, id: project.id, title: project.name, resources, nodes: [...nodes, ...city?.nodes ?? []],
     views: { map: { type: '2d', projection: project.crs, ...project.mapState }, ...city?.views }, activeView: city && getProjectType(project) === '3d' ? 'city' : 'map',
     ...(city?.environment ? { environment: city.environment } : {}), ...(Object.keys(credentials).length ? { credentials } : {}) })
+  return { document, cityNodeIds, hostCityNodeIds }
 }
 
 function restoreAuthentication(resource: SceneResource, document: SceneDocument): Pick<ServiceSource, 'authMode' | 'tokenParam' | 'credentialRef'> {
