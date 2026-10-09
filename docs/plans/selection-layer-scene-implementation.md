@@ -266,3 +266,10 @@
 - WFS 完成时确认请求身份及未取消状态；同 ID 资源修改后的迟到成功不再写入。旧请求结束不能清除较新请求的注册和加载状态，增加相应回归。
 - 通过：gis-core 72 项单测及构建；Desktop 全套 183 项通过、5 项既有平台测试跳过，生产构建和最终类型检查通过。选择交互浏览器组在三个窗口尺寸共 18 项通过；新增流程先实际框选和搜索，再调用公共 API，观察原生图层透明度，通过工具栏撤销/重做验证选中行与表格搜索保留。浏览器使用安装的 Chrome/SwiftShader，不等同于 Windows 原生、DPI 或硬件 GPU 验收。
 - 同项目差异历史不是协同冲突解决器：命令改写的同一字段、非稳定 ID 数组或创建/删除的整块内容仍按命令目标应用。Desktop 创建路径向公共文档运行时收敛、完整元数据与嵌套/多视图支持、资源包和性能门槛仍未完成；本批不签收整个 S07/S10。
+
+### Desktop city identity projection before runtime migration (2026-10-09)
+
+- Added `createProjectSceneProjection`: full scene document and bidirectional host city node/group ID mappings are built together. The existing document export delegates to this projection and keeps its output contract.
+- Mapping prevents map/city ID collisions from directing selection or transform callbacks to the wrong host object. It does not mutate Project content or create another writable content source.
+- Verification: 9 project scene document tests passed; Desktop TypeScript and production build passed. Existing mixed static/dynamic import and large bundle warnings remain.
+- Desktop CityWorkspace still uses the legacy runtime entry. Wiring the new document runtime, startup cancellation, retry/error state and mapped editing callbacks remains pending; this entry does not complete S06/S07 or the full plan. No push, package publication, native acceptance or shutdown was performed.

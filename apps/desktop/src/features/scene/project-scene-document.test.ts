@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createDefaultLayerStyle, createProject, type ProjectSnapshot } from '@desktop-webgis/gis-core'
 import { createCityScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
 import { parseSceneDocument } from '@desktop-webgis/scene-schema'
-import { createProjectFromSceneDocument, createProjectSceneDocument } from './project-scene-document'
+import { createProjectFromSceneDocument, createProjectSceneDocument, createProjectSceneProjection } from './project-scene-document'
 
 function snapshot(): ProjectSnapshot {
   const project = createProject('Complete content')
@@ -32,6 +32,22 @@ function snapshot(): ProjectSnapshot {
 }
 
 describe('full project scene content', () => {
+  it('maps city selection and edit identities without confusing colliding map nodes', () => {
+    const input = snapshot(), before = structuredClone(input)
+    const projection = createProjectSceneProjection(input)
+    expect(projection.cityNodeIds.get('a')).toBe('a-2')
+    expect(projection.cityNodeIds.get('group')).toBe('group-2')
+    expect(projection.hostCityNodeIds.get('a-2')).toBe('a')
+    expect(projection.hostCityNodeIds.get('a')).toBeUndefined()
+    expect(projection.hostCityNodeIds.get('group-2')).toBe('group')
+    expect(projection.document.nodes.find(node => node.id === 'a-2')).toMatchObject({ type: '3dtiles', parentId: 'group-2' })
+    expect(projection.document).toEqual(createProjectSceneDocument(input))
+    expect(input).toEqual(before)
+    delete input.project.city
+    const mapOnly = createProjectSceneProjection(input)
+    expect(mapOnly.cityNodeIds.size).toBe(0)
+    expect(mapOnly.hostCityNodeIds.size).toBe(0)
+  })
   it('retains unused city assets and explicitly scoped empty city groups without a city view', () => {
     const input = snapshot()
     delete input.project.city
