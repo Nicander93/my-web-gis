@@ -15,6 +15,38 @@ function document(): SceneDocument {
 }
 
 describe('v3 OL document factory', () => {
+  it('releases already prepared shared sources on abort before a later fetch returns', async () => {
+    const input = document(), operation = new AbortController()
+    input.resources.remote = { type: 'geojson', url: './remote.geojson' }
+    const first = input.nodes.find(node => node.type === 'vector')!
+    input.nodes.push({ ...first, id: 'remote', resource: 'remote' })
+    let resolve!: (response: Response) => void
+    const response = new Promise<Response>(done => { resolve = done }), fetcher = vi.fn(() => response)
+    const disposed = vi.spyOn(VectorSource.prototype, 'dispose')
+    const pending = createOlDocumentLayers(input, { signal: operation.signal, fetch: fetcher })
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce())
+    operation.abort()
+    expect(disposed).toHaveBeenCalledOnce()
+    resolve(new Response(JSON.stringify({ type: 'FeatureCollection', features: [] })))
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    expect(disposed).toHaveBeenCalledOnce()
+    disposed.mockRestore()
+  })
+  it('retains sources and native presentation when unrelated city or metadata content changes', async () => {
+    const input = document(), result = await createOlDocumentLayers(input)
+    const layer = result.getLayer('first') as VectorLayer, source = layer.getSource()!, style = layer.getStyle()
+    const next = structuredClone(input)
+    next.title = 'Mixed scene'; next.resources.city = { type: '3dtiles', url: './tileset.json' }
+    next.nodes.push({ type: '3dtiles', id: 'city', name: 'Buildings', visible: true, resource: 'city', transform: { translation: [0, 0, 0], rotation: [0, 0, 0], scale: 1 } })
+    expect(result.updatePresentation(next)).toBe(true)
+    expect(layer.getSource()).toBe(source); expect(layer.getStyle()).toBe(style)
+    expect(result.getDocument()).toEqual(next)
+    expect(result.issues).toContainEqual(expect.objectContaining({ path: '$.nodes.city', code: 'ol.unsupported' }))
+    next.nodes.pop(); delete next.resources.city
+    expect(result.updatePresentation(next)).toBe(true)
+    expect(result.issues.some(issue => issue.path === '$.nodes.city')).toBe(false)
+    result.dispose()
+  })
   it('updates styles and filters while preserving shared data and layer identity', async () => {
     const input = document(), result = await createOlDocumentLayers(input)
     const layer = result.getLayer('first') as VectorLayer, source = layer.getSource()!
@@ -44,8 +76,12 @@ describe('v3 OL document factory', () => {
     expect(layer.getOpacity()).toBe(0.3)
     expect(result.getDocument()).toEqual(next)
     next.resources.extra = { type: 'xyz', url: 'https://example.test/{z}/{x}/{y}.png' }
+    expect(result.updatePresentation(next)).toBe(true)
+    expect(result.getDocument().resources.extra).toEqual(next.resources.extra)
+    expect(layer.getSource()).toBe(source)
+    next.resources.data = { type: 'geojson', data: { type: 'FeatureCollection', features: [] } }
     expect(result.updatePresentation(next)).toBe(false)
-    expect(result.getDocument().resources.extra).toBeUndefined()
+    expect(source.getFeatures()).toHaveLength(3)
     result.dispose()
   })
   it('shares full data, retains typed identities and applies independent node filters', async () => {
@@ -86,7 +122,11 @@ describe('v3 OL document factory', () => {
 
   it('rejects unknown required extensions before creating native objects', async () => {
     const input = document()
+    const result = await createOlDocumentLayers(input), before = result.getDocument(), layer = result.getLayer('first')
     input.extensions = { 'example.required': { version: 1, required: true, data: {} } }
+    expect(() => result.updatePresentation(input)).toThrow()
+    expect(result.getDocument()).toEqual(before); expect(result.getLayer('first')).toBe(layer)
+    result.dispose()
     await expect(createOlDocumentLayers(input)).rejects.toThrow()
   })
   it('uses a WFS saved cache without making remote requests or claiming completeness', async () => {

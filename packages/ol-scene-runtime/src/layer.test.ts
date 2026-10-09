@@ -4,10 +4,27 @@ import TileLayer from 'ol/layer/Tile.js'
 import LayerGroup from 'ol/layer/Group.js'
 import VectorLayer from 'ol/layer/Vector.js'
 import XYZ from 'ol/source/XYZ.js'
-import { createOlSceneLayer, SCENE_LAYER_ID } from './index.js'
+import VectorSource from 'ol/source/Vector.js'
+import Feature from 'ol/Feature.js'
+import Point from 'ol/geom/Point.js'
+import { createOlSceneLayer, createOlVectorLayer, SCENE_LAYER_ID } from './index.js'
 
 describe('scene layer adapter', () => {
   const view = new View({ projection: 'EPSG:3857', center: [0, 0], zoom: 2 })
+
+  it('creates editor and document layers around the same caller-owned feature identities', async () => {
+    const feature = new Feature(new Point([1, 2])); feature.setId('host-id')
+    const source = new VectorSource({ features: [feature] })
+    const definition = { type: 'vector' as const, id: 'points', name: 'Points', source: 'data', visible: false, opacity: .4,
+      style: { mode: 'single' as const, symbol: { type: 'circle' as const, radius: 6 } } }
+    const editor = createOlVectorLayer(definition, source)
+    const viewer = await createOlSceneLayer(definition, { data: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } } }, view, { vectorSource: source }) as VectorLayer
+    expect(editor.getSource()).toBe(source); expect(viewer.getSource()).toBe(source)
+    expect(editor.get(SCENE_LAYER_ID)).toBe('points'); expect(editor.getVisible()).toBe(false); expect(editor.getOpacity()).toBe(.4)
+    editor.dispose(); viewer.dispose()
+    expect(source.getFeatureById('host-id')).toBe(feature)
+    source.dispose()
+  })
 
   it('creates XYZ layers without exposing OpenLayers in the scene definition', async () => {
     const layer = await createOlSceneLayer(

@@ -16,6 +16,7 @@ export class OlDocumentRuntime {
   private readonly ownsMap: boolean
   private readonly initialView: View
   private content: OlDocumentLayers | null = null
+  private installedView: View | null = null
   private preparation: AbortController | null = null
   private destroyed = false
 
@@ -32,17 +33,30 @@ export class OlDocumentRuntime {
     const operation = new AbortController()
     this.preparation = operation
     const abort = (): void => operation.abort(signal?.reason)
+    let rejectCanceled!: (reason: unknown) => void
+    const canceled = new Promise<never>((_resolve, reject) => { rejectCanceled = reject })
+    void canceled.catch(() => {})
+    const rejectAbort = (): void => rejectCanceled(operation.signal.reason)
+    operation.signal.addEventListener('abort', rejectAbort, { once: true })
     signal?.addEventListener('abort', abort, { once: true })
     if (signal?.aborted) abort()
     let prepared: OlDocumentLayers | null = null
     try {
       operation.signal.throwIfAborted()
-      prepared = await createOlDocumentLayers(input, { ...this.options, signal: operation.signal })
+      const preparing = createOlDocumentLayers(input, { ...this.options, signal: operation.signal })
+      void preparing.then(candidate => { if (operation.signal.aborted) candidate.dispose() }, () => {})
+      prepared = await Promise.race([preparing, canceled])
       operation.signal.throwIfAborted()
       const previous = this.content, previousView = this.map.getView()
+      const previousDocument = previous?.getDocument()
+      const previousViewId = this.options.viewId ?? previousDocument?.activeView
+      const nextViewId = this.options.viewId ?? input.activeView
+      const preserveView = previousDocument?.id === input.id && previousView === this.installedView && previousViewId === nextViewId &&
+        JSON.stringify(previousDocument.views[previousViewId!]) === JSON.stringify(input.views[nextViewId])
+      const nextView = preserveView ? previousView : prepared.view
       try {
         prepared.rootLayers.forEach(layer => this.map.addLayer(layer))
-        this.map.setView(prepared.view)
+        this.map.setView(nextView)
         previous?.rootLayers.forEach(layer => this.map.removeLayer(layer))
       } catch (error) {
         prepared.rootLayers.forEach(layer => this.map.removeLayer(layer))
@@ -53,11 +67,13 @@ export class OlDocumentRuntime {
         throw error
       }
       this.content = prepared
+      this.installedView = nextView
       prepared = null
       previous?.dispose()
     } finally {
       prepared?.dispose()
       signal?.removeEventListener('abort', abort)
+      operation.signal.removeEventListener('abort', rejectAbort)
       if (this.preparation === operation) this.preparation = null
     }
   }
@@ -86,9 +102,10 @@ export class OlDocumentRuntime {
     this.cancelPreparation()
     const content = this.content
     content?.rootLayers.forEach(layer => this.map.removeLayer(layer))
-    if (!this.ownsMap && content && this.map.getView() === content.view) this.map.setView(this.initialView)
+    if (!this.ownsMap && content && this.map.getView() === this.installedView) this.map.setView(this.initialView)
     content?.dispose()
     this.content = null
+    this.installedView = null
     if (this.ownsMap) { this.map.setTarget(undefined); this.map.dispose() }
   }
 }

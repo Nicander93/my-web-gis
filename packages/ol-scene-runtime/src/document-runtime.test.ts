@@ -28,11 +28,42 @@ function document(id: string, remote = false): SceneDocument {
 }
 
 describe('v3 document runtime lifecycle', () => {
+  it('rejects cancellation immediately while an uncooperative fetch is still pending', async () => {
+    let resolve!: (response: Response) => void
+    const response = new Promise<Response>(done => { resolve = done })
+    const runtime = new OlDocumentRuntime({ map: new Map({ view: new View() }), fetch: vi.fn(() => response) })
+    await runtime.loadDocument(document('first'))
+    const layer = runtime.getLayer('first')
+    const pending = runtime.loadDocument(document('pending', true)), rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    runtime.cancelPreparation()
+    await rejected
+    expect(runtime.getLayer('first')).toBe(layer)
+    resolve(new Response(JSON.stringify({ type: 'FeatureCollection', features: [] })))
+    await Promise.resolve(); await Promise.resolve()
+    expect(runtime.getDocument()?.id).toBe('first')
+    runtime.destroy()
+  })
+
+  it('retains navigation made while replacement data is being prepared', async () => {
+    let resolve!: (response: Response) => void
+    const response = new Promise<Response>(done => { resolve = done })
+    const runtime = new OlDocumentRuntime({ map: new Map({ view: new View() }), fetch: vi.fn(() => response) })
+    await runtime.loadDocument(document('first'))
+    const view = runtime.getNativeMap().getView(), next = document('first', true)
+    const pending = runtime.updateDocument(next)
+    view.setCenter([900, 800]); view.setZoom(8)
+    resolve(new Response(JSON.stringify({ type: 'FeatureCollection', features: [] })))
+    await pending
+    expect(runtime.getNativeMap().getView()).toBe(view)
+    expect(view.getCenter()).toEqual([900, 800]); expect(view.getZoom()).toBe(8)
+    runtime.destroy()
+  })
   it('reuses presentation layers but prepares replacements for changed resources', async () => {
     const runtime = new OlDocumentRuntime({ map: new Map({ view: new View() }) })
     const input = document('first')
     await runtime.loadDocument(input)
     const layer = runtime.getLayer('first'), view = runtime.getNativeMap().getView()
+    view.setCenter([123, 456]); view.setZoom(7); view.setRotation(.4)
     input.nodes[0].visible = false
     await runtime.updateDocument(input)
     expect(runtime.getLayer('first')).toBe(layer)
@@ -43,6 +74,12 @@ describe('v3 document runtime lifecycle', () => {
     await runtime.updateDocument(input)
     expect(runtime.getLayer('first')).not.toBe(layer)
     expect(runtime.getFilteredFeatures('first')).toHaveLength(1)
+    expect(runtime.getNativeMap().getView()).toBe(view)
+    expect(view.getCenter()).toEqual([123, 456]); expect(view.getZoom()).toBe(7); expect(view.getRotation()).toBe(.4)
+    input.views.map = { type: '2d', projection: 'EPSG:3857', center: [10, 20], zoom: 3 }
+    await runtime.updateDocument(input)
+    expect(runtime.getNativeMap().getView()).not.toBe(view)
+    expect(runtime.getNativeMap().getView().getCenter()).toEqual([10, 20])
     runtime.destroy()
   })
   it('retains host layers and restores its view without disposing the external map', async () => {
@@ -56,6 +93,19 @@ describe('v3 document runtime lifecycle', () => {
     expect(map.getLayers().getArray()).toEqual([host])
     expect(map.getView()).toBe(view)
     expect(dispose).not.toHaveBeenCalled()
+  })
+
+  it('restores the external original view after same-document replacements retain the navigated view', async () => {
+    const original = new View(), map = new Map({ view: original }), runtime = new OlDocumentRuntime({ map })
+    const input = document('first')
+    await runtime.loadDocument(input)
+    const installed = map.getView()
+    installed.setCenter([100, 200])
+    input.resources.data = { type: 'geojson', data: { type: 'FeatureCollection', features: [{ type: 'Feature', id: 'new', properties: {}, geometry: { type: 'Point', coordinates: [1, 1] } }] } }
+    await runtime.updateDocument(input)
+    expect(map.getView()).toBe(installed)
+    runtime.destroy()
+    expect(map.getView()).toBe(original)
   })
 
   it('keeps previous document, native layer and view when preparation fails', async () => {

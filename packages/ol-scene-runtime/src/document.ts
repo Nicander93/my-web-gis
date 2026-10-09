@@ -51,6 +51,27 @@ function matches(value: unknown, condition: SceneFilterCondition): boolean {
   return condition.op === 'lt' ? left < right : condition.op === 'lte' ? left <= right : condition.op === 'gt' ? left > right : left >= right
 }
 
+function nativeNodes(document: SceneDocument): SceneDocument['nodes'] {
+  return document.nodes.filter(node => node.type === 'tile' || node.type === 'vector' || node.type === 'group' && node.scope !== '3d')
+}
+
+function documentIssues(document: SceneDocument): OlDocumentIssue[] {
+  const extensions = getUnsupportedSceneExtensions(document)
+  const required = extensions.filter(issue => issue.code === 'extension.required')
+  if (required.length) throw new Error(required.map(issue => issue.message).join('; '))
+  const issues: OlDocumentIssue[] = extensions.map(({ path, code, message }) => ({ path, code, message }))
+  for (const node of document.nodes) {
+    if (node.type === 'group' && node.scope === '3d' || node.type !== 'group' && node.type !== 'tile' && node.type !== 'vector') {
+      issues.push({ path: `$.nodes.${node.id}`, code: 'ol.unsupported', message: `OL does not render ${node.type}` })
+    }
+  }
+  const resources = new Set(nativeNodes(document).flatMap(node => 'resource' in node ? [node.resource] : []))
+  for (const id of resources) {
+    if (document.resources[id].type === 'wfs') issues.push({ path: `$.resources.${id}`, code: 'wfs.snapshot', message: 'Displays the saved WFS cache; remote refresh is not performed' })
+  }
+  return issues
+}
+
 /** Shares resource sources without baking node filters into data. Reports unsupported content explicitly. */
 export async function createOlDocumentLayers(input: unknown, options: Omit<CreateOlSceneLayerOptions, 'vectorSource'> & { viewId?: string } = {}): Promise<OlDocumentLayers> {
   let document = parseSceneDocument(input)
@@ -58,10 +79,8 @@ export async function createOlDocumentLayers(input: unknown, options: Omit<Creat
   const definition = document.views[viewId]
   if (!definition || definition.type !== '2d') throw new Error(`OL requires a two-dimensional view: ${viewId}`)
   if (!getProjection(definition.projection)) throw new Error(`OL projection is not registered: ${definition.projection}`)
-  const required = getUnsupportedSceneExtensions(document).filter(issue => issue.code === 'extension.required')
-  if (required.length) throw new Error(required.map(issue => issue.message).join('; '))
   const view = new View({ ...definition })
-  const issues: OlDocumentIssue[] = getUnsupportedSceneExtensions(document).map(({ path, code, message }) => ({ path, code, message }))
+  const issues = documentIssues(document)
   const sources: Record<string, SceneSource> = Object.create(null)
   const shared = new Map<string, VectorSource<Feature<Geometry>>>()
   const handles = new Map<string, OlLayerHandle>(), layers = new Map<string, BaseLayer>()
@@ -75,16 +94,18 @@ export async function createOlDocumentLayers(input: unknown, options: Omit<Creat
     shared.forEach(source => source.dispose())
     handles.clear(); layers.clear(); shared.clear()
   }
+  const abortPreparation = (): void => dispose()
+  options.signal?.addEventListener('abort', abortPreparation, { once: true })
   try {
     for (const node of document.nodes) {
       options.signal?.throwIfAborted()
       if (node.type === 'group') {
-        if (node.scope === '3d') { issues.push({ path: `$.nodes.${node.id}`, code: 'ol.unsupported', message: 'Three-dimensional group is retained in the document but not rendered by OL' }); continue }
+        if (node.scope === '3d') continue
         layers.set(node.id, new LayerGroup({ layers: [], visible: node.visible }))
         continue
       }
       if (node.type !== 'vector' && node.type !== 'tile') {
-        issues.push({ path: `$.nodes.${node.id}`, code: 'ol.unsupported', message: `OL does not render ${node.type}` }); continue
+        continue
       }
       const resource = document.resources[node.resource]
       if ((resource.type === 'wms' || resource.type === 'wmts') && resource.authMode === 'runtime') throw new Error(`Authenticated service ${node.resource} requires an OL request adapter`)
@@ -124,7 +145,6 @@ export async function createOlDocumentLayers(input: unknown, options: Omit<Creat
           if (id !== undefined) featureIds.set(feature, id)
         })
         shared.set(node.resource, new VectorSource({ features }))
-        if (resource.type === 'wfs') issues.push({ path: `$.resources.${node.resource}`, code: 'wfs.snapshot', message: 'Displays the saved WFS cache; remote refresh is not performed' })
       }
       const { resource: resourceId, parentId, locked, filter, ...presentation } = node
       const handle = await createOlLayerHandle({ ...presentation, source: resourceId } as SceneLayer, sources, view, { ...options, vectorSource: shared.get(resourceId) })
@@ -150,15 +170,18 @@ export async function createOlDocumentLayers(input: unknown, options: Omit<Creat
       updatePresentation(input) {
         if (disposed) throw new Error('Document layers have been disposed')
         const next = parseSceneDocument(input)
-        const { nodes: previousNodes, ...previousContent } = document
-        const { nodes: nextNodes, ...nextContent } = next
-        if (JSON.stringify(previousContent) !== JSON.stringify(nextContent) || previousNodes.length !== nextNodes.length) return false
+        const nextIssues = documentIssues(next)
+        const previousNodes = nativeNodes(document), nextNodes = nativeNodes(next)
+        const content = (input: SceneDocument) => ({ id: input.id, view: input.views[options.viewId ?? input.activeView], viewId: options.viewId ?? input.activeView,
+          credentials: input.credentials, resources: Object.fromEntries(nativeNodes(input).flatMap(node => 'resource' in node ? [[node.resource, input.resources[node.resource]]] : [])) })
+        if (JSON.stringify(content(document)) !== JSON.stringify(content(next)) || previousNodes.length !== nextNodes.length) return false
         const identity = (node: SceneDocument['nodes'][number]): unknown => ({
           id: node.id, type: node.type, parentId: node.parentId,
           resource: 'resource' in node ? node.resource : undefined,
           scope: node.type === 'group' ? node.scope : undefined
         })
         if (nextNodes.some((node, index) => JSON.stringify(identity(node)) !== JSON.stringify(identity(previousNodes[index])))) return false
+        if (JSON.stringify(previousNodes) === JSON.stringify(nextNodes)) { document = next; issues.splice(0, issues.length, ...nextIssues); return true }
         // Compile every style before writing to any native object.
         nextNodes.forEach(node => { if (node.type === 'vector') createOlStyleFunction(node.style) })
         nextNodes.forEach(node => {
@@ -174,6 +197,7 @@ export async function createOlDocumentLayers(input: unknown, options: Omit<Creat
           }
         })
         document = next
+        issues.splice(0, issues.length, ...nextIssues)
         return true
       },
       getFilteredFeatures(id) {
@@ -185,4 +209,5 @@ export async function createOlDocumentLayers(input: unknown, options: Omit<Creat
       getDocument: () => structuredClone(document), dispose
     }
   } catch (error) { dispose(); throw error }
+  finally { options.signal?.removeEventListener('abort', abortPreparation) }
 }
