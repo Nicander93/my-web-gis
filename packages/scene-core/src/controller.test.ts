@@ -7,6 +7,42 @@ function document() { return createSceneDocument({ id: 'scene', title: 'Scene', 
 const node: SceneNode = { type: 'vector', id: 'points', name: 'Points', resource: 'data', visible: true, style: { mode: 'single', symbol: { type: 'circle', radius: 4 } } }
 
 describe('single scene content controller', () => {
+  it('prepares replacement outside state and commits exactly once after successful validation', async () => {
+    const controller = new SceneController(document()), observer = vi.fn()
+    controller.subscribe(observer)
+    const incoming = document(); incoming.title = 'Prepared'
+    let complete!: () => void
+    const gate = new Promise<void>(resolve => { complete = resolve })
+    const pending = controller.prepareAndReplaceDocument(incoming, { prepare: async candidate => { await gate; return candidate } })
+    expect(controller.getDocument().title).toBe('Scene')
+    expect(observer).not.toHaveBeenCalled()
+    complete(); await pending
+    expect(controller.getDocument().title).toBe('Prepared')
+    expect(observer).toHaveBeenCalledTimes(1)
+    expect(incoming.title).toBe('Prepared')
+    await expect(controller.prepareAndReplaceDocument(incoming, { prepare: async () => { throw new Error('missing resource') } })).rejects.toThrow('missing resource')
+    expect(observer).toHaveBeenCalledTimes(1)
+  })
+  it('rejects late prepared documents after supersession, content edits, cancellation and disposal', async () => {
+    const controller = new SceneController(document())
+    const incoming = document(); incoming.title = 'Old load'
+    let complete!: (value: ReturnType<typeof document>) => void
+    const first = controller.prepareAndReplaceDocument(incoming, { prepare: () => new Promise(resolve => { complete = resolve }) })
+    const rejected = expect(first).rejects.toMatchObject({ name: 'AbortError' })
+    const newer = document(); newer.title = 'New load'
+    await controller.prepareAndReplaceDocument(newer, { prepare: async candidate => candidate })
+    complete(incoming); await rejected
+    expect(controller.getDocument().title).toBe('New load')
+    for (const action of ['edit', 'cancel', 'dispose']) {
+      const pending = controller.prepareAndReplaceDocument(incoming, { prepare: () => new Promise(resolve => { complete = resolve }) })
+      const rejection = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+      if (action === 'edit') controller.transaction('Edit', draft => { draft.title = 'Local edit' })
+      else if (action === 'cancel') controller.cancelPreparation()
+      else controller.dispose()
+      complete(incoming); await rejection
+      expect(controller.getDocument().title).toBe('Local edit')
+    }
+  })
   it('adds tilesets through the same document and explicitly shares matching resources', () => {
     const controller = new SceneController(document()), observer = vi.fn()
     controller.subscribe(observer)
