@@ -152,17 +152,19 @@ export class EditHistory {
   }
 
   undo(context: EditContext): EditCommand | undefined {
-    const command = this.undoStack.pop()
+    const command = this.peekUndo()
     if (!command) return undefined
     command.undo(context)
+    this.undoStack.pop()
     this.redoStack.push(command)
     return command
   }
 
   redo(context: EditContext): EditCommand | undefined {
-    const command = this.redoStack.pop()
+    const command = this.peekRedo()
     if (!command) return undefined
     command.execute(context)
+    this.redoStack.pop()
     this.undoStack.push(command)
     return command
   }
