@@ -1,5 +1,6 @@
 export * from './scene.js'
 export * from './document.js'
 export * from './controller.js'
+export * from './runtime-binding.js'
 export * from './resources.js'
 export * from './merge.js'

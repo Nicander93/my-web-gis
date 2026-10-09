@@ -228,3 +228,12 @@
 - 已通过：Viewer TypeScript／生产构建、ol-selection 构建与 9 项单测；独立 Viewer 浏览器 12 用例，三种窗口尺寸。证据包含 v2/v3、资源加载一次、Popup、实际黄色高亮像素、拖动平移、显隐、未支持内容报告、503、重定向、实际 Cesium canvas 启动和切回二维。Desktop 默认框选 15 个浏览器回归通过，包括属性表联动、修饰键、Esc、独立消费者、旋转与父组裁剪、框选后单击和平移。
 - 测试为安装的 Chrome＋SwiftShader，网络样例受控；Cesium 此批只验证空场景启动，不证明模型／tileset、水面、三维 Popup／环境和硬件渲染的完整一致性。生产构建仍有既有 Cesium 大 chunk 警告。
 - 仍未签收 S09：完整发布格式／资源打包、能力矩阵逐项一致、controller 绑定、Desktop 创建路径收敛、独立 engine tarball 与原生／DPI 门槛仍需完成。本批未推送或 npm 发布。
+
+## 2026-10-09：SceneController 到运行时的受控投影
+
+- scene-core 新增无 DOM／引擎依赖的 `bindSceneRuntime`。订阅控制器提交，初始／后续投影共用 `updateDocument(document, signal)`；请求修订与已应用修订分开记录。取消旧投影、合并尚未开始的过期请求、忽略旧成功／错误状态，等待者跟随最新修订，不受永不结束的旧请求阻塞。
+- 渲染失败不回滚已提交文档或用户历史；状态报告失败和最后已应用修订，`refresh` 显式重试而不改内容。销毁取消本绑定并解除订阅，不销毁宿主控制器／运行时；适配器必须遵守 abort 后不发布原生内容的约定。旧 Cesium `updateScene` 不能直接当作此适配器。
+- Viewer 二维内容现在由 SceneController 持有；显隐走控制器便捷 API，运行时为只读投影副本，Popup 读取控制器内容。接回公共选择包和现有浏览器交互。三维 Viewer／Desktop 的内容真源与取消安全适配仍待收敛，本批不签收 S07。
+- 通过：scene-core 及三包依赖链构建、core 26 项测试（新增绑定 6 项）、Viewer 类型／生产构建与 12 个浏览器用例。生产构建仍有既有 Cesium 大 chunk 警告。单测包含初始投影、文档隔离、旧失败、最新修订等待、提交后渲染失败、重试、取消／销毁和所有权。
+- 三包重新打包并在独立消费者离线强制安装；新增绑定的实际 JS 调用、严格 NodeNext 声明消费通过，无源码 alias 或 DOM，导出仍包含控制器修改。仅证明此协议／core 依赖链；其他公共包、许可证、engine tarball 和原生门槛仍未签收。
+- 未新增 Windows 原生／DPI 或硬件 GPU 验收；未推送或 npm 发布。
