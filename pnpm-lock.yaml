@@ -436,6 +436,9 @@ importers:
       '@desktop-webgis/scene-schema':
         specifier: workspace:*
         version: link:../scene-schema
+      fflate:
+        specifier: 0.8.3
+        version: 0.8.3
     devDependencies:
       typescript:
         specifier: ^5.9.2
