@@ -13,6 +13,7 @@ it('rejects late results from a cancelled or superseded import', async () => {
   let finishFirst!: (value: unknown) => void
   probe.open.mockImplementationOnce(() => new Promise(resolve => { finishFirst = resolve }))
   const first = projectCommands.importScene()
+  await Promise.resolve()
   expect(projectCommands.isImportingScene()).toBe(true)
   probe.open.mockResolvedValueOnce({ path: 'new.json', document: { id: 'new' } })
   await projectCommands.importScene()
@@ -25,6 +26,7 @@ it('rejects late results from a cancelled or superseded import', async () => {
   let finishCancelled!: (value: unknown) => void
   probe.open.mockImplementationOnce(() => new Promise(resolve => { finishCancelled = resolve }))
   const cancelled = projectCommands.importScene()
+  await Promise.resolve()
   projectCommands.cancelSceneImport()
   finishCancelled({ path: 'cancelled.json', document: { id: 'cancelled' } })
   await cancelled
