@@ -3,6 +3,10 @@ import Collection from 'ol/Collection.js'
 import Map from 'ol/Map.js'
 import View from 'ol/View.js'
 import TileLayer from 'ol/layer/Tile.js'
+import VectorLayer from 'ol/layer/Vector.js'
+import VectorSource from 'ol/source/Vector.js'
+import Feature from 'ol/Feature.js'
+import Point from 'ol/geom/Point.js'
 import type BaseLayer from 'ol/layer/Base.js'
 import type { SceneDocument } from '@desktop-webgis/scene-schema'
 
@@ -28,6 +32,23 @@ function document(id: string, remote = false): SceneDocument {
 }
 
 describe('v3 document runtime lifecycle', () => {
+  it('retains host feature objects through document replacement and teardown', async () => {
+    const feature = new Feature({ geometry: new Point([10, 20]) })
+    feature.setId('editable')
+    const source = new VectorSource({ features: [feature] }), disposed = vi.spyOn(source, 'dispose')
+    const runtime = new OlDocumentRuntime({ map: new Map({ view: new View() }), vectorSources: { data: source } })
+    await runtime.loadDocument(document('first'))
+    const first = runtime.getLayer('first') as VectorLayer
+    expect(first.getSource()).toBe(source)
+    await runtime.loadDocument(document('second'))
+    expect((runtime.getLayer('second') as VectorLayer).getSource()).toBe(source)
+    expect(runtime.getFilteredFeatures('second')).toEqual([feature])
+    expect(source.getFeatureById('editable')).toBe(feature)
+    runtime.destroy()
+    expect(disposed).not.toHaveBeenCalled()
+    expect(source.getFeatureById('editable')).toBe(feature)
+    source.dispose()
+  })
   it('rejects cancellation immediately while an uncooperative fetch is still pending', async () => {
     let resolve!: (response: Response) => void
     const response = new Promise<Response>(done => { resolve = done })

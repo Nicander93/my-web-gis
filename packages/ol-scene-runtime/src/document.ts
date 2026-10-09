@@ -13,6 +13,11 @@ import type { CreateOlSceneLayerOptions } from './layer.js'
 import { createOlStyleFunction } from './style.js'
 
 export interface OlDocumentIssue { path: string; code: string; message: string }
+export interface OlDocumentOptions extends Omit<CreateOlSceneLayerOptions, 'vectorSource'> {
+  viewId?: string
+  /** Sources already projected for the selected view, owned and synchronized by the host. */
+  vectorSources?: Readonly<Record<string, VectorSource<Feature<Geometry>>>>
+}
 export interface OlDocumentLayers {
   readonly view: View
   readonly rootLayers: readonly BaseLayer[]
@@ -73,7 +78,7 @@ function documentIssues(document: SceneDocument): OlDocumentIssue[] {
 }
 
 /** Shares resource sources without baking node filters into data. Reports unsupported content explicitly. */
-export async function createOlDocumentLayers(input: unknown, options: Omit<CreateOlSceneLayerOptions, 'vectorSource'> & { viewId?: string } = {}): Promise<OlDocumentLayers> {
+export async function createOlDocumentLayers(input: unknown, options: OlDocumentOptions = {}): Promise<OlDocumentLayers> {
   let document = parseSceneDocument(input)
   const viewId = options.viewId ?? document.activeView
   const definition = document.views[viewId]
@@ -83,6 +88,7 @@ export async function createOlDocumentLayers(input: unknown, options: Omit<Creat
   const issues = documentIssues(document)
   const sources: Record<string, SceneSource> = Object.create(null)
   const shared = new Map<string, VectorSource<Feature<Geometry>>>()
+  const ownedSources = new Set<VectorSource<Feature<Geometry>>>()
   const handles = new Map<string, OlLayerHandle>(), layers = new Map<string, BaseLayer>()
   const format = new GeoJSON({ featureProjection: view.getProjection() })
   let disposed = false
@@ -91,7 +97,8 @@ export async function createOlDocumentLayers(input: unknown, options: Omit<Creat
     disposed = true
     handles.forEach(handle => handle.dispose())
     layers.forEach(layer => { if (layer instanceof LayerGroup) layer.dispose() })
-    shared.forEach(source => source.dispose())
+    ownedSources.forEach(source => source.dispose())
+    ownedSources.clear()
     handles.clear(); layers.clear(); shared.clear()
   }
   const abortPreparation = (): void => dispose()
@@ -114,6 +121,9 @@ export async function createOlDocumentLayers(input: unknown, options: Omit<Creat
       if (node.type === 'vector' && !shared.has(node.resource)) {
         const source = sources[node.resource]
         if (source.type !== 'geojson') throw new Error(`Vector node ${node.id} needs GeoJSON or WFS data`)
+        const supplied = options.vectorSources?.[node.resource]
+        if (supplied) shared.set(node.resource, supplied)
+        else {
         let content = source.data
         if (!content) {
           const fetcher = options.fetch ?? globalThis.fetch
@@ -144,7 +154,10 @@ export async function createOlDocumentLayers(input: unknown, options: Omit<Creat
           const id = portableIds[index]
           if (id !== undefined) featureIds.set(feature, id)
         })
-        shared.set(node.resource, new VectorSource({ features }))
+        const preparedSource = new VectorSource({ features })
+        shared.set(node.resource, preparedSource)
+        ownedSources.add(preparedSource)
+        }
       }
       const { resource: resourceId, parentId, locked, filter, ...presentation } = node
       const handle = await createOlLayerHandle({ ...presentation, source: resourceId } as SceneLayer, sources, view, { ...options, vectorSource: shared.get(resourceId) })

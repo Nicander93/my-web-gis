@@ -22,6 +22,8 @@ Runtime 可通过 `map` 接入调用方现有的 OpenLayers Map，或通过 `tar
 
 `createOlDocumentLayers(document, { viewId, fetch, credentials, signal })` 消费 v3 文档并返回 `view`、`rootLayers`、能力 `issues` 和幂等 `dispose`。宿主将根图层加入现有 Map，移除后释放。多个节点引用同一矢量资源时共享源；节点过滤只影响样式和 `getFilteredFeatures(id)`，不删除源数据或改写可导出的文档。该查询不代替宿主的显隐和可选策略。
 
+工厂与 `OlDocumentRuntime` 均接受 `vectorSources`，按资源 ID 提供宿主持有的完整矢量源。源须已投影到所选 View，宿主负责使其内容与文档声明一致；运行时不会重新请求该资源、改写原要素 ID，或在失败、替换、销毁时释放该源。节点仍各自应用样式与过滤。此接口用于编辑器适配，默认独立消费者仍由工厂创建并释放源。
+
 内嵌／URL GeoJSON 与 WFS 缓存均保持数字和字符串身份，使用 `getSceneFeatureId(feature)` 读取原身份。URL GeoJSON 准备完成并校验后才创建源；WFS 只显示缓存并返回提示，不自动刷新服务。三维对象返回能力问题并保留定义；未知必需扩展阻止创建。认证 WMS／WMTS 暂需请求适配器，当前明确拒绝。创建成功只表示对象与矢量准备完成，不表示瓦片已经加载。
 
 `updateScene` 在资源、视图、控件配置以及图层身份／类型不变时原位更新显示、样式与顺序，保持图层和源实例。其余变化走准备成功后替换路径。`getScene()` 返回隔离的声明式副本；便捷显隐／透明度 API 同步此内容。直接改原生对象仍不会自动写回文档。
