@@ -22,6 +22,8 @@ import {
   SetLayerOpacityCommand,
   SetLayerTreeCommand,
   ReplaceProjectSnapshotCommand,
+  ApplyProjectSnapshotEditCommand,
+  getProjectSnapshotChanges,
   AddLocalLayerCommand,
   snapshotLayerTree,
   capabilitiesForDataset
@@ -87,6 +89,8 @@ interface ProjectState {
   loadSnapshot(snapshot: ProjectSnapshot): void
   /** Whole-content replacement in the shared edit history, preserving prior undo entries. */
   replaceSnapshotAsEdit(snapshot: ProjectSnapshot, label: string): boolean
+  /** Same-project API edit; retains unaffected selection, table targets and drafts. */
+  applySnapshotAsEdit(snapshot: ProjectSnapshot, label: string): boolean
   getSnapshot(): ProjectSnapshot
   setLayerStyle(layerId: string, style: LayerStyle): void
   getNormalizedLayerStyle(layerId: string): LayerStyle | null
@@ -170,6 +174,29 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       getProject: () => get().project,
       replaceProject: (project) => {
         set({ project: normalizeLayerTree(project), dirty: true })
+      },
+      applySnapshotEdit: (snapshot) => {
+        const state = get(), changes = getProjectSnapshotChanges(state.getSnapshot(), snapshot)
+        const session = useSessionStore.getState(), workbench = useWorkbenchStore.getState()
+        const stale = new Set([...changes.removedLayers, ...changes.dataChangedLayers])
+        const guarded = new Set([...stale, ...changes.styleChangedLayers])
+        if ([...guarded].some(id => session.sessions[id]?.styleDraft?.dirty)) throw new Error('请先应用或放弃受影响图层的样式草稿')
+        const sessions = { ...session.sessions }
+        for (const id of stale) { session.abortWfsLoad(id); delete sessions[id] }
+        for (const id of changes.styleChangedLayers) {
+          if (!sessions[id]) continue
+          const { styleDraft: _draft, ...retained } = sessions[id]
+          sessions[id] = retained
+        }
+        if (workbench.editLayerId && stale.has(workbench.editLayerId)) { workbench.setEditLayer(null); workbench.setActiveTool('none') }
+        for (const id of changes.removedLayers) workbench.clearLayer(id)
+        useSessionStore.setState({ sessions })
+        const project = normalizeLayerTree(cloneValue(snapshot.project)), featuresByDataset = cloneValue(snapshot.featuresByDataset)
+        const selectedLayerId = project.layers.some(layer => layer.id === state.selectedLayerId) ? state.selectedLayerId : null
+        const selected = project.layers.find(layer => layer.id === state.selection.layerId)
+        const selection = selected ? { layerId: selected.id, featureIds: intersectSelectionIds(state.selection.featureIds,
+          applyFieldFilter(featuresByDataset[selected.datasetId] ?? [], selected.filter)) } : { layerId: null, featureIds: [] }
+        set({ project, featuresByDataset, selectedLayerId, selection, dirty: true, lastSelectionCountAfterFilter: selected ? selection.featureIds.length : null })
       },
       replaceSnapshot: (snapshot) => {
         const project = normalizeLayerTree(cloneValue(snapshot.project))
@@ -367,6 +394,13 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     project: cloneValue(get().project),
     featuresByDataset: cloneValue(get().featuresByDataset)
   }),
+  applySnapshotAsEdit: (snapshot, label) => {
+    const before = get().getSnapshot()
+    if (JSON.stringify(before) === JSON.stringify(snapshot)) return false
+    const command = new ApplyProjectSnapshotEditCommand(createId('cmd'), label, before, snapshot)
+    if (command.guardedLayerIds.some(id => useSessionStore.getState().sessions[id]?.styleDraft?.dirty)) throw new Error('请先应用或放弃受影响图层的样式草稿')
+    return get().executeEditCommand(command)
+  },
   replaceSnapshotAsEdit: (snapshot, label) => {
     if (Object.values(useSessionStore.getState().sessions).some(session => session.styleDraft?.dirty)) throw new Error('请先应用或放弃样式草稿，再替换场景')
     const before = get().getSnapshot()
@@ -539,6 +573,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   canUndoEdit: () => editHistory.canUndo,
   getHistoryBlockReason: (direction) => {
     const command = direction === 'undo' ? editHistory.peekUndo() : editHistory.peekRedo()
+    if (command instanceof ApplyProjectSnapshotEditCommand) return command.guardedLayerIds.some(id => useSessionStore.getState().sessions[id]?.styleDraft?.dirty)
+      ? '请先应用或放弃受影响图层的样式草稿，再恢复内容编辑' : null
     return command instanceof ReplaceProjectSnapshotCommand && Object.values(useSessionStore.getState().sessions).some(session => session.styleDraft?.dirty)
       ? '请先应用或放弃样式草稿，再恢复场景内容' : null
   },
