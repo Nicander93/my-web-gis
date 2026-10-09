@@ -63,6 +63,13 @@ export class OlDocumentRuntime {
   }
 
   getDocument(): SceneDocument | null { return this.content?.getDocument() ?? null }
+  /** Reuses layers and full sources for presentation-only edits. */
+  async updateDocument(input: SceneDocument, signal?: AbortSignal): Promise<void> {
+    if (this.destroyed) throw new Error('Scene runtime has been destroyed')
+    signal?.throwIfAborted()
+    if (this.content?.updatePresentation(input)) { this.cancelPreparation(); return }
+    await this.loadDocument(input, signal)
+  }
   getLayer(id: string): ReturnType<OlDocumentLayers['getLayer']> { return this.content?.getLayer(id) }
   getFilteredFeatures(id: string): ReturnType<OlDocumentLayers['getFilteredFeatures']> { return this.content?.getFilteredFeatures(id) ?? [] }
   getIssues(): OlDocumentLayers['issues'] { return this.content ? structuredClone(this.content.issues) : [] }
