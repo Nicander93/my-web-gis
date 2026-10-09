@@ -27,6 +27,8 @@ export abstract class BaseLayer {
     this.visible = options.show ?? true
   }
   get show(): boolean { return this.visible }
+  /** Used when a prepared layer is adopted without mounting/loading it a second time. */
+  isMountedOn(viewer: Viewer): boolean { return !this.destroyed && this.viewer === viewer && this.state === 'ready' }
   set show(value: boolean) { this.visible = value; this.setNativeVisible(value); if (!value) this.popup?.close(); this.viewer?.scene.requestRender() }
   bindPopup(content: PopupContent): this { this.popupContent = content; return this }
   unbindPopup(): this { this.popupContent = undefined; this.popup?.destroy(); this.popup = undefined; return this }

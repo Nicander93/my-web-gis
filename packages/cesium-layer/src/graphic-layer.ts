@@ -71,6 +71,7 @@ export class GraphicLayer extends BaseLayer {
   protected setNativeVisible(show: boolean): void { if (this.source) this.source.show = show; if (!show) { this.drawing?.cancel(); this.editing?.cancel() } }
   protected async createNative(viewer: Viewer, signal: AbortSignal): Promise<() => void> {
     const source = new CustomDataSource(this.name)
+    source.show = this.show
     await viewer.dataSources.add(source)
     if (signal.aborted || viewer.isDestroyed()) { if (!viewer.isDestroyed()) viewer.dataSources.remove(source, true); return () => {} }
     this.source = source; this.allGraphics.forEach(graphic => this.renderGraphic(graphic))

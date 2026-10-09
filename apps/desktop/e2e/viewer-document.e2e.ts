@@ -66,6 +66,26 @@ for (const version of [2, 3]) {
   })
 }
 
+test('Viewer prepares a real GLB while hidden before publishing the city scene', async ({ page }) => {
+  const scene = { version: 3, id: 'prepared-model', title: 'Prepared model', activeView: 'city', resources: {
+    tower: { type: 'glb', url: './city-sample/tower.glb' }
+  }, nodes: [{ type: 'model', id: 'tower', name: 'Tower', visible: true, resource: 'tower', position: [116.391, 39.907, 0], transform: { translation: [0, 0, 0], rotation: [0, 0, 0], scale: 1 } }], views: {
+    city: { type: '3d', heightReference: 'ellipsoid', camera: { position: [116.391, 39.907, 2500], heading: 0, pitch: -45, roll: 0 } }
+  } }
+  await page.route('**/scene-model.json', route => route.request().isNavigationRequest() ? route.continue() : route.fulfill({ json: scene }))
+  const modelResponse = page.waitForResponse(response => response.url().endsWith('/city-sample/tower.glb'))
+  await page.goto('/?scene=./scene-model.json')
+  expect((await modelResponse).ok()).toBe(true)
+  await expect(page.locator('#scene-status')).toHaveText('三维场景已加载', { timeout: 30_000 })
+  await expect(page.locator('.cesium-widget canvas')).toBeVisible()
+  const toggle = page.locator('#layer-list input')
+  await expect(toggle).toBeChecked()
+  await toggle.uncheck()
+  await expect(toggle).not.toBeChecked()
+  await toggle.check()
+  await expect(toggle).toBeChecked()
+})
+
 test('Viewer reports retained unsupported objects and load failures', async ({ page }) => {
   const scene = { version: 3, id: 'mixed', title: 'Mixed', activeView: 'map', views: { map: { type: '2d', ...view } }, resources: { model: { type: 'glb', url: './model.glb' } }, nodes: [{ type: 'model', id: 'model', name: 'Model', visible: true, resource: 'model', position: [0, 0, 0], transform: { translation: [0, 0, 0], rotation: [0, 0, 0], scale: 1 } }] }
   await page.route('**/fixtures/scene.json', route => route.fulfill({ json: scene }))
