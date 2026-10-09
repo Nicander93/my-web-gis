@@ -11,12 +11,12 @@ vi.mock('cesium', async original => ({ ...await original<typeof import('cesium')
   Resource: class { constructor(readonly options: { url: string }) {} },
   EllipsoidTerrainProvider: class {},
   buildModuleUrl: () => 'https://local.test/cesium/Assets/Textures/NaturalEarthII',
-  TileMapServiceImageryProvider: { fromUrl: async () => ({}) }
+  TileMapServiceImageryProvider: { fromUrl: async () => { await preparationProbe.environment; return {} } }
 }))
 vi.mock('@desktop-webgis/cesium-layer', async original => {
   const actual = await original<typeof import('@desktop-webgis/cesium-layer')>()
   return { ...actual, TilesetLayer: class extends actual.TilesetLayer {
-    protected async createNative(): Promise<() => void> { probe.created++; await probe.nativeGate; return () => { probe.released++ } }
+    protected async createNative(): Promise<() => void> { probe.created++; preparationProbe.visibility.push(this.show); await (preparationProbe.gates.length ? preparationProbe.gates.shift() : probe.nativeGate); return () => { probe.released++ } }
   }, GeoJsonLayer: class extends actual.GeoJsonLayer {
     protected async createNative(): Promise<() => void> { return () => {} }
   } }
@@ -28,11 +28,13 @@ vi.mock('@desktop-webgis/cesium-tileset-edit', () => ({ TilesetEditor: class {
 } }))
 beforeEach(() => { probe.created = 0; probe.released = 0; probe.nativeGate = undefined; probe.editors = []; vi.stubGlobal('document', { baseURI: 'https://local.test/' }); vi.stubGlobal('CESIUM_BASE_URL', 'https://local.test/cesium/') })
 afterEach(() => vi.unstubAllGlobals())
+const preparationProbe = vi.hoisted(() => ({ gates: [] as Promise<void>[], visibility: [] as boolean[], environment: undefined as Promise<void> | undefined }))
+beforeEach(() => { preparationProbe.gates = []; preparationProbe.visibility = []; preparationProbe.environment = undefined })
 function setup() {
   const scene = createCityScene()
   scene.assets.blocks = { type: '3dtiles', url: './city/tileset.json' }
   scene.nodes.push({ id: 'blocks', name: 'Blocks', type: '3dtiles', asset: 'blocks', visible: true, transform: createTransform() })
-  const viewer = { canvas: {}, isDestroyed: () => false, destroy: vi.fn(), scene: { requestRender: vi.fn(), fog: { density: 0, enabled: false }, postProcessStages: { bloom: { enabled: false } } }, imageryLayers: { addImageryProvider: vi.fn(), remove: vi.fn() } } as unknown as Viewer
+  const viewer = { canvas: {}, isDestroyed: () => false, destroy: vi.fn(), camera: { setView: vi.fn() }, scene: { requestRender: vi.fn(), fog: { density: 0, enabled: false }, postProcessStages: { bloom: { enabled: false } } }, imageryLayers: { addImageryProvider: vi.fn(), remove: vi.fn() } } as unknown as Viewer
   return { scene, viewer, runtime: new CitySceneRuntime(viewer, { target: 'map', scene }) }
 }
 describe('incremental scene reconciliation', () => {
@@ -222,5 +224,99 @@ describe('incremental scene reconciliation', () => {
     expect(s.viewer.scene.globe.enableLighting).toBe(false)
     expect(JulianDate.equals(s.viewer.clock.currentTime, originalTime)).toBe(true)
     expect(s.viewer.destroy).not.toHaveBeenCalled()
+  })
+})
+
+describe('prepared scene replacement', () => {
+  it('keeps old content while candidates load hidden, then adopts them without a second load', async () => {
+    const s = setup(); await s.runtime.updateScene(s.scene)
+    const previous = s.runtime.layers.getLayer('blocks'), terrain = s.viewer.terrainProvider
+    const incoming = structuredClone(s.scene); incoming.effects.fog = 0.1
+    let release!: () => void
+    probe.nativeGate = new Promise(resolve => { release = resolve })
+    const pending = s.runtime.replaceScene(incoming)
+    expect(preparationProbe.visibility.at(-1)).toBe(false)
+    expect(s.runtime.layers.getLayer('blocks')).toBe(previous)
+    expect(s.viewer.terrainProvider).toBe(terrain)
+    expect(s.viewer.scene.fog.density).toBe(0)
+    release(); await pending
+    expect(s.runtime.layers.getLayer('blocks')).not.toBe(previous)
+    expect(s.runtime.layers.getLayer('blocks')?.show).toBe(true)
+    expect(probe.created).toBe(2)
+    expect(probe.released).toBe(1)
+    expect(s.viewer.scene.fog.density).toBe(0.0002)
+    s.runtime.destroy()
+  })
+
+  it('releases partially prepared candidates when another resource fails and leaves the old scene intact', async () => {
+    const s = setup(); await s.runtime.updateScene(s.scene)
+    const previous = s.runtime.layers.getLayer('blocks')
+    const incoming = structuredClone(s.scene)
+    incoming.nodes.push({ ...incoming.nodes[0], id: 'second' })
+    preparationProbe.gates = [Promise.resolve(), Promise.reject(new Error('Missing resource'))]
+    await expect(s.runtime.replaceScene(incoming)).rejects.toThrow('Missing resource')
+    expect(s.runtime.layers.layers).toEqual([previous])
+    expect(previous?.state).toBe('ready')
+    expect(probe.released).toBe(1)
+    s.runtime.destroy()
+  })
+
+  it('does not change environment or camera on preparation failure', async () => {
+    const s = setup(); await s.runtime.updateScene(s.scene)
+    const previous = s.runtime.layers.getLayer('blocks'), terrain = s.viewer.terrainProvider
+    const incoming = structuredClone(s.scene); incoming.effects.fog = 0.2
+    preparationProbe.environment = Promise.reject(new Error('Environment unavailable'))
+    await expect(s.runtime.replaceScene(incoming)).rejects.toThrow('Environment unavailable')
+    expect(s.runtime.layers.getLayer('blocks')).toBe(previous)
+    expect(s.viewer.terrainProvider).toBe(terrain)
+    expect(s.viewer.scene.fog.density).toBe(0)
+    expect(s.viewer.camera.setView).not.toHaveBeenCalled()
+    s.runtime.destroy()
+  })
+
+  it('rejects obsolete resources after a newer replacement commits', async () => {
+    const s = setup(); await s.runtime.updateScene(s.scene)
+    let release!: () => void
+    probe.nativeGate = new Promise(resolve => { release = resolve })
+    const first = s.runtime.replaceScene(s.scene)
+    const rejected = expect(first).rejects.toMatchObject({ name: 'AbortError' })
+    probe.nativeGate = undefined
+    const next = { ...s.scene, nodes: [], effects: { fog: 0.3, bloom: false } }
+    await s.runtime.replaceScene(next)
+    release(); await rejected
+    expect(s.runtime.layers.layers).toEqual([])
+    expect(s.viewer.scene.fog.density).toBe(0.0006)
+    expect(probe.released).toBe(2)
+    s.runtime.destroy()
+  })
+
+  it('retains the latest legacy edit when it cancels a pending replacement', async () => {
+    const s = setup(); await s.runtime.updateScene(s.scene)
+    const previous = s.runtime.layers.getLayer('blocks')
+    let release!: () => void
+    probe.nativeGate = new Promise(resolve => { release = resolve })
+    const pending = s.runtime.replaceScene(s.scene)
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    s.scene.nodes[0].visible = false
+    await s.runtime.updateScene(s.scene)
+    release(); await rejected
+    expect(s.runtime.layers.getLayer('blocks')).toBe(previous)
+    expect(previous?.show).toBe(false)
+    s.runtime.destroy()
+  })
+
+  it('releases late candidates after external cancellation or destruction', async () => {
+    for (const destroy of [false, true]) {
+      const s = setup(); await s.runtime.updateScene(s.scene)
+      const previous = s.runtime.layers.getLayer('blocks')
+      let release!: () => void
+      probe.nativeGate = new Promise(resolve => { release = resolve })
+      const abort = new AbortController(), pending = s.runtime.replaceScene(s.scene, abort.signal)
+      const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+      if (destroy) s.runtime.destroy(); else abort.abort()
+      release(); await rejected
+      if (!destroy) expect(s.runtime.layers.getLayer('blocks')).toBe(previous)
+      s.runtime.destroy(); probe.nativeGate = undefined
+    }
   })
 })

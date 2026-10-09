@@ -38,7 +38,8 @@ export class WaterLayer extends BaseLayer {
     const primitive = new Primitive({
       geometryInstances: new GeometryInstance({ id: this.id, geometry: new PolygonGeometry({ polygonHierarchy: new PolygonHierarchy(this.options.boundary.map(p => Cartesian3.fromDegrees(p[0], p[1], this.options.height))), height: this.options.height, vertexFormat: MaterialAppearance.MaterialSupport.TEXTURED.vertexFormat }) }),
       appearance: new MaterialAppearance({ material, faceForward: true, translucent: true }),
-      asynchronous: false
+      asynchronous: false,
+      show: this.show
     })
     this.material = material; this.primitive = primitive
     viewer.scene.primitives.add(primitive)

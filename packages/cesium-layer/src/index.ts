@@ -77,6 +77,7 @@ export class TilesetLayer extends AssetLayer {
     this.tileset = tileset
     this.originalMatrix = Matrix4.clone(tileset.modelMatrix)
     this.pivot = Cartesian3.clone(tileset.boundingSphere.center)
+    tileset.show = this.show
     viewer.scene.primitives.add(tileset)
     this.setTransform(this.transform)
     this.setHighlighted(this.highlighted)
@@ -119,6 +120,7 @@ export class ModelLayer extends AssetLayer {
     if (signal.aborted || viewer.isDestroyed()) { model.destroy(); return () => {} }
     this.model = model; this.originalMatrix = base; this.pivot = pivot
     this.setHighlighted(this.highlighted)
+    model.show = this.show
     viewer.scene.primitives.add(model)
     const release = () => {
       if (this.highlightTarget === model) { this.highlightTarget = undefined; this.previousColor = undefined }
@@ -175,6 +177,7 @@ export class GeoJsonLayer extends BaseLayer {
     const color = Color.fromCssColorString(this.options.color ?? '#55a6ff')
     const source = await GeoJsonDataSource.load(this.options.data, { clampToGround: true, stroke: color, fill: color.withAlpha(0.35), markerColor: color })
     if (signal.aborted || viewer.isDestroyed()) return () => {}
+    source.show = this.show
     await viewer.dataSources.add(source)
     if (signal.aborted || viewer.isDestroyed()) { if (!viewer.isDestroyed()) viewer.dataSources.remove(source, true); return () => {} }
     this.dataSource = source
@@ -217,6 +220,21 @@ export class LayerCollection {
   }
   get layers(): BaseLayer[] { return [...this.registry.values()] }
   getLayer(id: string): BaseLayer | undefined { return this.registry.get(id) }
+  /** Adopt already-ready layers on this viewer; validation leaves current ownership untouched. */
+  replaceMountedLayers(layers: readonly BaseLayer[]): void {
+    if (this.destroyed) throw new Error('LayerCollection 已销毁')
+    const ids = new Set<string>()
+    for (const layer of layers) {
+      if (ids.has(layer.id)) throw new Error(`重复图层 ID：${layer.id}`)
+      if (!layer.isMountedOn(this.viewer)) throw new Error(`图层 ${layer.id} 未在当前 Viewer 就绪`)
+      ids.add(layer.id)
+    }
+    const previous = this.layers
+    this.registry.clear()
+    layers.forEach(layer => this.registry.set(layer.id, layer))
+    previous.forEach(layer => { if (!layers.includes(layer)) layer.unmount() })
+    if (!this.viewer.isDestroyed()) this.viewer.scene.requestRender()
+  }
   async addLayer<T extends BaseLayer>(layer: T): Promise<T> {
     if (this.destroyed) throw new Error('LayerCollection 已销毁')
     if (this.registry.has(layer.id)) throw new Error(`重复图层 ID：${layer.id}`)
