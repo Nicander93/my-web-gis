@@ -166,3 +166,7 @@
 - 构建并 pack cesium-scene-schema、scene-schema、scene-core，在独立 workspace 从 tarball 离线安装完整依赖链。
 - Node 运行验证 Schema 文件导出、资源准备、合并、完整文档重新解析及无 workspace 协议泄漏；严格 NodeNext TypeScript 声明消费通过。
 - 新增可重复生成消费者的脚本和执行文档。仅证明这三个包的内容 API 消费，不代替 OL/Cesium 渲染、其他候选包、兼容矩阵或许可证门槛。
+# 资源准备与取消真实浏览器路径
+
+- Chrome 菜单／文件选择／下载路径覆盖远程 GeoJSON 准备成功并导出内嵌数据、HTTP 503 失败保留原空项目、加载中菜单取消、完整过滤前数据导出与撤销重做。
+- 三种窗口尺寸共 12 项通过，未用直接写 Store 代替交互；网络使用受控响应，尚不证明真实服务或原生文件目录验收。
