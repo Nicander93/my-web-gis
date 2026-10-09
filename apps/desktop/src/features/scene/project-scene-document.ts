@@ -131,6 +131,9 @@ export function createProjectSceneProjection(snapshot: ProjectSnapshot): Project
     hostCityNodeIds.set(documentId, node.id)
   })
   const document = parseSceneDocument({ version: 3, id: project.id, title: project.name, resources, nodes: [...nodes, ...city?.nodes ?? []],
+    ...(project.description === undefined ? {} : { description: project.description }),
+    ...(project.metadata === undefined ? {} : { metadata: structuredClone(project.metadata) }),
+    ...structuredClone(project.sceneDisplay ?? {}),
     views: { map: { type: '2d', projection: project.crs, ...project.mapState }, ...city?.views }, activeView: city && getProjectType(project) === '3d' ? 'city' : 'map',
     ...(city?.environment ? { environment: city.environment } : {}), ...(Object.keys(credentials).length ? { credentials } : {}) })
   return { document, cityNodeIds, hostCityNodeIds, cityResourceIds, hostCityResourceIds }
@@ -178,9 +181,17 @@ export function createProjectFromSceneDocument(input: unknown): ProjectSnapshot 
   const mapViews = Object.values(document.views).filter(view => view.type === '2d')
   const cityViews = Object.values(document.views).filter(view => view.type === '3d')
   if (mapViews.length > 1 || cityViews.length > 1) throw new Error('当前工程只支持每种引擎一个初始视图')
-  if (document.presentation || document.widgets || document.theme || document.metadata) throw new Error('当前工程尚未保存场景展示配置或扩展元数据，请保留原始文档')
   const project = createProject(document.title), featuresByDataset: ProjectSnapshot['featuresByDataset'] = Object.create(null)
   project.id = document.id
+  if (document.description !== undefined) project.description = document.description
+  if (document.metadata !== undefined) project.metadata = structuredClone(document.metadata)
+  if (document.widgets !== undefined || document.theme !== undefined || document.presentation !== undefined) {
+    project.sceneDisplay = {
+      ...(document.widgets === undefined ? {} : { widgets: structuredClone(document.widgets) }),
+      ...(document.theme === undefined ? {} : { theme: structuredClone(document.theme) }),
+      ...(document.presentation === undefined ? {} : { presentation: structuredClone(document.presentation) }),
+    }
+  }
   project.settings.workspaceType = document.views[document.activeView].type
   const view = mapViews[0]
   if (view && (view.extent !== undefined || view.minZoom !== undefined || view.maxZoom !== undefined)) throw new Error('当前工程尚不支持保存二维视图约束，不能静默丢弃')

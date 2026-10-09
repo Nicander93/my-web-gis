@@ -12,6 +12,7 @@
   "dependencies": {
     "@desktop-webgis/cesium-scene-schema": "workspace:*",
     "@desktop-webgis/ol-style": "workspace:*",
+    "@desktop-webgis/scene-schema": "workspace:*",
     "@turf/boolean-valid": "7.3.4",
     "@turf/buffer": "7.3.4",
     "@turf/centroid": "7.3.4",
