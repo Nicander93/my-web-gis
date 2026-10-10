@@ -1,12 +1,12 @@
 import proj4 from 'proj4'
 import type { CrsInfo } from './types.js'
 import type { GeoJsonGeometry } from '@desktop-webgis/scene-schema'
+import { registerCrsPresets } from './crs-presets.js'
 
 const WGS84 = 'EPSG:4326'
 const WEB_MERCATOR = 'EPSG:3857'
 
-proj4.defs(WGS84, '+proj=longlat +datum=WGS84 +no_defs')
-proj4.defs(WEB_MERCATOR, '+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs')
+registerCrsPresets()
 
 export interface TransformResult {
   success: boolean

@@ -1,8 +1,8 @@
 import { stringifyGeoJson, type GisFeature } from '@desktop-webgis/gis-core'
-import { featuresToCsv, pointsToCoordinateCsv } from '@desktop-webgis/vector-io'
+import { featuresToCsv, pointsToCoordinateCsv, type CrsPresetCode } from '@desktop-webgis/vector-io'
 
 export type ExportFormat = 'geojson' | 'csv' | 'coordinate-csv'
-export type CoordinateExportCrs = 'EPSG:4326' | 'EPSG:3857'
+export type CoordinateExportCrs = CrsPresetCode
 
 /** Serialize an export snapshot before opening the save picker; exported coordinates never enter the project store. */
 export function serializeVectorExport(features: GisFeature[], format: ExportFormat, targetCrs: CoordinateExportCrs): { content: string; extension: string } {
