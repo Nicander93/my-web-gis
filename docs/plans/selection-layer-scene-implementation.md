@@ -1,0 +1,53 @@
+# 选择、图层与场景 API 实施记录
+
+日期：2026-10-08。对应[完整计划](selection-layer-scene-public-api.md)。目标保持 S00–S10 全部范围；此记录不是缩减后的完成声明。
+
+## 首批实现：163d688
+
+代码提交：`163d688`（`feat: extract controlled OL selection and link box selection to table`）。未推送。
+
+| 阶段 | 当前证据 | 尚需完成 |
+| --- | --- | --- |
+| S00 | 选择身份为 layerKey＋typed featureId；工作台仍使用字符串 ID；普通替换／Shift 追加／Alt 移除；同像素命中保留当前目标层的全部结果；已选中行普通单击幂等，Ctrl／勾选显式切换 | 旧协议与复杂场景样本基线、完整包依赖矩阵、锁定对象语义及其他协议决策 |
+| S01 | 独立 ol-selection、框选、真实几何精筛、旋转／孔洞／世界副本、空间索引、宿主确认、持续高亮、源变动／Esc／失焦取消、释放；独立生命周期与 tarball JS／类型检查；图层及父分组 extent 精确裁剪、多部件／集合／圆的纯几何回归 | 裁剪范围的真实浏览器集成、更多复杂／坏几何、目标切换／晚到事件、浏览器大数据与原生验收；当前为 private 候选，未通过完整公开门槛 |
+| S02 | OlSelectionRuntime 成为薄适配；Store 过滤后的集合反馈高亮；框选绑定属性表、清搜索／页码、只看选中；工具停用保留高亮，销毁显式释放 | 全量过滤／刷新／删除和绘制／修改互斥组合、异步 WFS／隐藏分组及中途切目标交互证据 |
+| S03 | 只读双击／Enter／单条按钮定位；可编辑单元格仍用于编辑；选择菜单批量定位全部选中；零结果状态／分页 | 表格行菜单、选中集合跨页定位、键盘编辑冲突、样式草稿保护的新增针对性证据；原生路径 |
+| S04–S10 | 原有 schema／runtime／IO 与消费脚本保留 | 统一协议 RFC 与实际迁移、OL／Cesium 工厂收敛、内容真源、完整场景／资源包导入导出、Viewer 一致性、各候选包的签收门槛 |
+
+现有公共包候选审查已经写在计划第 10 节。不能因选择包 tarball 检查通过，就将 ogc-io、vector-io、spatial-analysis 或其他场景包标为可公开消费。
+
+## 验证
+
+| 命令／路径 | 本轮结果 | 覆盖边界 |
+| --- | --- | --- |
+| `pnpm --filter @desktop-webgis/ol-selection build` | 通过 | 类型声明和 ESM 编译 |
+| `pnpm --filter @desktop-webgis/ol-selection test` | 6 通过 | ID／集合、线 bbox 误命中、孔洞／边界、旋转／世界副本、索引粗筛不全量扫描 |
+| `pnpm --filter @desktop-webgis/ol-runtime test` | 18 通过 | 原要素适配、注册、编辑捕捉、可见要素和 WMS／WMTS 请求 |
+| `pnpm --filter @desktop-webgis/desktop test` | 149 通过、5 跳过 | 现有 Store／工作台／数据与编辑规则；跳过的是独立平台验证 |
+| `pnpm --filter @desktop-webgis/desktop build` | 通过 | 最终 Desktop 编译；原有大 chunk 和混合动态／静态 import 提示仍在 |
+| `playwright test selection.e2e.ts` | 最终串行运行 12 通过 | 三种尺寸真实拖框、Shift／Alt、空集合、双击、Esc、主动点击、切平移、独立控制器资源释放 |
+| `playwright test workbench.e2e.ts` | 27 通过 | 起始页、CSV、Help、分页／选择、过滤／草稿、编辑目标、处理、三维工作台 |
+| `pnpm --filter @desktop-webgis/ol-selection verify:consumer` | 通过 | OS 临时目录独立 tarball 安装，Node 无 DOM 导入、几何 smoke、NodeNext 类型；OL 10.10.0 |
+| `git diff --check` | 通过 | 本轮文本空白检查 |
+
+浏览器使用 `C:/Program Files/Google/Chrome/Application/chrome.exe`，配置启用 SwiftShader；窗口为 1024×680、1440×900、1920×1080。OSM 请求主动中止，因此这些结果不证明联网底图或原生 GPU 渲染通过。未进行新的 Windows Tauri 文件／窗口／DPI 验收。
+
+默认 Playwright 缓存不存在，最初两项启动失败。独立消费 fixture 最初缺少直接 devDependency，已补全。新增零集合场景揭示选中数为零时不显示计数，已修正。一次同时进行构建／pack 的开发服务器验收出现动态观察模块返回 null；停止产物重写后串行重跑 12 项全部通过。以后 E2E 与重写 dist 的构建／pack 顺序执行，避免 HMR 干扰。
+
+浏览器 fixture 不写 Store 来伪造选择：数据经文件输入和确认导入，选择／拖框／取消／定位通过真实鼠标或键盘；只读取真实运行时来获得像素和最终状态。独立 lifecycle fixture 只消费 OL 与选择包，不消费工作台 Store。
+
+## 点数据性能基线
+
+命令：`pnpm --filter @desktop-webgis/ol-selection benchmark`。单次测量，Windows x64、Node v24.11.0、Intel Core i5-14600KF、OL 10.10.0。
+
+| 点数 | 命中候选／结果 | 源构建 ms | 索引＋精筛 ms | 集合移除 ms |
+| --- | --- | --- | --- | --- |
+| 1,000 | 11／11 | 6.69 | 0.73 | 0.36 |
+| 10,000 | 110／110 | 40.90 | 0.57 | 1.24 |
+| 100,000 | 121／121 | 285.07 | 0.43 | 8.90 |
+
+这只覆盖 Node 点 Source／索引／几何和集合运算，不包含浏览器绘制、复杂线面、全部选中时的高亮开销或真实用户端到端延迟。不能据此宣称十万要素 UI 验收完成。
+
+## 下一步与完整完成判定
+
+继续补齐 S01–S03 剩余矩阵，同时准备 S04 的真实旧二维／三维样本和 schema 迁移。阶段完成必须按 T01–T24 对照源码、测试和交互证据签收；完整目标仍包括统一场景内容真源、双引擎图层工厂、全场景／资源包往返、Viewer 和每个公共候选的消费证据。当前不满足完整完成条件。
