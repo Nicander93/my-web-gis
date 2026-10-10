@@ -1,20 +1,41 @@
-import { FolderPlus, Layers2, PanelBottom, PanelRight, Search } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import {
+  FolderPlus,
+  Layers2,
+  PanelBottom,
+  PanelRight,
+  Search
+} from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/Button'
 import { BottomPanel } from './BottomPanel'
 import { LeftPanel } from './LeftPanel'
 import { RightPanel } from './RightPanel'
 import { viewCommands } from './commands/view.commands'
-import { layerCommands } from './commands/layer.commands'
+import { layerCommands, getLayerCapabilities } from './commands/layer.commands'
 import { useProjectStore } from '@/stores/project.store'
 import { AttributeTable } from '@/features/attribute-table/AttributeTable'
 import { Inspector } from '@/features/inspector/Inspector'
 import { LayerPanel } from '@/features/layers/LayerPanel'
 import { MapCanvas } from '@/features/map/MapCanvas'
 import { useWorkspaceStore } from '@/stores/workspace.store'
+import { useWorkbenchStore } from '@/stores/workbench.store'
+import { cancelMapOperation } from '@/features/map/map-runtime-host'
+import { emitCommandStatus } from './commands/status'
 
 /** Reserve visible map space for open panels so navigation stays reachable. */
-export function Workspace() {
+export function Workspace({
+  processing,
+  onCloseProcessing
+}: {
+  processing?: ReactNode
+  onCloseProcessing?: () => void
+}) {
+  const project = useProjectStore((state) => state.project)
+  const inspectorId = useWorkbenchStore((state) => state.inspectorLayerId)
+  const tableId = useWorkbenchStore((state) => state.tableLayerId)
+  const inspectorLayer = project.layers.find(
+    (layer) => layer.id === inspectorId
+  )
   const [layerSearchOpen, setLayerSearchOpen] = useState(false)
   const layerSearchButtonRef = useRef<HTMLButtonElement>(null)
   const left = useWorkspaceStore((state) => state.left)
@@ -25,6 +46,22 @@ export function Workspace() {
 
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent): void {
+      if (
+        event.key === 'Escape' &&
+        !event.defaultPrevented &&
+        !(
+          event.target instanceof HTMLElement &&
+          event.target.closest(
+            'input, textarea, select, [role="dialog"], [role="menu"], [role="region"]'
+          )
+        )
+      ) {
+        if (cancelMapOperation()) {
+          event.preventDefault()
+          emitCommandStatus('已取消当前操作；已完成的修改可通过撤销恢复')
+        }
+        return
+      }
       const mod = event.ctrlKey || event.metaKey
       if (!mod || !event.shiftKey) return
       const key = event.key.toLowerCase()
@@ -61,23 +98,46 @@ export function Workspace() {
 
   return (
     <main className="workspace" aria-label="GIS Workspace">
-      <MapCanvas leftOffset={leftOffset} rightOffset={rightOffset} bottomOffset={bottom.open ? bottom.height : 0} />
-      <LeftPanel actions={
-        <>
-          <button ref={layerSearchButtonRef} type="button" className="ui-button ui-button-icon" title="搜索图层"
-            aria-label="搜索图层" aria-expanded={layerSearchOpen} onClick={() => setLayerSearchOpen((open) => !open)}>
-            <Search size={15} />
-          </button>
-          <Button variant="icon" title="新建组" aria-label="新建组" onClick={() => {
-            const selected = useProjectStore.getState().selectedLayerId
-            layerCommands.createGroup('新建组', selected ? [selected] : [])
-          }}><FolderPlus size={15} /></Button>
-        </>
-      }>
-        <LayerPanel searchOpen={layerSearchOpen} onCloseSearch={() => {
-          setLayerSearchOpen(false)
-          layerSearchButtonRef.current?.focus()
-        }} />
+      <MapCanvas
+        leftOffset={leftOffset}
+        rightOffset={rightOffset}
+        bottomOffset={bottom.open ? bottom.height : 0}
+      />
+      <LeftPanel
+        actions={
+          <>
+            <button
+              ref={layerSearchButtonRef}
+              type="button"
+              className="ui-button ui-button-icon"
+              title="搜索图层"
+              aria-label="搜索图层"
+              aria-expanded={layerSearchOpen}
+              onClick={() => setLayerSearchOpen((open) => !open)}
+            >
+              <Search size={15} />
+            </button>
+            <Button
+              variant="icon"
+              title="新建组"
+              aria-label="新建组"
+              onClick={() => {
+                const selected = useProjectStore.getState().selectedLayerId
+                layerCommands.createGroup('新建组', selected ? [selected] : [])
+              }}
+            >
+              <FolderPlus size={15} />
+            </Button>
+          </>
+        }
+      >
+        <LayerPanel
+          searchOpen={layerSearchOpen}
+          onCloseSearch={() => {
+            setLayerSearchOpen(false)
+            layerSearchButtonRef.current?.focus()
+          }}
+        />
       </LeftPanel>
       {!left.open && (
         <Button
@@ -90,8 +150,37 @@ export function Workspace() {
           <Layers2 size={15} />
         </Button>
       )}
-      <RightPanel>
-        <Inspector />
+      <RightPanel
+        title={processing ? '空间处理' : '图层属性'}
+        actions={
+          !processing && (
+            <label className="target-picker">
+              对象
+              <select
+                aria-label="配置图层"
+                value={inspectorId ?? ''}
+                onChange={(event) =>
+                  layerCommands.properties(event.target.value)
+                }
+              >
+                <option value="" disabled>
+                  选择图层
+                </option>
+                {project.layers.map((layer) => (
+                  <option key={layer.id} value={layer.id}>
+                    {layer.name}
+                  </option>
+                ))}
+              </select>
+              {inspectorLayer && (
+                <span className="target-bound-label">固定目标</span>
+              )}
+            </label>
+          )
+        }
+        onClose={processing ? onCloseProcessing : undefined}
+      >
+        {processing || <Inspector key={inspectorId} />}
       </RightPanel>
       {!right.open && (
         <Button
@@ -99,13 +188,39 @@ export function Workspace() {
           variant="icon"
           title="恢复检查器"
           aria-label="恢复检查器"
-          onClick={() => useWorkspaceStore.getState().restoreRight()}
+          onClick={viewCommands.toggleInspector}
         >
           <PanelRight size={15} />
         </Button>
       )}
       <BottomPanel leftOffset={leftOffset} rightOffset={rightOffset}>
-        <AttributeTable />
+        <AttributeTable
+          key={tableId}
+          onClose={() => useWorkspaceStore.getState().setBottomOpen(false)}
+          targetPicker={
+            <select
+              className="table-target-picker"
+              aria-label="属性表图层"
+              value={tableId ?? ''}
+              onChange={(event) =>
+                layerCommands.openAttributeTable(event.target.value)
+              }
+            >
+              <option value="" disabled>
+                选择图层
+              </option>
+              {project.layers
+                .filter(
+                  (layer) => getLayerCapabilities(layer.id).canAttributeTable
+                )
+                .map((layer) => (
+                  <option key={layer.id} value={layer.id}>
+                    {layer.name}
+                  </option>
+                ))}
+            </select>
+          }
+        />
       </BottomPanel>
       {!bottom.open && (
         <Button
@@ -113,7 +228,7 @@ export function Workspace() {
           variant="icon"
           title="恢复属性表"
           aria-label="恢复属性表"
-          onClick={() => useWorkspaceStore.getState().restoreBottom()}
+          onClick={viewCommands.toggleAttributeTable}
         >
           <PanelBottom size={15} />
         </Button>

@@ -9,7 +9,14 @@ describe('view commands', () => {
       setItem: () => undefined,
       removeItem: () => undefined
     }
-    vi.stubGlobal('window', Object.assign(new EventTarget(), { localStorage: storage, innerWidth: 1920, innerHeight: 1080 }))
+    vi.stubGlobal(
+      'window',
+      Object.assign(new EventTarget(), {
+        localStorage: storage,
+        innerWidth: 1920,
+        innerHeight: 1080
+      })
+    )
     vi.stubGlobal('localStorage', storage)
     useWorkspaceStore.setState({
       left: { open: false, width: 330 },
@@ -22,7 +29,8 @@ describe('view commands', () => {
 
   it('reports the state after toggling a panel', () => {
     const messages: string[] = []
-    const listener = (event: Event) => messages.push((event as CustomEvent<string>).detail)
+    const listener = (event: Event) =>
+      messages.push((event as CustomEvent<string>).detail)
     window.addEventListener('desktop-webgis:command-status', listener)
 
     viewCommands.toggleLayers()
@@ -72,7 +80,7 @@ describe('view commands', () => {
     expect(afterExit.savedLayout).toBeNull()
   })
 
-  it('resets layout to new defaults with right panel open', () => {
+  it('resets layout to map-first defaults with right panel closed', () => {
     useWorkspaceStore.setState({
       left: { open: false, width: 400 },
       right: { open: false, width: 500 },
@@ -83,8 +91,8 @@ describe('view commands', () => {
 
     const state = useWorkspaceStore.getState()
     expect(state.left).toEqual({ open: true, width: 260 })
-    expect(state.right).toEqual({ open: true, width: 300 })
-    expect(state.bottom).toEqual({ open: false, height: 240 })
+    expect(state.right).toEqual({ open: false, width: 320 })
+    expect(state.bottom).toEqual({ open: false, height: 280 })
   })
 
   it('constrains panel sizes when window shrinks to prevent map squeeze', () => {
@@ -94,11 +102,18 @@ describe('view commands', () => {
       bottom: { open: true, height: 300 }
     })
 
-    vi.stubGlobal('window', Object.assign(new EventTarget(), { 
-      localStorage: { getItem: () => null, setItem: () => undefined, removeItem: () => undefined },
-      innerWidth: 800,
-      innerHeight: 600 
-    }))
+    vi.stubGlobal(
+      'window',
+      Object.assign(new EventTarget(), {
+        localStorage: {
+          getItem: () => null,
+          setItem: () => undefined,
+          removeItem: () => undefined
+        },
+        innerWidth: 800,
+        innerHeight: 600
+      })
+    )
 
     useWorkspaceStore.getState().constrainPanelSizes()
 

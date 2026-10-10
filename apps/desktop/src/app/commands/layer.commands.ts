@@ -3,13 +3,19 @@ import { projectCommands } from './project.commands'
 import { useWorkspaceStore } from '@/stores/workspace.store'
 import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
+import { useWorkbenchStore } from '@/stores/workbench.store'
 import {
   isMapRuntimeMounted,
   retryMapServiceLayer,
   zoomMapToLayer
 } from '@/features/map/map-runtime-host'
 import { refreshWfsLayer } from '@/services/wfs-commands'
-import { capabilitiesForDataset, cloneValue, isLegacyStyle, migrateLegacyStyle } from '@desktop-webgis/gis-core'
+import {
+  capabilitiesForDataset,
+  cloneValue,
+  isLegacyStyle,
+  migrateLegacyStyle
+} from '@desktop-webgis/gis-core'
 import type { LayerStyle } from '@desktop-webgis/ol-style'
 
 interface StyleConfigOp {
@@ -76,11 +82,17 @@ export function getLayerCapabilities(layerId: string | null): {
   const state = useProjectStore.getState()
   const layer = state.project.layers.find((item) => item.id === layerId)
   if (!layer) return empty
-  const dataset = state.project.datasets.find((item) => item.id === layer.datasetId)
+  const dataset = state.project.datasets.find(
+    (item) => item.id === layer.datasetId
+  )
   const flags = capabilitiesForDataset(dataset)
   const isVector = dataset?.kind === 'vector'
-  const isService = dataset?.kind === 'wms' || dataset?.kind === 'wmts' || dataset?.kind === 'wfs'
-  const hasFeatures = (state.featuresByDataset[layer.datasetId]?.length ?? 0) > 0
+  const isService =
+    dataset?.kind === 'wms' ||
+    dataset?.kind === 'wmts' ||
+    dataset?.kind === 'wfs'
+  const hasFeatures =
+    (state.featuresByDataset[layer.datasetId]?.length ?? 0) > 0
   return {
     exists: true,
     isVector,
@@ -96,12 +108,50 @@ export function getLayerCapabilities(layerId: string | null): {
     canRename: true,
     canRemove: true,
     canZoom: true,
-    canRetry: dataset?.kind === 'wms' || dataset?.kind === 'wmts' || dataset?.kind === 'wfs'
+    canRetry:
+      dataset?.kind === 'wms' ||
+      dataset?.kind === 'wmts' ||
+      dataset?.kind === 'wfs'
   }
+}
+
+/** 配置目标变化前处理未应用草稿，浏览图层不触发配置切换。 */
+function openInspector(id: string, tab: 'layer' | 'style' | 'label'): void {
+  const workbench = useWorkbenchStore.getState()
+  const previous = workbench.inspectorLayerId
+  if (
+    previous &&
+    previous !== id &&
+    useSessionStore.getState().getLayerSession(previous).styleDraft?.dirty
+  ) {
+    workbench.setPendingInspector({ layerId: id, tab })
+    return
+  }
+  workbench.bindInspector(id)
+  useSessionStore.getState().setInspectorTab(id, tab)
+  useWorkspaceStore.getState().setRightOpen(true)
 }
 
 /** 图层相关命令，供 Header 按钮与 Layer Context Menu 共用。 */
 export const layerCommands = {
+  openProperties(layerId: string): void {
+    layerCommands.properties(layerId)
+  },
+  setEditingTarget(layerId: string): void {
+    if (!getLayerCapabilities(layerId).canEditGeometry) return
+    const workbench = useWorkbenchStore.getState()
+    if (workbench.editLayerId && workbench.editLayerId !== layerId) {
+      emitCommandStatus('请先结束当前图层编辑，再切换编辑目标')
+      return
+    }
+    workbench.setEditLayer(layerId)
+    emitCommandStatus('已设置编辑目标')
+  },
+  properties(layerId?: string | null): void {
+    const id = layerId ?? requireSelectedLayerId()
+    if (!id || !getLayerCapabilities(id).exists) return
+    openInspector(id, 'layer')
+  },
   zoomToLayer(layerId?: string | null): void {
     const id = layerId ?? useProjectStore.getState().selectedLayerId
     if (!id) {
@@ -148,7 +198,9 @@ export const layerCommands = {
       return
     }
     emitCommandStatus(
-      isMapRuntimeMounted() ? '服务图层重新加载失败' : '已请求重新加载服务图层（地图运行时未挂载）'
+      isMapRuntimeMounted()
+        ? '服务图层重新加载失败'
+        : '已请求重新加载服务图层（地图运行时未挂载）'
     )
   },
 
@@ -208,8 +260,7 @@ export const layerCommands = {
       return
     }
     useProjectStore.getState().setSelectedLayer(id)
-    useWorkspaceStore.getState().setRightOpen(true)
-    useSessionStore.getState().setInspectorTab(id, 'style')
+    openInspector(id, 'style')
     emitCommandStatus('已打开样式面板')
   },
 
@@ -222,8 +273,7 @@ export const layerCommands = {
       return
     }
     useProjectStore.getState().setSelectedLayer(id)
-    useWorkspaceStore.getState().setRightOpen(true)
-    useSessionStore.getState().setInspectorTab(id, 'label')
+    openInspector(id, 'label')
     emitCommandStatus('已打开标注面板')
   },
 
@@ -238,6 +288,7 @@ export const layerCommands = {
     useProjectStore.getState().setSelectedLayer(id)
     useWorkspaceStore.getState().setBottomOpen(true)
     emitCommandStatus('属性表已打开')
+    useWorkbenchStore.getState().bindTable(id)
   },
 
   openFilter(layerId?: string | null): void {
@@ -251,6 +302,8 @@ export const layerCommands = {
     useProjectStore.getState().setSelectedLayer(id)
     useWorkspaceStore.getState().setBottomOpen(true)
     emitCommandStatus('已打开属性表过滤')
+    useWorkbenchStore.getState().bindTable(id)
+    useSessionStore.getState().setAttributeTableState(id, { filterOpen: true })
   },
 
   /** Open export dialog in export mode (no copy primary). */
@@ -286,7 +339,9 @@ export const layerCommands = {
    */
   applyStyle(layerId: string, style: LayerStyle): boolean {
     const projectState = useProjectStore.getState()
-    const layer = projectState.project.layers.find((item) => item.id === layerId)
+    const layer = projectState.project.layers.find(
+      (item) => item.id === layerId
+    )
     if (!layer) {
       emitCommandStatus('图层不存在')
       return false
@@ -301,7 +356,9 @@ export const layerCommands = {
       dirty: false,
       classCount:
         after.mode === 'graduated' ? Math.max(after.breaks.length, 1) : 5,
-      colorRampId: useSessionStore.getState().getLayerSession(layerId).styleDraft?.colorRampId ?? 'BlueRed'
+      colorRampId:
+        useSessionStore.getState().getLayerSession(layerId).styleDraft
+          ?.colorRampId ?? 'BlueRed'
     })
 
     emitCommandStatus('已应用样式')
@@ -315,11 +372,15 @@ export const layerCommands = {
       emitCommandStatus('图层不存在')
       return
     }
-    const existing = useSessionStore.getState().getLayerSession(layerId).styleDraft
+    const existing = useSessionStore
+      .getState()
+      .getLayerSession(layerId).styleDraft
     useSessionStore.getState().setStyleDraft(layerId, {
       style: cloneValue(applied),
       dirty: false,
-      classCount: existing?.classCount ?? (applied.mode === 'graduated' ? Math.max(applied.breaks.length, 1) : 5),
+      classCount:
+        existing?.classCount ??
+        (applied.mode === 'graduated' ? Math.max(applied.breaks.length, 1) : 5),
       colorRampId: existing?.colorRampId ?? 'BlueRed'
     })
     emitCommandStatus('已重置样式草稿')

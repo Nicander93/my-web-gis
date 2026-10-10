@@ -2,6 +2,10 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 export interface WorkspaceState {
+  ribbonCategory: string
+  ribbonExpanded: boolean
+  setRibbonCategory(category: string): void
+  toggleRibbon(): void
   left: {
     open: boolean
     width: number
@@ -35,7 +39,8 @@ export interface WorkspaceState {
   constrainPanelSizes(): void
 }
 
-const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), max)
+const clamp = (value: number, min: number, max: number): number =>
+  Math.min(Math.max(value, min), max)
 
 function getBottomMaxHeight(): number {
   if (typeof window === 'undefined') return 720
@@ -50,28 +55,47 @@ function getMinMapWidth(): number {
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
     (set, get) => ({
+      ribbonCategory: 'edit',
+      ribbonExpanded: true,
+      setRibbonCategory: (ribbonCategory) => set({ ribbonCategory, ribbonExpanded: true }),
+      toggleRibbon: () => set(state => ({ ribbonExpanded: !state.ribbonExpanded })),
       left: { open: true, width: 260 },
-      right: { open: true, width: 300 },
-      bottom: { open: false, height: 240 },
+      right: { open: false, width: 320 },
+      bottom: { open: false, height: 280 },
       focusMode: false,
       savedLayout: null,
-      setLeftOpen: (open) => set((state) => ({ left: { ...state.left, open } })),
-      setLeftWidth: (width) => set((state) => ({ left: { ...state.left, width: clamp(width, 220, 380) } })),
-      setRightOpen: (open) => set((state) => ({ right: { ...state.right, open } })),
-      setRightWidth: (width) => set((state) => ({ right: { ...state.right, width: clamp(width, 260, 420) } })),
-      setBottomOpen: (open) => set((state) => ({ bottom: { ...state.bottom, open } })),
+      setLeftOpen: (open) =>
+        set((state) => ({ left: { ...state.left, open } })),
+      setLeftWidth: (width) =>
+        set((state) => ({
+          left: { ...state.left, width: clamp(width, 220, 380) }
+        })),
+      setRightOpen: (open) =>
+        set((state) => ({ right: { ...state.right, open } })),
+      setRightWidth: (width) =>
+        set((state) => ({
+          right: { ...state.right, width: clamp(width, 260, 420) }
+        })),
+      setBottomOpen: (open) =>
+        set((state) => ({ bottom: { ...state.bottom, open } })),
       setBottomHeight: (height) =>
         set((state) => ({
-          bottom: { ...state.bottom, height: clamp(height, 140, getBottomMaxHeight()) }
+          bottom: {
+            ...state.bottom,
+            height: clamp(height, 140, getBottomMaxHeight())
+          }
         })),
-      restoreLeft: () => set((state) => ({ left: { ...state.left, open: true } })),
-      restoreRight: () => set((state) => ({ right: { ...state.right, open: true } })),
-      restoreBottom: () => set((state) => ({ bottom: { ...state.bottom, open: true } })),
+      restoreLeft: () =>
+        set((state) => ({ left: { ...state.left, open: true } })),
+      restoreRight: () =>
+        set((state) => ({ right: { ...state.right, open: true } })),
+      restoreBottom: () =>
+        set((state) => ({ bottom: { ...state.bottom, open: true } })),
       resetLayout: () =>
         set({
           left: { open: true, width: 260 },
-          right: { open: true, width: 300 },
-          bottom: { open: false, height: 240 }
+          right: { open: false, width: 320 },
+          bottom: { open: false, height: 280 }
         }),
       enterFocusMode: () => {
         const state = get()
@@ -130,13 +154,20 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         const maxBottomHeight = getBottomMaxHeight()
         if (state.bottom.height > maxBottomHeight) {
-          set({ bottom: { ...state.bottom, height: clamp(maxBottomHeight, 140, maxBottomHeight) } })
+          set({
+            bottom: {
+              ...state.bottom,
+              height: clamp(maxBottomHeight, 140, maxBottomHeight)
+            }
+          })
         }
       }
     }),
     {
       name: 'desktop-webgis.workspace-layout',
-      partialize: (state) => ({ left: state.left, right: state.right, bottom: state.bottom })
+      version: 1,
+      migrate: (stored) => ({ left: (stored as Partial<WorkspaceState>).left ?? { open:true, width:260 }, right: { open:false, width:320 }, bottom: { open:false, height:280 }, ribbonCategory:'edit', ribbonExpanded:true }),
+      partialize: (state) => ({ left: state.left, right: state.right, bottom: state.bottom, ribbonCategory: state.ribbonCategory, ribbonExpanded: state.ribbonExpanded })
     }
   )
 )

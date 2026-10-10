@@ -1,10 +1,13 @@
 import { create } from 'zustand'
 import type { LayerStyle } from '@desktop-webgis/ol-style'
 import { cloneValue } from '@desktop-webgis/gis-core'
+import { useWorkbenchStore } from './workbench.store'
 
 type InspectorTab = 'layer' | 'feature' | 'style' | 'label'
 
 interface AttributeTableState {
+  filterOpen: boolean
+  statisticsOpen: boolean
   /** Session-only table text search (表内搜索); does not change map filter/selection. */
   searchQuery: string
   currentPage: number
@@ -43,6 +46,7 @@ export type MapViewExtentWgs84 = [number, number, number, number]
 const DEFAULT_MAP_VIEW_EXTENT: MapViewExtentWgs84 = [73, 18, 135, 54]
 
 interface SessionState {
+  inspectorTab: InspectorTab
   sessions: Record<string, LayerSession>
   /** Live / placeholder map view for WFS bounded load (extentMode=view). */
   mapViewExtentWgs84: MapViewExtentWgs84
@@ -56,7 +60,10 @@ interface SessionState {
   abortWfsLoad(layerId: string): void
   abortAllWfsLoads(): void
   getLayerSession(layerId: string): LayerSession
-  setAttributeTableState(layerId: string, updates: Partial<AttributeTableState>): void
+  setAttributeTableState(
+    layerId: string,
+    updates: Partial<AttributeTableState>
+  ): void
   setInspectorTab(layerId: string, tab: InspectorTab): void
   ensureStyleDraft(layerId: string, applied: LayerStyle): StyleDraftState
   setStyleDraft(layerId: string, draft: StyleDraftState): void
@@ -72,12 +79,16 @@ function createDraftFromApplied(applied: LayerStyle): StyleDraftState {
   return {
     style: cloneValue(applied),
     dirty: false,
-    classCount: applied.mode === 'graduated' ? Math.max(applied.breaks.length, 1) : DEFAULT_CLASS_COUNT,
+    classCount:
+      applied.mode === 'graduated'
+        ? Math.max(applied.breaks.length, 1)
+        : DEFAULT_CLASS_COUNT,
     colorRampId: DEFAULT_RAMP
   }
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
+  inspectorTab: 'layer',
   sessions: {},
   mapViewExtentWgs84: DEFAULT_MAP_VIEW_EXTENT,
   wfsLoadGeneration: 0,
@@ -117,13 +128,24 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           [layerId]: {
             ...existing,
             attributeTable: {
+              filterOpen: updates.filterOpen ?? current?.filterOpen ?? false,
+              statisticsOpen:
+                updates.statisticsOpen ?? current?.statisticsOpen ?? false,
               searchQuery: updates.searchQuery ?? current?.searchQuery ?? '',
               currentPage: updates.currentPage ?? current?.currentPage ?? 1,
               scrollTop: updates.scrollTop ?? current?.scrollTop ?? 0,
-              selectedOnly: updates.selectedOnly ?? current?.selectedOnly ?? false,
-              sortField: updates.sortField !== undefined ? updates.sortField : (current?.sortField ?? null),
-              sortDirection: updates.sortDirection ?? current?.sortDirection ?? 'asc',
-              statsField: updates.statsField !== undefined ? updates.statsField : (current?.statsField ?? null)
+              selectedOnly:
+                updates.selectedOnly ?? current?.selectedOnly ?? false,
+              sortField:
+                updates.sortField !== undefined
+                  ? updates.sortField
+                  : (current?.sortField ?? null),
+              sortDirection:
+                updates.sortDirection ?? current?.sortDirection ?? 'asc',
+              statsField:
+                updates.statsField !== undefined
+                  ? updates.statsField
+                  : (current?.statsField ?? null)
             }
           }
         }
@@ -133,6 +155,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set((prev) => {
       const existing = prev.sessions[layerId]
       return {
+        inspectorTab: tab,
         sessions: {
           ...prev.sessions,
           [layerId]: {
@@ -181,11 +204,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         }
       }
     }),
-  clearLayerSession: (layerId) =>
+  clearLayerSession: (layerId) => {
+    useWorkbenchStore.getState().clearLayer(layerId)
     set((prev) => {
       const { [layerId]: _removed, ...rest } = prev.sessions
       return { sessions: rest }
-    }),
+    })
+  },
   setLayerLoading: (layerId, loading) =>
     set((prev) => ({
       sessions: {

@@ -8,7 +8,13 @@ interface ToolbarButtonProps {
   onClick(): void
 }
 
-export function ToolbarButton({ icon: Icon, label, disabled, active, onClick }: ToolbarButtonProps) {
+export function ToolbarButton({
+  icon: Icon,
+  label,
+  disabled,
+  active,
+  onClick
+}: ToolbarButtonProps) {
   return (
     <button
       className="toolbar-button"
@@ -20,6 +26,7 @@ export function ToolbarButton({ icon: Icon, label, disabled, active, onClick }: 
       onClick={onClick}
     >
       <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
+      <span className="toolbar-button-label">{label}</span>
     </button>
   )
 }

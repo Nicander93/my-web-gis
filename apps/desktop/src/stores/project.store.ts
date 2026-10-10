@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useWorkbenchStore } from './workbench.store'
 import {
   createProject,
   createDefaultLayerStyle,
@@ -21,7 +22,8 @@ import {
   SetLayerOpacityCommand,
   SetLayerTreeCommand,
   AddLocalLayerCommand,
-  snapshotLayerTree
+  snapshotLayerTree,
+  capabilitiesForDataset
 } from '@desktop-webgis/gis-core'
 import type {
   Project,
@@ -331,6 +333,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   setDirty: (dirty) => set({ dirty }),
 
   loadSnapshot: (snapshot) => {
+    useSessionStore.setState({ inspectorTab: 'layer' })
+    useWorkbenchStore.getState().reset()
     editHistory.clear()
     const project = normalizeLayerTree(cloneValue(snapshot.project))
     const featuresByDataset = cloneValue(snapshot.featuresByDataset ?? {})

@@ -17,11 +17,14 @@
   --color-danger: #a64c47;
   --color-warning: #9a742f;
   --color-success: #56835b;
-  --font-ui: "Segoe UI", "Microsoft YaHei UI", system-ui, "Noto Sans SC", sans-serif;
-  --font-mono: "Maple Mono", "JetBrains Mono", Consolas, monospace;
+  --font-ui:
+    'Segoe UI', 'Microsoft YaHei UI', system-ui, 'Noto Sans SC', sans-serif;
+  --font-mono:
+    'Maple Mono', 'JetBrains Mono', Consolas, 'Microsoft YaHei UI',
+    'Noto Sans SC', monospace;
 }
 
-:root[data-theme="dark"] {
+:root[data-theme='dark'] {
   --color-app-bg: #171a18;
   --color-panel: #1d211e;
   --color-surface: #242925;
@@ -43,7 +46,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root[data-theme="system"] {
+  :root[data-theme='system'] {
     --color-app-bg: #171a18;
     --color-panel: #1d211e;
     --color-surface: #242925;

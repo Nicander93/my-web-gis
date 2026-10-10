@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react'
-import { X, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { AlertCircle } from 'lucide-react'
 import { previewCsv } from '@desktop-webgis/vector-io'
 import type { CsvPreviewResult, CrsInfo } from '@desktop-webgis/vector-io'
 
@@ -37,6 +37,11 @@ export function CsvConfigDialog({
   )
   const [crsCode, setCrsCode] = useState(() => COMMON_CRS.find(crs => crs.code === initialPreview.declaredCrs)?.code ?? 'EPSG:4326')
   const [preview, setPreview] = useState<CsvPreviewResult>(initialPreview)
+  const coordinateInput = useRef<HTMLSelectElement>(null)
+
+  useEffect(() => {
+    if (open) coordinateInput.current?.focus()
+  }, [open])
 
   useEffect(() => {
     if (xField && yField && xField !== yField) {
@@ -63,25 +68,13 @@ export function CsvConfigDialog({
   }
 
   return (
-    <div className="dialog-overlay" onClick={onCancel}>
-      <div className="dialog-content csv-config-dialog" onClick={(e) => e.stopPropagation()}>
-        <header className="dialog-header">
-          <h2>配置 CSV 坐标</h2>
-          <button className="dialog-close" onClick={onCancel} aria-label="关闭">
-            <X size={16} />
-          </button>
-        </header>
-
-        <div className="dialog-body">
+    <>
+        <div className="dialog-body csv-config-content">
           <div className="csv-config-section">
-            <h3>坐标字段</h3>
-            <p className="csv-config-hint">
-              选择包含 X(经度) 和 Y(纬度) 坐标的字段
-            </p>
-
             <div className="csv-config-row">
-              <label htmlFor="x-field">X 字段 (经度)</label>
+              <label htmlFor="x-field">{crsCode === 'EPSG:4326' ? '经度 (X)' : 'X (米)'}</label>
               <select
+                ref={coordinateInput}
                 id="x-field"
                 value={xField}
                 onChange={(e) => setXField(e.target.value)}
@@ -94,7 +87,7 @@ export function CsvConfigDialog({
             </div>
 
             <div className="csv-config-row">
-              <label htmlFor="y-field">Y 字段 (纬度)</label>
+              <label htmlFor="y-field">{crsCode === 'EPSG:4326' ? '纬度 (Y)' : 'Y (米)'}</label>
               <select
                 id="y-field"
                 value={yField}
@@ -109,9 +102,8 @@ export function CsvConfigDialog({
           </div>
 
           <div className="csv-config-section">
-            <h3>坐标参考系统 (CRS)</h3>
             <div className="csv-config-row">
-              <label htmlFor="crs">CRS</label>
+              <label htmlFor="crs">坐标系</label>
               <select
                 id="crs"
                 value={crsCode}
@@ -124,10 +116,10 @@ export function CsvConfigDialog({
                 ))}
               </select>
             </div>
-            <p className="csv-config-note">
-              <AlertCircle size={14} />
-              <span>如果 CRS 未知或不在列表中,请先通过外部工具转换为支持的坐标系</span>
-            </p>
+            <details className="csv-config-help">
+              <summary>坐标系说明</summary>
+              <p>坐标系未知或不在列表中时，请先转换为支持的坐标系，再导入。</p>
+            </details>
           </div>
 
           {preview.sampleRows.length > 0 && (
@@ -135,22 +127,10 @@ export function CsvConfigDialog({
               <h3>数据预览 (前 {preview.sampleRows.length} 行)</h3>
               
               {canConfirm && preview.validRows > 0 && (
-                <div className="csv-preview-summary">
-                  <div className="preview-stat-small">
-                    <span className="stat-label">总记录数</span>
-                    <span className="stat-value">{preview.totalRows}</span>
-                  </div>
-                  <div className="preview-stat-small success">
-                    <span className="stat-label">可导入</span>
-                    <span className="stat-value">{preview.validRows}</span>
-                  </div>
-                  {preview.invalidRows > 0 && (
-                    <div className="preview-stat-small error">
-                      <span className="stat-label">错误行</span>
-                      <span className="stat-value">{preview.invalidRows}</span>
-                    </div>
-                  )}
-                </div>
+                <p className="csv-record-count">
+                  全部 {preview.totalRows} · 可导入 {preview.validRows}
+                  {preview.invalidRows > 0 ? ` · 错误 ${preview.invalidRows}` : ''}
+                </p>
               )}
               
               <div className="csv-preview-table-container">
@@ -211,19 +191,11 @@ export function CsvConfigDialog({
             </div>
           )}
 
-          {canConfirm && preview.validRows > 0 && (
-            <div className="csv-config-success">
-              <CheckCircle2 size={16} />
-              <span>
-                将从 "{xField}" 和 "{yField}" 创建 {preview.validRows} 个点要素的图层
-              </span>
-            </div>
-          )}
         </div>
 
         <div className="dialog-footer">
           <button className="button-secondary" onClick={onCancel}>
-            取消
+            返回
           </button>
           <button
             className="button-primary"
@@ -233,8 +205,7 @@ export function CsvConfigDialog({
             确认 ({preview.validRows} 个有效记录)
           </button>
         </div>
-      </div>
-    </div>
+    </>
   )
 }
 

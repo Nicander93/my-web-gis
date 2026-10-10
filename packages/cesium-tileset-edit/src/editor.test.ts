@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { BoundingSphere, Cartesian2, Cartesian3, Entity, Ray, ScreenSpaceEventType } from 'cesium'
+import { BoundingSphere, Cartesian2, Cartesian3, Entity, JulianDate, PolylineArrowMaterialProperty, Ray, ScreenSpaceEventType } from 'cesium'
 import type { Viewer } from 'cesium'
 import { createTransform } from '@desktop-webgis/cesium-scene-schema'
 import type { Transform } from '@desktop-webgis/cesium-scene-schema'
@@ -35,11 +35,44 @@ function setup() {
 }
 
 describe('transform gesture transactions',() => {
+  it('uses arrows and keeps the same handles attached during drag, cancel and external transforms', () => {
+    const s = setup(), time = JulianDate.now(), handle = s.entities[0]
+    expect(handle.polyline?.material).toBeInstanceOf(PolylineArrowMaterialProperty)
+    const before = handle.polyline!.positions!.getValue(time)[0]
+    s.begin(); s.move()
+    expect(s.entities[0]).toBe(handle)
+    const moved = handle.polyline!.positions!.getValue(time)[0]
+    expect(Cartesian3.distance(before, moved)).toBeCloseTo(Math.hypot(25,15))
+    s.editor.cancel()
+    const restored = s.entities[0].polyline!.positions!.getValue(time)[0]
+    expect(Cartesian3.distance(before, restored)).toBeCloseTo(0)
+    s.layer.setTransform({ ...createTransform(), translation: [60,0,0] })
+    expect(Cartesian3.distance(before, s.entities[0].polyline!.positions!.getValue(time)[0])).toBeCloseTo(60)
+    s.editor.destroy()
+  })
+  it('keeps a consistent screen length while zooming and follows local rotation', () => {
+    const s = setup(), time = JulianDate.now()
+    Object.assign(s.viewer.canvas, { clientWidth: 800, clientHeight: 600 })
+    const getPixelSize = vi.fn(() => 2)
+    Object.assign(s.viewer.camera, { getPixelSize })
+    const points = () => s.entities[0].polyline!.positions!.getValue(time) as Cartesian3[]
+    expect(Cartesian3.distance(...points() as [Cartesian3,Cartesian3])).toBeCloseTo(200)
+    getPixelSize.mockReturnValue(4)
+    expect(Cartesian3.distance(...points() as [Cartesian3,Cartesian3])).toBeCloseTo(400)
+    s.editor.setMode('rotate')
+    const before = Cartesian3.clone(points()[0])
+    s.layer.setTransform({ ...createTransform(), rotation: [45,30,20] })
+    expect(Cartesian3.distance(before, points()[0])).toBeGreaterThan(1)
+    s.editor.destroy()
+  })
   it('rotates about ENU up using Cesium heading sign', () => {
     const s = setup(); s.editor.setMode('rotate')
     handlers.get(ScreenSpaceEventType.LEFT_DOWN)?.({ position: new Cartesian2(20,0) })
     handlers.get(ScreenSpaceEventType.MOUSE_MOVE)?.({ endPosition: new Cartesian2(0,20) })
-    expect(s.layer.getTransform().rotation).toEqual([-90,0,0])
+    const rotation = s.layer.getTransform().rotation
+    expect(rotation[0]).toBeCloseTo(-90)
+    expect(rotation[1]).toBeCloseTo(0)
+    expect(rotation[2]).toBeCloseTo(0)
     s.editor.commit(); expect(s.onCommit).toHaveBeenCalledOnce(); s.editor.destroy()
   })
   it('scales uniformly and keeps all axes within the positive scale bound', () => {

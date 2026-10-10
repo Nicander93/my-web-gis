@@ -6,11 +6,16 @@ import VectorLayer from 'ol/layer/Vector'
 import VectorSource from 'ol/source/Vector'
 import View from 'ol/View'
 import Snap from 'ol/interaction/Snap'
+import Draw from 'ol/interaction/Draw'
 import Select from 'ol/interaction/Select'
 import type Interaction from 'ol/interaction/Interaction'
 import type Map from 'ol/Map'
 import { OlMapRuntime } from '../map/OlMapRuntime'
-import { DEFAULT_SNAPPING, OlToolRuntime, type ToolCallbacks } from './OlToolRuntime'
+import {
+  DEFAULT_SNAPPING,
+  OlToolRuntime,
+  type ToolCallbacks
+} from './OlToolRuntime'
 
 function fixture() {
   const runtime = new OlMapRuntime()
@@ -28,25 +33,71 @@ function fixture() {
       if (index >= 0) interactions.splice(index, 1)
       if (interaction instanceof Snap) {
         // OL accepts null on removal, although Snap's override narrows its declaration.
-        (interaction as unknown as { setMap(map: Map | null): void }).setMap(null)
+        ;(interaction as unknown as { setMap(map: Map | null): void }).setMap(
+          null
+        )
       }
     }
   }
   vi.spyOn(runtime, 'getMap').mockReturnValue(map as unknown as Map)
-  const source = new VectorSource({ features: [new Feature(new LineString([[0, 0], [100, 0]]))] })
-  const reference = new VectorSource({ features: [new Feature(new Point([200, 0]))] })
+  const source = new VectorSource({
+    features: [
+      new Feature(
+        new LineString([
+          [0, 0],
+          [100, 0]
+        ])
+      )
+    ]
+  })
+  const reference = new VectorSource({
+    features: [new Feature(new Point([200, 0]))]
+  })
   const layer = new VectorLayer({ source })
   const referenceLayer = new VectorLayer({ source: reference })
   runtime.registry.register('active', 'a', layer)
   runtime.registry.register('reference', 'b', referenceLayer)
-  const callbacks: ToolCallbacks = { getActiveLayerId: () => 'active', onAddFeature: vi.fn(), onDeleteFeatures: vi.fn(), onUpdateGeometry: vi.fn(), onSelectionChange: vi.fn() }
+  const callbacks: ToolCallbacks = {
+    getActiveLayerId: () => 'active',
+    onAddFeature: vi.fn(),
+    onDeleteFeatures: vi.fn(),
+    onUpdateGeometry: vi.fn(),
+    onSelectionChange: vi.fn()
+  }
   const tool = new OlToolRuntime(runtime)
-  const snap = () => interactions.find((item): item is Snap => item instanceof Snap)!
-  const hit = (coordinate: number[]) => snap().snapTo(coordinate, coordinate, map as unknown as Map)
-  return { tool, interactions, callbacks, hit, reference, referenceLayer, layer, source, snap }
+  const snap = () =>
+    interactions.find((item): item is Snap => item instanceof Snap)!
+  const hit = (coordinate: number[]) =>
+    snap().snapTo(coordinate, coordinate, map as unknown as Map)
+  return {
+    tool,
+    interactions,
+    callbacks,
+    hit,
+    reference,
+    referenceLayer,
+    layer,
+    source,
+    snap
+  }
 }
 
 describe('editing capture', () => {
+  it('cancels only an unfinished sketch and leaves committed features unchanged', () => {
+    const f = fixture()
+    f.tool.activate('draw-line', f.callbacks)
+    const draw = f.interactions.find(
+      (item): item is Draw => item instanceof Draw
+    )!
+    expect(f.tool.cancelSketch()).toBe(false)
+    draw.dispatchEvent({ type: 'drawstart' } as never)
+    const abort = vi.spyOn(draw, 'abortDrawing')
+    expect(f.tool.cancelSketch()).toBe(true)
+    expect(abort).toHaveBeenCalledOnce()
+    expect(f.tool.cancelSketch()).toBe(false)
+    expect(f.callbacks.onAddFeature).not.toHaveBeenCalled()
+    expect(f.source.getFeatures()).toHaveLength(1)
+  })
   it('snaps to vertices and edges within tolerance without replacing an unfinished Draw', () => {
     const f = fixture()
     f.tool.activate('draw-line', f.callbacks)
@@ -57,7 +108,11 @@ describe('editing capture', () => {
     f.tool.setSnapping({ ...DEFAULT_SNAPPING, edge: false })
     expect(f.interactions[0]).toBe(draw)
     expect(f.hit([50, 5])).toBeNull()
-    f.tool.setSnapping({ ...DEFAULT_SNAPPING, vertex: false, pixelTolerance: 3 })
+    f.tool.setSnapping({
+      ...DEFAULT_SNAPPING,
+      vertex: false,
+      pixelTolerance: 3
+    })
     expect(f.hit([50, 5])).toBeNull()
     expect(f.hit([50, 2])?.vertex).toEqual([50, 0])
     f.tool.setSnapping({ ...DEFAULT_SNAPPING, enabled: false })
@@ -89,9 +144,13 @@ describe('editing capture', () => {
     const f = fixture()
     for (const mode of ['modify', 'delete'] as const) {
       f.tool.activate(mode, f.callbacks)
-      const select = f.interactions.find((item): item is Select => item instanceof Select)!
+      const select = f.interactions.find(
+        (item): item is Select => item instanceof Select
+      )!
       // Exercise the layer predicate passed to OpenLayers, without browser hit detection.
-      const filter = (select as unknown as { layerFilter_: (layer: VectorLayer) => boolean }).layerFilter_
+      const filter = (
+        select as unknown as { layerFilter_: (layer: VectorLayer) => boolean }
+      ).layerFilter_
       expect(filter(f.layer)).toBe(true)
       expect(filter(f.referenceLayer)).toBe(false)
       expect(f.interactions.at(-1) instanceof Snap).toBe(mode === 'modify')

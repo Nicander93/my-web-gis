@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Table2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { ChevronLeft, ChevronRight, PanelBottomClose } from 'lucide-react'
 import {
   applyFieldFilter,
   computeFieldStats,
@@ -8,6 +8,8 @@ import {
   type FieldFilterOp
 } from '@desktop-webgis/gis-core'
 import { useProjectStore } from '@/stores/project.store'
+import { useWorkbenchStore } from '@/stores/workbench.store'
+import { capabilitiesForDataset } from '@desktop-webgis/gis-core'
 import { useSessionStore } from '@/stores/session.store'
 import { Button } from '@/components/ui/Button'
 
@@ -29,19 +31,33 @@ function needsValue(op: FieldFilterOp): boolean {
   return op !== 'is-empty' && op !== 'is-not-empty'
 }
 
-export function AttributeTable() {
-  const selectedLayerId = useProjectStore((state) => state.selectedLayerId)
+interface AttributeTableProps {
+  targetPicker?: ReactNode
+  onClose?: () => void
+}
+
+export function AttributeTable({
+  targetPicker,
+  onClose
+}: AttributeTableProps = {}) {
+  const selectedLayerId = useWorkbenchStore((state) => state.tableLayerId)
+  const editLayerId = useWorkbenchStore((state) => state.editLayerId)
   const project = useProjectStore((state) => state.project)
   const featuresByDataset = useProjectStore((state) => state.featuresByDataset)
   const selection = useProjectStore((state) => state.selection)
-  const lastSelectionCountAfterFilter = useProjectStore((state) => state.lastSelectionCountAfterFilter)
   const setLayerFilter = useProjectStore((state) => state.setLayerFilter)
   const selectMatching = useProjectStore((state) => state.selectMatching)
-  const toggleFeatureSelection = useProjectStore((state) => state.toggleFeatureSelection)
+  const toggleFeatureSelection = useProjectStore(
+    (state) => state.toggleFeatureSelection
+  )
   const clearSelection = useProjectStore((state) => state.clearSelection)
-  const updateFeatureProperties = useProjectStore((state) => state.updateFeatureProperties)
+  const updateFeatureProperties = useProjectStore(
+    (state) => state.updateFeatureProperties
+  )
 
-  const setAttributeTableState = useSessionStore((state) => state.setAttributeTableState)
+  const setAttributeTableState = useSessionStore(
+    (state) => state.setAttributeTableState
+  )
   const layerSession = useSessionStore((state) =>
     selectedLayerId ? state.sessions[selectedLayerId] : undefined
   )
@@ -53,27 +69,51 @@ export function AttributeTable() {
   const sortField = tableState?.sortField ?? null
   const sortDirection = tableState?.sortDirection ?? 'asc'
   const statsField = tableState?.statsField ?? null
+  const filterOpen = tableState?.filterOpen ?? false
+  const statisticsOpen = tableState?.statisticsOpen ?? false
 
   const [draftField, setDraftField] = useState('')
   const [draftOp, setDraftOp] = useState<FieldFilterOp>('eq')
   const [draftValue, setDraftValue] = useState('')
-  const [editing, setEditing] = useState<{ featureId: string; field: string } | null>(null)
+  const [editing, setEditing] = useState<{
+    featureId: string
+    field: string
+  } | null>(null)
   const [editValue, setEditValue] = useState('')
+  const cancelledEdit = useRef(false)
 
   const selectedLayer = selectedLayerId
     ? project.layers.find((layer) => layer.id === selectedLayerId)
     : null
+  const canEditCells =
+    editLayerId === selectedLayerId &&
+    capabilitiesForDataset(
+      project.datasets.find(
+        (dataset) => dataset.id === selectedLayer?.datasetId
+      )
+    ).editGeometry
 
-  const allFeatures = selectedLayer ? (featuresByDataset[selectedLayer.datasetId] ?? []) : []
-  const layerFilter = selectedLayer?.filter ?? []
+  const allFeatures = selectedLayer
+    ? (featuresByDataset[selectedLayer.datasetId] ?? [])
+    : []
+  const layerFilter = selectedLayer?.filter
+  const appliedFilter = layerFilter ?? []
+  const [filterDraft, setFilterDraft] =
+    useState<FieldFilterCondition[]>(appliedFilter)
+  useEffect(() => {
+    setFilterDraft(layerFilter ?? [])
+  }, [layerFilter])
+  const filterDirty =
+    JSON.stringify(filterDraft) !== JSON.stringify(appliedFilter)
 
   const filteredFeatures = useMemo(
-    () => applyFieldFilter(allFeatures, layerFilter),
+    () => applyFieldFilter(allFeatures, appliedFilter),
     [allFeatures, layerFilter]
   )
 
   const selectionIds = useMemo(() => {
-    if (!selectedLayerId || selection.layerId !== selectedLayerId) return new Set<string>()
+    if (!selectedLayerId || selection.layerId !== selectedLayerId)
+      return new Set<string>()
     return new Set(selection.featureIds)
   }, [selectedLayerId, selection.layerId, selection.featureIds])
 
@@ -101,16 +141,28 @@ export function AttributeTable() {
       )
     }
     if (sortField) {
-      rows = sortFeatures(rows, [{ field: sortField, direction: sortDirection }])
+      rows = sortFeatures(rows, [
+        { field: sortField, direction: sortDirection }
+      ])
     } else {
       rows = sortFeatures(rows, [])
     }
     return rows
-  }, [filteredFeatures, selectedOnly, selectionIds, searchQuery, sortField, sortDirection])
+  }, [
+    filteredFeatures,
+    selectedOnly,
+    selectionIds,
+    searchQuery,
+    sortField,
+    sortDirection
+  ])
 
   const totalPages = Math.max(1, Math.ceil(viewFeatures.length / PAGE_SIZE))
   const safePage = Math.min(currentPage, totalPages)
-  const pageRows = viewFeatures.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const pageRows = viewFeatures.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE
+  )
 
   const statsTargetField = statsField ?? fieldNames[0] ?? null
   const stats = useMemo(() => {
@@ -118,7 +170,9 @@ export function AttributeTable() {
     return computeFieldStats(filteredFeatures, statsTargetField, 'filtered')
   }, [filteredFeatures, statsTargetField])
 
-  function patchTable(updates: Parameters<typeof setAttributeTableState>[1]): void {
+  function patchTable(
+    updates: Parameters<typeof setAttributeTableState>[1]
+  ): void {
     if (!selectedLayerId) return
     setAttributeTableState(selectedLayerId, updates)
   }
@@ -128,16 +182,13 @@ export function AttributeTable() {
     const condition: FieldFilterCondition = needsValue(draftOp)
       ? { field: draftField, op: draftOp, value: coerceDraftValue(draftValue) }
       : { field: draftField, op: draftOp }
-    setLayerFilter(selectedLayerId, [...layerFilter, condition])
+    setFilterDraft([...filterDraft, condition])
     patchTable({ currentPage: 1 })
   }
 
   function removeFilterCondition(index: number): void {
     if (!selectedLayerId) return
-    setLayerFilter(
-      selectedLayerId,
-      layerFilter.filter((_, i) => i !== index)
-    )
+    setFilterDraft(filterDraft.filter((_, i) => i !== index))
     patchTable({ currentPage: 1 })
   }
 
@@ -154,49 +205,50 @@ export function AttributeTable() {
   }
 
   function startEdit(featureId: string, field: string, current: unknown): void {
+    if (!canEditCells) return
+    cancelledEdit.current = false
     setEditing({ featureId, field })
     setEditValue(current == null ? '' : String(current))
   }
 
   function commitEdit(): void {
-    if (!selectedLayerId || !editing) return
+    if (
+      !selectedLayerId ||
+      !editing ||
+      cancelledEdit.current ||
+      !canEditCells
+    ) {
+      setEditing(null)
+      return
+    }
     const feature = allFeatures.find((item) => item.id === editing.featureId)
     if (!feature) {
       setEditing(null)
       return
     }
-    const next = { ...feature.properties, [editing.field]: coerceDraftValue(editValue) }
+    const next = {
+      ...feature.properties,
+      [editing.field]: coerceDraftValue(editValue)
+    }
     updateFeatureProperties(selectedLayerId, editing.featureId, next)
     setEditing(null)
   }
 
   const emptySelectedOnly = selectedOnly && selectionIds.size === 0
+  const recordStatus = `全部 ${allFeatures.length} · 过滤后 ${filteredFeatures.length} · 显示 ${viewFeatures.length}${selectionIds.size > 0 ? ` · 选中 ${selectionIds.size}` : ''}`
 
   return (
     <div className="feature-panel attribute-table-content">
-      <div className="table-summary">
-        <div className="table-title">
-          <Table2 size={15} />
-          <strong>{selectedLayer?.name ?? '未选择图层'}</strong>
-        </div>
-        <span>
-          A {allFeatures.length} · F {filteredFeatures.length} · S{' '}
-          {selection.layerId === selectedLayerId ? selection.featureIds.length : 0}
-          {lastSelectionCountAfterFilter != null && selection.layerId === selectedLayerId
-            ? `（筛选后选中 ${lastSelectionCountAfterFilter}）`
-            : ''}
-          {selectedOnly ? ' · 仅选中' : ''}
-        </span>
-      </div>
-
-      {selectedLayer && (
-        <div className="attr-toolbar" aria-label="属性表工具">
+      <div className="attr-toolbar" aria-label="属性表工具">
+        {targetPicker}
+        {selectedLayer && <>
           <label className="attr-search">
-            <span>表内搜索</span>
             <input
               type="search"
+              aria-label="表内搜索"
               value={searchQuery}
-              placeholder="仅筛表格，不改地图过滤/选择"
+              placeholder="搜索当前表格"
+              title="只影响表格显示，不改变地图过滤或要素选择"
               onChange={(event) =>
                 patchTable({ searchQuery: event.target.value, currentPage: 1 })
               }
@@ -208,34 +260,88 @@ export function AttributeTable() {
               type="checkbox"
               checked={selectedOnly}
               onChange={(event) =>
-                patchTable({ selectedOnly: event.target.checked, currentPage: 1 })
+                patchTable({
+                  selectedOnly: event.target.checked,
+                  currentPage: 1
+                })
               }
             />
             仅选中
           </label>
 
+          <details
+            className="attr-selection-actions"
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) {
+                event.currentTarget.open = false
+              }
+            }}
+            onClick={(event) => {
+              if (event.target instanceof HTMLElement && event.target.closest('button')) {
+                event.currentTarget.open = false
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.preventDefault()
+                event.stopPropagation()
+                event.currentTarget.open = false
+                event.currentTarget.querySelector('summary')?.focus()
+              }
+            }}
+          >
+            <summary>选择</summary>
+            <div>
+              <Button
+                variant="ghost"
+                title="选择图层过滤结果；表内搜索不改变此范围"
+                onClick={() => selectedLayerId && selectMatching(selectedLayerId)}
+              >
+                选择匹配记录
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => clearSelection()}
+                disabled={
+                  selection.layerId !== selectedLayerId ||
+                  selection.featureIds.length === 0
+                }
+              >
+                清除选择
+              </Button>
+            </div>
+          </details>
           <Button
             variant="ghost"
-            title="将当前图层筛选结果 F 设为选择 S（不会由筛选自动触发）"
-            onClick={() => selectedLayerId && selectMatching(selectedLayerId)}
+            aria-expanded={filterOpen}
+            onClick={() => patchTable({ filterOpen: !filterOpen })}
           >
-            选择匹配记录
+            图层过滤{appliedFilter.length ? ` (${appliedFilter.length})` : ''}
           </Button>
-
           <Button
             variant="ghost"
-            onClick={() => clearSelection()}
-            disabled={selection.featureIds.length === 0}
+            aria-expanded={statisticsOpen}
+            onClick={() => patchTable({ statisticsOpen: !statisticsOpen })}
           >
-            清除选择
+            字段统计
           </Button>
-        </div>
-      )}
+        </>}
+        {onClose && (
+          <Button variant="icon" aria-label="收起属性表" title="收起属性表" onClick={onClose}>
+            <PanelBottomClose size={16} />
+          </Button>
+        )}
+      </div>
 
-      {selectedLayer && (
+      {selectedLayer && filterOpen && (
         <div className="attr-filter-bar" aria-label="图层字段过滤">
-          <span className="attr-filter-label">图层过滤 (F)</span>
-          <select value={draftField} onChange={(e) => setDraftField(e.target.value)}>
+          <span className="attr-filter-label" title="应用后同时影响地图与此表">
+            图层过滤 · 影响地图和表格
+          </span>
+          <select
+            value={draftField}
+            onChange={(e) => setDraftField(e.target.value)}
+          >
             <option value="">字段…</option>
             {fieldNames.map((field) => (
               <option key={field} value={field}>
@@ -243,7 +349,10 @@ export function AttributeTable() {
               </option>
             ))}
           </select>
-          <select value={draftOp} onChange={(e) => setDraftOp(e.target.value as FieldFilterOp)}>
+          <select
+            value={draftOp}
+            onChange={(e) => setDraftOp(e.target.value as FieldFilterOp)}
+          >
             {FILTER_OPS.map((op) => (
               <option key={op.value} value={op.value}>
                 {op.label}
@@ -257,23 +366,51 @@ export function AttributeTable() {
               placeholder="值"
             />
           )}
-          <Button variant="ghost" onClick={addFilterCondition} disabled={!draftField}>
+          <Button
+            variant="ghost"
+            onClick={addFilterCondition}
+            disabled={!draftField}
+          >
             添加条件
           </Button>
-          {layerFilter.length > 0 && (
+          <Button
+            variant="primary"
+            disabled={!filterDirty}
+            onClick={() => {
+              if (selectedLayerId) setLayerFilter(selectedLayerId, filterDraft)
+              patchTable({ currentPage: 1 })
+            }}
+          >
+            应用过滤
+          </Button>
+          {filterDirty && (
             <Button
               variant="ghost"
-              onClick={() => selectedLayerId && setLayerFilter(selectedLayerId, [])}
+              onClick={() => setFilterDraft(appliedFilter)}
+            >
+              还原条件
+            </Button>
+          )}
+          {(appliedFilter.length > 0 || filterDraft.length > 0) && (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                if (selectedLayerId) setLayerFilter(selectedLayerId, [])
+                setFilterDraft([])
+                patchTable({ currentPage: 1 })
+              }}
             >
               清除过滤
             </Button>
           )}
           <ul className="attr-filter-chips">
-            {layerFilter.map((condition, index) => (
+            {filterDraft.map((condition, index) => (
               <li key={`${condition.field}-${condition.op}-${index}`}>
                 <code>
                   {condition.field} {condition.op}
-                  {needsValue(condition.op) ? ` ${String(condition.value ?? '')}` : ''}
+                  {needsValue(condition.op)
+                    ? ` ${String(condition.value ?? '')}`
+                    : ''}
                 </code>
                 <button
                   type="button"
@@ -288,7 +425,7 @@ export function AttributeTable() {
         </div>
       )}
 
-      {selectedLayer && stats && statsTargetField && (
+      {selectedLayer && statisticsOpen && stats && statsTargetField && (
         <div className="attr-stats" aria-label="字段统计">
           <label>
             统计字段
@@ -304,10 +441,10 @@ export function AttributeTable() {
             </select>
           </label>
           <span>
-            范围：{stats.scopeLabel} · 非空 {stats.nonNull} / 空 {stats.nullCount} / 合计{' '}
-            {stats.total}
+            范围：图层过滤结果 · 非空 {stats.nonNull} / 空{' '}
+            {stats.nullCount} / 合计 {stats.total}
             {stats.numeric
-              ? ` · min ${stats.numeric.min} · max ${stats.numeric.max} · sum ${stats.numeric.sum} · mean ${formatMean(stats.numeric.mean)}`
+              ? ` · 最小 ${stats.numeric.min} · 最大 ${stats.numeric.max} · 合计 ${stats.numeric.sum} · 平均 ${formatMean(stats.numeric.mean)}`
               : ' · 无数值统计'}
           </span>
         </div>
@@ -322,9 +459,24 @@ export function AttributeTable() {
                 <th style={{ width: 48 }}>#</th>
                 <th
                   className="sortable"
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      patchTable({
+                        sortField: null,
+                        sortDirection: 'asc',
+                        currentPage: 1
+                      })
+                    }
+                  }}
                   title="按稳定 Feature ID 排序（清除字段排序）"
                   onClick={() =>
-                    patchTable({ sortField: null, sortDirection: 'asc', currentPage: 1 })
+                    patchTable({
+                      sortField: null,
+                      sortDirection: 'asc',
+                      currentPage: 1
+                    })
                   }
                 >
                   ID
@@ -333,6 +485,13 @@ export function AttributeTable() {
                   <th
                     key={field}
                     className="sortable"
+                    tabIndex={0}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        toggleSort(field)
+                      }
+                    }}
                     onClick={() => toggleSort(field)}
                     aria-sort={
                       sortField === field
@@ -343,7 +502,11 @@ export function AttributeTable() {
                     }
                   >
                     {field}
-                    {sortField === field ? (sortDirection === 'asc' ? ' ↑' : ' ↓') : ''}
+                    {sortField === field
+                      ? sortDirection === 'asc'
+                        ? ' ↑'
+                        : ' ↓'
+                      : ''}
                   </th>
                 ))}
               </tr>
@@ -369,8 +532,15 @@ export function AttributeTable() {
                       <input
                         type="checkbox"
                         checked={selected}
-                        readOnly
-                        tabIndex={-1}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={() =>
+                          selectedLayerId &&
+                          toggleFeatureSelection(
+                            selectedLayerId,
+                            feature.id,
+                            true
+                          )
+                        }
                         aria-label={`选择 ${feature.id}`}
                       />
                     </td>
@@ -379,10 +549,23 @@ export function AttributeTable() {
                     {fieldNames.map((field) => {
                       const value = feature.properties[field]
                       const isEditing =
-                        editing?.featureId === feature.id && editing.field === field
+                        editing?.featureId === feature.id &&
+                        editing.field === field
                       return (
                         <td
                           key={field}
+                          tabIndex={canEditCells ? 0 : undefined}
+                          title={
+                            canEditCells
+                              ? '双击或按 Enter 编辑'
+                              : '只读；在编辑功能区启动此图层编辑'
+                          }
+                          onKeyDown={(event) => {
+                            if (!isEditing && event.key === 'Enter') {
+                              event.preventDefault()
+                              startEdit(feature.id, field, value)
+                            }
+                          }}
                           onDoubleClick={(event) => {
                             event.stopPropagation()
                             startEdit(feature.id, field, value)
@@ -397,8 +580,15 @@ export function AttributeTable() {
                               onChange={(e) => setEditValue(e.target.value)}
                               onBlur={commitEdit}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter') commitEdit()
-                                if (e.key === 'Escape') setEditing(null)
+                                if (e.key === 'Enter') {
+                                  e.stopPropagation()
+                                  commitEdit()
+                                }
+                                if (e.key === 'Escape') {
+                                  e.stopPropagation()
+                                  cancelledEdit.current = true
+                                  setEditing(null)
+                                }
                               }}
                             />
                           ) : value != null && value !== '' ? (
@@ -434,7 +624,9 @@ export function AttributeTable() {
                       <p>当前无选中要素（仅选中模式）</p>
                       <Button
                         variant="ghost"
-                        onClick={() => patchTable({ selectedOnly: false, currentPage: 1 })}
+                        onClick={() =>
+                          patchTable({ selectedOnly: false, currentPage: 1 })
+                        }
                       >
                         清除“仅选中”查看模式
                       </Button>
@@ -451,25 +643,32 @@ export function AttributeTable() {
         )}
       </div>
 
-      {selectedLayer && viewFeatures.length > 0 && (
-        <div className="attr-pagination">
+      {selectedLayer && (
+        <div className="attr-pagination" aria-label="表格状态与分页">
+          <span className="attr-record-count" title={recordStatus}>{recordStatus}</span>
+          <span title={canEditCells ? '双击单元格编辑' : '当前表格只读；从图层菜单开始编辑'}>
+            {canEditCells ? '可编辑' : '只读'}
+          </span>
           <Button
-            variant="ghost"
+            variant="icon"
+            aria-label="上一页"
+            title="上一页"
             disabled={safePage <= 1}
             onClick={() => patchTable({ currentPage: safePage - 1 })}
           >
-            上一页
+            <ChevronLeft size={16} />
           </Button>
-          <span>
-            第 {safePage} / {totalPages} 页 · 本页 {pageRows.length} · 表格 {viewFeatures.length}{' '}
-            条（每页 {PAGE_SIZE}）
+          <span title={`每页 ${PAGE_SIZE} 条`}>
+            {viewFeatures.length ? safePage : 0} / {viewFeatures.length ? totalPages : 0}
           </span>
           <Button
-            variant="ghost"
-            disabled={safePage >= totalPages}
+            variant="icon"
+            aria-label="下一页"
+            title="下一页"
+            disabled={viewFeatures.length === 0 || safePage >= totalPages}
             onClick={() => patchTable({ currentPage: safePage + 1 })}
           >
-            下一页
+            <ChevronRight size={16} />
           </Button>
         </div>
       )}

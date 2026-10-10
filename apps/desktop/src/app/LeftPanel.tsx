@@ -7,10 +7,12 @@ import { useWorkspaceStore } from '@/stores/workspace.store'
 interface LeftPanelProps {
   children: ReactNode
   actions?: ReactNode
+  title?: string
+  footer?: ReactNode
 }
 
 /** 左侧固定承载 Layer Manager，并负责自身开关、尺寸与恢复入口。 */
-export function LeftPanel({ children, actions }: LeftPanelProps) {
+export function LeftPanel({ children, actions, title = '图层', footer }: LeftPanelProps) {
   const left = useWorkspaceStore((state) => state.left)
   const setOpen = useWorkspaceStore((state) => state.setLeftOpen)
   const setWidth = useWorkspaceStore((state) => state.setLeftWidth)
@@ -19,12 +21,12 @@ export function LeftPanel({ children, actions }: LeftPanelProps) {
     <aside
       className="workspace-panel panel-left"
       style={{ width: left.width, display: left.open ? undefined : 'none' }}
-      aria-label="图层面板"
+      aria-label={`${title}面板`}
       aria-hidden={!left.open}
     >
       <header className="panel-titlebar">
         <div>
-          <h2>图层</h2>
+          <h2>{title}</h2>
         </div>
         <div className="panel-actions">
         {actions}
@@ -34,6 +36,7 @@ export function LeftPanel({ children, actions }: LeftPanelProps) {
         </div>
       </header>
       <div className="panel-body">{children}</div>
+      {footer}
       <ResizeHandle
         orientation="horizontal"
         label="调整图层面板宽度"

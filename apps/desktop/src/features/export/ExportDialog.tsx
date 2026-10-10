@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { X } from 'lucide-react'
+import { EditorDialog } from '@/components/ui/EditorDialog'
+import { inferLayerStyleKind, type GisFeature } from '@desktop-webgis/gis-core'
 import {
-  inferLayerStyleKind,
-  type GisFeature
-} from '@desktop-webgis/gis-core'
-import { serializeVectorExport, type ExportFormat, type CoordinateExportCrs } from './serializeVectorExport'
+  serializeVectorExport,
+  type ExportFormat,
+  type CoordinateExportCrs
+} from './serializeVectorExport'
 import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
 import { pickSaveFile, writeTextFile } from '@/services/files'
@@ -31,12 +32,19 @@ interface ExportDialogProps {
   mode?: ExportDialogMode
 }
 
-export function ExportDialog({ open, onClose, layerId, mode = 'export' }: ExportDialogProps) {
+export function ExportDialog({
+  open,
+  onClose,
+  layerId,
+  mode = 'export'
+}: ExportDialogProps) {
   const project = useProjectStore((s) => s.project)
   const featuresByDataset = useProjectStore((s) => s.featuresByDataset)
   const selection = useProjectStore((s) => s.selection)
   const selectedLayerId = useProjectStore((s) => s.selectedLayerId)
-  const copyFeaturesToLocalLayer = useProjectStore((s) => s.copyFeaturesToLocalLayer)
+  const copyFeaturesToLocalLayer = useProjectStore(
+    (s) => s.copyFeaturesToLocalLayer
+  )
 
   const targetLayerId = layerId ?? selectedLayerId
   const layer = findLayer(project, targetLayerId)
@@ -50,14 +58,16 @@ export function ExportDialog({ open, onClose, layerId, mode = 'export' }: Export
       searchQuery: layerSession?.attributeTable?.searchQuery ?? '',
       selectedOnly: layerSession?.attributeTable?.selectedOnly ?? false,
       sortField: layerSession?.attributeTable?.sortField ?? null,
-      sortDirection: (layerSession?.attributeTable?.sortDirection ?? 'asc') as 'asc' | 'desc'
+      sortDirection: (layerSession?.attributeTable?.sortDirection ?? 'asc') as
+        'asc' | 'desc'
     }),
     [layerSession]
   )
 
   const [scope, setScope] = useState<ExportScope>('all')
   const [format, setFormat] = useState<ExportFormat>('geojson')
-  const [coordinateCrs, setCoordinateCrs] = useState<CoordinateExportCrs>('EPSG:4326')
+  const [coordinateCrs, setCoordinateCrs] =
+    useState<CoordinateExportCrs>('EPSG:4326')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -128,7 +138,8 @@ export function ExportDialog({ open, onClose, layerId, mode = 'export' }: Export
     try {
       const serialized = serializeVectorExport(snapshot, format, coordinateCrs)
       const isCsv = serialized.extension === 'csv'
-      const suffix = format === 'coordinate-csv' ? `_${coordinateCrs.replace(':', '-')}` : ''
+      const suffix =
+        format === 'coordinate-csv' ? `_${coordinateCrs.replace(':', '-')}` : ''
       const defaultName = `${layer.name || 'layer'}${suffix}.${serialized.extension}`
       const path = await pickSaveFile({
         title: '导出数据',
@@ -183,32 +194,32 @@ export function ExportDialog({ open, onClose, layerId, mode = 'export' }: Export
       setError('复制失败')
       return
     }
-    emitCommandStatus(`已复制为本地图层「${newName}」，共 ${snapshot.length} 个要素`)
+    emitCommandStatus(
+      `已复制为本地图层「${newName}」，共 ${snapshot.length} 个要素`
+    )
     handleClose()
   }
 
   return (
-    <div className="dialog-overlay" onClick={handleClose}>
-      <div className="dialog-content export-dialog" onClick={(e) => e.stopPropagation()}>
-        <header className="dialog-header">
-          <h2>{mode === 'copy' ? '复制为本地图层' : '导出图层'}</h2>
-          <button className="dialog-close" onClick={handleClose} aria-label="关闭">
-            <X size={16} />
-          </button>
-        </header>
+    <EditorDialog
+      title={mode === 'copy' ? '复制为本地图层' : '导出图层'}
+      onClose={handleClose}
+      busy={busy}
+      className="export-dialog"
+    >
+      <div className="dialog-body">
+        {!layer ? (
+          <p className="export-empty">请先在图层面板选择一个矢量图层。</p>
+        ) : (
+          <>
+            <p className="export-layer-name export-target">
+              图层：<strong>{layer.name}</strong>
+            </p>
 
-        <div className="dialog-body">
-          {!layer ? (
-            <p className="export-empty">请先在图层面板选择一个矢量图层。</p>
-          ) : (
-            <>
-              <p className="export-layer-name">
-                图层：<strong>{layer.name}</strong>
-              </p>
-
-              <fieldset className="export-fieldset">
-                <legend>导出范围</legend>
-                {(Object.keys(EXPORT_SCOPE_LABELS) as ExportScope[]).map((key) => (
+            <fieldset className="export-fieldset">
+              <legend>导出范围</legend>
+              {(Object.keys(EXPORT_SCOPE_LABELS) as ExportScope[]).map(
+                (key) => (
                   <label key={key} className="export-radio">
                     <input
                       type="radio"
@@ -224,13 +235,17 @@ export function ExportDialog({ open, onClose, layerId, mode = 'export' }: Export
                       <span className="export-count">（{counts[key]}）</span>
                     </span>
                   </label>
-                ))}
-                <p className="export-hint">
-                  {mode === 'copy' ? '确认后使用同一快照复制为本地图层；之后改动不影响本次结果。' : '确认后使用同一快照导出；之后改动不影响本次结果。'}
-                </p>
-              </fieldset>
+                )
+              )}
+              <p className="export-hint">
+                {mode === 'copy'
+                  ? '确认后使用同一快照复制为本地图层；之后改动不影响本次结果。'
+                  : '确认后使用同一快照导出；之后改动不影响本次结果。'}
+              </p>
+            </fieldset>
 
-              {mode === 'export' && <fieldset className="export-fieldset">
+            {mode === 'export' && (
+              <fieldset className="export-fieldset">
                 <legend>导出格式</legend>
                 <label className="export-radio">
                   <input
@@ -239,7 +254,7 @@ export function ExportDialog({ open, onClose, layerId, mode = 'export' }: Export
                     checked={format === 'geojson'}
                     onChange={() => setFormat('geojson')}
                   />
-                  <span>GeoJSON（几何 + 属性；保留原始字符串）</span>
+                  <span>GeoJSON · 几何与属性</span>
                 </label>
                 <label className="export-radio">
                   <input
@@ -250,57 +265,107 @@ export function ExportDialog({ open, onClose, layerId, mode = 'export' }: Export
                   />
                   <span>属性 CSV</span>
                 </label>
-                {mode === 'export' && <>
-                  <label className="export-radio"><input type="radio" name="export-format" checked={format === 'coordinate-csv'} onChange={() => setFormat('coordinate-csv')} /><span>点坐标 CSV（X、Y、坐标系 + 属性）</span></label>
-                  {format === 'coordinate-csv' && <label>目标坐标系 <select value={coordinateCrs} onChange={event => setCoordinateCrs(event.target.value as CoordinateExportCrs)} disabled={busy}>
-                    <option value="EPSG:4326">WGS84 · 经度/纬度（度）</option><option value="EPSG:3857">Web Mercator · X/Y（米）</option>
-                  </select><p className="export-hint">仅支持单点；新增 id、x、y、crs 列，同名属性冲突时拒绝导出。仅转换导出快照，不更改项目；Z 不写入 CSV。重新导入时请选择相同坐标系。Web Mercator 米制坐标不代表准确地面距离。</p></label>}
-                </>}
-                {format === 'geojson' && <p className="export-hint">GeoJSON 固定输出 WGS84 经度/纬度；地图显示投影不改变导出坐标。</p>}
-                {format !== 'geojson' ? (
-                  <p className="export-hint export-formula-help">
-                    CSV 默认启用电子表格公式防护：以 <code>=</code> <code>+</code>{' '}
-                    <code>-</code> <code>@</code> 或制表符/回车开头的单元格会加上前导{' '}
-                    <code>&apos;</code>，避免 Excel / LibreOffice 将其当作公式执行。GeoJSON
-                    不受此处理，始终保留原始字符串。
+                {mode === 'export' && (
+                  <>
+                    <label className="export-radio">
+                      <input
+                        type="radio"
+                        name="export-format"
+                        checked={format === 'coordinate-csv'}
+                        onChange={() => setFormat('coordinate-csv')}
+                      />
+                      <span>点坐标 CSV（X、Y、坐标系 + 属性）</span>
+                    </label>
+                    {format === 'coordinate-csv' && (
+                      <label>
+                        目标坐标系{' '}
+                        <select
+                          value={coordinateCrs}
+                          onChange={(event) =>
+                            setCoordinateCrs(
+                              event.target.value as CoordinateExportCrs
+                            )
+                          }
+                          disabled={busy}
+                        >
+                          <option value="EPSG:4326">
+                            WGS84 · 经度/纬度（度）
+                          </option>
+                          <option value="EPSG:3857">
+                            Web Mercator · X/Y（米）
+                          </option>
+                        </select>
+                        <p className="export-hint">
+                          仅支持单点；新增 id、x、y、crs
+                          列，同名属性冲突时拒绝导出。仅转换导出快照，不更改项目；Z
+                          不写入 CSV。重新导入时请选择相同坐标系。Web Mercator
+                          米制坐标不代表准确地面距离。
+                        </p>
+                      </label>
+                    )}
+                  </>
+                )}
+                {format === 'geojson' && (
+                  <p className="export-hint">
+                    GeoJSON 固定输出 WGS84
+                    经度/纬度；地图显示投影不改变导出坐标。
                   </p>
+                )}
+                {format !== 'geojson' ? (
+                  <details className="property-section">
+                    <summary>CSV 输出说明</summary>
+                    <p className="export-hint export-formula-help">
+                      CSV 默认启用电子表格公式防护：以 <code>=</code>{' '}
+                      <code>+</code> <code>-</code> <code>@</code>{' '}
+                      或制表符/回车开头的单元格会加上前导 <code>&apos;</code>
+                      ，避免 Excel / LibreOffice 将其当作公式执行。GeoJSON
+                      不受此处理，始终保留原始字符串。
+                    </p>
+                  </details>
                 ) : null}
-              </fieldset>}
+              </fieldset>
+            )}
 
-              {currentCount === 0 ? (
-                <p className="export-warn">当前范围无要素，不会生成文件或图层。</p>
-              ) : null}
-              {error ? <p className="export-error">{error}</p> : null}
-            </>
-          )}
-        </div>
-
-        <footer className="dialog-footer">
-          <button type="button" className="button-secondary" onClick={handleClose} disabled={busy}>
-            取消
-          </button>
-          {mode === 'copy' ? (
-            <button
-              type="button"
-              className="button-primary"
-              onClick={handleCopyLocal}
-              disabled={!layer || busy || currentCount === 0}
-              title="将当前范围复制为独立本地图层（独立 Dataset）"
-            >
-              复制为本地图层
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="button-primary"
-              onClick={() => void handleExport()}
-              disabled={!layer || busy || currentCount === 0}
-            >
-              {busy ? '导出中…' : '导出'}
-            </button>
-          )}
-        </footer>
+            {currentCount === 0 ? (
+              <p className="export-warn">
+                当前范围无要素，不会生成文件或图层。
+              </p>
+            ) : null}
+            {error ? <p className="export-error">{error}</p> : null}
+          </>
+        )}
       </div>
-    </div>
+
+      <footer className="dialog-footer">
+        <button
+          type="button"
+          className="button-secondary"
+          onClick={handleClose}
+          disabled={busy}
+        >
+          取消
+        </button>
+        {mode === 'copy' ? (
+          <button
+            type="button"
+            className="button-primary"
+            onClick={handleCopyLocal}
+            disabled={!layer || busy || currentCount === 0}
+            title="将当前范围复制为独立本地图层（独立 Dataset）"
+          >
+            复制为本地图层
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="button-primary"
+            onClick={() => void handleExport()}
+            disabled={!layer || busy || currentCount === 0}
+          >
+            {busy ? '导出中…' : '导出'}
+          </button>
+        )}
+      </footer>
+    </EditorDialog>
   )
 }

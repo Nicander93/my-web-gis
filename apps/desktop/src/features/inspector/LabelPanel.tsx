@@ -5,7 +5,12 @@ import { useSessionStore } from '@/stores/session.store'
 import { layerCommands } from '@/app/commands/layer.commands'
 import type { LabelConfig } from '@desktop-webgis/ol-style'
 import { rgb } from '@desktop-webgis/ol-style'
-import { colorToHex, listAttributeFields, parseHexColor, withLabel } from './style-draft'
+import {
+  colorToHex,
+  listAttributeFields,
+  parseHexColor,
+  withLabel
+} from './style-draft'
 
 interface LabelPanelProps {
   layerId: string
@@ -24,13 +29,17 @@ function defaultLabel(field = ''): LabelConfig {
 export function LabelPanel({ layerId }: LabelPanelProps) {
   const project = useProjectStore((state) => state.project)
   const featuresByDataset = useProjectStore((state) => state.featuresByDataset)
-  const getNormalizedLayerStyle = useProjectStore((state) => state.getNormalizedLayerStyle)
+  const getNormalizedLayerStyle = useProjectStore(
+    (state) => state.getNormalizedLayerStyle
+  )
   const patchStyleDraft = useSessionStore((state) => state.patchStyleDraft)
-  const sessionDraft = useSessionStore((state) => state.sessions[layerId]?.styleDraft)
+  const sessionDraft = useSessionStore(
+    (state) => state.sessions[layerId]?.styleDraft
+  )
 
   const layer = project.layers.find((item) => item.id === layerId) ?? null
   const applied = getNormalizedLayerStyle(layerId)
-  const features = layer ? featuresByDataset[layer.datasetId] ?? [] : []
+  const features = layer ? (featuresByDataset[layer.datasetId] ?? []) : []
   const fields = useMemo(() => listAttributeFields(features), [features])
 
   if (!layer || !applied) {
@@ -47,11 +56,17 @@ export function LabelPanel({ layerId }: LabelPanelProps) {
 
   function patchLabel(partial: Partial<LabelConfig> | null) {
     if (partial === null) {
-      patchStyleDraft(layerId, { style: withLabel(draft.style, undefined), dirty: true })
+      patchStyleDraft(layerId, {
+        style: withLabel(draft.style, undefined),
+        dirty: true
+      })
       return
     }
     const nextLabel: LabelConfig = { ...label, ...partial }
-    patchStyleDraft(layerId, { style: withLabel(draft.style, nextLabel), dirty: true })
+    patchStyleDraft(layerId, {
+      style: withLabel(draft.style, nextLabel),
+      dirty: true
+    })
   }
 
   return (
@@ -100,7 +115,11 @@ export function LabelPanel({ layerId }: LabelPanelProps) {
           max={72}
           disabled={!enabled}
           value={label.fontSize ?? 12}
-          onChange={(event) => patchLabel({ fontSize: Math.max(8, Number(event.target.value) || 12) })}
+          onChange={(event) =>
+            patchLabel({
+              fontSize: Math.max(8, Number(event.target.value) || 12)
+            })
+          }
         />
       </label>
 
@@ -110,7 +129,9 @@ export function LabelPanel({ layerId }: LabelPanelProps) {
           type="color"
           disabled={!enabled}
           value={colorToHex(label.color ?? rgb(0, 0, 0))}
-          onChange={(event) => patchLabel({ color: parseHexColor(event.target.value) })}
+          onChange={(event) =>
+            patchLabel({ color: parseHexColor(event.target.value) })
+          }
         />
       </label>
 
@@ -120,7 +141,9 @@ export function LabelPanel({ layerId }: LabelPanelProps) {
           type="color"
           disabled={!enabled}
           value={colorToHex(label.strokeColor ?? rgb(255, 255, 255))}
-          onChange={(event) => patchLabel({ strokeColor: parseHexColor(event.target.value) })}
+          onChange={(event) =>
+            patchLabel({ strokeColor: parseHexColor(event.target.value) })
+          }
         />
       </label>
 
@@ -133,44 +156,54 @@ export function LabelPanel({ layerId }: LabelPanelProps) {
           step={0.5}
           disabled={!enabled}
           value={label.strokeWidth ?? 2}
-          onChange={(event) => patchLabel({ strokeWidth: Math.max(0, Number(event.target.value) || 0) })}
+          onChange={(event) =>
+            patchLabel({
+              strokeWidth: Math.max(0, Number(event.target.value) || 0)
+            })
+          }
         />
       </label>
 
-      <label className="style-field">
-        <span>最小缩放</span>
-        <input
-          type="number"
-          min={0}
-          max={24}
-          disabled={!enabled}
-          value={label.minZoom ?? ''}
-          placeholder="不限"
-          onChange={(event) => {
-            const raw = event.target.value
-            patchLabel({ minZoom: raw === '' ? undefined : Number(raw) })
-          }}
-        />
-      </label>
+      <details className="property-section">
+        <summary>缩放范围</summary>
+        <label className="style-field">
+          <span>最小缩放</span>
+          <input
+            type="number"
+            min={0}
+            max={24}
+            disabled={!enabled}
+            value={label.minZoom ?? ''}
+            placeholder="不限"
+            onChange={(event) => {
+              const raw = event.target.value
+              patchLabel({ minZoom: raw === '' ? undefined : Number(raw) })
+            }}
+          />
+        </label>
 
-      <label className="style-field">
-        <span>最大缩放</span>
-        <input
-          type="number"
-          min={0}
-          max={24}
-          disabled={!enabled}
-          value={label.maxZoom ?? ''}
-          placeholder="不限"
-          onChange={(event) => {
-            const raw = event.target.value
-            patchLabel({ maxZoom: raw === '' ? undefined : Number(raw) })
-          }}
-        />
-      </label>
-
+        <label className="style-field">
+          <span>最大缩放</span>
+          <input
+            type="number"
+            min={0}
+            max={24}
+            disabled={!enabled}
+            value={label.maxZoom ?? ''}
+            placeholder="不限"
+            onChange={(event) => {
+              const raw = event.target.value
+              patchLabel({ maxZoom: raw === '' ? undefined : Number(raw) })
+            }}
+          />
+        </label>
+      </details>
       <div className="style-actions">
-        <Button type="button" variant="ghost" onClick={() => layerCommands.resetStyleDraft(layerId)}>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => layerCommands.resetStyleDraft(layerId)}
+        >
           重置草稿
         </Button>
         <Button

@@ -1,4 +1,4 @@
-import { Cartesian2, Cartesian3, Color, Entity, IntersectionTests, Matrix4, Plane, ScreenSpaceEventHandler, ScreenSpaceEventType, Transforms } from 'cesium'
+import { BoundingSphere, CallbackProperty, Cartesian2, Cartesian3, Color, ColorMaterialProperty, Entity, HeadingPitchRoll, IntersectionTests, Math as CesiumMath, Matrix3, Matrix4, Plane, PolylineArrowMaterialProperty, Quaternion, ScreenSpaceEventHandler, ScreenSpaceEventType, Transforms } from 'cesium'
 import type { Viewer } from 'cesium'
 import type { TransformLayer } from '@desktop-webgis/cesium-layer'
 import type { Transform } from '@desktop-webgis/cesium-scene-schema'
@@ -33,6 +33,7 @@ export class TilesetEditor {
   private readonly axes = new Map<Entity, Axis>()
   private readonly handler: ScreenSpaceEventHandler
   private drag?: Drag
+  private hovered?: Axis
   private destroyed = false
   private readonly keyHandler = (event: KeyboardEvent) => { if (event.key === 'Escape') { this.cancel(); event.preventDefault() } }
   private readonly blurHandler = () => this.cancel()
@@ -94,14 +95,15 @@ export class TilesetEditor {
   }
   private clearHandles(): void {
     if (!this.viewer.isDestroyed()) this.handles.forEach(entity => this.viewer.entities.remove(entity))
-    this.handles = []; this.axes.clear()
+    this.handles = []; this.axes.clear(); this.hovered = undefined
   }
 
   private getFrame(): { origin: Cartesian3; basis: Cartesian3[] } | undefined {
     if (!this.layer?.pivot) return
     const frame = Transforms.eastNorthUpToFixedFrame(this.layer.pivot)
     const origin = Matrix4.multiplyByPoint(frame, Cartesian3.fromArray(this.layer.getTransform().translation), new Cartesian3())
-    const basis = [Cartesian3.UNIT_X, Cartesian3.UNIT_Y, Cartesian3.UNIT_Z].map(axis => Matrix4.multiplyByPointAsVector(frame, axis, new Cartesian3()))
+    const rotation = Matrix3.fromQuaternion(Quaternion.fromHeadingPitchRoll(new HeadingPitchRoll(...this.layer.getTransform().rotation.map(CesiumMath.toRadians))))
+    const basis = [Cartesian3.UNIT_X, Cartesian3.UNIT_Y, Cartesian3.UNIT_Z].map(axis => Matrix4.multiplyByPointAsVector(frame, this.mode === 'translate' ? axis : Matrix3.multiplyByVector(rotation, axis, new Cartesian3()), new Cartesian3()))
     return { origin, basis }
   }
 
@@ -109,31 +111,40 @@ export class TilesetEditor {
     this.clearHandles()
     const frame = this.getFrame()
     if (!frame || this.viewer.isDestroyed()) return
-    const { origin, basis } = frame
-    const radius = Math.max(10, Math.min(this.layer?.boundingSphere?.radius ?? 30, 250))
     const colors = [Color.fromCssColorString('#ff665e'), Color.fromCssColorString('#71d98a'), Color.fromCssColorString('#68b5ff')]
     const point = (x: number, y: number, z: number): Cartesian3 => {
+      const { origin, basis } = this.getFrame() ?? frame
+      // Keep a usable screen size while zooming; never freeze the live drag origin.
+      const canvas = this.viewer.canvas
+      const pixelSize = canvas.clientWidth && canvas.clientHeight
+        ? this.viewer.camera.getPixelSize(new BoundingSphere(origin, 1), canvas.clientWidth, canvas.clientHeight)
+        : 0
+      const radius = pixelSize > 0 ? pixelSize * 100 : Math.max(10, this.layer?.boundingSphere?.radius ?? 30)
       const result = Cartesian3.clone(origin)
       ;[x, y, z].forEach((value, i) => Cartesian3.add(result, Cartesian3.multiplyByScalar(basis[i], value * radius, new Cartesian3()), result))
       return result
     }
-    const add = (axis: Axis, positions: Cartesian3[], color: Color): void => {
-      const entity = this.viewer.entities.add({ polyline: { positions, width: 5, material: color, depthFailMaterial: color.withAlpha(0.5) } })
+    const add = (axis: Axis, positions: () => Cartesian3[], color: Color, arrow = false): void => {
+      const liveColor = new CallbackProperty(() => this.drag?.axis === axis || this.hovered === axis ? Color.YELLOW : color, false)
+      const material = arrow ? new PolylineArrowMaterialProperty(liveColor) : new ColorMaterialProperty(liveColor)
+      const entity = this.viewer.entities.add({ polyline: { positions: new CallbackProperty(positions, false), width: arrow ? 14 : 5, material, depthFailMaterial: arrow ? new PolylineArrowMaterialProperty(color.withAlpha(.65)) : color.withAlpha(.65) } })
       this.handles.push(entity); this.axes.set(entity, axis)
     }
     if (this.mode === 'translate') {
-      ;(['X', 'Y', 'Z'] as const).forEach((axis, i) => add(axis, [origin, point(i === 0 ? 1 : 0, i === 1 ? 1 : 0, i === 2 ? 1 : 0)], colors[i]))
-      add('XY', [point(.2,.2,0), point(.45,.2,0), point(.45,.45,0), point(.2,.45,0), point(.2,.2,0)], Color.YELLOW)
+      ;(['X', 'Y', 'Z'] as const).forEach((axis, i) => add(axis, () => [point(0,0,0), point(i === 0 ? 1 : 0, i === 1 ? 1 : 0, i === 2 ? 1 : 0)], colors[i], true))
+      add('XY', () => [point(.2,.2,0), point(.45,.2,0), point(.45,.45,0), point(.2,.45,0), point(.2,.2,0)], Color.YELLOW)
     } else if (this.mode === 'rotate') {
       ;(['X', 'Y', 'Z'] as const).forEach((axis, i) => {
-        const points = Array.from({ length: 65 }, (_, n) => {
-          const angle = n * Math.PI / 32, p = [0, 0, 0]
+        const points = () => Array.from({ length: 97 }, (_, n) => {
+          const angle = n * Math.PI / 48, p = [0, 0, 0]
           p[(i + 1) % 3] = Math.cos(angle); p[(i + 2) % 3] = Math.sin(angle)
           return point(p[0], p[1], p[2])
         })
         add(axis, points, colors[i])
       })
-    } else add('S', [origin, point(.7,.7,.7)], Color.WHITE)
+    } else {
+      add('S', () => [point(0,0,0), point(.7,.7,.7)], Color.WHITE, true)
+    }
     this.viewer.scene.requestRender()
   }
 
@@ -162,7 +173,13 @@ export class TilesetEditor {
   }
 
   private move(pixel: Cartesian2): void {
-    if (!this.drag || !this.layer) return
+    if (!this.layer) return
+    if (!this.drag) {
+      const picked = this.viewer.scene.pick(pixel)
+      this.hovered = picked?.id instanceof Entity ? this.axes.get(picked.id) : undefined
+      this.viewer.scene.requestRender()
+      return
+    }
     const drag = this.drag, next = structuredClone(drag.before)
     const ray = this.viewer.camera.getPickRay(pixel)
     const hit = ray ? IntersectionTests.rayPlane(ray, drag.plane) : undefined
@@ -178,12 +195,16 @@ export class TilesetEditor {
       const a = Cartesian3.subtract(drag.start, drag.origin, new Cartesian3()), b = Cartesian3.subtract(hit, drag.origin, new Cartesian3())
       if (Cartesian3.magnitudeSquared(a) < 1e-8 || Cartesian3.magnitudeSquared(b) < 1e-8) return
       const angle = Math.atan2(Cartesian3.dot(Cartesian3.cross(a, b, new Cartesian3()), drag.basis[axisIndex]), Cartesian3.dot(a, b)) * 180 / Math.PI
-      // Cesium HPR uses +roll around X, -pitch around Y, -heading around Z.
-      next.rotation[[2, 1, 0][axisIndex]] += snap(angle * (axisIndex === 0 ? 1 : -1), this.options.rotationSnap)
+      // Compose about the frozen local axis; adding Euler angles drifts after prior rotations.
+      const before = Quaternion.fromHeadingPitchRoll(new HeadingPitchRoll(...drag.before.rotation.map(CesiumMath.toRadians)))
+      const delta = Quaternion.fromAxisAngle([Cartesian3.UNIT_X, Cartesian3.UNIT_Y, Cartesian3.UNIT_Z][axisIndex], CesiumMath.toRadians(snap(angle, this.options.rotationSnap)))
+      const rotation = HeadingPitchRoll.fromQuaternion(Quaternion.multiply(before, delta, new Quaternion()))
+      next.rotation = [rotation.heading, rotation.pitch, rotation.roll].map(CesiumMath.toDegrees) as Transform['rotation']
     } else if (this.mode === 'scale') {
       next.scale = Math.max(.001, Math.min(10000, drag.before.scale * Math.exp(((pixel.x - drag.pixel.x) - (pixel.y - drag.pixel.y)) / 150)))
     } else return
     this.layer.setTransform(next)
+    this.viewer.scene.requestRender()
     this.options.onPreview?.({ id: this.layer.id, before: drag.before, after: next })
   }
 }

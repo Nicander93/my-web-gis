@@ -26,16 +26,28 @@ import {
   type LayerGroup,
   type LayerTreeEntry
 } from '@desktop-webgis/gis-core'
-import { colorToString, symbolPrimaryColor, type LayerStyle, type Symbol } from '@desktop-webgis/ol-style'
+import {
+  colorToString,
+  symbolPrimaryColor,
+  type LayerStyle,
+  type Symbol
+} from '@desktop-webgis/ol-style'
 import { LayerContextMenu } from './LayerContextMenu'
 import { LayerPopupMenu } from './LayerPopupMenu'
 import { MenuItem } from '@/app/header/menus/MenuItem'
+import { EditorDialog } from '@/components/ui/EditorDialog'
+import { projectCommands } from '@/app/commands/project.commands'
 import { layerCommands } from '@/app/commands/layer.commands'
+import { useWorkbenchStore } from '@/stores/workbench.store'
 
-function previewFromSymbol(symbol: Symbol): { kind: 'point' | 'line' | 'polygon'; color: string } {
+function previewFromSymbol(symbol: Symbol): {
+  kind: 'point' | 'line' | 'polygon'
+  color: string
+} {
   const color = colorToString(symbolPrimaryColor(symbol))
   if (symbol.type === 'circle') return { kind: 'point', color }
-  if (symbol.type === 'solid' && 'width' in symbol && !('fill' in symbol)) return { kind: 'line', color }
+  if (symbol.type === 'solid' && 'width' in symbol && !('fill' in symbol))
+    return { kind: 'line', color }
   if (symbol.type === 'mixed') {
     if (symbol.polygon) return { kind: 'polygon', color }
     if (symbol.line) return { kind: 'line', color }
@@ -44,10 +56,14 @@ function previewFromSymbol(symbol: Symbol): { kind: 'point' | 'line' | 'polygon'
   return { kind: 'polygon', color }
 }
 
-function getPreviewSymbol(style: LayerStyle | { kind: string }): { kind: 'point' | 'line' | 'polygon'; color: string } {
+function getPreviewSymbol(style: LayerStyle | { kind: string }): {
+  kind: 'point' | 'line' | 'polygon'
+  color: string
+} {
   if (isLegacyStyle(style as never)) {
     const legacy = style as { kind: string; fill: string; stroke: string }
-    if (legacy.kind === 'polygon') return { kind: 'polygon', color: legacy.fill }
+    if (legacy.kind === 'polygon')
+      return { kind: 'polygon', color: legacy.fill }
     if (legacy.kind === 'line') return { kind: 'line', color: legacy.stroke }
     return { kind: 'point', color: legacy.fill }
   }
@@ -57,7 +73,9 @@ function getPreviewSymbol(style: LayerStyle | { kind: string }): { kind: 'point'
     return previewFromSymbol(normalized.symbol)
   }
   if (normalized.mode === 'categorized') {
-    return previewFromSymbol(normalized.categories[0]?.symbol ?? normalized.fallback)
+    return previewFromSymbol(
+      normalized.categories[0]?.symbol ?? normalized.fallback
+    )
   }
   return previewFromSymbol(normalized.breaks[0]?.symbol ?? normalized.fallback)
 }
@@ -74,6 +92,9 @@ interface LayerPanelProps {
 }
 
 export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
+  const editLayerId = useWorkbenchStore((state) => state.editLayerId)
+  const [deletingGroup, setDeletingGroup] = useState<LayerGroup | null>(null)
+  const [removeChildren, setRemoveChildren] = useState(false)
   const [query, setQuery] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
   const project = useProjectStore((state) => state.project)
@@ -89,10 +110,16 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
   const sessions = useSessionStore((state) => state.sessions)
 
   const [menu, setMenu] = useState<MenuState | null>(null)
-  const [groupMenu, setGroupMenu] = useState<{ group: LayerGroup; x: number; y: number } | null>(null)
+  const [groupMenu, setGroupMenu] = useState<{
+    group: LayerGroup
+    x: number
+    y: number
+  } | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
+  const [collapsedGroups, setCollapsedGroups] = useState<
+    Record<string, boolean>
+  >({})
   const [dragLayerId, setDragLayerId] = useState<string | null>(null)
 
   const tree = useMemo(() => normalizeLayerTree(project), [project])
@@ -119,7 +146,11 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
     onCloseSearch()
   }
 
-  function openMenuFor(layerId: string, clientX: number, clientY: number): void {
+  function openMenuFor(
+    layerId: string,
+    clientX: number,
+    clientY: number
+  ): void {
     setGroupMenu(null)
     setSelectedLayer(layerId)
     setMenu({ layerId, x: clientX, y: clientY })
@@ -140,25 +171,15 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
   }
 
   function handleRemoveGroup(group: LayerGroup): void {
-    const keepChildren = window.confirm(
-      `删除组「${group.name}」？
-
-确定：保留子图层（移到顶层）
-取消：再确认是否连同子图层一起移除`
-    )
-    if (keepChildren) {
-      removeGroup(group.id, false)
-      return
-    }
-    const removeTogether = window.confirm(
-      `将组「${group.name}」与其 ${group.layerIds.length} 个子图层一起移除？此操作不可从该对话框撤销。`
-    )
-    if (removeTogether) {
-      removeGroup(group.id, true)
-    }
+    setRemoveChildren(false)
+    setDeletingGroup(group)
   }
 
-  function onDropLayer(target: { kind: 'root'; index: number } | { kind: 'group'; groupId: string; index: number }): void {
+  function onDropLayer(
+    target:
+      | { kind: 'root'; index: number }
+      | { kind: 'group'; groupId: string; index: number }
+  ): void {
     if (!dragLayerId) return
     relocateLayer(dragLayerId, target)
     setDragLayerId(null)
@@ -169,13 +190,18 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
     return layer.name.includes(q)
   }
 
-  function renderLayerRow(layer: Layer, options?: { indent?: boolean; groupId?: string; indexInGroup?: number }): ReactNode {
+  function renderLayerRow(
+    layer: Layer,
+    options?: { indent?: boolean; groupId?: string; indexInGroup?: number }
+  ): ReactNode {
     if (!matchesQuery(layer)) return null
     const isActive = selectedLayerId === layer.id
     const isLoading = Boolean(sessions[layer.id]?.loading)
     const selectedCount =
       selection.layerId === layer.id ? selection.featureIds.length : 0
-    const style = isLegacyStyle(layer.style) ? migrateLegacyStyle(layer.style) : layer.style
+    const style = isLegacyStyle(layer.style)
+      ? migrateLegacyStyle(layer.style)
+      : layer.style
     const preview = getPreviewSymbol(style)
     const indent = options?.indent ? ' is-child' : ''
 
@@ -190,7 +216,11 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
         onDrop={(event) => {
           event.preventDefault()
           if (options?.groupId != null && options.indexInGroup != null) {
-            onDropLayer({ kind: 'group', groupId: options.groupId, index: options.indexInGroup })
+            onDropLayer({
+              kind: 'group',
+              groupId: options.groupId,
+              index: options.indexInGroup
+            })
           } else {
             const rootIndex = rootOrder.findIndex(
               (entry) => entry.type === 'layer' && entry.id === layer.id
@@ -241,7 +271,14 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
               }
             />
             <span>{layer.name}</span>
-            {isLoading ? <Loader2 className="layer-loading-icon" size={12} /> : null}
+            {editLayerId === layer.id && (
+              <span className="layer-edit-marker" title="编辑目标已锁定">
+                编辑
+              </span>
+            )}
+            {isLoading ? (
+              <Loader2 className="layer-loading-icon" size={12} />
+            ) : null}
             {selectedCount > 0 ? (
               <span className="layer-selection-count" title="选中要素数">
                 {selectedCount}
@@ -255,7 +292,9 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
           title="更多"
           aria-label={`更多操作 ${layer.name}`}
           onClick={(event) => {
-            const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+            const rect = (
+              event.currentTarget as HTMLElement
+            ).getBoundingClientRect()
             openMenuFor(layer.id, rect.left, rect.bottom + 4)
           }}
         >
@@ -265,7 +304,10 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
     )
   }
 
-  function renderRootEntry(entry: LayerTreeEntry, _rootIndex: number): ReactNode {
+  function renderRootEntry(
+    entry: LayerTreeEntry,
+    _rootIndex: number
+  ): ReactNode {
     if (entry.type === 'layer') {
       const layer = layerById.get(entry.id)
       if (!layer) return null
@@ -293,7 +335,11 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => {
             event.preventDefault()
-            onDropLayer({ kind: 'group', groupId: group.id, index: group.layerIds.length })
+            onDropLayer({
+              kind: 'group',
+              groupId: group.id,
+              index: group.layerIds.length
+            })
           }}
         >
           <Button
@@ -301,7 +347,10 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
             title={collapsed ? '展开' : '折叠'}
             aria-label={collapsed ? '展开组' : '折叠组'}
             onClick={() =>
-              setCollapsedGroups((state) => ({ ...state, [group.id]: !collapsed }))
+              setCollapsedGroups((state) => ({
+                ...state,
+                [group.id]: !collapsed
+              }))
             }
           >
             {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
@@ -310,7 +359,9 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
             variant="icon"
             className="visibility-button"
             title={group.visible ? '隐藏组' : '显示组'}
-            aria-label={group.visible ? `隐藏组${group.name}` : `显示组${group.name}`}
+            aria-label={
+              group.visible ? `隐藏组${group.name}` : `显示组${group.name}`
+            }
             onClick={() => setGroupVisible(group.id, !group.visible)}
           >
             {group.visible ? <Eye size={14} /> : <EyeOff size={14} />}
@@ -354,17 +405,32 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
 
   return (
     <div className="feature-panel layer-manager">
-          {searchOpen && (
-            <label className="search-field layer-search">
-              <Search size={14} />
-              <input ref={searchInputRef} value={query} onChange={(event) => setQuery(event.target.value)}
-                placeholder="搜索图层" aria-label="搜索图层"
-                onKeyDown={(event) => {
-                  if (event.key === 'Escape') { event.preventDefault(); closeSearch() }
-                }} />
-              <Button variant="icon" title="关闭搜索" aria-label="关闭搜索" onClick={closeSearch}><X size={14} /></Button>
-            </label>
-          )}
+      {searchOpen && (
+        <label className="search-field layer-search">
+          <Search size={14} />
+          <input
+            ref={searchInputRef}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="搜索图层"
+            aria-label="搜索图层"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.preventDefault()
+                closeSearch()
+              }
+            }}
+          />
+          <Button
+            variant="icon"
+            title="关闭搜索"
+            aria-label="关闭搜索"
+            onClick={closeSearch}
+          >
+            <X size={14} />
+          </Button>
+        </label>
+      )}
       <div
         className="layer-tree"
         onDragOver={(event) => event.preventDefault()}
@@ -374,8 +440,21 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
         }}
       >
         {rootOrder.map((entry, index) => renderRootEntry(entry, index))}
-        {tree.layers.length === 0 && <p className="empty-state">没有图层，请通过&quot;添加数据&quot;导入</p>}
-        {tree.layers.length > 0 && filteredEmpty && <p className="empty-state">没有匹配的图层</p>}
+        {tree.layers.length === 0 && (
+          <div className="workbench-empty">
+            <Folder size={24} />
+            <strong>尚无图层</strong>
+            <button
+              className="button-secondary"
+              onClick={projectCommands.addData}
+            >
+              添加数据
+            </button>
+          </div>
+        )}
+        {tree.layers.length > 0 && filteredEmpty && (
+          <p className="empty-state">没有匹配的图层</p>
+        )}
       </div>
       {menu ? (
         <LayerContextMenu
@@ -386,17 +465,75 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
           onRequestRename={beginRename}
         />
       ) : null}
+      {deletingGroup && (
+        <EditorDialog title="移除图层组" onClose={() => setDeletingGroup(null)}>
+          <div className="dialog-body">
+            <p>
+              移除「{deletingGroup.name}」？默认保留其{' '}
+              {deletingGroup.layerIds.length} 个图层并移到顶层。
+            </p>
+            <label className="attr-check">
+              <input
+                type="checkbox"
+                checked={removeChildren}
+                onChange={(event) => setRemoveChildren(event.target.checked)}
+              />
+              同时移除组内图层
+            </label>
+            {removeChildren && (
+              <p className="editor-warning">组内图层将从此项目移除。</p>
+            )}
+          </div>
+          <footer className="dialog-footer">
+            <button
+              className="button-secondary"
+              onClick={() => setDeletingGroup(null)}
+            >
+              取消
+            </button>
+            <button
+              className={removeChildren ? 'button-danger' : 'button-primary'}
+              onClick={() => {
+                removeGroup(deletingGroup.id, removeChildren)
+                setDeletingGroup(null)
+              }}
+            >
+              {removeChildren ? '移除组及图层' : '移除组，保留图层'}
+            </button>
+          </footer>
+        </EditorDialog>
+      )}
       {groupMenu ? (
-        <LayerPopupMenu x={groupMenu.x} y={groupMenu.y} label="组菜单" onClose={() => setGroupMenu(null)}>
-          <MenuItem icon={ArrowUp} label="上移组" onClick={() => {
-            moveRootEntry({ type: 'group', id: groupMenu.group.id }, 'up'); setGroupMenu(null)
-          }} />
-          <MenuItem icon={ArrowDown} label="下移组" onClick={() => {
-            moveRootEntry({ type: 'group', id: groupMenu.group.id }, 'down'); setGroupMenu(null)
-          }} />
-          <MenuItem icon={Trash2} label="删除组" onClick={() => {
-            handleRemoveGroup(groupMenu.group); setGroupMenu(null)
-          }} />
+        <LayerPopupMenu
+          x={groupMenu.x}
+          y={groupMenu.y}
+          label="组菜单"
+          onClose={() => setGroupMenu(null)}
+        >
+          <MenuItem
+            icon={ArrowUp}
+            label="上移组"
+            onClick={() => {
+              moveRootEntry({ type: 'group', id: groupMenu.group.id }, 'up')
+              setGroupMenu(null)
+            }}
+          />
+          <MenuItem
+            icon={ArrowDown}
+            label="下移组"
+            onClick={() => {
+              moveRootEntry({ type: 'group', id: groupMenu.group.id }, 'down')
+              setGroupMenu(null)
+            }}
+          />
+          <MenuItem
+            icon={Trash2}
+            label="删除组"
+            onClick={() => {
+              handleRemoveGroup(groupMenu.group)
+              setGroupMenu(null)
+            }}
+          />
         </LayerPopupMenu>
       ) : null}
     </div>

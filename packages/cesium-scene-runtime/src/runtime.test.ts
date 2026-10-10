@@ -35,6 +35,18 @@ function setup() {
   return { scene, viewer, runtime: new CitySceneRuntime(viewer, { target: 'map', scene }) }
 }
 describe('incremental scene reconciliation', () => {
+  it('updates tileset quality in place without downloading a new resource', async () => {
+    const s = setup(); await s.runtime.updateScene(s.scene)
+    const layer = s.runtime.layers.getLayer('blocks') as import('@desktop-webgis/cesium-layer').TilesetLayer
+    const quality = vi.spyOn(layer, 'setQuality')
+    const node = s.scene.nodes[0]
+    if (node.type === '3dtiles') { node.maximumScreenSpaceError = 2; node.cacheBytes = 512 * 1024 * 1024 }
+    await s.runtime.updateScene(s.scene)
+    expect(quality).toHaveBeenLastCalledWith(2, 512 * 1024 * 1024)
+    expect(s.runtime.layers.getLayer('blocks')).toBe(layer)
+    expect(probe.created).toBe(1)
+    s.runtime.destroy()
+  })
   it('keeps vector selection after style updates and restores the latest scene color', async () => {
     const s = setup()
     s.scene.assets.roads = { type: 'geojson', url: './roads.geojson' }

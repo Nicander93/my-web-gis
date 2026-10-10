@@ -1,11 +1,23 @@
-import type { BasemapConfig, EditCommand, EditTool, MapState, SelectionState } from '@desktop-webgis/gis-core'
+import type {
+  BasemapConfig,
+  EditCommand,
+  EditTool,
+  MapState,
+  SelectionState
+} from '@desktop-webgis/gis-core'
 import { capabilitiesForDataset, isLegacyStyle } from '@desktop-webgis/gis-core'
-import { OlMapRuntime, OlSelectionRuntime, OlToolRuntime, type ToolCallbacks } from '@desktop-webgis/ol-runtime'
+import {
+  OlMapRuntime,
+  OlSelectionRuntime,
+  OlToolRuntime,
+  type ToolCallbacks
+} from '@desktop-webgis/ol-runtime'
 import { transform, transformExtent } from 'ol/proj'
 import { getSessionCredential } from '@/services/credentials'
 import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
 import { useSnappingStore } from '@/stores/snapping.store'
+import { useWorkbenchStore } from '@/stores/workbench.store'
 
 let runtime: OlMapRuntime | null = null
 let selectionRuntime: OlSelectionRuntime | null = null
@@ -50,12 +62,21 @@ export function getActiveEditTool(): EditTool {
   return activeTool
 }
 
+/** Esc 优先取消绘制草稿；再次使用时切回浏览，保持编辑目标。 */
+export function cancelMapOperation(): boolean {
+  if (toolRuntime?.cancelSketch()) return true
+  return setActiveEditTool('pan')
+}
+
 export function getLiveMapState(): MapState | null {
   if (!isMapRuntimeMounted() || !runtime) return null
   return runtime.getMapState()
 }
 
-export function mountMapRuntime(target: HTMLElement, mapState: MapState): OlMapRuntime {
+export function mountMapRuntime(
+  target: HTMLElement,
+  mapState: MapState
+): OlMapRuntime {
   if (runtime && mounted) {
     unmountMapRuntime()
   }
@@ -64,9 +85,12 @@ export function mountMapRuntime(target: HTMLElement, mapState: MapState): OlMapR
   runtime.mount(target, mapState)
   selectionRuntime = new OlSelectionRuntime(runtime)
   toolRuntime = new OlToolRuntime(runtime)
-  toolRuntime.setSnapping(useSnappingStore.getState().options, snapped => useSnappingStore.getState().setSnapped(snapped))
+  toolRuntime.setSnapping(useSnappingStore.getState().options, (snapped) =>
+    useSnappingStore.getState().setSnapped(snapped)
+  )
   snappingUnsub = useSnappingStore.subscribe((state, previous) => {
-    if (state.options !== previous.options) toolRuntime?.setSnapping(state.options)
+    if (state.options !== previous.options)
+      toolRuntime?.setSnapping(state.options)
   })
   mounted = true
   selectionMounted = true
@@ -87,15 +111,27 @@ export function mountMapRuntime(target: HTMLElement, mapState: MapState): OlMapR
   storeUnsub = useProjectStore.subscribe((state, previous) => {
     if (!isMapRuntimeMounted()) return
 
+    const target = useWorkbenchStore.getState().editLayerId
+    if (
+      state.project.id !== previous.project.id ||
+      ((isDrawTool(activeTool) ||
+        activeTool === 'modify' ||
+        activeTool === 'delete') &&
+        (!target || !state.project.layers.some((layer) => layer.id === target)))
+    ) {
+      useWorkbenchStore.getState().setEditLayer(null)
+      setActiveEditTool('select')
+    }
+
     if (state.selection !== previous.selection) {
       syncSelectionHighlight(state.selection)
     }
 
     if (
       state.selectedLayerId !== previous.selectedLayerId &&
-      (activeTool === 'select' || isDrawTool(activeTool) || activeTool === 'modify' || activeTool === 'delete')
+      activeTool === 'select'
     ) {
-      // Re-bind tools/selection to the newly selected layer.
+      // 浏览只重绑选择工具；几何编辑保持锁定目标。
       setActiveEditTool(activeTool)
     }
   })
@@ -120,6 +156,8 @@ export function unmountMapRuntime(): void {
   selectionMounted = false
   toolMounted = false
   activeTool = 'none'
+  useWorkbenchStore.getState().setEditLayer(null)
+  useWorkbenchStore.getState().setActiveTool('none')
   runtime?.unmount()
   runtime = null
   mounted = false
@@ -146,7 +184,10 @@ export function syncMapFromProject(): void {
   const basemapKey = JSON.stringify(project.basemap)
   if (basemapKey !== lastBasemapKey) {
     lastBasemapKey = basemapKey
-    void runtime.syncBasemap(project.basemap, collectBasemapCredentials(project.basemap))
+    void runtime.syncBasemap(
+      project.basemap,
+      collectBasemapCredentials(project.basemap)
+    )
   }
 
   runtime.syncLayers(state.getMapLayers(), featuresByDataset, project.datasets)
@@ -177,15 +218,27 @@ export function zoomMapToLayer(layerId: string): boolean {
 }
 
 /** Focus a diagnostic coordinate, or the finite bounds of its source feature. */
-export function zoomMapToFeature(layerId: string, featureId: string, location: [number, number] | null): boolean {
+export function zoomMapToFeature(
+  layerId: string,
+  featureId: string,
+  location: [number, number] | null
+): boolean {
   if (!runtime || !mounted) return false
   const state = useProjectStore.getState()
-  const layer = state.project.layers.find(item => item.id === layerId)
-  const feature = layer && state.featuresByDataset[layer.datasetId]?.find(item => item.id === featureId)
+  const layer = state.project.layers.find((item) => item.id === layerId)
+  const feature =
+    layer &&
+    state.featuresByDataset[layer.datasetId]?.find(
+      (item) => item.id === featureId
+    )
   if (!feature) return false
   const view = runtime.getMap().getView()
   if (location) {
-    view.animate({ center: transform(location, 'EPSG:4326', view.getProjection()), zoom: Math.max(view.getZoom() ?? 0, 16), duration: 150 })
+    view.animate({
+      center: transform(location, 'EPSG:4326', view.getProjection()),
+      zoom: Math.max(view.getZoom() ?? 0, 16),
+      duration: 150
+    })
     return true
   }
   const extent = [Infinity, Infinity, -Infinity, -Infinity]
@@ -193,14 +246,26 @@ export function zoomMapToFeature(layerId: string, featureId: string, location: [
     if (!Array.isArray(value)) return
     if (typeof value[0] === 'number') {
       const [x, y] = value
-      if (!Number.isFinite(x) || !Number.isFinite(y) || Math.abs(x) > 180 || Math.abs(y) > 90) return
-      extent[0] = Math.min(extent[0], x); extent[1] = Math.min(extent[1], y)
-      extent[2] = Math.max(extent[2], x); extent[3] = Math.max(extent[3], y)
+      if (
+        !Number.isFinite(x) ||
+        !Number.isFinite(y) ||
+        Math.abs(x) > 180 ||
+        Math.abs(y) > 90
+      )
+        return
+      extent[0] = Math.min(extent[0], x)
+      extent[1] = Math.min(extent[1], y)
+      extent[2] = Math.max(extent[2], x)
+      extent[3] = Math.max(extent[3], y)
     } else value.forEach(visit)
   }
   visit(feature.geometry.coordinates)
   if (!extent.every(Number.isFinite)) return false
-  view.fit(transformExtent(extent, 'EPSG:4326', view.getProjection()), { padding: [60, 60, 60, 60], maxZoom: 16, duration: 150 })
+  view.fit(transformExtent(extent, 'EPSG:4326', view.getProjection()), {
+    padding: [60, 60, 60, 60],
+    maxZoom: 16,
+    duration: 150
+  })
   return true
 }
 
@@ -218,12 +283,9 @@ export function syncSessionViewExtent(): void {
   const extent = view.calculateExtent(size)
   const wgs84 = transformExtent(extent, view.getProjection(), 'EPSG:4326')
   if (wgs84.some((value) => !Number.isFinite(value))) return
-  useSessionStore.getState().setMapViewExtentWgs84([
-    wgs84[0],
-    wgs84[1],
-    wgs84[2],
-    wgs84[3]
-  ])
+  useSessionStore
+    .getState()
+    .setMapViewExtentWgs84([wgs84[0], wgs84[1], wgs84[2], wgs84[3]])
 }
 
 /**
@@ -234,6 +296,7 @@ export function setActiveEditTool(tool: EditTool): boolean {
   if (!isMapRuntimeMounted() || !selectionRuntime || !toolRuntime) return false
 
   activeTool = tool
+  useWorkbenchStore.getState().setActiveTool(tool)
 
   if (tool === 'none' || tool === 'pan') {
     selectionRuntime.deactivate()
@@ -258,21 +321,31 @@ export function setActiveEditTool(tool: EditTool): boolean {
 
   // Draw / modify / delete require a vector layer that supports geometry edits.
   selectionRuntime.deactivate()
-  const layerId = useProjectStore.getState().selectedLayerId
+  const layerId =
+    useWorkbenchStore.getState().editLayerId ??
+    useProjectStore.getState().selectedLayerId
   if (!layerId) {
     toolRuntime.deactivate()
+    activeTool = 'none'
+    useWorkbenchStore.getState().setActiveTool('none')
     return false
   }
   const project = useProjectStore.getState().project
   const layer = project.layers.find((item) => item.id === layerId)
-  const dataset = layer ? project.datasets.find((item) => item.id === layer.datasetId) : undefined
+  const dataset = layer
+    ? project.datasets.find((item) => item.id === layer.datasetId)
+    : undefined
   if (!capabilitiesForDataset(dataset).editGeometry) {
     toolRuntime.deactivate()
+    activeTool = 'none'
+    useWorkbenchStore.getState().setActiveTool('none')
     return false
   }
 
   const resolved: EditTool = isDrawTool(tool) ? resolveDrawTool(layerId) : tool
+  useWorkbenchStore.getState().setEditLayer(layerId)
   activeTool = resolved
+  useWorkbenchStore.getState().setActiveTool(resolved)
   toolRuntime.activate(resolved, createToolCallbacks())
   return true
 }
@@ -289,7 +362,7 @@ export function clearMapSelection(): boolean {
 
 function createToolCallbacks(): ToolCallbacks {
   return {
-    getActiveLayerId: () => useProjectStore.getState().selectedLayerId,
+    getActiveLayerId: () => useWorkbenchStore.getState().editLayerId,
     onAddFeature: (_datasetId, _feature, command) => {
       useProjectStore.getState().executeEditCommand(command)
       syncMapFromProject()
@@ -304,7 +377,7 @@ function createToolCallbacks(): ToolCallbacks {
       syncMapFromProject()
     },
     onSelectionChange: (featureIds) => {
-      const layerId = useProjectStore.getState().selectedLayerId
+      const layerId = useWorkbenchStore.getState().editLayerId
       if (!layerId) return
       applyingStoreSelection = true
       try {
@@ -323,7 +396,9 @@ function syncSelectionHighlight(selection: SelectionState): void {
 }
 
 function isDrawTool(tool: EditTool): boolean {
-  return tool === 'draw-point' || tool === 'draw-line' || tool === 'draw-polygon'
+  return (
+    tool === 'draw-point' || tool === 'draw-line' || tool === 'draw-polygon'
+  )
 }
 
 /** Pick draw geometry from layer style kind / symbol, falling back to existing feature geometry. */
@@ -344,7 +419,8 @@ function resolveDrawTool(layerId: string): EditTool {
           ? layer.style.fallback
           : null
     if (symbol?.type === 'circle') return 'draw-point'
-    if (symbol?.type === 'solid' && 'color' in symbol && !('fill' in symbol)) return 'draw-line'
+    if (symbol?.type === 'solid' && 'color' in symbol && !('fill' in symbol))
+      return 'draw-line'
     if (symbol?.type === 'solid' && 'fill' in symbol) return 'draw-polygon'
   }
 
@@ -355,8 +431,11 @@ function resolveDrawTool(layerId: string): EditTool {
   return 'draw-point'
 }
 
-function collectBasemapCredentials(basemap: BasemapConfig): Record<string, string> {
-  if (basemap.type !== 'tianditu' && basemap.type !== 'google-map-tiles') return {}
+function collectBasemapCredentials(
+  basemap: BasemapConfig
+): Record<string, string> {
+  if (basemap.type !== 'tianditu' && basemap.type !== 'google-map-tiles')
+    return {}
   const key = basemap.credential
   const stored = getSessionCredential(key)
   if (!stored) return {}

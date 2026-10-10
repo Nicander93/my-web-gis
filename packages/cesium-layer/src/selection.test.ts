@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Cartesian3, Cesium3DTileStyle, Color, ColorBlendMode, Entity, JulianDate, KeyboardEventModifier, ScreenSpaceEventType } from 'cesium'
+import { Cartesian3, Cesium3DTileStyle, Color, Cesium3DTileColorBlendMode, ColorBlendMode, Entity, JulianDate, KeyboardEventModifier, ScreenSpaceEventType } from 'cesium'
 import type { Model, Viewer } from 'cesium'
 import { BaseLayer, LayerCollection, ModelLayer, TilesetLayer } from './index'
 
@@ -30,10 +30,12 @@ describe('independent layer selection', () => {
   })
   it('restores tileset styles and model colors exactly after transient highlighting', () => {
     const tiles = new TilesetLayer({ id: 'city', url: './city.json' }), style = new Cesium3DTileStyle({ color: 'color("red")' })
-    tiles.tileset = { style } as typeof tiles.tileset
+    tiles.tileset = { style, colorBlendMode: Cesium3DTileColorBlendMode.HIGHLIGHT, colorBlendAmount: .5 } as typeof tiles.tileset
     tiles.setHighlighted(true); const highlight = tiles.tileset?.style
     expect(highlight).not.toBe(style); tiles.setHighlighted(true); expect(tiles.tileset?.style).toBe(highlight)
+    expect(tiles.tileset?.colorBlendMode).toBe(Cesium3DTileColorBlendMode.MIX); expect(tiles.tileset?.colorBlendAmount).toBe(.2)
     tiles.setHighlighted(false); expect(tiles.tileset?.style).toBe(style)
+    expect(tiles.tileset?.colorBlendMode).toBe(Cesium3DTileColorBlendMode.HIGHLIGHT); expect(tiles.tileset?.colorBlendAmount).toBe(.5)
     const model = new ModelLayer({ id: 'model', url: './model.glb', position: [116,39,0] })
     model.model = { color: Color.RED, colorBlendMode: ColorBlendMode.REPLACE, colorBlendAmount: .2 } as Model
     model.setHighlighted(true); expect(model.model.color).not.toEqual(Color.RED)

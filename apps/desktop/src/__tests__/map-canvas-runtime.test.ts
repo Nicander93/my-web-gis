@@ -7,10 +7,12 @@ import { mapCommands } from '@/app/commands/map.commands'
 import { editCommands } from '@/app/commands/edit.commands'
 import { layerCommands } from '@/app/commands/layer.commands'
 import { useProjectStore } from '@/stores/project.store'
+import { useWorkbenchStore } from '@/stores/workbench.store'
 import { useSessionStore } from '@/stores/session.store'
 import {
   _setMapRuntimeForTests,
   getActiveEditTool,
+  getToolRuntime,
   getLiveMapState,
   isMapRuntimeMounted,
   isSelectionRuntimeMounted,
@@ -169,6 +171,24 @@ describe('MapCanvas OlMapRuntime selection tool wiring', () => {
     expect(Object.keys(featuresByDataset)).toContain('ds-1')
     expect(datasets).toHaveLength(1)
     expect(getLiveMapState()?.zoom).toBe(useProjectStore.getState().project.mapState.zoom)
+  })
+
+  it('geometry callbacks stay on the explicit target while browsing another layer', () => {
+    const runtime = createMockRuntime()
+    _setMapRuntimeForTests(runtime, true)
+    const store = useProjectStore.getState()
+    store.addLayer('target', 'Lines', [{ id:'line', geometry:{ type:'LineString', coordinates:[[0,0],[1,1]] }, properties:{} }], 'line')
+    const targetId = useProjectStore.getState().selectedLayerId!
+    store.addLayer('browse', 'Points', [{ id:'point', geometry:{ type:'Point', coordinates:[0,0] }, properties:{} }], 'point')
+    useWorkbenchStore.getState().setEditLayer(targetId)
+    const activate = vi.spyOn(getToolRuntime()!, 'activate')
+    expect(setActiveEditTool('draw-point')).toBe(true)
+    expect(getActiveEditTool()).toBe('draw-line')
+    const callbacks = activate.mock.calls.at(-1)![1]
+    expect(callbacks.getActiveLayerId()).toBe(targetId)
+    callbacks.onSelectionChange?.(['line'])
+    expect(useProjectStore.getState().selection).toEqual({ layerId:targetId, featureIds:['line'] })
+    expect(useProjectStore.getState().selectedLayerId).not.toBe(targetId)
   })
 
   it('zoom commands drive the real map view when runtime is mounted', () => {
