@@ -18,6 +18,85 @@ fn write_binary_path(path: String, content: Vec<u8>) -> Result<(), String> {
     std::fs::write(path, content).map_err(|error| error.to_string())
 }
 
+/// Resolve resources under a user-selected directory, including symlink containment.
+#[tauri::command]
+fn read_scene_resource(directory: String, path: String) -> Result<Vec<u8>, String> {
+    let root = std::fs::canonicalize(directory).map_err(|error| error.to_string())?;
+    let relative = std::path::Path::new(&path);
+    if path.contains([':', '\\']) || relative.is_absolute() || relative.components().any(|part| !matches!(part, std::path::Component::Normal(_) | std::path::Component::CurDir)) {
+        return Err("invalid scene resource path".into());
+    }
+    let file = std::fs::canonicalize(root.join(relative)).map_err(|error| error.to_string())?;
+    if !file.starts_with(&root) || !file.is_file() {
+        return Err("scene resource escapes selected directory".into());
+    }
+    let metadata = std::fs::metadata(&file).map_err(|error| error.to_string())?;
+    if metadata.len() > 512 * 1024 * 1024 {
+        return Err("scene resource exceeds byte limit".into());
+    }
+    std::fs::read(file).map_err(|error| error.to_string())
+}
+
+#[derive(serde::Deserialize)]
+struct SceneArchiveFile {
+    path: String,
+    content: Vec<u8>,
+}
+
+/// Writes a validated archive into a new immutable application-owned directory.
+fn persist_scene_files(root: &std::path::Path, files: Vec<SceneArchiveFile>) -> Result<String, String> {
+    let mut paths = std::collections::HashSet::new();
+    let mut total = 0usize;
+    if files.len() > 10_000 { return Err("scene archive exceeds file limit".into()); }
+    for file in &files {
+        let path = std::path::Path::new(&file.path);
+        if file.path.is_empty() || file.path.contains([':', '\\']) || path.is_absolute()
+            || path.components().any(|part| !matches!(part, std::path::Component::Normal(_)))
+            || file.path.split('/').any(|part| part.is_empty() || part.ends_with(['.', ' ']))
+            || !paths.insert(file.path.to_lowercase()) {
+            return Err("invalid or duplicate scene archive path".into());
+        }
+        total = total.checked_add(file.content.len()).ok_or("scene archive byte overflow")?;
+        if total > 512 * 1024 * 1024 { return Err("scene archive exceeds byte limit".into()); }
+    }
+    std::fs::create_dir_all(root).map_err(|error| error.to_string())?;
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|error| error.to_string())?.as_nanos();
+    let directory = root.join(format!("{}-{}", std::process::id(), stamp));
+    std::fs::create_dir(&directory).map_err(|error| error.to_string())?;
+    let write = || -> Result<(), String> {
+        for file in files {
+            let path = directory.join(file.path);
+            if let Some(parent) = path.parent() { std::fs::create_dir_all(parent).map_err(|error| error.to_string())?; }
+            std::fs::write(path, file.content).map_err(|error| error.to_string())?;
+        }
+        Ok(())
+    };
+    if let Err(error) = write() {
+        let _ = std::fs::remove_dir_all(&directory);
+        return Err(error);
+    }
+    Ok(directory.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+fn persist_scene_archive(app: tauri::AppHandle, files: Vec<SceneArchiveFile>) -> Result<String, String> {
+    use tauri::Manager;
+    let root = app.path().app_local_data_dir().map_err(|error| error.to_string())?.join("scene-archives");
+    persist_scene_files(&root, files)
+}
+
+#[tauri::command]
+fn read_cached_scene_resource(app: tauri::AppHandle, directory: String, path: String) -> Result<Vec<u8>, String> {
+    use tauri::Manager;
+    let root = app.path().app_local_data_dir().map_err(|error| error.to_string())?.join("scene-archives");
+    let root = std::fs::canonicalize(root).map_err(|error| error.to_string())?;
+    let selected = std::fs::canonicalize(&directory).map_err(|error| error.to_string())?;
+    if !selected.starts_with(&root) || selected == root {
+        return Err("resource directory is not an application scene archive".into());
+    }
+    read_scene_resource(directory, path)
+}
+
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct HttpGetArgs {
@@ -137,6 +216,9 @@ pub fn run() {
             write_text_path,
             read_binary_path,
             write_binary_path,
+            read_scene_resource,
+            persist_scene_archive,
+            read_cached_scene_resource,
             http_get_text,
             secure_credential_set,
             secure_credential_get,
@@ -144,6 +226,46 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running Desktop WebGIS");
+}
+
+#[cfg(test)]
+mod scene_resource_tests {
+    #[test]
+    fn persists_nested_files_and_rejects_unsafe_entries_before_writing() {
+        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let root = std::env::temp_dir().join(format!("webgis-archive-{}-{}", std::process::id(), stamp));
+        let unsafe_files = vec![super::SceneArchiveFile { path: "../escape".into(), content: vec![1] }];
+        assert!(super::persist_scene_files(&root, unsafe_files).is_err());
+        assert!(!root.exists());
+        let duplicate = vec![super::SceneArchiveFile { path: "Mesh.bin".into(), content: vec![1] }, super::SceneArchiveFile { path: "mesh.bin".into(), content: vec![2] }];
+        assert!(super::persist_scene_files(&root, duplicate).is_err());
+        assert!(!root.exists());
+        let directory = super::persist_scene_files(&root, vec![super::SceneArchiveFile { path: "models/mesh.bin".into(), content: vec![1, 2] }]).unwrap();
+        let directory = std::path::PathBuf::from(directory);
+        assert!(directory.starts_with(&root));
+        assert_eq!(std::fs::read(directory.join("models/mesh.bin")).unwrap(), vec![1, 2]);
+        std::fs::remove_file(directory.join("models/mesh.bin")).unwrap();
+        std::fs::remove_dir(directory.join("models")).unwrap();
+        std::fs::remove_dir(directory).unwrap();
+        std::fs::remove_dir(root).unwrap();
+    }
+
+    #[test]
+    fn reads_only_files_under_selected_directory() {
+        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let root = std::env::temp_dir().join(format!("webgis-scene-{}-{}", std::process::id(), stamp));
+        std::fs::create_dir(&root).unwrap();
+        let file = root.join("buffer.bin");
+        std::fs::write(&file, [1u8, 2, 3]).unwrap();
+        let directory = root.to_string_lossy().into_owned();
+        assert_eq!(super::read_scene_resource(directory.clone(), "buffer.bin".into()).unwrap(), vec![1, 2, 3]);
+        for path in ["../outside.bin", "C:/outside.bin", "buffer.bin:stream", "folder\\buffer.bin"] {
+            assert!(super::read_scene_resource(directory.clone(), path.into()).is_err());
+        }
+        assert!(super::read_scene_resource(directory, "missing.bin".into()).is_err());
+        std::fs::remove_file(file).unwrap();
+        std::fs::remove_dir(root).unwrap();
+    }
 }
 
 #[cfg(test)]

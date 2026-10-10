@@ -39,6 +39,16 @@ export async function readBinaryFile(path: string): Promise<Uint8Array> {
   return new Uint8Array(bytes)
 }
 
+export async function pickDirectory(): Promise<string | null> {
+  const selected = await open({ multiple: false, directory: true, title: '选择场景资源目录' })
+  return typeof selected === 'string' ? selected : null
+}
+
+/** Native adapter checks the canonical path remains within the selected directory. */
+export async function readSceneResourceFile(directory: string, path: string): Promise<Uint8Array> {
+  return new Uint8Array(await invoke<number[]>('read_scene_resource', { directory, path }))
+}
+
 export async function writeTextFile(path: string, content: string): Promise<void> {
   await invoke('write_text_path', { path, content })
 }
