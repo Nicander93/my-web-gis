@@ -16,6 +16,22 @@ async function mapState(page: Page) {
   })
 }
 
+async function waitForMapResize(page: Page) {
+  // OpenLayers applies a viewport resize on a later frame; pixels read before that are stale.
+  await expect.poll(() => page.evaluate(async () => {
+    const host = await import('/src/features/map/map-runtime-host.ts')
+    const map = host.getMapRuntime()!.getMap()
+    const viewport = map.getViewport()
+    const size = map.getSize()
+    return size?.[0] === viewport.clientWidth && size?.[1] === viewport.clientHeight
+  })).toBe(true)
+  await page.evaluate(async () => {
+    const host = await import('/src/features/map/map-runtime-host.ts')
+    const map = host.getMapRuntime()!.getMap()
+    await new Promise(resolve => { map.once('rendercomplete', resolve); map.render() })
+  })
+}
+
 async function drag(page: Page, from: number[], to: number[], key?: 'Shift' | 'Alt') {
   const bounds = (await page.locator('.ol-viewport').boundingBox())!
   if (key) await page.keyboard.down(key)
@@ -100,6 +116,7 @@ test('a deliberate click after a box is accepted and keeps selection on pan', as
   const first = initial.positions[0].pixel
   await drag(page, [first[0] - 12, first[1] - 12], [first[0] + 12, first[1] + 12])
   await expect(page.locator('.table-scroll tbody tr')).toHaveCount(1)
+  await waitForMapResize(page)
   const state = await mapState(page)
   const bounds = (await page.locator('.ol-viewport').boundingBox())!
   const point = state.positions[1]
