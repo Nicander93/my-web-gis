@@ -7,10 +7,10 @@ export function downloadProject(content: string, name: string): void {
   try { link.click() } finally { link.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 60_000) }
 }
 
-export function pickBrowserProject(): Promise<File | null> {
+export function pickBrowserProject(accept = '.json'): Promise<File | null> {
   return new Promise(resolve => {
     const input = document.createElement('input')
-    input.type = 'file'; input.accept = '.json'; input.hidden = true
+    input.type = 'file'; input.accept = accept; input.hidden = true
     const done = (file: File | null): void => { input.remove(); resolve(file) }
     input.addEventListener('change', () => done(input.files?.[0] ?? null), { once: true })
     input.addEventListener('cancel', () => done(null), { once: true })
