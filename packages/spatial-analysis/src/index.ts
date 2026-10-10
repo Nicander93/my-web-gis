@@ -147,6 +147,8 @@ export function joinAttributes<T extends AnalysisFeature>(features: T[], rows: R
 }
 
 export interface SpatialJoinOptions {
+  /** Optional positive safe-integer output budget. Exceeding it fails the whole operation before cloning that row. */
+  maxResults?: number
   predicate: 'intersects' | 'within'
   fields: string[]
   prefix: string
@@ -155,6 +157,7 @@ export interface SpatialJoinOptions {
 
 /** One output per matching feature pair, in input order; left joins retain unmatched features once. */
 export function joinByLocation<T extends AnalysisFeature>(features: T[], joinFeatures: AnalysisFeature[], options: SpatialJoinOptions): T[] {
+  if (options.maxResults !== undefined && (!Number.isSafeInteger(options.maxResults) || options.maxResults < 1)) throw new Error('结果数量上限必须为正安全整数。')
   if (!['intersects', 'within'].includes(options.predicate) || !['left', 'inner'].includes(options.mode) || !options.fields.length) throw new Error('请选择空间关系、连接方式及带入字段。')
   validateOutputs(features, options.fields.map(field => `${options.prefix}${field}`))
   for (const field of options.fields) {
@@ -166,6 +169,7 @@ export function joinByLocation<T extends AnalysisFeature>(features: T[], joinFea
     const geometry = readGeometry(feature, reader)
     index.insert(geometry.getEnvelopeInternal(), { feature, geometry, order })
   })
+  let outputCount = 0
   return features.flatMap(feature => {
     const geometry = readGeometry(feature, reader)
     const matches = index.query(geometry.getEnvelopeInternal()).toArray().filter(candidate => {
@@ -173,6 +177,8 @@ export function joinByLocation<T extends AnalysisFeature>(features: T[], joinFea
       return options.predicate === 'within' ? relation.isWithin() : relation.isIntersects()
     }).sort((a, b) => a.order - b.order)
     if (!matches.length && options.mode === 'inner') return []
+    outputCount += matches.length || 1
+    if (options.maxResults !== undefined && outputCount > options.maxResults) throw new Error(`空间连接结果超过 ${options.maxResults} 条上限，请缩小范围、减少重叠或提高上限；未返回部分结果。`)
     return (matches.length ? matches : [undefined]).map(match => {
       const result = copyResult(feature, Object.fromEntries(options.fields.map(field => [`${options.prefix}${field}`, match && Object.hasOwn(match.feature.properties, field) ? match.feature.properties[field] : null])))
       result.metadata = { ...result.metadata, overlaySourceId: match?.feature.id }

@@ -20,7 +20,7 @@ export function executeProcessing(features: GisFeature[], options: ProcessingOpt
     return { inputCount: features.length, overlayCount: overlay.length, features: joinAttributes(features, overlay.map(feature => feature.properties), options) }
   }
   if (options.tool === 'spatial-join') {
-    return { inputCount: features.length, overlayCount: overlay.length, features: joinByLocation(features, overlay, options) }
+    return { inputCount: features.length, overlayCount: overlay.length, features: joinByLocation(features, overlay, { ...options, maxResults: options.maxResults ?? 100000 }) }
   }
   return processFeatures(features, options, overlay)
 }
