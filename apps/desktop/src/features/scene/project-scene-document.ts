@@ -101,8 +101,10 @@ export function createProjectSceneProjection(snapshot: ProjectSnapshot): Project
     if (!layer) throw new Error(`图层 “${id}” 不存在`)
     const dataset = datasets.get(layer.datasetId)
     if (!dataset) throw new Error(`图层 “${id}” 的数据资源不存在`)
-    const base = { id: layer.id, name: layer.name, resource: layer.datasetId, visible: layer.visible, opacity: layer.opacity, locked: !layer.editable, ...(parentId ? { parentId } : {}) }
+    const base = { id: layer.id, name: layer.name, resource: layer.datasetId, visible: layer.visible, opacity: layer.opacity, locked: !layer.editable, ...(parentId ? { parentId } : {}),
+      ...(layer.minZoom === undefined ? {} : { minZoom: layer.minZoom }), ...(layer.maxZoom === undefined ? {} : { maxZoom: layer.maxZoom }) }
     if (dataset.kind === 'vector' || dataset.kind === 'wfs') nodes.push({ ...base, type: 'vector', style: isLegacyStyle(layer.style) ? migrateLegacyStyle(layer.style) : structuredClone(layer.style),
+      ...(layer.interaction === undefined ? {} : { interaction: structuredClone(layer.interaction) }),
       ...(layer.filter ? { filter: layer.filter.map(condition => omitUndefined(structuredClone(condition))) as Extract<SceneNode, { type: 'vector' }>['filter'] } : {}) })
     else nodes.push({ ...base, type: 'tile' })
   }
@@ -134,7 +136,7 @@ export function createProjectSceneProjection(snapshot: ProjectSnapshot): Project
     ...(project.description === undefined ? {} : { description: project.description }),
     ...(project.metadata === undefined ? {} : { metadata: structuredClone(project.metadata) }),
     ...structuredClone(project.sceneDisplay ?? {}),
-    views: { map: { type: '2d', projection: project.crs, ...project.mapState }, ...city?.views }, activeView: city && getProjectType(project) === '3d' ? 'city' : 'map',
+    views: { map: { type: '2d', projection: project.crs, ...project.mapState, ...project.mapViewConstraints }, ...city?.views }, activeView: city && getProjectType(project) === '3d' ? 'city' : 'map',
     ...(city?.environment ? { environment: city.environment } : {}), ...(Object.keys(credentials).length ? { credentials } : {}) })
   return { document, cityNodeIds, hostCityNodeIds, cityResourceIds, hostCityResourceIds }
 }
@@ -194,7 +196,11 @@ export function createProjectFromSceneDocument(input: unknown): ProjectSnapshot 
   }
   project.settings.workspaceType = document.views[document.activeView].type
   const view = mapViews[0]
-  if (view && (view.extent !== undefined || view.minZoom !== undefined || view.maxZoom !== undefined)) throw new Error('当前工程尚不支持保存二维视图约束，不能静默丢弃')
+  if (view && (view.extent !== undefined || view.minZoom !== undefined || view.maxZoom !== undefined)) project.mapViewConstraints = {
+    ...(view.extent === undefined ? {} : { extent: structuredClone(view.extent) }),
+    ...(view.minZoom === undefined ? {} : { minZoom: view.minZoom }),
+    ...(view.maxZoom === undefined ? {} : { maxZoom: view.maxZoom }),
+  }
   if (view) { project.crs = view.projection; project.mapState = { center: view.center, zoom: view.zoom, rotation: view.rotation ?? 0 } }
   const mapNodes = document.nodes.filter(node => node.type === 'tile' || node.type === 'vector')
   const basemaps = mapNodes.filter(node => node.type === 'tile' && node.role === 'basemap')
@@ -230,8 +236,9 @@ export function createProjectFromSceneDocument(input: unknown): ProjectSnapshot 
   for (const node of [...document.nodes].reverse()) {
     if (node.type === 'tile' && node.role === 'basemap') continue
     if (node.type !== 'tile' && node.type !== 'vector') continue
-    if (node.minZoom !== undefined || node.maxZoom !== undefined || node.type === 'vector' && node.interaction) throw new Error('当前工程尚不支持图层缩放限制或二维 Popup，不能静默丢弃')
     project.layers.push({ id: node.id, name: node.name, datasetId: node.resource, visible: node.visible ?? true, opacity: node.opacity ?? 1, editable: node.type === 'vector' && !node.locked,
+      ...(node.minZoom === undefined ? {} : { minZoom: node.minZoom }), ...(node.maxZoom === undefined ? {} : { maxZoom: node.maxZoom }),
+      ...(node.type === 'vector' && node.interaction !== undefined ? { interaction: structuredClone(node.interaction) } : {}),
       style: node.type === 'vector' ? node.style : { kind: 'mixed', stroke: '#000000', fill: '#000000', width: 1, pointRadius: 4 }, ...(node.type === 'vector' && node.filter ? { filter: node.filter } : {}) })
     if (node.parentId) grouped.add(node.id)
   }

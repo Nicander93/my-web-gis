@@ -32,6 +32,21 @@ function snapshot(): ProjectSnapshot {
 }
 
 describe('full project scene content', () => {
+  it('retains view constraints and vector interaction when live navigation changes', () => {
+    const document = createProjectSceneDocument(snapshot())
+    const view = document.views.map
+    if (view.type !== '2d') throw new Error('Expected map view')
+    view.extent = [-100, -100, 100, 100]; view.minZoom = 0; view.maxZoom = 18
+    const node = document.nodes.find(node => node.type === 'vector')!
+    if (node.type !== 'vector') throw new Error('Expected vector')
+    node.minZoom = 2; node.maxZoom = 16
+    node.interaction = { selectable: false, popup: { titleField: 'label', fields: [{ field: 'value', label: 'Value', format: 'number' }] } }
+    const restored = parseProjectSnapshot(serializeProjectSnapshot(createProjectFromSceneDocument(document)))
+    restored.project.mapState = { center: [20, 30], zoom: 4, rotation: 0 }
+    const exported = createProjectSceneDocument(restored)
+    expect(exported.views.map).toMatchObject({ center: [20, 30], minZoom: 0, maxZoom: 18, extent: [-100, -100, 100, 100] })
+    expect(exported.nodes.find(candidate => candidate.id === node.id)).toMatchObject({ minZoom: 2, maxZoom: 16, interaction: node.interaction })
+  })
   it('retains description and nested JSON metadata across project serialization and scene edits', () => {
     const document = createProjectSceneDocument(snapshot())
     document.description = ''

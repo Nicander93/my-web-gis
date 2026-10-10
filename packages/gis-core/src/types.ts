@@ -1,5 +1,5 @@
 import type { ProcessingRecord } from './processing'
-import type { SceneDocument } from '@desktop-webgis/scene-schema'
+import type { LayerInteraction, SceneDocument, SceneDocumentView } from '@desktop-webgis/scene-schema'
 
 export type Position = [number, number] | [number, number, number]
 
@@ -252,6 +252,9 @@ export interface Layer {
   style: LegacyLayerStyle | import('@desktop-webgis/ol-style').LayerStyle
   /** Persisted field filter (F). Empty/undefined ⇒ F = A. */
   filter?: import('./filter').FieldFilterCondition[]
+  minZoom?: number
+  maxZoom?: number
+  interaction?: LayerInteraction
 }
 
 export interface MapState {
@@ -315,6 +318,8 @@ export interface Project {
    */
   rootOrder: LayerTreeEntry[]
   mapState: MapState
+  /** Content constraints survive live camera snapshots and navigation updates. */
+  mapViewConstraints?: Pick<Extract<SceneDocumentView, { type: '2d' }>, 'extent' | 'minZoom' | 'maxZoom'>
   basemap: BasemapConfig
   settings: Record<string, unknown>
 }
