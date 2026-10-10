@@ -12,7 +12,7 @@ async function mapState(page: Page) {
     const positions = layer.getSource()!.getFeatures().map(feature => ({
       id: String(feature.getId()), pixel: map.getPixelFromCoordinate(feature.getGeometry()!.getExtent().slice(0, 2))
     })).sort((a, b) => a.pixel[0] - b.pixel[0])
-    return { positions, selection: state.selection.featureIds, center: map.getView().getCenter(), dirty: state.dirty }
+    return { positions, selection: state.selection.featureIds, center: map.getView().getCenter(), dirty: state.dirty, opacity: layer.getOpacity() }
   })
 }
 
@@ -86,6 +86,80 @@ test('box selection links the accepted rows; modifiers, empty selection and row 
   await page.screenshot({ path: info.outputPath('selection-empty.png') })
 })
 
+test('public scene display edits preserve selection and table through toolbar undo and redo', async ({ page }) => {
+  const initial = await mapState(page), first = initial.positions[0].pixel
+  await drag(page, [first[0] - 12, first[1] - 12], [first[0] + 12, first[1] + 12])
+  await expect(page.getByRole('complementary', { name: '属性表面板' })).toBeVisible()
+  await page.getByRole('searchbox', { name: '表内搜索' }).fill('Point')
+  const selected = (await mapState(page)).selection
+  const exported = await page.evaluate(async () => {
+    const { createProjectSceneController } = await import('/src/features/scene/project-scene-controller.ts')
+    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const controller = createProjectSceneController(), id = useProjectStore.getState().selectedLayerId!
+    try { controller.setNodeOpacity(id, 0.4); return controller.getDocument().nodes.find(node => node.id === id) }
+    finally { controller.dispose() }
+  })
+  expect(exported).toMatchObject({ opacity: 0.4 })
+  await expect.poll(async () => (await mapState(page)).opacity).toBe(0.4)
+  await expect(page.locator('.table-scroll tbody tr')).toHaveCount(1)
+  await expect(page.getByRole('searchbox', { name: '表内搜索' })).toHaveValue('Point')
+  await expect.poll(async () => (await mapState(page)).selection).toEqual(selected)
+  await page.getByRole('button', { name: '撤销', exact: true }).first().click()
+  await expect.poll(async () => (await mapState(page)).opacity).toBe(1)
+  await expect(page.locator('.table-scroll tbody tr')).toHaveCount(1)
+  await expect(page.getByRole('searchbox', { name: '表内搜索' })).toHaveValue('Point')
+  await page.getByRole('button', { name: '重做', exact: true }).first().click()
+  await expect.poll(async () => (await mapState(page)).opacity).toBe(0.4)
+  await expect.poll(async () => (await mapState(page)).selection).toEqual(selected)
+})
+
+test('drawing commits through document replacement and toolbar undo preserves the active edit target', async ({ page }) => {
+  await page.getByRole('tab', { name: '编辑', exact: true }).click()
+  await page.getByRole('button', { name: '开始编辑', exact: true }).click()
+  await page.getByRole('button', { name: '绘制要素', exact: true }).click()
+  const bounds = (await page.locator('.ol-viewport').boundingBox())!
+  await page.mouse.click(bounds.x + 120, bounds.y + 100)
+  await expect.poll(async () => (await mapState(page)).positions.length).toBe(4)
+  const snapshot = () => page.evaluate(async () => {
+    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const { useWorkbenchStore } = await import('/src/stores/workbench.store.ts')
+    const state = useProjectStore.getState(), layer = state.project.layers.find(item => item.id === state.selectedLayerId)!
+    return { count: state.featuresByDataset[layer.datasetId].length, target: useWorkbenchStore.getState().editLayerId, layer: layer.id }
+  })
+  const drawn = await snapshot()
+  expect(drawn.count).toBe(4); expect(drawn.target).toBe(drawn.layer)
+  await page.getByRole('button', { name: '撤销', exact: true }).first().click()
+  await expect.poll(async () => (await mapState(page)).positions.length).toBe(3)
+  expect((await snapshot()).target).toBe(drawn.target)
+  await page.getByRole('button', { name: '重做', exact: true }).first().click()
+  await expect.poll(async () => (await mapState(page)).positions.length).toBe(4)
+  expect((await snapshot()).count).toBe(4)
+  await page.keyboard.press('Escape')
+})
+
+test('public view edits reproject native features and toolbar undo restores the declared view', async ({ page }) => {
+  await page.evaluate(async () => {
+    const { createProjectSceneController } = await import('/src/features/scene/project-scene-controller.ts')
+    const controller = createProjectSceneController()
+    try { controller.setView('map', { type: '2d', projection: 'EPSG:4326', center: [116.4, 39.9], zoom: 8 }) }
+    finally { controller.dispose() }
+  })
+  const read = () => page.evaluate(async () => {
+    const { getMapRuntime } = await import('/src/features/map/map-runtime-host.ts')
+    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const runtime = getMapRuntime()!, view = runtime.getMap().getView()
+    const layer = runtime.registry.getVector(useProjectStore.getState().selectedLayerId!)!
+    const point = layer.getSource()!.getFeatureById('point-0')!
+    return { projection: view.getProjection().getCode(), center: view.getCenter(), extent: point.getGeometry()!.getExtent() }
+  })
+  await expect.poll(async () => (await read()).projection).toBe('EPSG:4326')
+  expect((await read()).extent).toEqual([116.4, 39.9, 116.4, 39.9])
+  expect((await read()).center).toEqual([116.4, 39.9])
+  await page.getByRole('button', { name: '撤销', exact: true }).first().click()
+  await expect.poll(async () => (await read()).projection).toBe('EPSG:3857')
+  expect((await read()).extent[0]).toBeGreaterThan(1_000_000)
+})
+
 test('escape cancels a live drag and preserves selection and camera', async ({ page }) => {
   const initial = await mapState(page)
   const first = initial.positions[0].pixel
@@ -109,6 +183,18 @@ test('standalone package lifecycle retains highlights and releases only owned re
   })
   expect(result).toEqual({ retained: 1, ownedInteraction: true, silent: true, interactionsRestored: true,
     overlayReleased: true, sourceIntact: true, mapIntact: true })
+})
+
+test('real rotated box selection respects parent group clipping', async ({ page }) => {
+  await page.evaluate(async () => (await import('/e2e/selection-consumer.ts')).createClippedFixture())
+  await page.waitForTimeout(200)
+  const bounds = (await page.locator('#clipped-selection-consumer').boundingBox())!
+  await page.mouse.move(bounds.x + 50, bounds.y + 50)
+  await page.mouse.down()
+  await page.mouse.move(bounds.x + 380, bounds.y + 280, { steps: 12 })
+  await page.mouse.up()
+  await expect.poll(() => page.evaluate(async () => (await import('/e2e/selection-consumer.ts')).readClippedSelection())).toEqual(['clip-0'])
+  await page.evaluate(async () => (await import('/e2e/selection-consumer.ts')).disposeClippedFixture())
 })
 
 test('a deliberate click after a box is accepted and keeps selection on pan', async ({ page }) => {

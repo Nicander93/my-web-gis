@@ -6,11 +6,15 @@ import type { LayerStyle } from '@desktop-webgis/ol-style'
 import { cloneValue } from './clone'
 import type { EditCommand, EditContext } from './editHistory'
 import type { FieldFilterCondition } from './filter'
-import type { Dataset, GisFeature, Layer, LayerGroup, LayerTreeEntry, Project } from './types'
+import type { Dataset, GisFeature, Layer, LayerGroup, LayerTreeEntry, Project, ProjectSnapshot } from './types'
 
 export interface ProjectEditContext extends EditContext {
   getProject(): Project
   replaceProject(project: Project): void
+  /** Optional atomic host path for whole-content replacement. */
+  replaceSnapshot?(snapshot: ProjectSnapshot): void
+  /** Atomic same-project content edit; host preserves unaffected UI sessions. */
+  applySnapshotEdit?(snapshot: ProjectSnapshot): void
 }
 
 function isProjectEditContext(context: EditContext): context is ProjectEditContext {
@@ -31,6 +35,98 @@ function replaceLayer(project: Project, layerId: string, patch: Partial<Layer>):
   return {
     ...project,
     layers: project.layers.map((layer) => (layer.id === layerId ? { ...layer, ...patch } : layer))
+  }
+}
+
+/** Replaces project content and all feature datasets as one operation in the existing history. */
+export class ReplaceProjectSnapshotCommand implements EditCommand {
+  protected readonly before: ProjectSnapshot
+  protected readonly after: ProjectSnapshot
+  constructor(readonly id: string, readonly label: string, before: ProjectSnapshot, after: ProjectSnapshot) {
+    this.before = cloneValue(before); this.after = cloneValue(after)
+  }
+  execute(context: EditContext): void { this.apply(context, this.after) }
+  undo(context: EditContext): void { this.apply(context, this.before) }
+  protected apply(context: EditContext, snapshot: ProjectSnapshot): void {
+    const ctx = requireProjectContext(context)
+    const retained = new Set(snapshot.project.datasets.map(dataset => dataset.id))
+    for (const id of Object.keys(ctx.featureStore.snapshot())) if (!retained.has(id)) ctx.featureStore.clear(id)
+    for (const id of retained) ctx.featureStore.setAll(id, cloneValue(snapshot.featuresByDataset[id] ?? []))
+    if (ctx.replaceSnapshot) ctx.replaceSnapshot(cloneValue(snapshot))
+    else ctx.replaceProject(cloneValue(snapshot.project))
+  }
+}
+
+/** Describes which existing layer sessions become stale after a same-project edit. */
+export function getProjectSnapshotChanges(before: ProjectSnapshot, after: ProjectSnapshot): {
+  removedLayers: string[]; dataChangedLayers: string[]; styleChangedLayers: string[]
+} {
+  const removedLayers: string[] = [], changedDatasets: string[] = [], changedStyles: string[] = []
+  const nextLayers = new Map(after.project.layers.map(layer => [layer.id, layer]))
+  const previousDatasets = new Map(before.project.datasets.map(dataset => [dataset.id, dataset]))
+  const nextDatasets = new Map(after.project.datasets.map(dataset => [dataset.id, dataset]))
+  for (const layer of before.project.layers) {
+    const next = nextLayers.get(layer.id)
+    if (!next) { removedLayers.push(layer.id); continue }
+    if (layer.datasetId !== next.datasetId || JSON.stringify(previousDatasets.get(layer.datasetId)) !== JSON.stringify(nextDatasets.get(next.datasetId)) ||
+        JSON.stringify(before.featuresByDataset[layer.datasetId] ?? []) !== JSON.stringify(after.featuresByDataset[next.datasetId] ?? [])) changedDatasets.push(layer.id)
+    if (JSON.stringify(layer.style) !== JSON.stringify(next.style)) changedStyles.push(layer.id)
+  }
+  return { removedLayers, dataChangedLayers: changedDatasets, styleChangedLayers: changedStyles }
+}
+
+/** Apply only changed fields and stable-ID entries, preserving unrelated later host updates. */
+function patchSnapshotContent(current: unknown, before: unknown, after: unknown): unknown {
+  if (JSON.stringify(before) === JSON.stringify(after)) return cloneValue(current)
+  if (Array.isArray(current) && Array.isArray(before) && Array.isArray(after)) {
+    const keyed = (items: unknown[]): items is Array<Record<string, unknown> & { id: string }> => items.every(item =>
+      !!item && typeof item === 'object' && 'id' in item && typeof item.id === 'string') && new Set(items.map(item => (item as { id: string }).id)).size === items.length
+    if (keyed(current) && keyed(before) && keyed(after)) {
+      const previous = new Map(before.map(item => [item.id, item])), next = new Map(after.map(item => [item.id, item]))
+      const retained = current.filter(item => !previous.has(item.id) || next.has(item.id)).map(item => next.has(item.id) && previous.has(item.id)
+        ? patchSnapshotContent(item, previous.get(item.id), next.get(item.id)) as typeof item : cloneValue(item))
+      const ids = new Set(retained.map(item => item.id))
+      after.forEach(item => { if (!ids.has(item.id) && !previous.has(item.id)) retained.push(cloneValue(item)) })
+      if (JSON.stringify(before.map(item => item.id)) !== JSON.stringify(after.map(item => item.id))) {
+        const rank = new Map(after.map((item, index) => [item.id, index]))
+        retained.sort((a, b) => (rank.get(a.id) ?? after.length) - (rank.get(b.id) ?? after.length))
+      }
+      return retained
+    }
+  }
+  if (current && before && after && typeof current === 'object' && typeof before === 'object' && typeof after === 'object' &&
+      !Array.isArray(current) && !Array.isArray(before) && !Array.isArray(after)) {
+    const result = cloneValue(current) as Record<string, unknown>, old = before as Record<string, unknown>, next = after as Record<string, unknown>
+    for (const key of new Set([...Object.keys(old), ...Object.keys(next)])) {
+      if (!Object.hasOwn(next, key)) { delete result[key]; continue }
+      const value = Object.hasOwn(old, key) ? patchSnapshotContent(result[key], old[key], next[key]) : cloneValue(next[key])
+      Object.defineProperty(result, key, { value, configurable: true, writable: true, enumerable: true })
+    }
+    return result
+  }
+  return cloneValue(after)
+}
+
+/** One reversible content edit; existing selection and sessions are managed by the host delta path. */
+export class ApplyProjectSnapshotEditCommand extends ReplaceProjectSnapshotCommand {
+  readonly guardedLayerIds: readonly string[]
+  constructor(id: string, label: string, before: ProjectSnapshot, after: ProjectSnapshot) {
+    if (before.project.id !== after.project.id) throw new Error('内容编辑不能切换项目标识')
+    super(id, label, before, after)
+    const forward = getProjectSnapshotChanges(before, after), backward = getProjectSnapshotChanges(after, before)
+    this.guardedLayerIds = Object.freeze([...new Set([...Object.values(forward).flat(), ...Object.values(backward).flat()])])
+  }
+  protected override apply(context: EditContext, snapshot: ProjectSnapshot): void {
+    const ctx = requireProjectContext(context)
+    if (!ctx.applySnapshotEdit) throw new Error('内容编辑需要宿主原子快照编辑接口')
+    const current: ProjectSnapshot = { project: ctx.getProject(), featuresByDataset: ctx.featureStore.snapshot() }
+    const source = snapshot === this.after ? this.before : this.after
+    const applied = patchSnapshotContent(current, source, snapshot) as ProjectSnapshot
+    // Host validation/guards run before touching the feature store.
+    ctx.applySnapshotEdit(cloneValue(applied))
+    const retained = new Set(applied.project.datasets.map(dataset => dataset.id))
+    for (const id of Object.keys(ctx.featureStore.snapshot())) if (!retained.has(id)) ctx.featureStore.clear(id)
+    for (const id of retained) ctx.featureStore.setAll(id, cloneValue(applied.featuresByDataset[id] ?? []))
   }
 }
 

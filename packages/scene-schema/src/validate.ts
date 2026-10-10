@@ -148,6 +148,37 @@ function validateGeoJson(value: unknown, path: string, issues: ValidationIssue[]
   }
   if (!Array.isArray(value.features)) {
     issue(issues, `${path}.features`, 'type.array', '必须是数组')
+    return
+  }
+  const ids = new Set<string | number>()
+  value.features.forEach((feature, index) => {
+    const featurePath = `${path}.features[${index}]`
+    if (!isRecord(feature) || feature.type !== 'Feature') { issue(issues, featurePath, 'geojson.feature', '必须是 Feature 对象'); return }
+    if (feature.id !== undefined) {
+      if ((typeof feature.id !== 'string' && !isFiniteNumber(feature.id)) || ids.has(feature.id as string | number)) issue(issues, `${featurePath}.id`, 'geojson.id', '要素 ID 必须是唯一字符串或有限数字')
+      else ids.add(feature.id as string | number)
+    }
+    if (feature.properties !== null && !isRecord(feature.properties)) issue(issues, `${featurePath}.properties`, 'geojson.properties', '属性必须是对象或 null')
+    if (feature.geometry !== null && !validGeoJsonGeometry(feature.geometry)) issue(issues, `${featurePath}.geometry`, 'geojson.geometry', '几何类型、坐标或闭合环无效')
+  })
+}
+
+function validGeoJsonGeometry(value: unknown, depth = 0): boolean {
+  if (!isRecord(value) || depth > 100) return false
+  const position = (input: unknown): input is number[] => Array.isArray(input) && input.length >= 2 && input.every(isFiniteNumber)
+  const line = (input: unknown): boolean => Array.isArray(input) && (input.length === 0 || input.length >= 2) && input.every(position)
+  const ring = (input: unknown): boolean => Array.isArray(input) && input.length >= 4 && input.every(position)
+    && input[0].length === input[input.length - 1].length && input[0].every((coordinate, index) => coordinate === input[input.length - 1][index])
+  const polygon = (input: unknown): boolean => Array.isArray(input) && input.every(ring)
+  switch (value.type) {
+    case 'Point': return position(value.coordinates)
+    case 'MultiPoint': return Array.isArray(value.coordinates) && value.coordinates.every(position)
+    case 'LineString': return line(value.coordinates)
+    case 'MultiLineString': return Array.isArray(value.coordinates) && value.coordinates.every(line)
+    case 'Polygon': return polygon(value.coordinates)
+    case 'MultiPolygon': return Array.isArray(value.coordinates) && value.coordinates.every(polygon)
+    case 'GeometryCollection': return Array.isArray(value.geometries) && value.geometries.every(geometry => validGeoJsonGeometry(geometry, depth + 1))
+    default: return false
   }
 }
 

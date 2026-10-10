@@ -1,4 +1,5 @@
 import type { ProcessingRecord } from './processing'
+import type { LayerInteraction, SceneDocument, SceneDocumentView } from '@desktop-webgis/scene-schema'
 
 export type Position = [number, number] | [number, number, number]
 
@@ -49,6 +50,9 @@ export interface GisFeature {
     overlaySourceId?: string
     sourceCrs?: string
     importId?: string
+    /** Host mapping for typed public scene IDs; omitted from portable feature metadata. */
+    sceneFeatureId?: string | number
+    sceneMetadataPresent?: boolean
   }
 }
 
@@ -182,10 +186,18 @@ export interface WfsServiceSource {
 
 export type ServiceSource = WmsServiceSource | WmtsServiceSource | WfsServiceSource
 
+/** Declared columns survive empty datasets and are independent of current feature values. */
+export interface DatasetField {
+  name: string
+  type: 'string' | 'number' | 'boolean' | 'json'
+  nullable: boolean
+}
+
 export type VectorDataset = {
   id: string
   name: string
   kind: 'vector'
+  fields?: DatasetField[]
   source: LocalVectorSource
   processing?: ProcessingRecord
 }
@@ -194,6 +206,7 @@ export type WmsDataset = {
   id: string
   name: string
   kind: 'wms'
+  fields?: DatasetField[]
   source: WmsServiceSource
 }
 
@@ -201,6 +214,7 @@ export type WmtsDataset = {
   id: string
   name: string
   kind: 'wmts'
+  fields?: DatasetField[]
   source: WmtsServiceSource
 }
 
@@ -208,6 +222,7 @@ export type WfsDataset = {
   id: string
   name: string
   kind: 'wfs'
+  fields?: DatasetField[]
   source: WfsServiceSource
 }
 
@@ -237,6 +252,9 @@ export interface Layer {
   style: LegacyLayerStyle | import('@desktop-webgis/ol-style').LayerStyle
   /** Persisted field filter (F). Empty/undefined ⇒ F = A. */
   filter?: import('./filter').FieldFilterCondition[]
+  minZoom?: number
+  maxZoom?: number
+  interaction?: LayerInteraction
 }
 
 export interface MapState {
@@ -285,6 +303,11 @@ export interface Project {
   version: number
   name: string
   crs: string
+  /** Portable scene description and JSON metadata, retained in project snapshots. */
+  description?: string
+  metadata?: SceneDocument['metadata']
+  /** Viewer presentation is content; desktop layout preferences remain separate. */
+  sceneDisplay?: Pick<SceneDocument, 'widgets' | 'theme' | 'presentation'>
   datasets: Dataset[]
   layers: Layer[]
   /** Single-level groups. Absent/empty on legacy projects until normalizeLayerTree. */
@@ -295,6 +318,8 @@ export interface Project {
    */
   rootOrder: LayerTreeEntry[]
   mapState: MapState
+  /** Content constraints survive live camera snapshots and navigation updates. */
+  mapViewConstraints?: Pick<Extract<SceneDocumentView, { type: '2d' }>, 'extent' | 'minZoom' | 'maxZoom'>
   basemap: BasemapConfig
   settings: Record<string, unknown>
 }

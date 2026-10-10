@@ -1,0 +1,3131 @@
+{
+  "type": "object",
+  "properties": {
+    "version": {
+      "const": 3
+    },
+    "id": {
+      "$ref": "#/$defs/nonEmptyString"
+    },
+    "title": {
+      "$ref": "#/$defs/nonEmptyString"
+    },
+    "description": {
+      "type": "string"
+    },
+    "resources": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/nonEmptyString"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/resource"
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/node"
+      }
+    },
+    "views": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/view2d"
+          },
+          {
+            "$ref": "#/$defs/view3d"
+          }
+        ]
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/nonEmptyString"
+      }
+    },
+    "activeView": {
+      "$ref": "#/$defs/nonEmptyString"
+    },
+    "environment": {
+      "type": "object",
+      "properties": {
+        "basemap": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string"
+            },
+            "attribution": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "url"
+          ]
+        },
+        "terrain": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "url"
+          ]
+        },
+        "effects": {
+          "type": "object",
+          "properties": {
+            "fog": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "bloom": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "fog",
+            "bloom"
+          ]
+        },
+        "lighting": {
+          "type": "object",
+          "properties": {
+            "sunlight": {
+              "type": "boolean"
+            },
+            "shadows": {
+              "type": "boolean"
+            },
+            "time": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "required": [
+            "sunlight",
+            "shadows",
+            "time"
+          ]
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "credentials": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/credentialReference"
+      }
+    },
+    "widgets": {
+      "$ref": "#/$defs/widgets"
+    },
+    "theme": {
+      "$ref": "#/$defs/theme"
+    },
+    "presentation": {
+      "$ref": "#/$defs/presentation"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "data": {}
+        },
+        "required": [
+          "version",
+          "required",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "propertyNames": {
+        "pattern": "^[a-zA-Z][a-zA-Z0-9-]*(\\.[a-zA-Z][a-zA-Z0-9-]*)+$"
+      }
+    }
+  },
+  "required": [
+    "version",
+    "id",
+    "title",
+    "resources",
+    "nodes",
+    "views",
+    "activeView"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://desktop-webgis.dev/schemas/scene-document-v3.json",
+  "title": "Desktop WebGIS SceneDocument v3",
+  "$comment": "Structural validation only. Use validateSceneDocument for reference integrity, cycles, resource compatibility and cross-field constraints.",
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "finiteNumber": {
+      "type": "number"
+    },
+    "numberPair": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/finiteNumber"
+        },
+        {
+          "$ref": "#/$defs/finiteNumber"
+        }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "extent": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/finiteNumber"
+        },
+        {
+          "$ref": "#/$defs/finiteNumber"
+        },
+        {
+          "$ref": "#/$defs/finiteNumber"
+        },
+        {
+          "$ref": "#/$defs/finiteNumber"
+        }
+      ],
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "view": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projection",
+        "center",
+        "zoom"
+      ],
+      "properties": {
+        "projection": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "center": {
+          "$ref": "#/$defs/numberPair"
+        },
+        "zoom": {
+          "$ref": "#/$defs/finiteNumber"
+        },
+        "rotation": {
+          "$ref": "#/$defs/finiteNumber"
+        },
+        "minZoom": {
+          "$ref": "#/$defs/finiteNumber"
+        },
+        "maxZoom": {
+          "$ref": "#/$defs/finiteNumber"
+        },
+        "extent": {
+          "$ref": "#/$defs/extent"
+        }
+      }
+    },
+    "geoJsonFeatureCollection": {
+      "type": "object",
+      "required": [
+        "type",
+        "features"
+      ],
+      "properties": {
+        "type": {
+          "const": "FeatureCollection"
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/geoJsonFeature"
+          }
+        }
+      }
+    },
+    "credentialReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "key"
+      ],
+      "properties": {
+        "type": {
+          "const": "runtime-reference"
+        },
+        "key": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "source": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/geoJsonSource"
+        },
+        {
+          "$ref": "#/$defs/xyzSource"
+        },
+        {
+          "$ref": "#/$defs/tiandituSource"
+        },
+        {
+          "$ref": "#/$defs/googleMapTilesSource"
+        }
+      ]
+    },
+    "geoJsonSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "geojson"
+        },
+        "data": {
+          "$ref": "#/$defs/geoJsonFeatureCollection"
+        },
+        "url": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "dataProjection": {
+          "type": "string"
+        },
+        "idField": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "type": {
+                "enum": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "json"
+                ]
+              },
+              "nullable": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name",
+              "type",
+              "nullable"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "featureMetadata": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(string|number):"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "sourceId": {
+                "type": [
+                  "string",
+                  "number"
+                ]
+              },
+              "overlaySourceId": {
+                "type": "string"
+              },
+              "sourceCrs": {
+                "type": "string"
+              },
+              "importId": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        "authentication": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "enum": [
+                "query-token",
+                "bearer"
+              ]
+            },
+            "credential": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "tokenParam": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "mode"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "data"
+          ],
+          "not": {
+            "required": [
+              "url"
+            ]
+          }
+        },
+        {
+          "required": [
+            "url"
+          ],
+          "not": {
+            "required": [
+              "data"
+            ]
+          }
+        }
+      ]
+    },
+    "xyzSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "url"
+      ],
+      "properties": {
+        "type": {
+          "const": "xyz"
+        },
+        "url": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "crossOrigin": {
+          "enum": [
+            "anonymous",
+            "use-credentials"
+          ]
+        },
+        "maxZoom": {
+          "type": "number",
+          "minimum": 0
+        },
+        "attribution": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "type": {
+                "enum": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "json"
+                ]
+              },
+              "nullable": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name",
+              "type",
+              "nullable"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "featureMetadata": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(string|number):"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "sourceId": {
+                "type": [
+                  "string",
+                  "number"
+                ]
+              },
+              "overlaySourceId": {
+                "type": "string"
+              },
+              "sourceCrs": {
+                "type": "string"
+              },
+              "importId": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        "authentication": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "enum": [
+                "query-token",
+                "bearer"
+              ]
+            },
+            "credential": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "tokenParam": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "mode"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "tiandituSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "provider",
+        "mapType",
+        "credential"
+      ],
+      "properties": {
+        "type": {
+          "const": "provider"
+        },
+        "provider": {
+          "const": "tianditu"
+        },
+        "mapType": {
+          "enum": [
+            "vector",
+            "imagery",
+            "terrain"
+          ]
+        },
+        "projection": {
+          "enum": [
+            "EPSG:3857",
+            "EPSG:4326"
+          ]
+        },
+        "withLabels": {
+          "type": "boolean"
+        },
+        "credential": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "title": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "type": {
+                "enum": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "json"
+                ]
+              },
+              "nullable": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name",
+              "type",
+              "nullable"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "featureMetadata": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(string|number):"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "sourceId": {
+                "type": [
+                  "string",
+                  "number"
+                ]
+              },
+              "overlaySourceId": {
+                "type": "string"
+              },
+              "sourceCrs": {
+                "type": "string"
+              },
+              "importId": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        "authentication": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "enum": [
+                "query-token",
+                "bearer"
+              ]
+            },
+            "credential": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "tokenParam": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "mode"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "googleMapTilesSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "provider",
+        "mapType",
+        "language",
+        "region",
+        "credential"
+      ],
+      "properties": {
+        "type": {
+          "const": "provider"
+        },
+        "provider": {
+          "const": "google-map-tiles"
+        },
+        "mapType": {
+          "enum": [
+            "roadmap",
+            "satellite",
+            "terrain"
+          ]
+        },
+        "language": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "region": {
+          "type": "string",
+          "pattern": "^[A-Za-z]{2}$"
+        },
+        "credential": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "title": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "type": {
+                "enum": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "json"
+                ]
+              },
+              "nullable": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name",
+              "type",
+              "nullable"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "featureMetadata": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(string|number):"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "sourceId": {
+                "type": [
+                  "string",
+                  "number"
+                ]
+              },
+              "overlaySourceId": {
+                "type": "string"
+              },
+              "sourceCrs": {
+                "type": "string"
+              },
+              "importId": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        "authentication": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "enum": [
+                "query-token",
+                "bearer"
+              ]
+            },
+            "credential": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "tokenParam": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "mode"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "tileLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "type",
+        "resource"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "type": {
+          "const": "tile"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "minZoom": {
+          "$ref": "#/$defs/finiteNumber"
+        },
+        "maxZoom": {
+          "$ref": "#/$defs/finiteNumber"
+        },
+        "role": {
+          "enum": [
+            "basemap",
+            "overlay"
+          ]
+        },
+        "resource": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "parentId": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "locked": {
+          "type": "boolean"
+        }
+      }
+    },
+    "vectorLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "type",
+        "resource",
+        "style"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "type": {
+          "const": "vector"
+        },
+        "style": {
+          "$ref": "#/$defs/layerStyle"
+        },
+        "label": {
+          "$ref": "#/$defs/label"
+        },
+        "interaction": {
+          "$ref": "#/$defs/interaction"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "minZoom": {
+          "$ref": "#/$defs/finiteNumber"
+        },
+        "maxZoom": {
+          "$ref": "#/$defs/finiteNumber"
+        },
+        "role": {
+          "enum": [
+            "basemap",
+            "overlay"
+          ]
+        },
+        "resource": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "parentId": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "filter": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/filter"
+          }
+        }
+      }
+    },
+    "style": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/pointStyle"
+        },
+        {
+          "$ref": "#/$defs/lineStyle"
+        },
+        {
+          "$ref": "#/$defs/polygonStyle"
+        }
+      ]
+    },
+    "pointStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "radius",
+        "fill"
+      ],
+      "properties": {
+        "type": {
+          "const": "point"
+        },
+        "radius": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "fill": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "stroke": {
+          "type": "string"
+        },
+        "strokeWidth": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "lineStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "color",
+        "width"
+      ],
+      "properties": {
+        "type": {
+          "const": "line"
+        },
+        "color": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "lineDash": {
+          "$ref": "#/$defs/lineDash"
+        }
+      }
+    },
+    "polygonStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "fill",
+        "stroke",
+        "strokeWidth"
+      ],
+      "properties": {
+        "type": {
+          "const": "polygon"
+        },
+        "fill": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "stroke": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "strokeWidth": {
+          "type": "number",
+          "minimum": 0
+        },
+        "lineDash": {
+          "$ref": "#/$defs/lineDash"
+        }
+      }
+    },
+    "lineDash": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "label": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field"
+      ],
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "color": {
+          "type": "string"
+        },
+        "font": {
+          "type": "string"
+        },
+        "haloColor": {
+          "type": "string"
+        },
+        "haloWidth": {
+          "type": "number",
+          "minimum": 0
+        },
+        "offset": {
+          "$ref": "#/$defs/numberPair"
+        },
+        "minZoom": {
+          "$ref": "#/$defs/finiteNumber"
+        },
+        "maxZoom": {
+          "$ref": "#/$defs/finiteNumber"
+        }
+      }
+    },
+    "interaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "selectable": {
+          "type": "boolean"
+        },
+        "popup": {
+          "$ref": "#/$defs/popup"
+        }
+      }
+    },
+    "popup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fields"
+      ],
+      "properties": {
+        "titleField": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/popupField"
+          }
+        }
+      }
+    },
+    "popupField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field"
+      ],
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "label": {
+          "type": "string"
+        },
+        "format": {
+          "enum": [
+            "text",
+            "number",
+            "date",
+            "url"
+          ]
+        }
+      }
+    },
+    "widgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "layerSwitcher": {
+          "type": "boolean"
+        },
+        "legend": {
+          "type": "boolean"
+        },
+        "scaleLine": {
+          "type": "boolean"
+        },
+        "fullscreen": {
+          "type": "boolean"
+        },
+        "zoom": {
+          "type": "boolean"
+        },
+        "mousePosition": {
+          "type": "boolean"
+        }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "preset": {
+          "type": "string"
+        },
+        "colorScheme": {
+          "enum": [
+            "light",
+            "dark",
+            "system"
+          ]
+        },
+        "accent": {
+          "type": "string"
+        },
+        "surface": {
+          "enum": [
+            "solid",
+            "glass"
+          ]
+        },
+        "fontFamily": {
+          "type": "string"
+        },
+        "logo": {
+          "type": "string"
+        }
+      }
+    },
+    "presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "chapters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/chapter"
+          }
+        }
+      }
+    },
+    "chapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "view"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "title": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "description": {
+          "type": "string"
+        },
+        "view": {
+          "$ref": "#/$defs/view"
+        },
+        "visibleLayers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "highlightedFeatureIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        }
+      }
+    },
+    "sceneColor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "r",
+        "g",
+        "b",
+        "a"
+      ],
+      "properties": {
+        "r": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "g": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "b": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "a": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "pointSymbol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "radius"
+      ],
+      "properties": {
+        "type": {
+          "const": "circle"
+        },
+        "radius": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "fill": {
+          "$ref": "#/$defs/sceneColor"
+        },
+        "stroke": {
+          "$ref": "#/$defs/sceneColor"
+        },
+        "strokeWidth": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "lineSymbol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "color",
+        "width"
+      ],
+      "properties": {
+        "type": {
+          "const": "solid"
+        },
+        "color": {
+          "$ref": "#/$defs/sceneColor"
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "lineDash": {
+          "$ref": "#/$defs/lineDash"
+        }
+      }
+    },
+    "polygonSymbol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "solid"
+        },
+        "fill": {
+          "$ref": "#/$defs/sceneColor"
+        },
+        "stroke": {
+          "$ref": "#/$defs/sceneColor"
+        },
+        "strokeWidth": {
+          "type": "number",
+          "minimum": 0
+        },
+        "lineDash": {
+          "$ref": "#/$defs/lineDash"
+        }
+      }
+    },
+    "mixedSymbol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "mixed"
+        },
+        "point": {
+          "$ref": "#/$defs/pointSymbol"
+        },
+        "line": {
+          "$ref": "#/$defs/lineSymbol"
+        },
+        "polygon": {
+          "$ref": "#/$defs/polygonSymbol"
+        }
+      }
+    },
+    "sceneSymbol": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/pointSymbol"
+        },
+        {
+          "$ref": "#/$defs/lineSymbol"
+        },
+        {
+          "$ref": "#/$defs/polygonSymbol"
+        },
+        {
+          "$ref": "#/$defs/mixedSymbol"
+        }
+      ]
+    },
+    "labelConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field"
+      ],
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "fontSize": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "color": {
+          "$ref": "#/$defs/sceneColor"
+        },
+        "strokeColor": {
+          "$ref": "#/$defs/sceneColor"
+        },
+        "strokeWidth": {
+          "type": "number",
+          "minimum": 0
+        },
+        "offsetX": {
+          "$ref": "#/$defs/finiteNumber"
+        },
+        "offsetY": {
+          "$ref": "#/$defs/finiteNumber"
+        },
+        "minZoom": {
+          "$ref": "#/$defs/finiteNumber"
+        },
+        "maxZoom": {
+          "$ref": "#/$defs/finiteNumber"
+        }
+      }
+    },
+    "singleLayerStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "symbol"
+      ],
+      "properties": {
+        "mode": {
+          "const": "single"
+        },
+        "symbol": {
+          "$ref": "#/$defs/sceneSymbol"
+        },
+        "label": {
+          "$ref": "#/$defs/labelConfig"
+        }
+      }
+    },
+    "categoryItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "symbol"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "symbol": {
+          "$ref": "#/$defs/sceneSymbol"
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "categorizedLayerStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "field",
+        "categories",
+        "fallback"
+      ],
+      "properties": {
+        "mode": {
+          "const": "categorized"
+        },
+        "field": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/categoryItem"
+          }
+        },
+        "fallback": {
+          "$ref": "#/$defs/sceneSymbol"
+        },
+        "label": {
+          "$ref": "#/$defs/labelConfig"
+        }
+      }
+    },
+    "graduatedBreak": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "symbol"
+      ],
+      "properties": {
+        "value": {
+          "$ref": "#/$defs/finiteNumber"
+        },
+        "symbol": {
+          "$ref": "#/$defs/sceneSymbol"
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "graduatedLayerStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "field",
+        "method",
+        "breaks",
+        "fallback"
+      ],
+      "properties": {
+        "mode": {
+          "const": "graduated"
+        },
+        "field": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "method": {
+          "enum": [
+            "equal-interval",
+            "quantile",
+            "manual"
+          ]
+        },
+        "breaks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/graduatedBreak"
+          }
+        },
+        "fallback": {
+          "$ref": "#/$defs/sceneSymbol"
+        },
+        "label": {
+          "$ref": "#/$defs/labelConfig"
+        }
+      }
+    },
+    "legacyStyle": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/pointStyle"
+        },
+        {
+          "$ref": "#/$defs/lineStyle"
+        },
+        {
+          "$ref": "#/$defs/polygonStyle"
+        }
+      ]
+    },
+    "layerStyle": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/singleLayerStyle"
+        },
+        {
+          "$ref": "#/$defs/categorizedLayerStyle"
+        },
+        {
+          "$ref": "#/$defs/graduatedLayerStyle"
+        }
+      ]
+    },
+    "cityPosition": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "cityTriple": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "cityTransform": {
+      "type": "object",
+      "properties": {
+        "translation": {
+          "$ref": "#/$defs/cityTriple"
+        },
+        "rotation": {
+          "$ref": "#/$defs/cityTriple"
+        },
+        "scale": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10000
+        }
+      },
+      "required": [
+        "translation",
+        "rotation",
+        "scale"
+      ]
+    },
+    "cityPopup": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "titleField": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "field"
+            ]
+          }
+        }
+      },
+      "required": [
+        "fields"
+      ]
+    },
+    "cityCamera": {
+      "type": "object",
+      "properties": {
+        "position": {
+          "$ref": "#/$defs/cityPosition"
+        },
+        "heading": {
+          "type": "number"
+        },
+        "pitch": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "roll": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "position",
+        "heading",
+        "pitch",
+        "roll"
+      ]
+    },
+    "cityAsset": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "enum": [
+            "3dtiles",
+            "glb"
+          ]
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "type": {
+                "enum": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "json"
+                ]
+              },
+              "nullable": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name",
+              "type",
+              "nullable"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "featureMetadata": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(string|number):"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "sourceId": {
+                "type": [
+                  "string",
+                  "number"
+                ]
+              },
+              "overlaySourceId": {
+                "type": "string"
+              },
+              "sourceCrs": {
+                "type": "string"
+              },
+              "importId": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        "authentication": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "enum": [
+                "query-token",
+                "bearer"
+              ]
+            },
+            "credential": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "tokenParam": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "mode"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "type",
+        "url"
+      ]
+    },
+    "cityTileset": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "name": {
+          "type": "string"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "popup": {
+          "$ref": "#/$defs/cityPopup"
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "type": {
+          "const": "3dtiles"
+        },
+        "transform": {
+          "$ref": "#/$defs/cityTransform"
+        },
+        "maximumScreenSpaceError": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "cacheBytes": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "resource": {
+          "type": "string"
+        },
+        "parentId": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "visible",
+        "type",
+        "resource",
+        "transform"
+      ]
+    },
+    "cityModel": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "name": {
+          "type": "string"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "popup": {
+          "$ref": "#/$defs/cityPopup"
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "type": {
+          "const": "model"
+        },
+        "position": {
+          "$ref": "#/$defs/cityPosition"
+        },
+        "transform": {
+          "$ref": "#/$defs/cityTransform"
+        },
+        "resource": {
+          "type": "string"
+        },
+        "parentId": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "visible",
+        "type",
+        "resource",
+        "position",
+        "transform"
+      ]
+    },
+    "cityGeoJson": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "name": {
+          "type": "string"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "popup": {
+          "$ref": "#/$defs/cityPopup"
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "type": {
+          "const": "geojson"
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "resource": {
+          "type": "string"
+        },
+        "parentId": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "visible",
+        "type",
+        "resource"
+      ]
+    },
+    "cityWater": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "name": {
+          "type": "string"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "popup": {
+          "$ref": "#/$defs/cityPopup"
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "type": {
+          "const": "water"
+        },
+        "boundary": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "$ref": "#/$defs/cityPosition"
+          }
+        },
+        "height": {
+          "type": "number"
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$"
+        },
+        "amplitude": {
+          "type": "number",
+          "minimum": 0
+        },
+        "frequency": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "speed": {
+          "type": "number",
+          "minimum": 0
+        },
+        "parentId": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "visible",
+        "type",
+        "boundary",
+        "height",
+        "amplitude",
+        "frequency",
+        "speed",
+        "color"
+      ]
+    },
+    "cityScene": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "camera": {
+          "$ref": "#/$defs/cityCamera"
+        },
+        "basemap": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string"
+            },
+            "attribution": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "url"
+          ]
+        },
+        "terrain": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "url"
+          ]
+        },
+        "assets": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/cityAsset"
+          }
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/cityGroup"
+          }
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/cityTileset"
+              },
+              {
+                "$ref": "#/$defs/cityModel"
+              },
+              {
+                "$ref": "#/$defs/cityGeoJson"
+              },
+              {
+                "$ref": "#/$defs/cityWater"
+              },
+              {
+                "$ref": "#/$defs/cityGraphic"
+              }
+            ]
+          }
+        },
+        "effects": {
+          "type": "object",
+          "properties": {
+            "fog": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "bloom": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "fog",
+            "bloom"
+          ]
+        },
+        "lighting": {
+          "type": "object",
+          "properties": {
+            "sunlight": {
+              "type": "boolean"
+            },
+            "shadows": {
+              "type": "boolean"
+            },
+            "time": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "required": [
+            "sunlight",
+            "shadows",
+            "time"
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "camera",
+        "assets",
+        "nodes",
+        "effects"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "version": {
+                "const": 1
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "lighting"
+                  ]
+                },
+                {
+                  "required": [
+                    "groups"
+                  ]
+                }
+              ]
+            },
+            "properties": {
+              "nodes": {
+                "items": {
+                  "allOf": [
+                    {
+                      "not": {
+                        "required": [
+                          "groupId"
+                        ]
+                      }
+                    }
+                  ],
+                  "not": {
+                    "properties": {
+                      "type": {
+                        "const": "graphic"
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "cityGraphic": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "name": {
+          "type": "string"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "popup": {
+          "$ref": "#/$defs/cityPopup"
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "type": {
+          "const": "graphic"
+        },
+        "geometry": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "enum": [
+                "point",
+                "polyline",
+                "polygon"
+              ]
+            },
+            "positions": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/cityPosition"
+              }
+            },
+            "heightMode": {
+              "enum": [
+                "ground",
+                "absolute"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "positions",
+            "heightMode"
+          ],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "type": {
+                    "const": "point"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "positions": {
+                    "minItems": 1,
+                    "maxItems": 1
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "type": {
+                    "const": "polyline"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "positions": {
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "type": {
+                    "const": "polygon"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "positions": {
+                    "minItems": 3
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "style": {
+          "type": "object",
+          "properties": {
+            "color": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$"
+            },
+            "width": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 64
+            },
+            "pointSize": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 128
+            },
+            "label": {
+              "type": "string"
+            },
+            "labelField": {
+              "type": "string",
+              "pattern": "\\S"
+            }
+          },
+          "required": [
+            "color",
+            "width",
+            "pointSize"
+          ]
+        },
+        "properties": {
+          "type": "object"
+        },
+        "parentId": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "visible",
+        "type",
+        "geometry",
+        "style",
+        "properties"
+      ]
+    },
+    "cityGroup": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "locked": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "visible"
+      ]
+    },
+    "geoJsonPosition": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 2
+    },
+    "geoJsonLine": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/geoJsonPosition"
+      },
+      "minItems": 2
+    },
+    "geoJsonRing": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/geoJsonPosition"
+      },
+      "minItems": 4
+    },
+    "geoJsonPolygon": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/geoJsonRing"
+      },
+      "minItems": 1
+    },
+    "geoJsonGeometry": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "Point"
+            },
+            "coordinates": {
+              "$ref": "#/$defs/geoJsonPosition"
+            }
+          },
+          "required": [
+            "type",
+            "coordinates"
+          ],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "MultiPoint"
+            },
+            "coordinates": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/geoJsonPosition"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "coordinates"
+          ],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "LineString"
+            },
+            "coordinates": {
+              "$ref": "#/$defs/geoJsonLine"
+            }
+          },
+          "required": [
+            "type",
+            "coordinates"
+          ],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "MultiLineString"
+            },
+            "coordinates": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/geoJsonLine"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "coordinates"
+          ],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "Polygon"
+            },
+            "coordinates": {
+              "$ref": "#/$defs/geoJsonPolygon"
+            }
+          },
+          "required": [
+            "type",
+            "coordinates"
+          ],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "MultiPolygon"
+            },
+            "coordinates": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/geoJsonPolygon"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "coordinates"
+          ],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "GeometryCollection"
+            },
+            "geometries": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/geoJsonGeometry"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "geometries"
+          ],
+          "additionalProperties": true
+        }
+      ]
+    },
+    "geoJsonFeature": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "Feature"
+        },
+        "id": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "geometry": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/geoJsonGeometry"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "properties": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "geometry",
+        "properties"
+      ],
+      "additionalProperties": true
+    },
+    "wmsSource": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "wms"
+        },
+        "url": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "version": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "layerNames": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "styleNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "format": {
+          "type": "string"
+        },
+        "transparent": {
+          "type": "boolean"
+        },
+        "crs": {
+          "type": "string"
+        },
+        "bboxWgs84": {
+          "$ref": "#/$defs/extent"
+        },
+        "authMode": {
+          "enum": [
+            "none",
+            "runtime"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "type": {
+                "enum": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "json"
+                ]
+              },
+              "nullable": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name",
+              "type",
+              "nullable"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "featureMetadata": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(string|number):"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "sourceId": {
+                "type": [
+                  "string",
+                  "number"
+                ]
+              },
+              "overlaySourceId": {
+                "type": "string"
+              },
+              "sourceCrs": {
+                "type": "string"
+              },
+              "importId": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        "authentication": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "enum": [
+                "query-token",
+                "bearer"
+              ]
+            },
+            "credential": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "tokenParam": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "mode"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "type",
+        "url",
+        "version",
+        "layerNames",
+        "authMode"
+      ],
+      "additionalProperties": false
+    },
+    "wmtsMatrix": {
+      "type": "object",
+      "properties": {
+        "identifier": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "scaleDenominator": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "topLeftCorner": {
+          "$ref": "#/$defs/numberPair"
+        },
+        "tileWidth": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tileHeight": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "matrixWidth": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "matrixHeight": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "identifier",
+        "scaleDenominator",
+        "topLeftCorner",
+        "tileWidth",
+        "tileHeight"
+      ],
+      "additionalProperties": false
+    },
+    "wmtsSource": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "wmts"
+        },
+        "url": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "version": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "layer": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "style": {
+          "type": "string"
+        },
+        "format": {
+          "type": "string"
+        },
+        "tileMatrixSet": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "requestEncoding": {
+          "enum": [
+            "KVP",
+            "REST"
+          ]
+        },
+        "urls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "projection": {
+          "type": "string"
+        },
+        "supportedCrs": {
+          "type": "string"
+        },
+        "bboxWgs84": {
+          "$ref": "#/$defs/extent"
+        },
+        "tileMatrices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/wmtsMatrix"
+          },
+          "minItems": 1
+        },
+        "authMode": {
+          "enum": [
+            "none",
+            "runtime"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "type": {
+                "enum": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "json"
+                ]
+              },
+              "nullable": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name",
+              "type",
+              "nullable"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "featureMetadata": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(string|number):"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "sourceId": {
+                "type": [
+                  "string",
+                  "number"
+                ]
+              },
+              "overlaySourceId": {
+                "type": "string"
+              },
+              "sourceCrs": {
+                "type": "string"
+              },
+              "importId": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        "authentication": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "enum": [
+                "query-token",
+                "bearer"
+              ]
+            },
+            "credential": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "tokenParam": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "mode"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "type",
+        "url",
+        "version",
+        "layer",
+        "tileMatrixSet",
+        "requestEncoding",
+        "tileMatrices",
+        "authMode"
+      ],
+      "additionalProperties": false
+    },
+    "wfsSource": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "wfs"
+        },
+        "url": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "version": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "typeName": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "outputFormat": {
+          "type": "string"
+        },
+        "maxFeatures": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "srsName": {
+          "type": "string"
+        },
+        "bboxWgs84": {
+          "$ref": "#/$defs/extent"
+        },
+        "queryExtentWgs84": {
+          "$ref": "#/$defs/extent"
+        },
+        "extentMode": {
+          "enum": [
+            "view",
+            "full"
+          ]
+        },
+        "paginationUsed": {
+          "type": "boolean"
+        },
+        "loadedCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "truncatedByLimit": {
+          "type": "boolean"
+        },
+        "duplicateIdCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lastLoadedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "authMode": {
+          "enum": [
+            "none",
+            "runtime"
+          ]
+        },
+        "snapshot": {
+          "$ref": "#/$defs/geoJsonFeatureCollection"
+        },
+        "title": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "type": {
+                "enum": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "json"
+                ]
+              },
+              "nullable": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name",
+              "type",
+              "nullable"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "featureMetadata": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(string|number):"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "sourceId": {
+                "type": [
+                  "string",
+                  "number"
+                ]
+              },
+              "overlaySourceId": {
+                "type": "string"
+              },
+              "sourceCrs": {
+                "type": "string"
+              },
+              "importId": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        "authentication": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "enum": [
+                "query-token",
+                "bearer"
+              ]
+            },
+            "credential": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "tokenParam": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "mode"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "type",
+        "url",
+        "version",
+        "typeName",
+        "authMode",
+        "snapshot"
+      ],
+      "additionalProperties": false
+    },
+    "resource": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/geoJsonSource"
+        },
+        {
+          "$ref": "#/$defs/xyzSource"
+        },
+        {
+          "$ref": "#/$defs/tiandituSource"
+        },
+        {
+          "$ref": "#/$defs/googleMapTilesSource"
+        },
+        {
+          "$ref": "#/$defs/wmsSource"
+        },
+        {
+          "$ref": "#/$defs/wmtsSource"
+        },
+        {
+          "$ref": "#/$defs/wfsSource"
+        },
+        {
+          "$ref": "#/$defs/cityAsset"
+        }
+      ]
+    },
+    "filter": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "op": {
+          "enum": [
+            "eq",
+            "neq",
+            "contains",
+            "lt",
+            "lte",
+            "gt",
+            "gte",
+            "is-empty",
+            "is-not-empty"
+          ]
+        },
+        "value": {}
+      },
+      "required": [
+        "field",
+        "op"
+      ],
+      "additionalProperties": false,
+      "if": {
+        "properties": {
+          "op": {
+            "enum": [
+              "is-empty",
+              "is-not-empty"
+            ]
+          }
+        }
+      },
+      "else": {
+        "required": [
+          "value"
+        ]
+      }
+    },
+    "group": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "group"
+        },
+        "id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "parentId": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "scope": {
+          "enum": [
+            "2d",
+            "3d"
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "name",
+        "visible"
+      ],
+      "additionalProperties": false
+    },
+    "node": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/tileLayer"
+        },
+        {
+          "$ref": "#/$defs/vectorLayer"
+        },
+        {
+          "$ref": "#/$defs/cityTileset"
+        },
+        {
+          "$ref": "#/$defs/cityModel"
+        },
+        {
+          "$ref": "#/$defs/cityGeoJson"
+        },
+        {
+          "$ref": "#/$defs/cityWater"
+        },
+        {
+          "$ref": "#/$defs/cityGraphic"
+        },
+        {
+          "$ref": "#/$defs/group"
+        }
+      ]
+    },
+    "view2d": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projection",
+        "center",
+        "zoom",
+        "type"
+      ],
+      "properties": {
+        "projection": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "center": {
+          "$ref": "#/$defs/numberPair"
+        },
+        "zoom": {
+          "$ref": "#/$defs/finiteNumber"
+        },
+        "rotation": {
+          "$ref": "#/$defs/finiteNumber"
+        },
+        "minZoom": {
+          "$ref": "#/$defs/finiteNumber"
+        },
+        "maxZoom": {
+          "$ref": "#/$defs/finiteNumber"
+        },
+        "extent": {
+          "$ref": "#/$defs/extent"
+        },
+        "type": {
+          "const": "2d"
+        }
+      }
+    },
+    "view3d": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "3d"
+        },
+        "camera": {
+          "$ref": "#/$defs/cityCamera"
+        },
+        "heightReference": {
+          "const": "ellipsoid"
+        }
+      },
+      "required": [
+        "type",
+        "camera",
+        "heightReference"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

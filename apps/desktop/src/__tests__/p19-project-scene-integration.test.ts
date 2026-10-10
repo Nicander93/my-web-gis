@@ -8,7 +8,7 @@ import {
   serializeProjectSnapshot,
   findSecretLeaks
 } from '@desktop-webgis/gis-core'
-import { compileProjectToScene } from '@desktop-webgis/scene-core'
+import { compileProjectToScene } from '../features/scene/compile-project'
 import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
 import { layerCommands } from '@/app/commands/layer.commands'

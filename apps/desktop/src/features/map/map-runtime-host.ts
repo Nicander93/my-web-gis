@@ -19,6 +19,8 @@ import { useSessionStore } from '@/stores/session.store'
 import { useSnappingStore } from '@/stores/snapping.store'
 import { useWorkbenchStore } from '@/stores/workbench.store'
 import { useWorkspaceStore } from '@/stores/workspace.store'
+import { createProjectSceneDocument } from '../scene/project-scene-document'
+import { configureMapServiceLayer } from './map-service-requests'
 
 let runtime: OlMapRuntime | null = null
 let selectionRuntime: OlSelectionRuntime | null = null
@@ -27,8 +29,6 @@ let mounted = false
 let selectionMounted = false
 let toolMounted = false
 let activeTool: EditTool = 'none'
-let lastSyncedProjectId: string | null = null
-let lastBasemapKey = ''
 let moveEndKey: (() => void) | null = null
 let storeUnsub: (() => void) | null = null
 let snappingUnsub: (() => void) | null = null
@@ -97,8 +97,6 @@ export function mountMapRuntime(
   mounted = true
   selectionMounted = true
   toolMounted = true
-  lastSyncedProjectId = null
-  lastBasemapKey = ''
   activeTool = 'none'
 
   const map = runtime.getMap()
@@ -163,8 +161,6 @@ export function unmountMapRuntime(): void {
   runtime?.unmount()
   runtime = null
   mounted = false
-  lastSyncedProjectId = null
-  lastBasemapKey = ''
 }
 
 /** Pull layers / view / basemap from the project store into the mounted runtime. */
@@ -174,28 +170,22 @@ export function syncMapFromProject(): void {
   const state = useProjectStore.getState()
   const { project, featuresByDataset } = state
 
-  if (project.id !== lastSyncedProjectId) {
-    lastSyncedProjectId = project.id
-    const view = runtime.getMap().getView()
-    view.setCenter(project.mapState.center)
-    view.setZoom(project.mapState.zoom)
-    view.setRotation(project.mapState.rotation)
-    lastBasemapKey = ''
-  }
-
-  const basemapKey = JSON.stringify(project.basemap)
-  if (basemapKey !== lastBasemapKey) {
-    lastBasemapKey = basemapKey
-    void runtime.syncBasemap(
-      project.basemap,
-      collectBasemapCredentials(project.basemap)
-    )
-  }
-
-  runtime.syncLayers(state.getMapLayers(), featuresByDataset, project.datasets)
-  toolRuntime?.refreshSnapping()
-  syncSessionViewExtent()
-  syncSelectionHighlight(state.selection)
+  const current = runtime
+  const target = useWorkbenchStore.getState().editLayerId
+  const previousSource = target ? current.registry.getVector(target)?.getSource() : undefined
+  void current.syncDocument(createProjectSceneDocument(state.getSnapshot()), featuresByDataset, {
+    credentials: collectBasemapCredentials(project.basemap), configureServiceLayer: (layer, resource) => configureMapServiceLayer(layer, resource)
+  }).then(applied => {
+    if (!applied || runtime !== current) return
+    const nextSource = target ? current.registry.getVector(target)?.getSource() : undefined
+    if (previousSource !== nextSource && activeTool !== 'select') setActiveEditTool(activeTool)
+    toolRuntime?.refreshSnapping()
+    syncSessionViewExtent()
+    syncSelectionHighlight(useProjectStore.getState().selection)
+  }).catch(() => {
+    if (runtime !== current) return
+    window.dispatchEvent(new CustomEvent('desktop-webgis:command-status', { detail: '地图资源加载失败，已显示的内容保留。' }))
+  })
 }
 
 export function zoomMapBy(delta: number): boolean {
@@ -489,8 +479,6 @@ export function _setMapRuntimeForTests(
   selectionMounted = Boolean(options?.selection ?? (isMounted && next))
   toolMounted = Boolean(options?.tool ?? (isMounted && next))
   activeTool = options?.activeTool ?? (isMounted ? 'select' : 'none')
-  lastSyncedProjectId = null
-  lastBasemapKey = ''
 
   if (next && isMounted) {
     // Lightweight stand-ins so getSelectionRuntime/getToolRuntime are non-null in unit tests.

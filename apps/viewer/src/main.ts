@@ -1,15 +1,17 @@
-import { createSceneRuntime, type RuntimeFeatureClickEvent } from '@desktop-webgis/ol-scene-runtime'
+import { OlDocumentRuntime } from '@desktop-webgis/ol-scene-runtime'
+import { bindSceneRuntime, SceneController } from '@desktop-webgis/scene-core'
 import {
-  parseScene,
   type PopupField,
   type SceneColor,
   type SceneLayerStyle,
-  type SceneManifest,
+  type SceneDocument,
   type SceneSymbol,
-  type VectorLayer
+  type SceneNode
 } from '@desktop-webgis/scene-schema'
-import Map from 'ol/Map'
 import Overlay from 'ol/Overlay'
+import { defaults as defaultControls, FullScreen, MousePosition, ScaleLine } from 'ol/control.js'
+import { loadViewerDocument } from './scene-document'
+import { createViewerSelection } from './selection'
 import 'ol/ol.css'
 import './style.css'
 
@@ -30,17 +32,24 @@ const popupFields = requireElement<HTMLElement>('popup-fields')
 const popupClose = requireElement<HTMLButtonElement>('popup-close')
 const statusElement = requireElement<HTMLElement>('scene-status')
 
-let scene: SceneManifest
+type MapNode = Extract<SceneNode, { type: 'tile' | 'vector' }>
+type VectorNode = Extract<SceneNode, { type: 'vector' }>
+let sceneController: SceneController
+
+function mapNodes(document: SceneDocument): MapNode[] {
+  return document.nodes.filter((node): node is MapNode => node.type === 'tile' || node.type === 'vector')
+}
 
 void start()
 
 async function start(): Promise<void> {
+  const startup = new AbortController()
+  window.addEventListener('pagehide', () => startup.abort(), { once: true })
   try {
-    const sceneUrl = new URLSearchParams(window.location.search).get('scene') ?? './scene.json'
-    const response = await fetch(sceneUrl)
-    if (!response.ok) throw new Error(`场景加载失败：HTTP ${response.status}`)
-    scene = parseScene(await response.json())
+    const sceneUrl = new URL(new URLSearchParams(window.location.search).get('scene') ?? './scene.json', document.baseURI).href
+    const scene = await loadViewerDocument(sceneUrl, fetch, startup.signal)
     const runtimeConfig = await loadRuntimeConfig()
+    startup.signal.throwIfAborted()
 
     document.title = scene.title
     titleElement.textContent = scene.title
@@ -48,17 +57,37 @@ async function start(): Promise<void> {
     descriptionElement.hidden = !scene.description
 
     applyTheme(scene)
-    if (scene.city && new URLSearchParams(window.location.search).get('mode') !== '2d') {
+    const active = scene.views[scene.activeView]
+    const mapView = active.type === '2d' ? scene.activeView : Object.entries(scene.views).find(([, view]) => view.type === '2d')?.[0]
+    const cityView = active.type === '3d' ? scene.activeView : Object.entries(scene.views).find(([, view]) => view.type === '3d')?.[0]
+    const mode = new URLSearchParams(window.location.search).get('mode')
+    if (cityView && mode !== '2d' && (mode === '3d' || active.type === '3d')) {
       const { renderCityViewer } = await import('./city-viewer')
-      await renderCityViewer(scene, sceneUrl)
+      await renderCityViewer(scene, sceneUrl, cityView)
       return
     }
-    const runtime = await createSceneRuntime({
+    if (!mapView) throw new Error('场景没有二维视图')
+    sceneController = new SceneController(scene)
+    const runtime = new OlDocumentRuntime({
       target: mapTarget,
-      scene,
+      viewId: mapView,
       credentials: runtimeConfig.credentials
     })
-    const map = runtime.getNativeMap() as Map
+    let selection: ReturnType<typeof createViewerSelection> | undefined
+    const binding = bindSceneRuntime(sceneController, runtime)
+    window.addEventListener('pagehide', () => { binding.dispose(); selection?.dispose(); runtime.destroy(); sceneController.dispose() }, { once: true })
+    try {
+      const synchronized = await binding.settled()
+      startup.signal.throwIfAborted()
+      if (synchronized.status === 'error') throw synchronized.error
+    } catch (error) { binding.dispose(); runtime.destroy(); sceneController.dispose(); throw error }
+    const map = runtime.getNativeMap()
+    selection = createViewerSelection(runtime)
+    const widgets = scene.widgets ?? {}
+    defaultControls({ zoom: widgets.zoom ?? true, rotate: false, attribution: true }).forEach(control => map.addControl(control))
+    if (widgets.scaleLine) map.addControl(new ScaleLine())
+    if (widgets.fullscreen) map.addControl(new FullScreen())
+    if (widgets.mousePosition) map.addControl(new MousePosition())
     const popupOverlay = new Overlay({
       element: popupElement,
       positioning: 'bottom-center',
@@ -67,19 +96,30 @@ async function start(): Promise<void> {
     })
     map.addOverlay(popupOverlay)
 
-    runtime.on('feature:click', (event) => showPopup(event, popupOverlay))
-    runtime.on('scene:error', ({ error }) => showError(error.message))
-    runtime.on('layer:error', ({ layerId, error }) => showError(`${layerId}: ${error.message}`))
+    map.on('singleclick', event => map.forEachFeatureAtPixel(event.pixel, (feature, layer) => {
+      const node = mapNodes(sceneController.getDocument()).find(node => runtime.getLayer(node.id) === layer)
+      if (node?.type !== 'vector' || !node.interaction?.popup) return undefined
+      showPopup({ layerId: node.id, properties: feature.getProperties(), coordinate: event.coordinate }, popupOverlay)
+      return feature
+    }))
 
     popupClose.addEventListener('click', () => {
       popupOverlay.setPosition(undefined)
       popupElement.hidden = true
     })
 
-    renderLayerSwitcher(scene, runtime.setLayerVisible.bind(runtime))
+    renderLayerSwitcher(scene, (id, visible) => {
+      try { sceneController.setNodeVisible(id, visible) }
+      catch (error) { showError(String(error)); return }
+      void binding.settled().then(state => {
+        if (state.status === 'error') showError(String(state.error))
+        if (state.status === 'ready') selection?.refresh()
+      })
+    })
     renderLegend(scene)
-    statusElement.textContent = '场景已加载'
-    window.setTimeout(() => statusElement.classList.add('scene-status--quiet'), 1800)
+    const issues = runtime.getIssues()
+    statusElement.textContent = issues.length ? issues.map(issue => `${issue.path}: ${issue.message}`).join('\n') : '场景已加载'
+    if (!issues.length) window.setTimeout(() => statusElement.classList.add('scene-status--quiet'), 1800)
   } catch (error) {
     showError(error instanceof Error ? error.message : String(error))
   }
@@ -103,7 +143,7 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
   }
 }
 
-function applyTheme(manifest: SceneManifest): void {
+function applyTheme(manifest: SceneDocument): void {
   const theme = manifest.theme
   if (!theme) return
   document.documentElement.dataset.colorScheme = theme.colorScheme ?? 'light'
@@ -118,20 +158,21 @@ function requireElement<T extends HTMLElement>(id: string): T {
   return element as T
 }
 
-function renderLayerSwitcher(manifest: SceneManifest, setVisible: (layerId: string, visible: boolean) => void): void {
+function renderLayerSwitcher(manifest: SceneDocument, setVisible: (layerId: string, visible: boolean) => void): void {
   if (!manifest.widgets?.layerSwitcher) return
   layerPanel.hidden = false
   layerList.replaceChildren(
-    ...[...manifest.layers].reverse().map((layer) => {
+    ...manifest.nodes.filter(node => node.type === 'tile' || node.type === 'vector' || node.type === 'group' && node.scope !== '3d').reverse().map((layer) => {
       const label = document.createElement('label')
       label.className = 'layer-row'
       const checkbox = document.createElement('input')
-      checkbox.type = layer.role === 'basemap' ? 'radio' : 'checkbox'
-      if (layer.role === 'basemap') checkbox.name = 'scene-basemap'
+      const basemap = 'role' in layer && layer.role === 'basemap'
+      checkbox.type = basemap ? 'radio' : 'checkbox'
+      if (basemap) checkbox.name = 'scene-basemap'
       checkbox.checked = layer.visible ?? true
       checkbox.addEventListener('change', () => {
-        if (layer.role === 'basemap' && checkbox.checked) {
-          for (const candidate of manifest.layers) {
+        if (basemap && checkbox.checked) {
+          for (const candidate of mapNodes(manifest)) {
             if (candidate.role === 'basemap') setVisible(candidate.id, candidate.id === layer.id)
           }
         } else {
@@ -178,17 +219,22 @@ function applyLegendSymbol(element: HTMLSpanElement, symbol: SceneSymbol): void 
     return
   }
   if (symbol.type === 'solid') {
-    element.style.background = colorToCss(symbol.fill, '#94a3b8')
-    element.style.borderColor = colorToCss(symbol.stroke, 'transparent')
+    if ('width' in symbol) {
+      element.style.background = colorToCss(symbol.color, '#64748b')
+      element.style.height = `${Math.max(2, symbol.width)}px`
+    } else {
+      element.style.background = colorToCss(symbol.fill, '#94a3b8')
+      element.style.borderColor = colorToCss(symbol.stroke, 'transparent')
+    }
     return
   }
   const nested = symbol.point ?? symbol.polygon ?? symbol.line
   if (nested) applyLegendSymbol(element, nested)
 }
 
-function renderLegend(manifest: SceneManifest): void {
+function renderLegend(manifest: SceneDocument): void {
   if (!manifest.widgets?.legend) return
-  const vectorLayers = manifest.layers.filter((layer): layer is VectorLayer => layer.type === 'vector')
+  const vectorLayers = mapNodes(manifest).filter((layer): layer is VectorNode => layer.type === 'vector')
   if (vectorLayers.length === 0) return
   legendPanel.hidden = false
   legendList.replaceChildren(
@@ -205,14 +251,14 @@ function renderLegend(manifest: SceneManifest): void {
   )
 }
 
-function showPopup(event: RuntimeFeatureClickEvent, overlay: Overlay): void {
-  const layer = scene.layers.find(
-    (candidate): candidate is VectorLayer => candidate.id === event.layerId && candidate.type === 'vector'
+function showPopup(event: { layerId: string; properties: Record<string, unknown>; coordinate: number[] }, overlay: Overlay): void {
+  const layer = sceneController.getDocument().nodes.find(
+    (candidate): candidate is VectorNode => candidate.id === event.layerId && candidate.type === 'vector'
   )
   const popup = layer?.interaction?.popup
   if (!popup) return
 
-  const properties = event.feature.properties ?? {}
+  const properties = event.properties
   popupTitle.textContent = popup.titleField ? formatText(properties[popup.titleField]) : layer.name
   popupFields.replaceChildren(
     ...popup.fields.map((field) => createPopupField(field, properties[field.field]))

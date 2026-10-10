@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { createProject } from '@desktop-webgis/gis-core'
 import { parseProjectSnapshot, serializeProjectSnapshot } from '@desktop-webgis/gis-core'
 import { useWorkspaceStore } from '@/stores/workspace.store'
-import { compileProjectToScene } from '@desktop-webgis/scene-core'
+import { compileProjectToScene } from '../scene/compile-project'
 import { useProjectStore } from '@/stores/project.store'
 import { addCityGroup, copyCityNodes, deleteCityNodes, dissolveCityGroup, loadCitySample, moveCitySelection, patchCityGroup, setCityNodesLocked, setCityNodesVisible, updateCity } from './city-commands'
 

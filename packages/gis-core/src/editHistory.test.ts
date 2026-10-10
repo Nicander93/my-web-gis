@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AddFeatureCommand, EditHistory, MemoryFeatureStore, UpdatePropertiesCommand } from './index'
+import { AddFeatureCommand, EditHistory, MemoryFeatureStore, UpdatePropertiesCommand, type EditCommand } from './index'
 
 describe('EditHistory', () => {
   it('executes, undoes, and redoes feature edits', () => {
@@ -29,5 +29,31 @@ describe('EditHistory', () => {
 
     history.redo(context)
     expect(featureStore.getAll('dataset-1')).toHaveLength(1)
+  })
+  it('keeps the same command available after a failed undo or redo so the host can retry', () => {
+    const history = new EditHistory(), context = { featureStore: new MemoryFeatureStore() }
+    let failUndo = true, failExecute = false, value = 0
+    const command: EditCommand = {
+      id: 'scene', label: 'Replace scene',
+      execute: () => { if (failExecute) throw new Error('prepare failed'); value = 1 },
+      undo: () => { if (failUndo) throw new Error('restore failed'); value = 0 }
+    }
+    history.execute(command, context)
+    expect(history.peekUndo()).toBe(command)
+    expect(() => history.undo(context)).toThrow('restore failed')
+    expect(history.undoCount).toBe(1)
+    expect(history.redoCount).toBe(0)
+    expect(value).toBe(1)
+    failUndo = false
+    expect(history.undo(context)).toBe(command)
+    expect(history.peekRedo()).toBe(command)
+    failExecute = true
+    expect(() => history.redo(context)).toThrow('prepare failed')
+    expect(history.undoCount).toBe(0)
+    expect(history.redoCount).toBe(1)
+    expect(value).toBe(0)
+    failExecute = false
+    expect(history.redo(context)).toBe(command)
+    expect(value).toBe(1)
   })
 })

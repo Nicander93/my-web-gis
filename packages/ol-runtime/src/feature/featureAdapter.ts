@@ -8,7 +8,7 @@ const geoJsonFormat = new GeoJSON({
   featureProjection: 'EPSG:3857'
 })
 
-export function toOlFeature(feature: GisFeature): Feature<Geometry> {
+export function toOlFeature(feature: GisFeature, projection = 'EPSG:3857'): Feature<Geometry> {
   const olFeature = geoJsonFormat.readFeature(
     {
       type: 'Feature',
@@ -18,7 +18,7 @@ export function toOlFeature(feature: GisFeature): Feature<Geometry> {
     },
     {
       dataProjection: 'EPSG:4326',
-      featureProjection: 'EPSG:3857'
+      featureProjection: projection
     }
   ) as Feature<Geometry>
   olFeature.setId(feature.id)
@@ -26,10 +26,10 @@ export function toOlFeature(feature: GisFeature): Feature<Geometry> {
   return olFeature
 }
 
-export function fromOlFeature(feature: Feature<Geometry>): GisFeature {
+export function fromOlFeature(feature: Feature<Geometry>, projection = 'EPSG:3857'): GisFeature {
   const json = geoJsonFormat.writeFeatureObject(feature, {
     dataProjection: 'EPSG:4326',
-    featureProjection: 'EPSG:3857'
+    featureProjection: projection
   })
   if (!json.geometry || json.geometry.type === 'GeometryCollection') {
     throw new Error('Unsupported or empty geometry')

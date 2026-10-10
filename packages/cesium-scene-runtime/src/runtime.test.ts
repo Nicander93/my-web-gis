@@ -2,20 +2,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EntityCollection, JulianDate } from 'cesium'
 import type { Viewer } from 'cesium'
 import { createCityScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
-import { CitySceneRuntime } from './index'
+import { CitySceneRuntime, createCesiumDocumentRuntime } from './index'
+import { migrateSceneDocument } from '@desktop-webgis/scene-schema'
 
-const probe = vi.hoisted(() => ({ created: 0, released: 0, editors: [] as Array<{ stopEditing: ReturnType<typeof vi.fn>; cancel: ReturnType<typeof vi.fn> }> }))
+const probe = vi.hoisted(() => ({ created: 0, released: 0, nativeGate: undefined as Promise<void> | undefined, editors: [] as Array<{ stopEditing: ReturnType<typeof vi.fn>; cancel: ReturnType<typeof vi.fn> }> }))
 vi.mock('cesium', async original => ({ ...await original<typeof import('cesium')>(),
   ScreenSpaceEventHandler: class { setInputAction(): void {} destroy(): void {} },
   Resource: class { constructor(readonly options: { url: string }) {} },
   EllipsoidTerrainProvider: class {},
   buildModuleUrl: () => 'https://local.test/cesium/Assets/Textures/NaturalEarthII',
-  TileMapServiceImageryProvider: { fromUrl: async () => ({}) }
+  TileMapServiceImageryProvider: { fromUrl: async () => { await preparationProbe.environment; return {} } }
 }))
 vi.mock('@desktop-webgis/cesium-layer', async original => {
   const actual = await original<typeof import('@desktop-webgis/cesium-layer')>()
   return { ...actual, TilesetLayer: class extends actual.TilesetLayer {
-    protected async createNative(): Promise<() => void> { probe.created++; return () => { probe.released++ } }
+    protected async createNative(): Promise<() => void> { probe.created++; preparationProbe.visibility.push(this.show); await (preparationProbe.gates.length ? preparationProbe.gates.shift() : probe.nativeGate); return () => { probe.released++ } }
   }, GeoJsonLayer: class extends actual.GeoJsonLayer {
     protected async createNative(): Promise<() => void> { return () => {} }
   } }
@@ -25,16 +26,161 @@ vi.mock('@desktop-webgis/cesium-tileset-edit', () => ({ TilesetEditor: class {
   constructor(_viewer: Viewer, private options: { onStart(): void }) { probe.editors.push(this) }
   startEditing(): void { this.options.onStart() } setMode(): void {} refresh(): void {} destroy(): void {}
 } }))
-beforeEach(() => { probe.created = 0; probe.released = 0; probe.editors = []; vi.stubGlobal('document', { baseURI: 'https://local.test/' }); vi.stubGlobal('CESIUM_BASE_URL', 'https://local.test/cesium/') })
+beforeEach(() => { probe.created = 0; probe.released = 0; probe.nativeGate = undefined; probe.editors = []; vi.stubGlobal('document', { baseURI: 'https://local.test/' }); vi.stubGlobal('CESIUM_BASE_URL', 'https://local.test/cesium/') })
 afterEach(() => vi.unstubAllGlobals())
+const preparationProbe = vi.hoisted(() => ({ gates: [] as Promise<void>[], visibility: [] as boolean[], environment: undefined as Promise<void> | undefined }))
+beforeEach(() => { preparationProbe.gates = []; preparationProbe.visibility = []; preparationProbe.environment = undefined })
 function setup() {
   const scene = createCityScene()
   scene.assets.blocks = { type: '3dtiles', url: './city/tileset.json' }
   scene.nodes.push({ id: 'blocks', name: 'Blocks', type: '3dtiles', asset: 'blocks', visible: true, transform: createTransform() })
-  const viewer = { canvas: {}, isDestroyed: () => false, destroy: vi.fn(), scene: { requestRender: vi.fn(), fog: { density: 0, enabled: false }, postProcessStages: { bloom: { enabled: false } } }, imageryLayers: { addImageryProvider: vi.fn(), remove: vi.fn() } } as unknown as Viewer
+  const viewer = { canvas: {}, isDestroyed: () => false, destroy: vi.fn(), camera: { setView: vi.fn() }, scene: { requestRender: vi.fn(), fog: { density: 0, enabled: false }, postProcessStages: { bloom: { enabled: false } } }, imageryLayers: { addImageryProvider: vi.fn(), remove: vi.fn() } } as unknown as Viewer
   return { scene, viewer, runtime: new CitySceneRuntime(viewer, { target: 'map', scene }) }
 }
+describe('v3 document updates', () => {
+  it('retains native interaction when content outside the city projection changes', async () => {
+    const s = setup(), input = migrateSceneDocument(s.scene)
+    const loaded = await createCesiumDocumentRuntime({ viewer: s.viewer, document: input })
+    const editor = probe.editors.at(-1)!
+    editor.cancel.mockClear()
+    const next = structuredClone(input); next.title = 'New title'
+    next.resources.points = { type: 'geojson', data: { type: 'FeatureCollection', features: [] } }
+    next.nodes.push({ type: 'vector', id: 'points', name: 'Map points', visible: true, resource: 'points', style: { mode: 'single', symbol: { type: 'circle', radius: 3 } } })
+    await loaded.updateDocument(next)
+    expect(editor.cancel).not.toHaveBeenCalled()
+    expect(probe.created).toBe(1)
+    expect(loaded.getDocument()).toEqual(next)
+    expect(loaded.issues).toContainEqual(expect.objectContaining({ code: 'cesium.unsupported' }))
+    loaded.destroy(); s.runtime.destroy()
+  })
+  it('keeps navigated camera through resource replacement and explicit reload, but applies a new project camera', async () => {
+    const s = setup(), input = migrateSceneDocument(s.scene)
+    const loaded = await createCesiumDocumentRuntime({ viewer: s.viewer, document: input })
+    const original = loaded.runtime.layers.getLayer('blocks')
+    vi.mocked(s.viewer.camera.setView).mockClear()
+    const next = structuredClone(input)
+    next.resources.blocks = { type: '3dtiles', url: './updated/tileset.json' }
+    await loaded.updateDocument(next)
+    expect(loaded.runtime.layers.getLayer('blocks')).not.toBe(original)
+    expect(s.viewer.camera.setView).not.toHaveBeenCalled()
+    const replacement = loaded.runtime.layers.getLayer('blocks')
+    await loaded.updateDocument(next, undefined, { reload: true })
+    expect(loaded.runtime.layers.getLayer('blocks')).not.toBe(replacement)
+    expect(s.viewer.camera.setView).not.toHaveBeenCalled()
+    const editor = probe.editors.at(-1)!; editor.stopEditing.mockClear()
+    next.id = 'another-project'
+    await loaded.updateDocument(next)
+    expect(s.viewer.camera.setView).toHaveBeenCalledOnce()
+    expect(editor.stopEditing).toHaveBeenCalledOnce()
+    vi.mocked(s.viewer.camera.setView).mockClear()
+    if (next.views.city.type !== '3d') throw new Error('Unexpected view')
+    next.views.city.camera.position[2] += 100
+    next.resources.blocks = { type: '3dtiles', url: './next/tileset.json' }
+    await loaded.updateDocument(next)
+    expect(s.viewer.camera.setView).toHaveBeenCalledOnce()
+    loaded.destroy(); s.runtime.destroy()
+  })
+  it('retains native instances and navigated camera for visibility, transform and quality edits', async () => {
+    const s = setup(), input = migrateSceneDocument(s.scene)
+    const loaded = await createCesiumDocumentRuntime({ viewer: s.viewer, document: input })
+    const layer = loaded.runtime.layers.getLayer('blocks')!
+    const transform = vi.spyOn(layer as import('@desktop-webgis/cesium-layer').TilesetLayer, 'setTransform')
+    vi.mocked(s.viewer.camera.setView).mockClear()
+    const next = structuredClone(input), node = next.nodes[0]
+    if (node.type !== '3dtiles') throw new Error('Unexpected node')
+    node.visible = false; node.transform.translation = [12, 0, 0]; node.maximumScreenSpaceError = 2
+    await loaded.updateDocument(next)
+    expect(loaded.runtime.layers.getLayer('blocks')).toBe(layer)
+    expect(layer.show).toBe(false)
+    expect(transform).toHaveBeenLastCalledWith(node.transform)
+    expect(probe.created).toBe(1)
+    expect(s.viewer.camera.setView).not.toHaveBeenCalled()
+    expect(loaded.getDocument()).toEqual(next)
+    next.title = 'Outside mutation'
+    expect(loaded.getDocument().title).toBe(input.title)
+    const camera = loaded.getDocument()
+    if (camera.views.city.type !== '3d') throw new Error('Unexpected view')
+    camera.views.city.camera.position[2] += 10
+    await loaded.updateDocument(camera)
+    expect(s.viewer.camera.setView).toHaveBeenCalledOnce()
+    loaded.destroy(); s.runtime.destroy()
+  })
+  it('preserves the applied document and layer after a replacement resource fails', async () => {
+    const s = setup(), input = migrateSceneDocument(s.scene)
+    const loaded = await createCesiumDocumentRuntime({ viewer: s.viewer, document: input })
+    const layer = loaded.runtime.layers.getLayer('blocks'), next = structuredClone(input)
+    next.resources.blocks = { type: '3dtiles', url: './missing/tileset.json' }
+    probe.nativeGate = Promise.reject(new Error('Resource unavailable'))
+    await expect(loaded.updateDocument(next)).rejects.toThrow('Resource unavailable')
+    expect(loaded.getDocument()).toEqual(input)
+    expect(loaded.runtime.layers.getLayer('blocks')).toBe(layer)
+    loaded.destroy(); s.runtime.destroy()
+  })
+  it('prevents canceled and superseded replacements from overwriting newer presentation', async () => {
+    const s = setup(), input = migrateSceneDocument(s.scene)
+    const loaded = await createCesiumDocumentRuntime({ viewer: s.viewer, document: input })
+    let release!: () => void
+    probe.nativeGate = new Promise(resolve => { release = resolve })
+    const replacement = structuredClone(input)
+    replacement.resources.blocks = { type: '3dtiles', url: './other/tileset.json' }
+    const obsolete = loaded.updateDocument(replacement)
+    const latest = structuredClone(input); latest.nodes[0].visible = false
+    await loaded.updateDocument(latest)
+    release(); await expect(obsolete).rejects.toMatchObject({ name: 'AbortError' })
+    expect(loaded.getDocument()).toEqual(latest)
+    expect(loaded.runtime.layers.getLayer('blocks')?.show).toBe(false)
+    const canceled = new AbortController(); canceled.abort()
+    await expect(loaded.updateDocument(input, canceled.signal)).rejects.toMatchObject({ name: 'AbortError' })
+    expect(loaded.getDocument()).toEqual(latest)
+    loaded.destroy()
+    await expect(loaded.updateDocument(input)).rejects.toThrow('已销毁')
+    s.runtime.destroy()
+  })
+  it('rejects invalid document updates before touching ready native content', async () => {
+    const s = setup(), input = migrateSceneDocument(s.scene)
+    const loaded = await createCesiumDocumentRuntime({ viewer: s.viewer, document: input })
+    const layer = loaded.runtime.layers.getLayer('blocks'), next = structuredClone(input)
+    next.nodes[0].parentId = 'missing'
+    await expect(loaded.updateDocument(next)).rejects.toThrow()
+    expect(loaded.runtime.layers.getLayer('blocks')).toBe(layer)
+    expect(loaded.getDocument()).toEqual(input)
+    loaded.destroy(); s.runtime.destroy()
+  })
+})
+
 describe('incremental scene reconciliation', () => {
+  it('awaits a reused loading resource and applies latest visibility without loading twice', async () => {
+    let release!: () => void
+    probe.nativeGate = new Promise(resolve => { release = resolve })
+    const s = setup()
+    const first = s.runtime.updateScene(s.scene)
+    s.scene.nodes[0].visible = false
+    let settled = false
+    const second = s.runtime.updateScene(s.scene).then(() => { settled = true })
+    await Promise.resolve(); await Promise.resolve()
+    expect(settled).toBe(false)
+    expect(probe.created).toBe(1)
+    release(); await Promise.all([first, second])
+    expect(s.runtime.layers.getLayer('blocks')?.show).toBe(false)
+    s.runtime.destroy()
+  })
+  it('ignores a removed resource failure and allows a failed current resource to retry', async () => {
+    let reject!: (error: Error) => void
+    probe.nativeGate = new Promise((_resolve, fail) => { reject = fail })
+    const s = setup()
+    const first = s.runtime.updateScene(s.scene)
+    const empty = { ...s.scene, nodes: [] }
+    await s.runtime.updateScene(empty)
+    reject(new Error('late removed request'))
+    await expect(first).resolves.toBeUndefined()
+    expect(s.runtime.layers.getLayer('blocks')).toBeUndefined()
+    probe.nativeGate = Promise.reject(new Error('current request'))
+    await expect(s.runtime.updateScene(s.scene)).rejects.toThrow('current request')
+    probe.nativeGate = undefined
+    await s.runtime.updateScene(s.scene)
+    expect(s.runtime.layers.getLayer('blocks')?.state).toBe('ready')
+    s.runtime.destroy()
+  })
   it('updates tileset quality in place without downloading a new resource', async () => {
     const s = setup(); await s.runtime.updateScene(s.scene)
     const layer = s.runtime.layers.getLayer('blocks') as import('@desktop-webgis/cesium-layer').TilesetLayer
@@ -158,5 +304,143 @@ describe('incremental scene reconciliation', () => {
     expect(probe.editors[0].stopEditing).toHaveBeenCalledOnce()
     expect(() => s.runtime.startEditing('blocks')).toThrow('隐藏')
     s.runtime.destroy(); s.runtime.destroy(); expect(s.viewer.destroy).toHaveBeenCalledOnce()
+  })
+  it('releases runtime layers but retains an explicitly caller-owned viewer', async () => {
+    const s = setup()
+    s.runtime.destroy()
+    vi.mocked(s.viewer.destroy).mockClear()
+    const runtime = new CitySceneRuntime(s.viewer, { target: 'map', scene: s.scene, ownsViewer: false })
+    await runtime.updateScene(s.scene)
+    const before = probe.released
+    runtime.destroy(); runtime.destroy()
+    expect(probe.released).toBe(before + 1)
+    expect(s.viewer.destroy).not.toHaveBeenCalled()
+  })
+  it('loads v3 content into a caller viewer, retains full definitions and restores host environment', async () => {
+    const s = setup(); s.runtime.destroy(); vi.mocked(s.viewer.destroy).mockClear()
+    s.viewer.camera = { setView: vi.fn() } as unknown as Viewer['camera']
+    s.viewer.scene.globe = { enableLighting: false } as Viewer['scene']['globe']
+    const originalTime = JulianDate.fromIso8601('2026-01-01T00:00:00Z')
+    s.viewer.clock = { currentTime: originalTime } as Viewer['clock']
+    s.scene.lighting = { sunlight: true, shadows: true, time: '2026-02-01T00:00:00Z' }
+    const document = migrateSceneDocument(s.scene)
+    document.resources.base = { type: 'xyz', url: 'https://example.test/{z}/{x}/{y}.png' }
+    document.nodes.push({ type: 'tile', id: 'map', name: 'Map', resource: 'base' })
+    const loaded = await createCesiumDocumentRuntime({ document, viewer: s.viewer })
+    expect(loaded.runtime.layers.getLayer('blocks')?.state).toBe('ready')
+    expect(loaded.getDocument()).toEqual(document)
+    expect(loaded.issues).toContainEqual(expect.objectContaining({ code: 'cesium.unsupported' }))
+    expect(s.viewer.scene.globe.enableLighting).toBe(true)
+    loaded.destroy(); loaded.destroy()
+    expect(s.viewer.scene.globe.enableLighting).toBe(false)
+    expect(JulianDate.equals(s.viewer.clock.currentTime, originalTime)).toBe(true)
+    expect(s.viewer.destroy).not.toHaveBeenCalled()
+  })
+})
+
+describe('prepared scene replacement', () => {
+  it('rejects cancellation promptly when a native load has not settled', async () => {
+    const s = setup(); await s.runtime.updateScene(s.scene)
+    const old = s.runtime.layers.getLayer('blocks')
+    let release!: () => void
+    probe.nativeGate = new Promise(resolve => { release = resolve })
+    const operation = new AbortController(), pending = s.runtime.replaceScene(s.scene, operation.signal)
+    operation.abort()
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    expect(s.runtime.layers.getLayer('blocks')).toBe(old)
+    release(); await Promise.resolve(); await Promise.resolve()
+    expect(probe.released).toBe(1)
+    s.runtime.destroy()
+  })
+  it('keeps old content while candidates load hidden, then adopts them without a second load', async () => {
+    const s = setup(); await s.runtime.updateScene(s.scene)
+    const previous = s.runtime.layers.getLayer('blocks'), terrain = s.viewer.terrainProvider
+    const incoming = structuredClone(s.scene); incoming.effects.fog = 0.1
+    let release!: () => void
+    probe.nativeGate = new Promise(resolve => { release = resolve })
+    const pending = s.runtime.replaceScene(incoming)
+    expect(preparationProbe.visibility.at(-1)).toBe(false)
+    expect(s.runtime.layers.getLayer('blocks')).toBe(previous)
+    expect(s.viewer.terrainProvider).toBe(terrain)
+    expect(s.viewer.scene.fog.density).toBe(0)
+    release(); await pending
+    expect(s.runtime.layers.getLayer('blocks')).not.toBe(previous)
+    expect(s.runtime.layers.getLayer('blocks')?.show).toBe(true)
+    expect(probe.created).toBe(2)
+    expect(probe.released).toBe(1)
+    expect(s.viewer.scene.fog.density).toBe(0.0002)
+    s.runtime.destroy()
+  })
+
+  it('releases partially prepared candidates when another resource fails and leaves the old scene intact', async () => {
+    const s = setup(); await s.runtime.updateScene(s.scene)
+    const previous = s.runtime.layers.getLayer('blocks')
+    const incoming = structuredClone(s.scene)
+    incoming.nodes.push({ ...incoming.nodes[0], id: 'second' })
+    preparationProbe.gates = [Promise.resolve(), Promise.reject(new Error('Missing resource'))]
+    await expect(s.runtime.replaceScene(incoming)).rejects.toThrow('Missing resource')
+    expect(s.runtime.layers.layers).toEqual([previous])
+    expect(previous?.state).toBe('ready')
+    expect(probe.released).toBe(1)
+    s.runtime.destroy()
+  })
+
+  it('does not change environment or camera on preparation failure', async () => {
+    const s = setup(); await s.runtime.updateScene(s.scene)
+    const previous = s.runtime.layers.getLayer('blocks'), terrain = s.viewer.terrainProvider
+    const incoming = structuredClone(s.scene); incoming.effects.fog = 0.2
+    preparationProbe.environment = Promise.reject(new Error('Environment unavailable'))
+    await expect(s.runtime.replaceScene(incoming)).rejects.toThrow('Environment unavailable')
+    expect(s.runtime.layers.getLayer('blocks')).toBe(previous)
+    expect(s.viewer.terrainProvider).toBe(terrain)
+    expect(s.viewer.scene.fog.density).toBe(0)
+    expect(s.viewer.camera.setView).not.toHaveBeenCalled()
+    s.runtime.destroy()
+  })
+
+  it('rejects obsolete resources after a newer replacement commits', async () => {
+    const s = setup(); await s.runtime.updateScene(s.scene)
+    let release!: () => void
+    probe.nativeGate = new Promise(resolve => { release = resolve })
+    const first = s.runtime.replaceScene(s.scene)
+    const rejected = expect(first).rejects.toMatchObject({ name: 'AbortError' })
+    probe.nativeGate = undefined
+    const next = { ...s.scene, nodes: [], effects: { fog: 0.3, bloom: false } }
+    await s.runtime.replaceScene(next)
+    release(); await rejected
+    expect(s.runtime.layers.layers).toEqual([])
+    expect(s.viewer.scene.fog.density).toBe(0.0006)
+    expect(probe.released).toBe(2)
+    s.runtime.destroy()
+  })
+
+  it('retains the latest legacy edit when it cancels a pending replacement', async () => {
+    const s = setup(); await s.runtime.updateScene(s.scene)
+    const previous = s.runtime.layers.getLayer('blocks')
+    let release!: () => void
+    probe.nativeGate = new Promise(resolve => { release = resolve })
+    const pending = s.runtime.replaceScene(s.scene)
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    s.scene.nodes[0].visible = false
+    await s.runtime.updateScene(s.scene)
+    release(); await rejected
+    expect(s.runtime.layers.getLayer('blocks')).toBe(previous)
+    expect(previous?.show).toBe(false)
+    s.runtime.destroy()
+  })
+
+  it('releases late candidates after external cancellation or destruction', async () => {
+    for (const destroy of [false, true]) {
+      const s = setup(); await s.runtime.updateScene(s.scene)
+      const previous = s.runtime.layers.getLayer('blocks')
+      let release!: () => void
+      probe.nativeGate = new Promise(resolve => { release = resolve })
+      const abort = new AbortController(), pending = s.runtime.replaceScene(s.scene, abort.signal)
+      const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+      if (destroy) s.runtime.destroy(); else abort.abort()
+      release(); await rejected
+      if (!destroy) expect(s.runtime.layers.getLayer('blocks')).toBe(previous)
+      s.runtime.destroy(); probe.nativeGate = undefined
+    }
   })
 })

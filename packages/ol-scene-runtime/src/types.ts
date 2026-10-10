@@ -1,9 +1,12 @@
 import type { GeoJsonFeature, SceneManifest, SceneView } from '@desktop-webgis/scene-schema'
+import type Map from 'ol/Map.js'
 
 export type SceneTarget = HTMLElement | string
 
 export interface CreateSceneRuntimeOptions {
-  target: SceneTarget
+  target?: SceneTarget
+  /** Caller-owned map; host layers, controls and the map itself are retained. */
+  map?: Map
   scene?: SceneManifest | string
   fetch?: typeof globalThis.fetch
   credentials?: Record<string, string>
@@ -48,6 +51,7 @@ export type SceneRuntimeEvent = keyof SceneRuntimeEventMap
 export type Unsubscribe = () => void
 
 export interface SceneRuntime {
+  getScene(): SceneManifest | null
   loadScene(scene: SceneManifest | string): Promise<void>
   updateScene(scene: SceneManifest): Promise<void>
   setLayerVisible(layerId: string, visible: boolean): void

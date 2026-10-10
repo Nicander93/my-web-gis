@@ -1,0 +1,14 @@
+{
+  "version": 3,
+  "id": "viewer-v3-example",
+  "title": "Viewer v3",
+  "activeView": "map",
+  "views": { "map": { "type": "2d", "projection": "EPSG:3857", "center": [0, 0], "zoom": 3 } },
+  "resources": { "data": { "type": "geojson", "url": "./points.geojson" } },
+  "nodes": [{
+    "type": "vector", "id": "points", "name": "测试点", "resource": "data", "visible": true,
+    "style": { "mode": "single", "symbol": { "type": "circle", "radius": 12, "fill": { "r": 255, "g": 0, "b": 0, "a": 1 } } },
+    "interaction": { "selectable": true, "popup": { "titleField": "name", "fields": [{ "field": "name", "label": "名称" }] } }
+  }],
+  "widgets": { "layerSwitcher": true, "legend": true }
+}

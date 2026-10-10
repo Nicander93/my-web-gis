@@ -10,11 +10,13 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./scene.schema.json": "./scene.schema.json"
+    "./scene.schema.json": "./scene.schema.json",
+    "./scene-document.schema.json": "./scene-document.schema.json"
   },
   "files": [
     "dist",
     "scene.schema.json",
+    "scene-document.schema.json",
     "README.md"
   ],
   "sideEffects": false,

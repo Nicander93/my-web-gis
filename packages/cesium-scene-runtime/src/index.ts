@@ -8,16 +8,24 @@ import { getCityNodeState, parseCityScene } from '@desktop-webgis/cesium-scene-s
 import type { CityCamera, CityNode, CityScene } from '@desktop-webgis/cesium-scene-schema'
 import { applyRenderQuality, defaultRenderQuality } from './render-quality.js'
 import type { RenderQuality } from './render-quality.js'
+import { projectCesiumDocument, type CesiumDocumentIssue } from './document.js'
+import type { SceneDocument } from '@desktop-webgis/scene-schema'
+import type { ImageryProvider, TerrainProvider } from 'cesium'
 export { defaultRenderQuality, isRenderQuality } from './render-quality.js'
 export type { RenderQuality } from './render-quality.js'
 export type { EditMode, TransformEditEvent } from '@desktop-webgis/cesium-tileset-edit'
 export type { CityScene, CityNode, Transform } from '@desktop-webgis/cesium-scene-schema'
 export type { DrawOptions, DrawResult } from '@desktop-webgis/cesium-layer'
 export type { EditState, GraphicEditOptions, GraphicEditResult } from '@desktop-webgis/cesium-layer'
+export * from './document.js'
 
 export interface CityRuntimeOptions {
-  target: HTMLElement | string
+  target?: HTMLElement | string
+  /** Existing viewer is caller-owned unless ownsViewer is explicitly true. */
+  viewer?: Viewer
   scene: CityScene
+  /** Direct constructor defaults to owning the viewer for compatibility. */
+  ownsViewer?: boolean
   /** Base URL of scene.json; resolves relative asset and terrain URLs. */
   sceneUrl?: string
   cesiumBaseUrl?: string
@@ -28,6 +36,8 @@ export interface CityRuntimeOptions {
   onSelect?: (id: string | null, properties?: Record<string, unknown>, selection?: 'toggle' | 'range') => void
   onLayerState?: (id: string, state: BaseLayer['state'], error?: Error) => void
 }
+
+interface PreparedEnvironment { key: string; imagery: ImageryProvider; terrain: TerrainProvider }
 
 /** Composes independent packages; editing and read-only viewers share this renderer. */
 export class CitySceneRuntime {
@@ -42,14 +52,20 @@ export class CitySceneRuntime {
   private graphicEditing?: EditSession
   private selectedIds: readonly string[] = []
   private destroyed = false
+  private preparation: AbortController | null = null
+  private sceneRevision = 0
+  private readonly layerReady = new Map<BaseLayer, Promise<unknown>>()
+  private readonly currentLayers = new Map<string, BaseLayer>()
   private baseLayer?: ImageryLayer
   private environmentRevision = 0
   private environmentKey = ''
   private lightingKey = ''
   private readonly originalLighting: { sunlight: boolean; shadows: boolean; time: JulianDate }
+  private readonly originalTerrain: Viewer['terrainProvider']
 
   constructor(readonly viewer: Viewer, private readonly options: CityRuntimeOptions) {
     this.scene = parseCityScene(options.scene)
+    this.originalTerrain = viewer.terrainProvider
     this.originalLighting = { sunlight: viewer.scene.globe?.enableLighting ?? false, shadows: viewer.shadows ?? false, time: JulianDate.clone(viewer.clock?.currentTime ?? JulianDate.now()) }
     this.layers = new LayerCollection(viewer)
     this.effects = new CityEffects(viewer)
@@ -64,6 +80,8 @@ export class CitySceneRuntime {
   async updateScene(input: CityScene): Promise<void> {
     if (this.destroyed) throw new Error('CitySceneRuntime 已销毁')
     const scene = parseCityScene(input)
+    this.cancelPreparation()
+    const revision = ++this.sceneRevision
     // Cancel an in-flight gesture before applying authoritative state (undo/import/hide).
     this.cancelDraw(); this.cancelGraphicEditing(); this.editor.cancel()
     this.scene = scene
@@ -79,19 +97,21 @@ export class CitySceneRuntime {
     for (const id of this.nodes.keys()) {
       if (scene.nodes.some(node => node.id === id)) continue
       if (this.editingId === id) this.stopEditing()
-      this.layers.removeLayer(id); this.nodes.delete(id); this.nativeKeys.delete(id)
+      this.layers.removeLayer(id); this.nodes.delete(id); this.nativeKeys.delete(id); this.currentLayers.delete(id)
     }
     for (const definition of scene.nodes) {
       const node = { ...definition, ...getCityNodeState(scene, definition) }
       const previous = this.nodes.get(node.id)
       let layer = this.layers.getLayer(node.id)
-      if (layer && previous && this.nativeKeys.get(node.id) !== nativeKey(node, scene)) {
+      if (layer && previous && (layer.state === 'error' || this.nativeKeys.get(node.id) !== nativeKey(node, scene))) {
         if (this.editingId === node.id) this.stopEditing()
         this.layers.removeLayer(node.id); layer = undefined
       }
       this.nodes.set(node.id, structuredClone(node))
       this.nativeKeys.set(node.id, nativeKey(node, scene))
       if (layer) {
+        const ready = this.layerReady.get(layer)
+        if (ready) promises.push(ready)
         layer.name = node.name
         if ((!node.visible || node.locked) && this.editingId === node.id) this.stopEditing()
         layer.show = node.visible
@@ -106,8 +126,11 @@ export class CitySceneRuntime {
       layer = this.createLayer(node, scene)
       if (node.popup) layer.bindPopup(node.popup)
       const mounted = layer
+      this.currentLayers.set(node.id, mounted)
       mounted.on('click', event => this.options.onSelect?.(node.id, event.properties, event.selection))
-      mounted.on('error', error => this.options.onLayerState?.(node.id, 'error', error))
+      mounted.on('error', error => {
+        if (!this.destroyed && this.currentLayers.get(node.id) === mounted) this.options.onLayerState?.(node.id, 'error', error)
+      })
       const pending = this.layers.addLayer(mounted).then(() => {
         if (this.destroyed || this.layers.getLayer(node.id) !== mounted) return
         const latest = this.nodes.get(node.id)
@@ -116,7 +139,12 @@ export class CitySceneRuntime {
         if (latest?.type === 'geojson' && mounted instanceof GeoJsonLayer) mounted.setColor(latest.color ?? '#55a6ff')
         this.applySelection(mounted)
         this.options.onLayerState?.(node.id, mounted.state)
+      }).catch(error => {
+        if (this.destroyed || this.currentLayers.get(node.id) !== mounted) return
+        throw error
       })
+      this.layerReady.set(mounted, pending)
+      void pending.then(() => this.layerReady.delete(mounted), () => this.layerReady.delete(mounted))
       this.options.onLayerState?.(node.id, 'loading')
       promises.push(pending)
     }
@@ -124,8 +152,131 @@ export class CitySceneRuntime {
     promises.push(this.updateEnvironment(scene))
     const results = await Promise.allSettled(promises)
     const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
-    if (failures.length && !this.destroyed) throw new Error(failures.map(f => f.reason instanceof Error ? f.reason.message : String(f.reason)).join('\n'))
+    if (failures.length && !this.destroyed && revision === this.sceneRevision) throw new Error(failures.map(f => f.reason instanceof Error ? f.reason.message : String(f.reason)).join('\n'))
   }
+
+  /** Load hidden candidates before replacing owned content; failed preparation preserves the current scene. */
+  async replaceScene(input: CityScene, signal?: AbortSignal, options: { preserveCamera?: boolean } = {}): Promise<void> {
+    if (this.destroyed) throw new Error('CitySceneRuntime 已销毁')
+    const scene = parseCityScene(input)
+    this.cancelPreparation()
+    const operation = new AbortController()
+    this.preparation = operation
+    const prepared = new Map<string, BaseLayer>()
+    const definitions = new Map(scene.nodes.map(node => [node.id, { ...node, ...getCityNodeState(scene, node) }]))
+    let committed = false, committing = false
+    const abort = (): void => operation.abort(signal?.reason)
+    const release = (): void => { if (!committed && !committing) prepared.forEach(layer => layer.destroy()) }
+    let rejectCancellation!: (reason: unknown) => void
+    const canceled = new Promise<never>((_resolve, reject) => { rejectCancellation = reject })
+    const rejectAborted = (): void => rejectCancellation(operation.signal.reason)
+    // Observe cancellation even when a native provider ignores its own abort signal.
+    void canceled.catch(() => {})
+    signal?.addEventListener('abort', abort, { once: true })
+    operation.signal.addEventListener('abort', release, { once: true })
+    operation.signal.addEventListener('abort', rejectAborted, { once: true })
+    if (signal?.aborted) abort()
+    try {
+      operation.signal.throwIfAborted()
+      for (const node of definitions.values()) {
+        operation.signal.throwIfAborted()
+        const layer = this.createLayer(node, scene)
+        layer.show = false
+        if (node.popup) layer.bindPopup(node.popup)
+        prepared.set(node.id, layer)
+      }
+      operation.signal.throwIfAborted()
+      const loads = [...prepared.values()].map(layer => layer.mount(this.viewer))
+      // Prepare even an equal environment: a pending legacy update may still change the installed one.
+      const environment = this.prepareEnvironment(scene)
+      const [nextEnvironment] = await Promise.race([Promise.all([environment, ...loads]), canceled])
+      operation.signal.throwIfAborted()
+      if (this.destroyed || this.viewer.isDestroyed()) throw new Error('CitySceneRuntime 已销毁')
+      const custom = this.layers.layers.filter(layer => !this.nodes.has(layer.id))
+      const previousManaged = this.layers.layers.filter(layer => this.nodes.has(layer.id))
+      const nextLayers = [...custom, ...prepared.values()]
+      if (new Set(nextLayers.map(layer => layer.id)).size !== nextLayers.length) throw new Error('场景对象与原生自定义图层 ID 冲突')
+      if (nextLayers.some(layer => !layer.isMountedOn(this.viewer))) throw new Error('准备的图层未就绪')
+      const time = scene.lighting ? JulianDate.fromIso8601(scene.lighting.time) : JulianDate.clone(this.originalLighting.time)
+      // Preparation guarantees end here; host exceptions/reentrant writes inside native setters need host rollback.
+      committing = true
+      this.cancelDraw(); this.cancelGraphicEditing(); this.stopEditing()
+      if (nextEnvironment) this.installEnvironment(nextEnvironment)
+      this.environmentRevision++; this.sceneRevision++
+      this.layers.replaceMountedLayers(nextLayers)
+      previousManaged.forEach(layer => layer.destroy())
+      this.scene = scene
+      this.nodes.clear(); this.nativeKeys.clear(); this.currentLayers.clear(); this.layerReady.clear()
+      for (const node of definitions.values()) {
+        const layer = prepared.get(node.id)!
+        this.nodes.set(node.id, structuredClone(node)); this.nativeKeys.set(node.id, nativeKey(node, scene)); this.currentLayers.set(node.id, layer)
+        layer.on('click', event => this.options.onSelect?.(node.id, event.properties, event.selection))
+        layer.on('error', error => {
+          if (!this.destroyed && this.currentLayers.get(node.id) === layer) this.options.onLayerState?.(node.id, 'error', error)
+        })
+        layer.show = node.visible
+        this.applySelection(layer)
+      }
+      this.effects.update(scene.effects)
+      if (this.viewer.scene.globe) this.viewer.scene.globe.enableLighting = scene.lighting?.sunlight ?? this.originalLighting.sunlight
+      this.viewer.shadows = scene.lighting?.shadows ?? this.originalLighting.shadows
+      if (this.viewer.clock) this.viewer.clock.currentTime = time
+      this.lightingKey = JSON.stringify(scene.lighting ?? null)
+      if (!options.preserveCamera) this.setCamera(scene.camera)
+      this.editor.refresh()
+      committed = true
+      prepared.clear()
+      for (const node of definitions.values()) this.options.onLayerState?.(node.id, 'ready')
+    } finally {
+      committing = false
+      release()
+      operation.signal.removeEventListener('abort', release)
+      operation.signal.removeEventListener('abort', rejectAborted)
+      signal?.removeEventListener('abort', abort)
+      if (this.preparation === operation) this.preparation = null
+    }
+  }
+
+  /** Updates ready native objects without reloading resources or resetting an unchanged camera. */
+  updatePresentation(input: CityScene): boolean {
+    if (this.destroyed) throw new Error('CitySceneRuntime 已销毁')
+    const scene = parseCityScene(input)
+    if (JSON.stringify([scene.basemap, scene.terrain]) !== this.environmentKey) return false
+    if (scene.nodes.length !== this.nodes.size || scene.nodes.some(node => {
+      const layer = this.layers.getLayer(node.id)
+      return !layer?.isMountedOn(this.viewer) || this.nativeKeys.get(node.id) !== nativeKey(node, scene)
+    })) return false
+    const cameraChanged = JSON.stringify(scene.camera) !== JSON.stringify(this.scene.camera)
+    const time = scene.lighting ? JulianDate.fromIso8601(scene.lighting.time) : JulianDate.clone(this.originalLighting.time)
+    this.cancelPreparation(); this.sceneRevision++
+    this.cancelDraw(); this.cancelGraphicEditing(); this.editor.cancel()
+    for (const definition of scene.nodes) {
+      const node = { ...definition, ...getCityNodeState(scene, definition) }, layer = this.layers.getLayer(node.id)!
+      this.nodes.set(node.id, structuredClone(node))
+      layer.name = node.name; layer.show = node.visible
+      if ((!node.visible || node.locked) && this.editingId === node.id) this.stopEditing()
+      if ((layer instanceof TilesetLayer || layer instanceof ModelLayer) && (node.type === '3dtiles' || node.type === 'model')) layer.setTransform(node.transform)
+      if (layer instanceof TilesetLayer && node.type === '3dtiles') layer.setQuality(node.maximumScreenSpaceError, node.cacheBytes)
+      if (layer instanceof GraphicLayer && node.type === 'graphic') layer.getGraphic(node.id)?.setOptions(node)
+      if (layer instanceof GeoJsonLayer && node.type === 'geojson') layer.setColor(node.color ?? '#55a6ff')
+      if (node.popup) layer.bindPopup(node.popup); else layer.unbindPopup()
+      this.applySelection(layer)
+    }
+    this.effects.update(scene.effects)
+    const lightingKey = JSON.stringify(scene.lighting ?? null)
+    if (lightingKey !== this.lightingKey) {
+      if (this.viewer.scene.globe) this.viewer.scene.globe.enableLighting = scene.lighting?.sunlight ?? this.originalLighting.sunlight
+      this.viewer.shadows = scene.lighting?.shadows ?? this.originalLighting.shadows
+      if (this.viewer.clock) this.viewer.clock.currentTime = time
+      this.lightingKey = lightingKey
+    }
+    this.scene = scene
+    if (cameraChanged) this.setCamera(scene.camera)
+    this.editor.refresh(); this.viewer.scene.requestRender()
+    return true
+  }
+
+  cancelPreparation(): void { this.preparation?.abort(); this.preparation = null }
 
   startEditing(id: string, mode: EditMode = 'translate'): void {
     this.cancelDraw(); this.cancelGraphicEditing()
@@ -184,9 +335,17 @@ export class CitySceneRuntime {
   getNativeViewer(): Viewer { return this.viewer }
   destroy(): void {
     if (this.destroyed) return
-    this.destroyed = true; this.environmentRevision++
+    this.destroyed = true; this.cancelPreparation(); this.environmentRevision++; this.sceneRevision++; this.layerReady.clear(); this.currentLayers.clear()
     this.cancelDraw(); this.cancelGraphicEditing(); this.editor.destroy(); this.layers.destroy(); this.effects.destroy()
-    this.viewer.destroy()
+    if (this.baseLayer) this.viewer.imageryLayers.remove(this.baseLayer, true)
+    if (this.options.ownsViewer !== false) this.viewer.destroy()
+    else {
+      if (this.originalTerrain) this.viewer.terrainProvider = this.originalTerrain
+      if (this.viewer.scene.globe) this.viewer.scene.globe.enableLighting = this.originalLighting.sunlight
+      this.viewer.shadows = this.originalLighting.shadows
+      if (this.viewer.clock) this.viewer.clock.currentTime = JulianDate.clone(this.originalLighting.time)
+      this.viewer.scene.requestRender()
+    }
   }
 
   private resource(url: string): Resource {
@@ -207,15 +366,27 @@ export class CitySceneRuntime {
     const key = JSON.stringify([scene.basemap, scene.terrain])
     if (key === this.environmentKey) return
     const revision = ++this.environmentRevision
+    const prepared = await this.prepareEnvironment(scene)
+    if (this.destroyed || revision !== this.environmentRevision) return
+    this.installEnvironment(prepared)
+  }
+
+  private async prepareEnvironment(scene: CityScene): Promise<PreparedEnvironment> {
     const imagery = scene.basemap
       ? new UrlTemplateImageryProvider({ url: this.resource(scene.basemap.url), credit: scene.basemap.attribution })
       : await TileMapServiceImageryProvider.fromUrl(buildModuleUrl('Assets/Textures/NaturalEarthII'))
     const terrain = scene.terrain ? await CesiumTerrainProvider.fromUrl(this.resource(scene.terrain.url)) : new EllipsoidTerrainProvider()
-    if (this.destroyed || revision !== this.environmentRevision) return
-    if (this.baseLayer) this.viewer.imageryLayers.remove(this.baseLayer, true)
-    this.baseLayer = this.viewer.imageryLayers.addImageryProvider(imagery, 0)
-    this.viewer.terrainProvider = terrain
-    this.environmentKey = key
+    return { key: JSON.stringify([scene.basemap, scene.terrain]), imagery, terrain }
+  }
+
+  private installEnvironment(prepared: PreparedEnvironment): void {
+    const previous = this.baseLayer, terrain = this.viewer.terrainProvider
+    const layer = this.viewer.imageryLayers.addImageryProvider(prepared.imagery, 0)
+    try { this.viewer.terrainProvider = prepared.terrain }
+    catch (error) { this.viewer.imageryLayers.remove(layer, true); this.viewer.terrainProvider = terrain; throw error }
+    this.baseLayer = layer
+    if (previous) this.viewer.imageryLayers.remove(previous, true)
+    this.environmentKey = prepared.key
     this.viewer.scene.requestRender()
   }
 }
@@ -229,12 +400,56 @@ function nativeKey(node: CityNode, scene: CityScene): string {
   return JSON.stringify([assetNode, scene.assets[node.asset]])
 }
 
-export function createCityRuntime(options: CityRuntimeOptions): CitySceneRuntime {
+export function createCityRuntime(options: CityRuntimeOptions): CitySceneRuntime { return createRuntime(options, true) }
+
+function createRuntime(options: CityRuntimeOptions, initializeCamera: boolean): CitySceneRuntime {
   const scene = parseCityScene(options.scene)
   if (options.cesiumBaseUrl) (globalThis as typeof globalThis & { CESIUM_BASE_URL: string }).CESIUM_BASE_URL = options.cesiumBaseUrl
-  const viewer = new Viewer(options.target, { animation: false, timeline: false, baseLayerPicker: false, geocoder: false, homeButton: false, sceneModePicker: false, navigationHelpButton: false, fullscreenButton: false, selectionIndicator: false, infoBox: false, baseLayer: false, requestRenderMode: true, maximumRenderTimeChange: Infinity })
-  const runtime = new CitySceneRuntime(viewer, { ...options, scene })
-  runtime.setRenderQuality(options.renderQuality ?? defaultRenderQuality)
-  runtime.setCamera(scene.camera)
+  if (!options.viewer && !options.target) throw new Error('Provide a viewer or target')
+  const viewer = options.viewer ?? new Viewer(options.target!, { animation: false, timeline: false, baseLayerPicker: false, geocoder: false, homeButton: false, sceneModePicker: false, navigationHelpButton: false, fullscreenButton: false, selectionIndicator: false, infoBox: false, baseLayer: false, requestRenderMode: true, maximumRenderTimeChange: Infinity })
+  const runtime = new CitySceneRuntime(viewer, { ...options, scene, ownsViewer: options.ownsViewer ?? !options.viewer })
+  try {
+    if (options.renderQuality || !options.viewer) runtime.setRenderQuality(options.renderQuality ?? defaultRenderQuality)
+    if (initializeCamera) runtime.setCamera(scene.camera)
+  } catch (error) { runtime.destroy(); throw error }
   return runtime
+}
+
+export interface CesiumDocumentRuntime {
+  readonly runtime: CitySceneRuntime
+  readonly issues: readonly CesiumDocumentIssue[]
+  /** Full input content, including definitions unsupported by the native city projection. */
+  getDocument(): SceneDocument
+  /** Applies a validated snapshot; aborted preparation cannot publish obsolete native content. */
+  updateDocument(document: unknown, signal?: AbortSignal, options?: { reload?: boolean }): Promise<void>
+  destroy(): void
+}
+
+/** Creates and loads a native projection; low-level native edits still require host document updates. */
+export async function createCesiumDocumentRuntime(options: Omit<CityRuntimeOptions, 'scene'> & { document: unknown; viewId?: string; signal?: AbortSignal }): Promise<CesiumDocumentRuntime> {
+  let projection = projectCesiumDocument(options.document, options.viewId)
+  const runtime = createRuntime({ ...options, scene: projection.scene }, false)
+  try { await runtime.replaceScene(projection.scene, options.signal) }
+  catch (error) { runtime.destroy(); throw error }
+  let revision = 0, destroyed = false
+  return {
+    runtime,
+    get issues() { return structuredClone(projection.issues) },
+    getDocument: () => structuredClone(projection.document),
+    async updateDocument(document, signal, updateOptions) {
+      if (destroyed) throw new Error('CesiumDocumentRuntime 已销毁')
+      signal?.throwIfAborted()
+      const next = projectCesiumDocument(document, options.viewId)
+      const cameraChanged = projection.document.id !== next.document.id || JSON.stringify(projection.scene.camera) !== JSON.stringify(next.scene.camera)
+      const nativeChanged = JSON.stringify(projection.scene) !== JSON.stringify(next.scene)
+      const current = ++revision
+      runtime.cancelPreparation()
+      if (updateOptions?.reload || nativeChanged && !runtime.updatePresentation(next.scene)) await runtime.replaceScene(next.scene, signal, { preserveCamera: !cameraChanged })
+      else if (projection.document.id !== next.document.id) { runtime.cancelDraw(); runtime.stopEditing(); runtime.setCamera(next.scene.camera) }
+      signal?.throwIfAborted()
+      if (destroyed || revision !== current) throw new DOMException('Scene projection superseded', 'AbortError')
+      projection = next
+    },
+    destroy() { if (destroyed) return; destroyed = true; revision++; runtime.destroy() }
+  }
 }

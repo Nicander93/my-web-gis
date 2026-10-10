@@ -129,6 +129,12 @@ importers:
       '@desktop-webgis/ol-scene-runtime':
         specifier: workspace:*
         version: link:../../packages/ol-scene-runtime
+      '@desktop-webgis/ol-selection':
+        specifier: workspace:*
+        version: link:../../packages/ol-selection
+      '@desktop-webgis/scene-core':
+        specifier: workspace:*
+        version: link:../../packages/scene-core
       '@desktop-webgis/scene-schema':
         specifier: workspace:*
         version: link:../../packages/scene-schema
@@ -235,6 +241,9 @@ importers:
       '@desktop-webgis/cesium-tileset-edit':
         specifier: workspace:*
         version: link:../cesium-tileset-edit
+      '@desktop-webgis/scene-schema':
+        specifier: workspace:*
+        version: link:../scene-schema
     devDependencies:
       cesium:
         specifier: ^1.145.0
@@ -282,6 +291,9 @@ importers:
       '@desktop-webgis/ol-style':
         specifier: workspace:*
         version: link:../ol-style
+      '@desktop-webgis/scene-schema':
+        specifier: workspace:*
+        version: link:../scene-schema
       '@turf/boolean-valid':
         specifier: 7.3.4
         version: 7.3.4
@@ -421,9 +433,6 @@ importers:
 
   packages/scene-core:
     dependencies:
-      '@desktop-webgis/gis-core':
-        specifier: workspace:*
-        version: link:../gis-core
       '@desktop-webgis/scene-schema':
         specifier: workspace:*
         version: link:../scene-schema

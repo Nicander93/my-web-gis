@@ -9,6 +9,44 @@ vi.mock('cesium', async original => ({ ...await original<typeof import('cesium')
   destroy(): void {}
 } }))
 
+describe('prepared layer adoption', () => {
+  it('validates every candidate before replacing mounted layers and retains shared layers', async () => {
+    const viewer = { canvas: {}, isDestroyed: () => false, scene: { requestRender: vi.fn() } } as unknown as Viewer
+    class PreparedLayer extends BaseLayer {
+      readonly release = vi.fn()
+      contains(): boolean { return false }
+      async flyTo(): Promise<void> {}
+      protected setNativeVisible(): void {}
+      protected async createNative(): Promise<() => void> { return this.release }
+    }
+    const collection = new LayerCollection(viewer)
+    const old = new PreparedLayer({ id: 'old' }), shared = new PreparedLayer({ id: 'shared' })
+    await collection.addLayer(old); await collection.addLayer(shared)
+    const next = new PreparedLayer({ id: 'next' }), unmounted = new PreparedLayer({ id: 'unmounted' })
+    await next.mount(viewer)
+    expect(() => collection.replaceMountedLayers([next, unmounted])).toThrow()
+    expect(collection.layers).toEqual([old, shared])
+    expect(old.release).not.toHaveBeenCalled()
+    const duplicate = new PreparedLayer({ id: 'next' })
+    await duplicate.mount(viewer)
+    expect(() => collection.replaceMountedLayers([next, duplicate])).toThrow()
+    expect(collection.layers).toEqual([old, shared])
+    const otherViewer = { ...viewer } as Viewer
+    const foreign = new PreparedLayer({ id: 'foreign' })
+    await foreign.mount(otherViewer)
+    expect(() => collection.replaceMountedLayers([foreign])).toThrow()
+    expect(collection.layers).toEqual([old, shared])
+    collection.replaceMountedLayers([shared, next])
+    expect(collection.layers).toEqual([shared, next])
+    expect(old.release).toHaveBeenCalledOnce()
+    expect(shared.release).not.toHaveBeenCalled()
+    expect(next.isMountedOn(viewer)).toBe(true)
+    collection.destroy(); duplicate.destroy(); foreign.destroy(); old.destroy(); unmounted.destroy()
+    expect(next.release).toHaveBeenCalledOnce()
+    expect(shared.release).toHaveBeenCalledOnce()
+  })
+})
+
 describe('independent layer selection', () => {
   it('forwards normal/Ctrl/Shift selection while respecting picking and visibility guards', async () => {
     const entity = new Entity({ properties: { name: 'Actual name' } }), picked = { id: entity }

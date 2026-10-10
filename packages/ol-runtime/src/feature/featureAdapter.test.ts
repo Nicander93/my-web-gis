@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { fromOlFeature, toOlFeature } from './featureAdapter'
 
 describe('feature adapter', () => {
+  it('uses the selected projection for editing round trips', () => {
+    const feature = { id: 'geographic', geometry: { type: 'Point' as const, coordinates: [106, 26] as [number, number] }, properties: { value: 1 } }
+    const native = toOlFeature(feature, 'EPSG:4326')
+    expect(native.getGeometry()?.getExtent()).toEqual([106, 26, 106, 26])
+    expect(fromOlFeature(native, 'EPSG:4326')).toEqual(feature)
+  })
   it('preserves domain feature id and properties across OL conversion', () => {
     const feature = {
       id: 'station-1',

@@ -20,6 +20,8 @@ selection.dispose()
 
 Use stable feature IDs (string or number). A reference is `{ layerKey, featureId }`; numeric and string IDs remain distinct. There is no array-index fallback. `getFeatureId` can provide a domain ID. Targets must have unique layer keys. Classic OL Features in vector layers are supported; RenderFeatures, clusters and vector tiles are outside the initial contract.
 
+Set `boxSelection: false` for click-only consumers such as a read-only Viewer. Activating the controller then keeps OL drag-to-pan available while supporting click selection and its highlight. The default remains primary-button rectangular selection.
+
 Plain click or primary-button drag replaces selection; Shift adds, Alt removes (Alt wins over Shift). Small movements retain click behavior. A completed drag produces one request, including zero hits; a request does not mutate accepted selection. `setSelection` is silent. `setTargets`, externally accepted selection changes, source changes, hiding a layer, Esc, blur or disabling the controller cancel an in-flight drag. Box intersections account for rotation, polygon holes and wrapped worlds. Only loaded source features participate; this package does not download all WFS features.
 
 `setActive(false)` stops interactions and retains the accepted highlight. `setTargets` rebonds listeners; the host must update targets when replacing layer objects. `resolveSelectedFeature` optionally resolves accepted references outside the current interactive targets; the host must return only visible/allowed features and resynchronize when external layers change. The default resolver observes target sources.

@@ -30,6 +30,9 @@ export const SCENE_LAYER_ID = 'sceneLayerId'
 export interface CreateOlSceneLayerOptions {
   credentials?: Record<string, string>
   fetch?: typeof globalThis.fetch
+  signal?: AbortSignal
+  /** A caller-owned source; layer disposal must not dispose it. */
+  vectorSource?: VectorSource<Feature<Geometry>>
 }
 
 interface GoogleMapTilesSession {
@@ -179,7 +182,8 @@ async function createGoogleMapTilesLayer(
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(requestBody),
+      signal: options.signal
     }
   )
   if (!response.ok) throw new Error(`Google Map Tiles Session 创建失败：HTTP ${response.status}`)
@@ -214,6 +218,7 @@ async function createProviderLayer(
   source: ProviderSource,
   options: CreateOlSceneLayerOptions
 ): Promise<BaseLayer> {
+  options.signal?.throwIfAborted()
   if (source.provider === 'tianditu') return createTiandituLayer(source, options)
   return createGoogleMapTilesLayer(source, options)
 }
@@ -258,6 +263,7 @@ export async function createOlSceneLayer(
   view: View,
   options: CreateOlSceneLayerOptions = {}
 ): Promise<BaseLayer> {
+  options.signal?.throwIfAborted()
   if (definition.type === 'tile') {
     const sourceDefinition = sources[definition.source]
     if (!sourceDefinition) throw new Error(`Layer “${definition.id}” 引用的 Source “${definition.source}” 不存在`)
@@ -295,7 +301,15 @@ export async function createOlSceneLayer(
   if (sourceDefinition.type !== 'geojson') {
     throw new Error(`Vector Layer “${definition.id}” 必须引用 GeoJSON Source`)
   }
-  const source = createVectorSource(sourceDefinition, view)
+  const source = options.vectorSource ?? createVectorSource(sourceDefinition, view)
+  return createOlVectorLayer(definition, source)
+}
+
+/** Creates a display layer around caller-owned vector data; usable by editors and document viewers. */
+export function createOlVectorLayer(
+  definition: Extract<SceneLayer, { type: 'vector' }>,
+  source: VectorSource<Feature<Geometry>>
+): VectorLayer<VectorSource<Feature<Geometry>>> {
   const layer = new VectorLayer({
     visible: definition.visible,
     opacity: definition.opacity,

@@ -10,6 +10,7 @@ import Draw from 'ol/interaction/Draw'
 import Select from 'ol/interaction/Select'
 import type Interaction from 'ol/interaction/Interaction'
 import type Map from 'ol/Map'
+import type Geometry from 'ol/geom/Geometry'
 import { OlMapRuntime } from '../map/OlMapRuntime'
 import {
   DEFAULT_SNAPPING,
@@ -23,6 +24,7 @@ function fixture() {
   const view = new View({ center: [0, 0], resolution: 1 })
   const map = {
     getView: () => view,
+    getLayerGroup: () => ({ getLayerStatesArray: () => runtime.registry.entries().map(([, layer]) => layer.getLayerState()) }),
     getPixelFromCoordinate: (coordinate: number[]) => coordinate,
     addInteraction: (interaction: Interaction) => {
       interactions.push(interaction)
@@ -40,7 +42,7 @@ function fixture() {
     }
   }
   vi.spyOn(runtime, 'getMap').mockReturnValue(map as unknown as Map)
-  const source = new VectorSource({
+  const source = new VectorSource<Feature<Geometry>>({
     features: [
       new Feature(
         new LineString([
@@ -70,6 +72,7 @@ function fixture() {
   const hit = (coordinate: number[]) =>
     snap().snapTo(coordinate, coordinate, map as unknown as Map)
   return {
+    runtime,
     tool,
     interactions,
     callbacks,
@@ -83,6 +86,27 @@ function fixture() {
 }
 
 describe('editing capture', () => {
+  it('excludes node-filtered records from capture and editing without deleting full source data', () => {
+    const f = fixture(), hidden = f.source.getFeatures()[0]
+    vi.spyOn(f.runtime, 'isFeatureIncluded').mockImplementation((_id, feature) => feature.get('allowed') !== false)
+    hidden.set('allowed', false)
+    f.tool.activate('draw-point', f.callbacks)
+    expect(f.hit([2, 0])).toBeNull()
+    const point = new Feature({ geometry: new Point([300, 0]), allowed: false })
+    f.source.addFeature(point)
+    expect(f.hit([302, 0])).toBeNull()
+    point.set('allowed', true)
+    expect(f.hit([302, 0])?.vertex).toEqual([300, 0])
+    for (const mode of ['modify', 'delete'] as const) {
+      f.tool.activate(mode, f.callbacks)
+      const select = f.interactions.find((item): item is Select => item instanceof Select)!
+      const predicate = (select as unknown as { filter_: (feature: Feature) => boolean }).filter_
+      expect(predicate(hidden)).toBe(false)
+      expect(predicate(point)).toBe(true)
+    }
+    expect(f.source.getFeatures()).toEqual([hidden, point])
+    f.tool.deactivate()
+  })
   it('cancels only an unfinished sketch and leaves committed features unchanged', () => {
     const f = fixture()
     f.tool.activate('draw-line', f.callbacks)
