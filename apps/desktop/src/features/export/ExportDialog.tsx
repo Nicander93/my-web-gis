@@ -6,6 +6,7 @@ import {
   type ExportFormat,
   type CoordinateExportCrs
 } from './serializeVectorExport'
+import { CRS_PRESETS } from '@desktop-webgis/vector-io'
 import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
 import { pickSaveFile, writeTextFile } from '@/services/files'
@@ -288,12 +289,11 @@ export function ExportDialog({
                           }
                           disabled={busy}
                         >
-                          <option value="EPSG:4326">
-                            WGS84 · 经度/纬度（度）
-                          </option>
-                          <option value="EPSG:3857">
-                            Web Mercator · X/Y（米）
-                          </option>
+                          {CRS_PRESETS.map((preset) => (
+                            <option key={preset.code} value={preset.code}>
+                              {preset.name}（{preset.code}）
+                            </option>
+                          ))}
                         </select>
                         <p className="export-hint">
                           仅支持单点；新增 id、x、y、crs

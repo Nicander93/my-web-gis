@@ -12,6 +12,7 @@ import {
 } from '@/services/import'
 import type { ImportResult } from '@/services/import'
 import type { CrsInfo } from '@desktop-webgis/vector-io'
+import { CRS_PRESETS } from '@desktop-webgis/vector-io'
 import { CsvConfigDialog } from './CsvConfigDialog'
 import type { CsvConfig } from './CsvConfigDialog'
 import {
@@ -35,12 +36,7 @@ type DialogStep =
   | 'select-csv-config'
   | 'select-dxf-config'
 
-// 仅列出已在 proj4 注册的 CRS (EPSG:4326 和 EPSG:3857)
-// 更多中国常用投影 (CGCS2000, Beijing 1954 等) 留待后续 PR
-const COMMON_CRS = [
-  { code: 'EPSG:4326', name: 'WGS84 (经纬度)' },
-  { code: 'EPSG:3857', name: 'Web Mercator' }
-]
+const COMMON_CRS = CRS_PRESETS
 
 export function AddDataDialog({
   open,

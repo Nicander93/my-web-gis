@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { AlertCircle } from 'lucide-react'
 import { previewCsv } from '@desktop-webgis/vector-io'
 import type { CsvPreviewResult, CrsInfo } from '@desktop-webgis/vector-io'
+import { CRS_PRESETS, isGeographicCrsCode } from '@desktop-webgis/vector-io'
 
 export interface CsvConfig {
   xField: string
@@ -16,10 +17,7 @@ export interface CsvConfigDialogProps {
   onCancel: () => void
 }
 
-const COMMON_CRS = [
-  { code: 'EPSG:4326', name: 'WGS84 (经纬度)' },
-  { code: 'EPSG:3857', name: 'Web Mercator' }
-]
+const COMMON_CRS = CRS_PRESETS
 
 export function CsvConfigDialog({
   open,
@@ -72,7 +70,7 @@ export function CsvConfigDialog({
         <div className="dialog-body csv-config-content">
           <div className="csv-config-section">
             <div className="csv-config-row">
-              <label htmlFor="x-field">{crsCode === 'EPSG:4326' ? '经度 (X)' : 'X (米)'}</label>
+              <label htmlFor="x-field">{isGeographicCrsCode(crsCode) ? '经度 (X)' : 'X (米)'}</label>
               <select
                 ref={coordinateInput}
                 id="x-field"
@@ -87,7 +85,7 @@ export function CsvConfigDialog({
             </div>
 
             <div className="csv-config-row">
-              <label htmlFor="y-field">{crsCode === 'EPSG:4326' ? '纬度 (Y)' : 'Y (米)'}</label>
+              <label htmlFor="y-field">{isGeographicCrsCode(crsCode) ? '纬度 (Y)' : 'Y (米)'}</label>
               <select
                 id="y-field"
                 value={yField}
@@ -111,7 +109,7 @@ export function CsvConfigDialog({
               >
                 {COMMON_CRS.map(option => (
                   <option key={option.code} value={option.code}>
-                    {option.name}
+                    {option.name} ({option.code})
                   </option>
                 ))}
               </select>
