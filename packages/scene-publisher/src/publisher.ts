@@ -43,7 +43,7 @@ function sceneResourceUrls(scene: SceneManifest): string[] {
     if (source.type === 'geojson' && source.url) urls.push(source.url)
   }
   if (scene.theme?.logo) urls.push(scene.theme.logo)
-  if (scene.city) for (const asset of Object.values(scene.city.assets)) urls.push(asset.url)
+  if (scene.city) for (const asset of Object.values(scene.city.assets)) if (asset.url) urls.push(asset.url)
   return [...new Set(urls)]
 }
 

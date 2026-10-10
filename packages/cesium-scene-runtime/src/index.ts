@@ -1,5 +1,5 @@
 import { Cartesian3, CesiumTerrainProvider, EllipsoidTerrainProvider, ImageryLayer, JulianDate, Math as CesiumMath, Resource, TileMapServiceImageryProvider, UrlTemplateImageryProvider, Viewer, buildModuleUrl } from 'cesium'
-import { BaseLayer, DrawSession, GeoJsonLayer, GraphicLayer, LayerCollection, ModelLayer, TilesetLayer } from '@desktop-webgis/cesium-layer'
+import { BaseLayer, DrawSession, GeoJsonLayer, GraphicLayer, ImageryTemplateLayer, LayerCollection, ModelLayer, TilesetLayer } from '@desktop-webgis/cesium-layer'
 import type { DrawOptions, EditSession, GraphicEditOptions } from '@desktop-webgis/cesium-layer'
 import { TilesetEditor } from '@desktop-webgis/cesium-tileset-edit'
 import type { EditMode, TransformEditEvent } from '@desktop-webgis/cesium-tileset-edit'
@@ -119,6 +119,7 @@ export class CitySceneRuntime {
         if (layer instanceof TilesetLayer && node.type === '3dtiles') layer.setQuality(node.maximumScreenSpaceError, node.cacheBytes)
         if (layer instanceof GraphicLayer && node.type === 'graphic') layer.getGraphic(node.id)?.setOptions(node)
         if (layer instanceof GeoJsonLayer && node.type === 'geojson') layer.setColor(node.color ?? '#55a6ff')
+        if (layer instanceof ImageryTemplateLayer && node.type === 'imagery' && node.opacity !== undefined) layer.setOpacity(node.opacity)
         this.applySelection(layer)
         if (node.popup) layer.bindPopup(node.popup); else layer.unbindPopup()
         continue
@@ -259,6 +260,7 @@ export class CitySceneRuntime {
       if (layer instanceof TilesetLayer && node.type === '3dtiles') layer.setQuality(node.maximumScreenSpaceError, node.cacheBytes)
       if (layer instanceof GraphicLayer && node.type === 'graphic') layer.getGraphic(node.id)?.setOptions(node)
       if (layer instanceof GeoJsonLayer && node.type === 'geojson') layer.setColor(node.color ?? '#55a6ff')
+        if (layer instanceof ImageryTemplateLayer && node.type === 'imagery' && node.opacity !== undefined) layer.setOpacity(node.opacity)
       if (node.popup) layer.bindPopup(node.popup); else layer.unbindPopup()
       this.applySelection(layer)
     }
@@ -356,10 +358,19 @@ export class CitySceneRuntime {
     const base = { id: node.id, name: node.name, show: node.visible }
     if (node.type === 'graphic') return new GraphicLayer({ ...base, graphics: [node] })
     if (node.type === 'water') return new WaterLayer({ ...base, ...node })
-    const resource = this.resource(scene.assets[node.asset].url)
-    if (node.type === '3dtiles') return new TilesetLayer({ ...base, url: resource, transform: node.transform, maximumScreenSpaceError: node.maximumScreenSpaceError, cacheBytes: node.cacheBytes })
-    if (node.type === 'model') return new ModelLayer({ ...base, url: resource, position: node.position, transform: node.transform })
-    return new GeoJsonLayer({ ...base, data: resource, color: node.color })
+    if (node.type === 'imagery') {
+      return new ImageryTemplateLayer({
+        ...base,
+        url: this.resource(node.url),
+        attribution: node.attribution,
+        maximumLevel: node.maximumLevel,
+        opacity: node.opacity
+      })
+    }
+    const asset = scene.assets[node.asset]
+    if (node.type === '3dtiles') return new TilesetLayer({ ...base, url: this.resource(asset.url!), transform: node.transform, maximumScreenSpaceError: node.maximumScreenSpaceError, cacheBytes: node.cacheBytes })
+    if (node.type === 'model') return new ModelLayer({ ...base, url: this.resource(asset.url!), position: node.position, transform: node.transform })
+    return new GeoJsonLayer({ ...base, data: asset.data ?? this.resource(asset.url!), color: node.color })
   }
 
   private async updateEnvironment(scene: CityScene): Promise<void> {
@@ -393,6 +404,7 @@ export class CitySceneRuntime {
 
 function nativeKey(node: CityNode, scene: CityScene): string {
   if (node.type === 'graphic') return 'graphic'
+  if (node.type === 'imagery') return JSON.stringify({ url: node.url, attribution: node.attribution, maximumLevel: node.maximumLevel })
   if (node.type === 'geojson') return JSON.stringify([node.asset, scene.assets[node.asset]])
   const { popup: _popup, visible: _visible, locked: _locked, name: _name, groupId: _groupId, ...rest } = node
   if (node.type === 'water') return JSON.stringify(rest)

@@ -153,11 +153,47 @@
         "url": {
           "type": "string",
           "minLength": 1
+        },
+        "data": {
+          "type": "object"
         }
       },
       "required": [
-        "type",
-        "url"
+        "type"
+      ],
+      "anyOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "geojson"
+            }
+          },
+          "anyOf": [
+            {
+              "required": [
+                "url"
+              ]
+            },
+            {
+              "required": [
+                "data"
+              ]
+            }
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "enum": [
+                "3dtiles",
+                "glb"
+              ]
+            }
+          },
+          "required": [
+            "url"
+          ]
+        }
       ]
     },
     "cityTileset": {
@@ -583,6 +619,9 @@
               },
               {
                 "$ref": "#/$defs/cityGraphic"
+              },
+              {
+                "$ref": "#/$defs/cityImagery"
               }
             ]
           }
@@ -683,6 +722,57 @@
             }
           }
         }
+      ]
+    },
+    "cityImagery": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "name": {
+          "type": "string"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "popup": {
+          "$ref": "#/$defs/cityPopup"
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "groupId": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "type": {
+          "const": "imagery"
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attribution": {
+          "type": "string"
+        },
+        "maximumLevel": {
+          "type": "number",
+          "minimum": 0
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "visible",
+        "type",
+        "url"
       ]
     }
   }

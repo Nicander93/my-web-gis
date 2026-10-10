@@ -23,14 +23,36 @@ describe('v3 Cesium projection', () => {
     input.nodes[0].visible = true; input.nodes[0].locked = false
     expect(projectCesiumDocument(input).scene.nodes[0]).toMatchObject({ visible: true, locked: false })
   })
-  it('reports shared map nodes and retains them in the full document', () => {
+  it('projects shared XYZ tiles and GeoJSON vectors into the city scene', () => {
     const input = document()
-    input.resources.base = { type: 'xyz', url: 'https://example.test/{z}/{x}/{y}.png' }
-    input.nodes.push({ type: 'tile', id: 'map-base', name: 'Map base', resource: 'base' })
+    input.resources.base = { type: 'xyz', url: 'https://example.test/{z}/{x}/{y}.png', attribution: 'Example' }
+    input.resources.points = { type: 'geojson', data: { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { name: 'A' }, geometry: { type: 'Point', coordinates: [116.4, 39.9] } }] } }
+    input.nodes.push(
+      { type: 'tile', id: 'map-base', name: 'Map base', resource: 'base', visible: true },
+      { type: 'vector', id: 'points', name: 'Points', resource: 'points', visible: true, style: { mode: 'single', symbol: { type: 'circle', radius: 4, fill: { r: 255, g: 0, b: 0, a: 1 } } } }
+    )
+    const before = JSON.stringify(input)
     const result = projectCesiumDocument(input)
-    expect(result.issues).toContainEqual(expect.objectContaining({ path: '$.nodes.map-base', code: 'cesium.unsupported' }))
+    expect(result.issues.filter(issue => issue.code === 'cesium.unsupported')).toEqual([])
     expect(result.document).toEqual(input)
-    expect(result.scene.nodes).toHaveLength(1)
+    expect(JSON.stringify(input)).toBe(before)
+    expect(result.scene.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'imagery', id: 'map-base', url: 'https://example.test/{z}/{x}/{y}.png', attribution: 'Example', visible: true }),
+      expect.objectContaining({ type: 'geojson', id: 'points', asset: 'points', color: '#ff0000', visible: true }),
+      expect.objectContaining({ type: '3dtiles', id: 'blocks' })
+    ]))
+    expect(result.scene.assets.points).toMatchObject({ type: 'geojson' })
+    expect(result.scene.assets.points.data).toBeDefined()
+  })
+
+  it('keeps unsupported tile providers in the document without projecting them', () => {
+    const input = document()
+    input.resources.service = { type: 'wms', url: 'https://example.test/wms', version: '1.3.0', layerNames: ['L'], authMode: 'none' }
+    input.nodes.push({ type: 'tile', id: 'wms', name: 'WMS', resource: 'service', visible: true })
+    const result = projectCesiumDocument(input)
+    expect(result.issues).toContainEqual(expect.objectContaining({ path: '$.nodes.wms', code: 'cesium.unsupported' }))
+    expect(result.document.nodes.some(node => node.id === 'wms')).toBe(true)
+    expect(result.scene.nodes.some(node => node.id === 'wms')).toBe(false)
   })
   it('rejects unsupported required extensions before projecting native content', () => {
     const input = document()

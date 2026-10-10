@@ -9,7 +9,7 @@ export function compileCityObjectExport(snapshot: ProjectSnapshot, ids: readonly
   if (!scene.city.nodes.length) throw new Error('请选择要导出的对象')
   const groups = new Set(scene.city.nodes.map(node => node.groupId))
   scene.city.groups = scene.city.groups?.filter(group => groups.has(group.id))
-  const assets = new Set(scene.city.nodes.flatMap(node => node.type === 'water' || node.type === 'graphic' ? [] : [node.asset]))
+  const assets = new Set(scene.city.nodes.flatMap(node => node.type === 'water' || node.type === 'graphic' || node.type === 'imagery' ? [] : 'asset' in node ? [node.asset] : []))
   scene.city.assets = Object.fromEntries(Object.entries(scene.city.assets).filter(([id]) => assets.has(id)))
   return scene
 }

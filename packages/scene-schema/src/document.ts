@@ -257,12 +257,40 @@ export function migrateSceneDocument(input: unknown, identity = { id: 'city-scen
     const assets = new Map<string, string>(), groups = new Map<string, string>()
     for (const [id, asset] of Object.entries(city.assets)) {
       const next = allocateId(id, resourceIds); assets.set(id, next)
-      resources[next] = asset.type === 'geojson' ? { type: 'geojson', url: asset.url } : { type: asset.type, url: asset.url }
+      if (asset.type === 'geojson') {
+        resources[next] = {
+          type: 'geojson',
+          ...(asset.url ? { url: asset.url } : {}),
+          ...(asset.data ? { data: structuredClone(asset.data) as import('./types.js').GeoJsonFeatureCollection } : {})
+        }
+      } else {
+        resources[next] = { type: asset.type, url: asset.url! }
+      }
     }
     for (const group of city.groups ?? []) {
       const id = allocateId(group.id, nodeIds); groups.set(group.id, id); nodes.push({ ...group, id, type: 'group', scope: '3d' })
     }
     for (const node of city.nodes) {
+      if (node.type === 'imagery') {
+        const resourceId = allocateId(`${node.id}-xyz`, resourceIds)
+        resources[resourceId] = {
+          type: 'xyz',
+          url: node.url,
+          ...(node.attribution ? { attribution: node.attribution } : {}),
+          ...(node.maximumLevel !== undefined ? { maxZoom: node.maximumLevel } : {})
+        }
+        nodes.push({
+          type: 'tile',
+          id: allocateId(node.id, nodeIds),
+          name: node.name,
+          visible: node.visible,
+          resource: resourceId,
+          ...(node.locked !== undefined ? { locked: node.locked } : {}),
+          ...(node.opacity !== undefined ? { opacity: node.opacity } : {}),
+          ...(node.groupId ? { parentId: groups.get(node.groupId) } : {})
+        })
+        continue
+      }
       const { groupId, ...definition } = node
       const migrated = { ...structuredClone(definition), id: allocateId(node.id, nodeIds), ...(groupId ? { parentId: groups.get(groupId) } : {}) }
       if ('asset' in migrated) {

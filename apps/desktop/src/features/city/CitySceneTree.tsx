@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { DragEvent } from 'react'
-import { Box, Building2, ChevronDown, ChevronRight, Folder, Layers2, MoreHorizontal, LockKeyhole, Shapes, Waves } from 'lucide-react'
+import { Box, Building2, ChevronDown, ChevronRight, Folder, Layers2, Map, MoreHorizontal, LockKeyhole, Shapes, Waves } from 'lucide-react'
 import { getCityNodeState } from '@desktop-webgis/cesium-scene-schema'
 import type { CityNode, CityScene } from '@desktop-webgis/cesium-scene-schema'
 import type { CitySelectionMode } from './city-selection'
@@ -20,8 +20,8 @@ interface Props {
   onLocate(id: string): void
   onMove(ids: string[], groupId?: string, beforeId?: string): void
 }
-const typeLabels = { '3dtiles': '3D Tiles', model: '模型', geojson: '矢量数据', water: '水面', graphic: '标绘图形' }
-const icons = { '3dtiles': Building2, model: Box, geojson: Layers2, water: Waves, graphic: Shapes }
+const typeLabels = { '3dtiles': '3D Tiles', model: '模型', geojson: '矢量数据', imagery: '影像底图', water: '水面', graphic: '标绘图形' }
+const icons = { '3dtiles': Building2, model: Box, geojson: Layers2, imagery: Map, water: Waves, graphic: Shapes }
 
 /** One-level folders and transient selection; persisted state stays in scene commands. */
 export function CitySceneTree({ city, search, selectedIds, selectedGroup, states, onContext, onSelect, onGroup, onVisible, onGroupVisible, onLocate, onMove }: Props) {
