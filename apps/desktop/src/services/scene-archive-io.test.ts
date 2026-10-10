@@ -3,8 +3,8 @@ import { migrateSceneDocument } from '@desktop-webgis/scene-schema'
 import { decodeSceneArchiveZip } from '@desktop-webgis/scene-core'
 import { saveSceneArchive } from './scene-archive-io'
 
-const probe = vi.hoisted(() => ({ directory: vi.fn(), save: vi.fn(), read: vi.fn(), write: vi.fn() }))
-vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
+const probe = vi.hoisted(() => ({ directory: vi.fn(), save: vi.fn(), read: vi.fn(), write: vi.fn(), cachedRead: vi.fn() }))
+vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true, invoke: probe.cachedRead }))
 vi.mock('./files', () => ({ pickDirectory: probe.directory, pickSaveFile: probe.save, readSceneResourceFile: probe.read, writeBinaryFile: probe.write }))
 beforeEach(() => { vi.clearAllMocks(); probe.directory.mockResolvedValue('C:/scene'); probe.save.mockResolvedValue('C:/exports/test.scene.zip'); probe.write.mockResolvedValue(undefined) })
 function scene() {
@@ -42,4 +42,36 @@ it('keeps remote references external without asking for a resource directory', a
   const archive = await decodeSceneArchiveZip(probe.write.mock.calls[0][1])
   expect(archive.manifest.selfContained).toBe(false)
   expect(archive.manifest.external).toEqual([{ from: 'scene.json', url: 'https://example.test/model.glb' }])
+})
+
+it('repackages persisted models and relative dependencies without machine-specific URLs', async () => {
+  const document = scene()
+  document.resources.model = { type: 'glb', url: 'http://asset.localhost/C%3A%2Fapp%2Fscene-archives%2F123%2Fmodels%2Fmesh.gltf' }
+  const original = structuredClone(document)
+  probe.cachedRead.mockImplementation(async (_command: string, args: { path: string }) => args.path.endsWith('.gltf') ? Array.from(new TextEncoder().encode(JSON.stringify({ asset: { version: '2.0' }, images: [{ uri: '../texture.png' }] }))) : [1, 2])
+  await saveSceneArchive(document, 'Repacked')
+  expect(probe.directory).not.toHaveBeenCalled()
+  expect(probe.read).not.toHaveBeenCalled()
+  expect(probe.cachedRead).toHaveBeenCalledWith('read_cached_scene_resource', { directory: 'C:/app/scene-archives/123', path: 'texture.png' })
+  const archive = await decodeSceneArchiveZip(probe.write.mock.calls[0][1])
+  expect(archive.document.resources.model).toMatchObject({ url: '_archive1/models/mesh.gltf' })
+  expect(archive.files.get('_archive1/texture.png')).toEqual(new Uint8Array([1, 2]))
+  expect(archive.manifest.selfContained).toBe(true)
+  expect(JSON.stringify(archive.document)).not.toContain('asset.localhost')
+  expect(document).toEqual(original)
+})
+
+it('keeps selected-directory assets separate when their names overlap cache packaging prefixes', async () => {
+  const document = scene()
+  document.resources.local = { type: 'glb', url: '_archive1/local.gltf' }
+  document.resources.cached = { type: 'glb', url: 'http://asset.localhost/C%3A%2Fapp%2Fscene-archives%2F123%2Fcached.gltf' }
+  const data = new TextEncoder().encode(JSON.stringify({ asset: { version: '2.0' } }))
+  probe.read.mockResolvedValue(data); probe.cachedRead.mockResolvedValue(Array.from(data))
+  await saveSceneArchive(document, 'Mixed')
+  expect(probe.directory).toHaveBeenCalledOnce()
+  expect(probe.read).toHaveBeenCalledWith('C:/scene', '_archive1/local.gltf')
+  const archive = await decodeSceneArchiveZip(probe.write.mock.calls[0][1])
+  expect(archive.document.resources.cached).toMatchObject({ url: '_archive2/cached.gltf' })
+  expect(archive.files.has('_archive1/local.gltf')).toBe(true)
+  expect(archive.files.has('_archive2/cached.gltf')).toBe(true)
 })

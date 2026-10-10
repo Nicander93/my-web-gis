@@ -85,6 +85,18 @@ fn persist_scene_archive(app: tauri::AppHandle, files: Vec<SceneArchiveFile>) ->
     persist_scene_files(&root, files)
 }
 
+#[tauri::command]
+fn read_cached_scene_resource(app: tauri::AppHandle, directory: String, path: String) -> Result<Vec<u8>, String> {
+    use tauri::Manager;
+    let root = app.path().app_local_data_dir().map_err(|error| error.to_string())?.join("scene-archives");
+    let root = std::fs::canonicalize(root).map_err(|error| error.to_string())?;
+    let selected = std::fs::canonicalize(&directory).map_err(|error| error.to_string())?;
+    if !selected.starts_with(&root) || selected == root {
+        return Err("resource directory is not an application scene archive".into());
+    }
+    read_scene_resource(directory, path)
+}
+
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct HttpGetArgs {
@@ -206,6 +218,7 @@ pub fn run() {
             write_binary_path,
             read_scene_resource,
             persist_scene_archive,
+            read_cached_scene_resource,
             http_get_text,
             secure_credential_set,
             secure_credential_get,
