@@ -19,6 +19,8 @@ vi.mock('@desktop-webgis/cesium-layer', async original => {
     protected async createNative(): Promise<() => void> { probe.created++; preparationProbe.visibility.push(this.show); await (preparationProbe.gates.length ? preparationProbe.gates.shift() : probe.nativeGate); return () => { probe.released++ } }
   }, GeoJsonLayer: class extends actual.GeoJsonLayer {
     protected async createNative(): Promise<() => void> { return () => {} }
+  }, ImageryTemplateLayer: class extends actual.ImageryTemplateLayer {
+    protected async createNative(): Promise<() => void> { return () => {} }
   } }
 })
 vi.mock('@desktop-webgis/cesium-tileset-edit', () => ({ TilesetEditor: class {
@@ -44,8 +46,8 @@ describe('v3 document updates', () => {
     const editor = probe.editors.at(-1)!
     editor.cancel.mockClear()
     const next = structuredClone(input); next.title = 'New title'
-    next.resources.points = { type: 'geojson', data: { type: 'FeatureCollection', features: [] } }
-    next.nodes.push({ type: 'vector', id: 'points', name: 'Map points', visible: true, resource: 'points', style: { mode: 'single', symbol: { type: 'circle', radius: 3 } } })
+    next.resources.service = { type: 'wms', url: 'https://example.test/wms', version: '1.3.0', layerNames: ['L'], authMode: 'none' }
+    next.nodes.push({ type: 'tile', id: 'wms', name: 'WMS', visible: true, resource: 'service' })
     await loaded.updateDocument(next)
     expect(editor.cancel).not.toHaveBeenCalled()
     expect(probe.created).toBe(1)
@@ -325,11 +327,17 @@ describe('incremental scene reconciliation', () => {
     s.scene.lighting = { sunlight: true, shadows: true, time: '2026-02-01T00:00:00Z' }
     const document = migrateSceneDocument(s.scene)
     document.resources.base = { type: 'xyz', url: 'https://example.test/{z}/{x}/{y}.png' }
-    document.nodes.push({ type: 'tile', id: 'map', name: 'Map', resource: 'base' })
+    document.resources.points = { type: 'geojson', data: { type: 'FeatureCollection', features: [] } }
+    document.nodes.push(
+      { type: 'tile', id: 'map', name: 'Map', resource: 'base', visible: true },
+      { type: 'vector', id: 'points', name: 'Points', resource: 'points', visible: true, style: { mode: 'single', symbol: { type: 'circle', radius: 3, fill: { r: 85, g: 166, b: 255, a: 1 } } } }
+    )
     const loaded = await createCesiumDocumentRuntime({ document, viewer: s.viewer })
     expect(loaded.runtime.layers.getLayer('blocks')?.state).toBe('ready')
+    expect(loaded.runtime.layers.getLayer('map')?.state).toBe('ready')
+    expect(loaded.runtime.layers.getLayer('points')?.state).toBe('ready')
     expect(loaded.getDocument()).toEqual(document)
-    expect(loaded.issues).toContainEqual(expect.objectContaining({ code: 'cesium.unsupported' }))
+    expect(loaded.issues.filter(issue => issue.code === 'cesium.unsupported')).toEqual([])
     expect(s.viewer.scene.globe.enableLighting).toBe(true)
     loaded.destroy(); loaded.destroy()
     expect(s.viewer.scene.globe.enableLighting).toBe(false)

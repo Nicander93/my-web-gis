@@ -25,8 +25,10 @@ export interface PopupDefinition {
 
 export interface CityAsset {
   type: '3dtiles' | 'glb' | 'geojson'
-  /** HTTP(S) or a relative URL. Credentials are supplied by the host. */
-  url: string
+  /** HTTP(S) or a relative URL. Credentials are supplied by the host. Required for 3dtiles/glb; optional for geojson when data is inline. */
+  url?: string
+  /** Inline GeoJSON used by document-projected vector resources that have no portable URL. */
+  data?: object
 }
 
 interface NodeBase {
@@ -99,6 +101,15 @@ export interface GeoJsonNode extends NodeBase {
   color?: string
 }
 
+/** XYZ template imagery projected from shared SceneDocument tile nodes. */
+export interface ImageryNode extends NodeBase {
+  type: 'imagery'
+  url: string
+  attribution?: string
+  maximumLevel?: number
+  opacity?: number
+}
+
 export interface WaterNode extends NodeBase {
   type: 'water'
   /** Open boundary; the runtime closes it. At least three distinct points. */
@@ -110,7 +121,7 @@ export interface WaterNode extends NodeBase {
   speed: number
 }
 
-export type CityNode = TilesetNode | ModelNode | GeoJsonNode | WaterNode | GraphicNode
+export type CityNode = TilesetNode | ModelNode | GeoJsonNode | ImageryNode | WaterNode | GraphicNode
 export interface CityGroup { id: string; name: string; visible: boolean; locked?: boolean }
 export interface CityScene {
   version: 1 | 2
@@ -178,7 +189,17 @@ export function validateCityScene(input: unknown, root = '$'): CityValidationIss
   const assets = record(input.assets) ? input.assets : {}
   check(record(input.assets), 'assets', '资源必须是字典')
   for (const [id, asset] of Object.entries(assets)) {
-    check(Boolean(id.trim()) && record(asset) && ['3dtiles', 'glb', 'geojson'].includes(String(asset.type)) && isCityResourceUrl(asset.url), `assets.${id}`, '资源类型或 URL 无效')
+    if (!Boolean(id.trim()) || !record(asset) || !['3dtiles', 'glb', 'geojson'].includes(String(asset.type))) {
+      check(false, `assets.${id}`, '资源类型或 URL 无效'); continue
+    }
+    if (asset.type === 'geojson') {
+      const hasUrl = asset.url !== undefined && isCityResourceUrl(asset.url)
+      const hasData = asset.data !== undefined && record(asset.data)
+      check(hasUrl || hasData, `assets.${id}`, 'GeoJSON 资源需要有效 URL 或内联 data')
+      if (asset.url !== undefined) check(isCityResourceUrl(asset.url), `assets.${id}.url`, '资源 URL 无效')
+    } else {
+      check(isCityResourceUrl(asset.url), `assets.${id}`, '资源类型或 URL 无效')
+    }
   }
   const groupIds = new Set<string>()
   if (input.groups !== undefined) {
@@ -207,6 +228,13 @@ export function validateCityScene(input: unknown, root = '$'): CityValidationIss
     }
     if (node.type === 'graphic') {
       check(input.version === 2 && validateGraphic(node), path, '图形需要 version 2 和有效的几何、样式与属性')
+      return
+    }
+    if (node.type === 'imagery') {
+      check(isCityResourceUrl(node.url), `${path}.url`, '影像 URL 无效')
+      if (node.attribution !== undefined) check(typeof node.attribution === 'string', `${path}.attribution`, '归属信息必须是字符串')
+      if (node.maximumLevel !== undefined) check(finite(node.maximumLevel) && node.maximumLevel >= 0, `${path}.maximumLevel`, '最大级别必须是非负数')
+      if (node.opacity !== undefined) check(finite(node.opacity) && node.opacity >= 0 && node.opacity <= 1, `${path}.opacity`, '透明度必须在 0–1 之间')
       return
     }
     if (node.type === 'water') {
