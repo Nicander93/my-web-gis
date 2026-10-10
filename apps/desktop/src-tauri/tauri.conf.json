@@ -10,6 +10,12 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "security": {
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$APPLOCALDATA/scene-archives/**"]
+      }
+    },
     "windows": [
       {
         "title": "Desktop WebGIS",
