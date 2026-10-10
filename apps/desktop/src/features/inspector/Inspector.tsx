@@ -224,6 +224,13 @@ export function Inspector() {
                       ；前缀 {dataset.processing.options.prefix || '无'}
                     </p>
                   )}
+                  {dataset.processing.options.tool === 'spatial-join' && (
+                    <p>
+                      结果数量上限：
+                      {dataset.processing.options.maxResults ??
+                        '未记录（旧任务）'}
+                    </p>
+                  )}
                   {(dataset.processing.options.tool === 'measure-area' ||
                     dataset.processing.options.tool === 'measure-length' ||
                     dataset.processing.options.tool ===

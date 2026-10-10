@@ -358,6 +358,34 @@ describe('processing workflow', () => {
     expect(useProjectStore.getState().dirty).toBe(false)
   })
 
+  it('a spatial result limit fails atomically and is retained in successful provenance', async () => {
+    const layerId = useProjectStore.getState().selectedLayerId!
+    const area: GisFeature = { id: 'area', properties: { code: 'A' }, geometry: { type: 'Polygon', coordinates: [[[116, 39], [117, 39], [117, 41], [116, 41], [116, 39]]] } }
+    useProjectStore.getState().addLayer('join-areas', '重叠区域', [area, { ...area, id: 'area2' }], 'polygon')
+    const overlayId = useProjectStore.getState().selectedLayerId!
+    const before = useProjectStore.getState().getSnapshot()
+    const workers = fakeWorker()
+    const options: ProcessingOptions = { tool: 'spatial-join', predicate: 'within', fields: ['code'], prefix: 'region_', mode: 'inner', maxResults: 5 }
+    const args = { layerId, scope: 'all' as const, overlay: { layerId: overlayId, scope: 'all' as const }, options, name: '有限结果', signal: new AbortController().signal }
+    const failure = processingCommands.run(args)
+    let worker = workers.current
+    expect(worker?.payload).toBeTruthy()
+    let limitError: Error | undefined
+    try { executeProcessing(worker.payload.features, worker.payload.options, worker.payload.overlay) }
+    catch (error) { limitError = error as Error }
+    expect(limitError?.message).toMatch(/超过 5/)
+    worker.onmessage!({ data: { error: limitError!.message } })
+    await expect(failure).rejects.toThrow('超过 5')
+    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
+    const pending = processingCommands.run({ ...args, options: { ...options, maxResults: 6 } })
+    worker = workers.current
+    worker.onmessage!({ data: { result: executeProcessing(worker.payload.features, worker.payload.options, worker.payload.overlay) } })
+    const result = await pending
+    const snapshot = parseProjectSnapshot(serializeProjectSnapshot(useProjectStore.getState().getSnapshot()))
+    const layer = snapshot.project.layers.find(layer => layer.id === result.layerId)!
+    expect(snapshot.project.datasets.find(dataset => dataset.id === layer.datasetId)).toMatchObject({ processing: { options: { maxResults: 6 } } })
+  })
+
   it('spatial join preserves pair provenance and multiple matches through save/reopen', async () => {
     const layerId = useProjectStore.getState().selectedLayerId!
     const area: GisFeature = { id: 'area', properties: { name: '区域' }, geometry: { type: 'Polygon', coordinates: [[[116, 39], [117, 39], [117, 41], [116, 41], [116, 39]]] } }

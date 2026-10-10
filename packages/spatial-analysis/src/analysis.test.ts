@@ -118,4 +118,14 @@ describe('spatial join', () => {
     expect(joinByLocation([point('p', 1)], [], options)[0].properties.region_name).toBeNull()
     expect(() => joinByLocation([region('a')], [region('b')], { ...options, prefix: '' })).toThrow('已存在')
   })
+  it('enforces maxResults across pairs and unmatched left-join rows without returning partial results', () => {
+    const overlaps = [region('a'), region('b', 4)]
+    expect(joinByLocation([point('inside', 5)], overlaps, { ...options, mode: 'inner', maxResults: 2 })).toHaveLength(2)
+    expect(() => joinByLocation([point('inside', 5)], overlaps, { ...options, mode: 'inner', maxResults: 1 })).toThrow('未返回部分结果')
+    expect(joinByLocation([point('outside', 50), point('far', 60)], [], { ...options, mode: 'left', maxResults: 2 })).toHaveLength(2)
+    expect(() => joinByLocation([point('outside', 50), point('far', 60)], [], { ...options, mode: 'left', maxResults: 1 })).toThrow('上限')
+    for (const maxResults of [0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(() => joinByLocation([], [], { ...options, maxResults })).toThrow('正安全整数')
+    }
+  })
 })

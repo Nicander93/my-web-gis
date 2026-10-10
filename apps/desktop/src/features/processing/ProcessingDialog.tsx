@@ -95,6 +95,7 @@ export function ProcessingDialog({
   const [joinKey, setJoinKey] = useState('')
   const [joinFields, setJoinFields] = useState<string[]>([])
   const [joinMode, setJoinMode] = useState<'left' | 'inner'>('left')
+  const [resultLimit, setResultLimit] = useState('100000')
   const [distance, setDistance] = useState('100')
   const [unit, setUnit] = useState<'meters' | 'kilometers'>('meters')
   const [name, setName] = useState('')
@@ -386,7 +387,8 @@ export function ProcessingDialog({
                           predicate === 'within' ? 'within' : 'intersects',
                         fields: joinFields,
                         prefix,
-                        mode: joinMode
+                        mode: joinMode,
+                        maxResults: Number(resultLimit)
                       }
                     : tool === 'extract-location'
                       ? { tool, predicate }
@@ -805,6 +807,25 @@ export function ProcessingDialog({
                         <option value="inner">仅保留匹配输入（内连接）</option>
                       </select>
                     </label>
+                    {tool === 'spatial-join' && (
+                      <label>
+                        结果数量上限
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={resultLimit}
+                          disabled={busy}
+                          onChange={(event) => {
+                            setResultLimit(event.target.value)
+                            setSuccess(null)
+                          }}
+                        />
+                        <p className="processing-description">
+                          默认 100,000 条，重叠区域可放大结果。超限时整个任务失败，不截断结果；提高上限会增加内存与返回耗时。
+                        </p>
+                      </label>
+                    )}
                     <details className="tool-help">
                       <summary>计算说明</summary>
                       <p className="processing-description">
