@@ -126,6 +126,98 @@ test('map selectable policy preserves table selection and location, and follows 
   await expect.poll(async () => (await mapState(page)).selection).toEqual([restored.positions[1].id])
 })
 
+test('popup fields are safe, independent of map selection, and close when filtered or editing', async ({ page }, info) => {
+  await page.getByRole('button', { name: '图层属性', exact: true }).click()
+  await page.locator('summary').filter({ hasText: '属性弹窗' }).click()
+  await page.getByRole('checkbox', { name: '弹窗显示字段 name', exact: true }).check()
+  await page.getByLabel('弹窗标题字段', { exact: true }).selectOption('name')
+  await waitForMapResize(page)
+  await page.getByRole('button', { name: '定位图层', exact: true }).click()
+  await page.waitForTimeout(350)
+  const clickFeature = async (index: number) => {
+    await waitForMapResize(page)
+    await expect.poll(() => page.evaluate(async () => {
+      const { getMapRuntime } = await import('/src/features/map/map-runtime-host.ts')
+      return getMapRuntime()!.getMap().getView().getAnimating()
+    })).toBe(false)
+    const state = await mapState(page), pixel = state.positions[index].pixel
+    const bounds = (await page.locator('.ol-viewport').boundingBox())!
+    // Wait for OL's delayed singleclick, rather than accidentally making a doubleclick.
+    await page.evaluate(async () => {
+      const { getMapRuntime } = await import('/src/features/map/map-runtime-host.ts')
+      const pending = window as Window & { __popupClick?: Promise<void> }
+      pending.__popupClick = new Promise(resolve => getMapRuntime()!.getMap().once('singleclick', () => resolve()))
+    })
+    await page.mouse.click(bounds.x + pixel[0], bounds.y + pixel[1])
+    await page.evaluate(() => (window as Window & { __popupClick?: Promise<void> }).__popupClick)
+  }
+  const popup = page.getByRole('dialog', { name: '要素属性弹窗', exact: true })
+  await clickFeature(0)
+  await expect(popup).toBeVisible()
+  await expect(popup.locator('strong')).toHaveText('Point 0')
+  await popup.getByRole('button', { name: '关闭属性弹窗' }).click()
+  await expect(popup).toBeHidden()
+  await clickFeature(0)
+  await expect(popup).toBeVisible()
+  await page.getByRole('checkbox', { name: '弹窗显示字段 name', exact: true }).uncheck()
+  await expect(popup).toBeHidden()
+  await clickFeature(0)
+  await expect(popup).toBeHidden()
+  await page.getByRole('button', { name: '撤销', exact: true }).first().click()
+  await clickFeature(0)
+  await expect(popup.locator('strong')).toHaveText('Point 0')
+  await page.getByRole('checkbox', { name: '地图可选择', exact: true }).uncheck()
+  await clickFeature(1)
+  await expect(popup.locator('strong')).toHaveText('Point 1')
+  await expect.poll(async () => (await mapState(page)).selection).toEqual(['point-0'])
+  await page.evaluate(async () => {
+    const { createProjectSceneController } = await import('/src/features/scene/project-scene-controller.ts')
+    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const state = useProjectStore.getState(), controller = createProjectSceneController()
+    try { controller.transaction('Popup safety fixture', draft => {
+      const node = draft.nodes.find(item => item.id === state.selectedLayerId)
+      if (node?.type !== 'vector') throw new Error('expected vector')
+      const resource = draft.resources[node.resource]
+      if (resource.type !== 'geojson' || !resource.data) throw new Error('expected local GeoJSON')
+      resource.data.features[1].properties = { name: '<img src=x onerror=alert(1)>' }
+    }) } finally { controller.dispose() }
+  })
+  await clickFeature(1)
+  await expect(popup).toContainText('<img src=x onerror=alert(1)>')
+  await expect(popup.locator('img')).toHaveCount(0)
+  await expect.poll(async () => {
+    const close = await popup.getByRole('button', { name: '关闭属性弹窗' }).boundingBox()
+    const map = await page.locator('.ol-viewport').boundingBox()
+    return !!close && !!map && close.x >= map.x && close.x + close.width <= map.x + map.width
+  }).toBe(true)
+  await page.screenshot({ path: info.outputPath('popup-safe-text.png') })
+  await page.getByRole('button', { name: '隐藏selection', exact: true }).click()
+  await expect(popup).toBeHidden()
+  await page.getByRole('button', { name: '显示selection', exact: true }).click()
+  await waitForMapResize(page)
+  await clickFeature(1)
+  await expect(popup).toBeVisible()
+  await page.evaluate(async () => {
+    const { createProjectSceneController } = await import('/src/features/scene/project-scene-controller.ts')
+    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const controller = createProjectSceneController()
+    try { controller.transaction('Exclude popup feature', draft => {
+      const node = draft.nodes.find(item => item.id === useProjectStore.getState().selectedLayerId)
+      if (node?.type === 'vector') node.filter = [{ field: 'name', op: 'eq', value: 'Point 0' }]
+    }) } finally { controller.dispose() }
+  })
+  await expect(popup).toBeHidden()
+  await waitForMapResize(page)
+  await page.getByRole('button', { name: '定位图层', exact: true }).click()
+  await page.waitForTimeout(350)
+  await clickFeature(0)
+  await expect(popup).toBeVisible()
+  await page.getByRole('tab', { name: '编辑', exact: true }).click()
+  await page.getByRole('button', { name: '开始编辑', exact: true }).click()
+  await page.getByRole('button', { name: '绘制要素', exact: true }).click()
+  await expect(popup).toBeHidden()
+})
+
 test('public scene display edits preserve selection and table through toolbar undo and redo', async ({ page }) => {
   const initial = await mapState(page), first = initial.positions[0].pixel
   await drag(page, [first[0] - 12, first[1] - 12], [first[0] + 12, first[1] + 12])

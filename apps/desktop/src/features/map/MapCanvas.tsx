@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useWorkbenchStore } from '@/stores/workbench.store'
 import { useProjectStore } from '@/stores/project.store'
 import { useSnappingStore } from '@/stores/snapping.store'
+import { MapPopup } from './MapPopup'
 import {
   getActiveEditTool,
   isSelectionRuntimeMounted,
@@ -122,6 +123,7 @@ export function MapCanvas({
         className="map-canvas__viewport"
         data-testid="map-runtime-viewport"
       />
+      {runtimeMounted && <MapPopup />}
       {!hint.startsWith('选择工具') &&
         !hint.startsWith('平移工具') &&
         hint !== '地图工具' && (

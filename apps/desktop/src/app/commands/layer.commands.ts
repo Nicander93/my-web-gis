@@ -11,6 +11,7 @@ import {
 } from '@/features/map/map-runtime-host'
 import { refreshWfsLayer } from '@/services/wfs-commands'
 import { createProjectSceneController } from '@/features/scene/project-scene-controller'
+import type { PopupDefinition } from '@desktop-webgis/scene-schema'
 import {
   capabilitiesForDataset,
   cloneValue,
@@ -135,6 +136,20 @@ function openInspector(id: string, tab: 'layer' | 'style' | 'label'): void {
 
 /** 图层相关命令，供 Header 按钮与 Layer Context Menu 共用。 */
 export const layerCommands = {
+  setPopup(layerId: string, popup?: PopupDefinition): void {
+    if (!getLayerCapabilities(layerId).canAttributeTable) return
+    const controller = createProjectSceneController()
+    try {
+      controller.transaction('设置属性弹窗', draft => {
+        const node = draft.nodes.find(node => node.id === layerId)
+        if (node?.type !== 'vector') return
+        const interaction = { ...node.interaction }
+        if (popup?.fields.length) interaction.popup = structuredClone(popup)
+        else delete interaction.popup
+        node.interaction = interaction
+      })
+    } finally { controller.dispose() }
+  },
   setSelectable(layerId: string, selectable: boolean): void {
     if (!getLayerCapabilities(layerId).canAttributeTable) return
     const controller = createProjectSceneController()

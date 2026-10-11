@@ -11,6 +11,7 @@ import { LabelPanel } from './LabelPanel'
 import { Legend } from './Legend'
 import { getLayerCapabilities } from '@/app/commands/layer.commands'
 import { processingToolName } from '@/features/processing/processing-tools'
+import { PopupFields } from './PopupFields'
 
 type InspectorTab = 'layer' | 'feature' | 'style' | 'label'
 
@@ -407,6 +408,8 @@ export function Inspector() {
                     onChange={event => layerCommands.setSelectable(selectedLayer.id, event.target.checked)} />
                 </label>
               )}
+              {flags.queryAttributes && <PopupFields layerId={selectedLayer.id} popup={selectedLayer.interaction?.popup}
+                fields={[...new Set([...(dataset?.fields?.map(field => field.name) ?? []), ...(featuresByDataset[selectedLayer.datasetId] ?? []).slice(0, 100).flatMap(feature => Object.keys(feature.properties))])]} />}
               <div className="inspector-row inspector-opacity-row">
                 <span>不透明度</span>
                 <label className="inspector-opacity">

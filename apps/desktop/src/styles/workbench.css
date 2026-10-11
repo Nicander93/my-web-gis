@@ -860,3 +860,15 @@
 .help-shortcuts dd { margin: 0; }
 .help-content details + details { margin-top: 12px; }
 .help-content p { font-size: 12px; line-height: 1.6; }
+.inspector-popup { border-block: 1px solid var(--color-border); padding: 8px 0; }
+.inspector-popup summary { cursor: pointer; }
+.inspector-popup summary span { float: right; color: var(--color-text-secondary); }
+.inspector-popup select { min-width: 0; max-width: 180px; height: 26px; }
+.map-popup { width: 260px; max-width: min(260px, 60vw); max-height: 240px; overflow: auto; background: var(--color-surface); color: var(--color-text-primary); border: 1px solid var(--color-border); border-radius: 4px; padding: 8px; box-shadow: 0 3px 12px #0002; font-size: 12px; }
+.map-popup header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.map-popup header strong { min-width: 0; overflow-wrap: anywhere; }
+.map-popup header button { border: 0; background: transparent; color: inherit; cursor: pointer; }
+.map-popup dl { margin: 6px 0 0; }
+.map-popup dl div { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 8px; padding: 3px 0; }
+.map-popup dt { color: var(--color-text-secondary); }
+.map-popup dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
