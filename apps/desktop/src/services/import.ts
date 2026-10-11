@@ -119,7 +119,7 @@ export async function importShapefileZip(
       
       const parseResult = parseGeoJsonFeatures(layer.featureCollection, {
         importId: createId('import'),
-        sourceCrs: layer.sourceCrs?.code || layer.crs?.code,
+        sourceCrs: layer.sourceCrs?.code || layer.sourceCrs?.wkt || layer.crs?.code,
         transform: transformResult.transform
       })
       

@@ -4,6 +4,13 @@
 
 ## 矢量数据样本
 
+### projected-chinese-multi.zip（2026-10-11 文件验收 A）
+
+- 三个独立 Point 源图层：stations（2 条）、sites（1 条）、excluded（1 条）；UI 只选择前两个。
+- 源坐标 EPSG:3857，包含实际 PRJ、UTF-8 CPG 和中文字段“编号／名称”；“01／北京站”对应经纬度 116.4、39.9。
+- 使用标准库脚本 `python examples/phase-1/generate-projected-chinese-shapefile.py` 可确定性重新生成；仅手工测试数据，Public Domain。
+- 验收检查中文、源投影元数据、转换后的坐标和两个图层的显示范围，不以无网络底图截图宣称公网地图定位验证。
+
 ### 1. points.geojson
 
 - **类型**: GeoJSON Point
