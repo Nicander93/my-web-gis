@@ -28,6 +28,7 @@
 - [第二阶段：空间处理工作流](plans/phase-2-spatial-processing.md)
 - [二维编辑捕捉](plans/editing-snapping.md)
 - [下一步计划](plans/next-steps-2026-10-10.md) — 当前执行范围：冻结同渲、内部包维护、按小 PR 推进
+- [用户功能清单与改进顺序](specs/user-capabilities.md) — 产品原则、已具备工作流、限制与每刀验收条件
 - [同渲冻结清理](plans/freeze-co-render-cleanup.md) — 默认行为、KEEP／REMOVE 清单与验收记录
 - [选择、图层与统一场景 API 实施计划](plans/selection-layer-scene-public-api.md) — 历史方案，保留作对照，不再整包执行
 - [选择、图层与场景 API 实施记录](plans/selection-layer-scene-implementation.md) — 历史验证证据及未签收项

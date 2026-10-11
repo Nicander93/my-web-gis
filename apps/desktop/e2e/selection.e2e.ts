@@ -86,6 +86,46 @@ test('box selection links the accepted rows; modifiers, empty selection and row 
   await page.screenshot({ path: info.outputPath('selection-empty.png') })
 })
 
+test('map selectable policy preserves table selection and location, and follows undo', async ({ page }, info) => {
+  const initial = await mapState(page), first = initial.positions[0].pixel
+  await drag(page, [first[0] - 12, first[1] - 12], [first[0] + 12, first[1] + 12])
+  await expect(page.locator('.table-scroll tbody tr')).toHaveCount(1)
+  await page.getByRole('button', { name: '图层属性', exact: true }).click()
+  const selectable = page.getByRole('checkbox', { name: '地图可选择', exact: true })
+  await selectable.uncheck()
+  await expect(page.getByRole('button', { name: /^当前工具说明：此图层未启用地图选择/ })).toBeVisible()
+  await expect.poll(() => page.evaluate(async () => {
+    const host = await import('/src/features/map/map-runtime-host.ts')
+    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    return host.getMapRuntime()!.isLayerSelectable(useProjectStore.getState().selectedLayerId!)
+  })).toBe(false)
+  await waitForMapResize(page)
+  const current = await mapState(page), second = current.positions[1].pixel
+  const bounds = (await page.locator('.ol-viewport').boundingBox())!
+  await page.mouse.click(bounds.x + second[0], bounds.y + second[1])
+  await drag(page, [second[0] - 12, second[1] - 12], [second[0] + 12, second[1] + 12], 'Shift')
+  await expect.poll(async () => (await mapState(page)).selection).toEqual([initial.positions[0].id])
+  await expect(page.locator('.table-scroll tbody tr')).toHaveCount(1)
+  await page.getByLabel('仅选中', { exact: true }).uncheck()
+  await page.screenshot({ path: info.outputPath('map-selection-disabled.png') })
+  const row = page.locator('.table-scroll tbody tr').filter({ hasText: 'Point 2' })
+  await row.locator('td').nth(2).click()
+  await expect.poll(async () => (await mapState(page)).selection).toEqual(['point-2'])
+  const before = (await mapState(page)).center
+  await row.locator('td').nth(2).dblclick()
+  await expect.poll(async () => (await mapState(page)).center).not.toEqual(before)
+  await page.getByRole('button', { name: '撤销', exact: true }).first().click()
+  await expect(selectable).toBeChecked()
+  await expect(page.getByRole('button', { name: /^当前工具说明：单击或拖框选择/ })).toBeVisible()
+  await expect.poll(async () => (await mapState(page)).selection).toEqual(['point-2'])
+  await page.getByRole('button', { name: '定位图层', exact: true }).click()
+  await page.waitForTimeout(350)
+  await waitForMapResize(page)
+  const restored = await mapState(page), pick = restored.positions[1].pixel
+  await drag(page, [pick[0] - 12, pick[1] - 12], [pick[0] + 12, pick[1] + 12])
+  await expect.poll(async () => (await mapState(page)).selection).toEqual([restored.positions[1].id])
+})
+
 test('public scene display edits preserve selection and table through toolbar undo and redo', async ({ page }) => {
   const initial = await mapState(page), first = initial.positions[0].pixel
   await drag(page, [first[0] - 12, first[1] - 12], [first[0] + 12, first[1] + 12])

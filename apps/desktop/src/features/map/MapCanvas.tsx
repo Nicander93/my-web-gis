@@ -14,8 +14,13 @@ import {
 
 function toolHint(tool: string): string {
   switch (tool) {
-    case 'select':
+    case 'select': {
+      const { project, selectedLayerId } = useProjectStore.getState()
+      if (project.layers.find(layer => layer.id === selectedLayerId)?.interaction?.selectable === false) {
+        return '此图层未启用地图选择；属性表仍可选择和定位'
+      }
       return '单击或拖框选择 · Shift 追加 · Alt 移除 · Esc 取消'
+    }
     case 'draw-point':
       return '绘制点 · 单击地图添加'
     case 'draw-line':
@@ -86,6 +91,7 @@ export function MapCanvas({
         state.featuresByDataset !== previous.featuresByDataset
 
       if (projectChanged) syncMapFromProject()
+      if (projectChanged || state.selectedLayerId !== previous.selectedLayerId) setHint(toolHint(getActiveEditTool()))
     })
     return unsubscribe
   }, [])
@@ -119,16 +125,11 @@ export function MapCanvas({
       {!hint.startsWith('选择工具') &&
         !hint.startsWith('平移工具') &&
         hint !== '地图工具' && (
-          <div className="map-tool-hint">
-            {hint}
-            {(hint.startsWith('绘制') || hint.startsWith('修改')) && (
-              <span>
-                {' '}
-                ·{' '}
-                {snapped ? '已捕捉' : snappingEnabled ? '捕捉开启' : '捕捉关闭'}
-              </span>
-            )}
-          </div>
+          <button type="button" className="map-tool-hint"
+            aria-label={`当前工具说明：${hint}`}
+            title={`${hint}${hint.startsWith('绘制') || hint.startsWith('修改') ? ` · ${snapped ? '已捕捉' : snappingEnabled ? '捕捉开启' : '捕捉关闭'}` : ''}`}>
+            {snapped && (hint.startsWith('绘制') || hint.startsWith('修改')) ? '已捕捉' : 'i'}
+          </button>
         )}
     </section>
   )

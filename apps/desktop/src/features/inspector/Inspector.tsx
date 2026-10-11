@@ -400,6 +400,13 @@ export function Inspector() {
                   </>
                 )}
               </details>
+              {flags.queryAttributes && (
+                <label className="inspector-row" title="限制地图点击与框选；属性表仍可选择记录和定位。">
+                  <span>地图可选择</span>
+                  <input type="checkbox" checked={selectedLayer.interaction?.selectable !== false}
+                    onChange={event => layerCommands.setSelectable(selectedLayer.id, event.target.checked)} />
+                </label>
+              )}
               <div className="inspector-row inspector-opacity-row">
                 <span>不透明度</span>
                 <label className="inspector-opacity">
