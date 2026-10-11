@@ -12,6 +12,7 @@ interface AttributeTableState {
   searchQuery: string
   currentPage: number
   scrollTop: number
+  scrollLeft: number
   /** View mode: show only S. Does not modify F. */
   selectedOnly: boolean
   /** Session sort specs (stable Feature ID tie-break in gis-core). */
@@ -134,6 +135,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
               searchQuery: updates.searchQuery ?? current?.searchQuery ?? '',
               currentPage: updates.currentPage ?? current?.currentPage ?? 1,
               scrollTop: updates.scrollTop ?? current?.scrollTop ?? 0,
+              scrollLeft: updates.scrollLeft ?? current?.scrollLeft ?? 0,
               selectedOnly:
                 updates.selectedOnly ?? current?.selectedOnly ?? false,
               sortField:

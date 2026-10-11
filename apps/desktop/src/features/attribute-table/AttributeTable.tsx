@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChevronLeft, ChevronRight, PanelBottomClose, LocateFixed } from 'lucide-react'
 import {
   applyFieldFilter,
@@ -63,6 +63,13 @@ export function AttributeTable({
     selectedLayerId ? state.sessions[selectedLayerId] : undefined
   )
   const tableState = layerSession?.attributeTable
+  const scrollRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    if (!selectedLayerId || !scrollRef.current) return
+    const saved = useSessionStore.getState().sessions[selectedLayerId]?.attributeTable
+    scrollRef.current.scrollTop = saved?.scrollTop ?? 0
+    scrollRef.current.scrollLeft = saved?.scrollLeft ?? 0
+  }, [selectedLayerId])
 
   const searchQuery = tableState?.searchQuery ?? ''
   const currentPage = tableState?.currentPage ?? 1
@@ -455,7 +462,13 @@ export function AttributeTable({
         </div>
       )}
 
-      <div className="table-scroll">
+      <div className="table-scroll" ref={scrollRef} onScroll={event => {
+        if (!selectedLayerId) return
+        const { scrollTop, scrollLeft } = event.currentTarget
+        if (scrollTop !== tableState?.scrollTop || scrollLeft !== tableState?.scrollLeft) {
+          setAttributeTableState(selectedLayerId, { scrollTop, scrollLeft })
+        }
+      }}>
         {selectedLayer && !emptySelectedOnly && pageRows.length > 0 ? (
           <table>
             <thead>
