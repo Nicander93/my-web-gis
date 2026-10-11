@@ -1,6 +1,8 @@
 import { zip } from '@mapbox/shp-write'
 import type { GeoJsonFeatureCollection } from '@desktop-webgis/scene-schema'
 import shp from 'shpjs'
+import { unzipSync } from 'fflate'
+import { createCoordinateTransform } from './coordinate-transform.js'
 import type { CrsInfo, ShapefileExportOptions, VectorImportResult, ShapefileImportResult, ShapefileLayerResult } from './types.js'
 
 type ShpResult = GeoJsonFeatureCollection & { fileName?: string; crs?: { type?: string; properties?: { name?: string } } }
@@ -19,14 +21,19 @@ type ShpResult = GeoJsonFeatureCollection & { fileName?: string; crs?: { type?: 
 export async function importShapefileZipLayers(
   input: ArrayBuffer | ArrayBufferView
 ): Promise<ShapefileImportResult> {
+  const projections = readProjectionFiles(input)
+  for (const [name, wkt] of projections) {
+    if (!wkt || !createCoordinateTransform({ wkt }).success) throw new Error(`Shapefile 投影定义无效：${name}.prj`)
+  }
   const parsed = (await shp(input)) as ShpResult | ShpResult[]
   const collections = Array.isArray(parsed) ? parsed : [parsed]
   
   const layers: ShapefileLayerResult[] = collections.map((collection, index) => {
-    const crsInfo = extractCrsInfo(collection)
+    const projection = projections.get((collection.fileName ?? '').replaceAll('\\', '/').toLowerCase())
+    const crsInfo = projection ? projectionCrsInfo(projection) : extractCrsInfo(collection)
     const warnings: ShapefileLayerResult['warnings'] = []
     
-    const hasPrj = collection.crs !== undefined
+    const hasPrj = projection !== undefined || collection.crs !== undefined
     const fileName = collection.fileName ?? `layer-${index + 1}`
     
     if (!hasPrj) {
@@ -63,31 +70,48 @@ export async function importShapefileZipLayers(
 export async function importShapefile(
   input: ArrayBuffer | ArrayBufferView
 ): Promise<VectorImportResult> {
-  const parsed = (await shp(input)) as ShpResult | ShpResult[]
-  const collections = Array.isArray(parsed) ? parsed : [parsed]
-  const sourceLayers = collections.map((collection, index) => collection.fileName ?? `layer-${index + 1}`)
-  
-  const crsInfo = extractCrsInfo(collections[0])
+  const result = await importShapefileZipLayers(input)
+  const sourceLayers = result.layers.map(layer => layer.name)
   const warnings: VectorImportResult['warnings'] = []
   
-  if (collections.length > 1) {
+  if (result.layers.length > 1) {
     warnings.push({ 
       code: 'shapefile.multipleLayers', 
       message: 'ZIP 中包含多个 Shapefile，已合并为一个要素集合。',
-      count: collections.length
+      count: result.layers.length
     })
   }
   
   return {
     featureCollection: {
       type: 'FeatureCollection',
-      features: collections.flatMap((collection) => collection.features)
+      features: result.layers.flatMap(layer => layer.featureCollection.features)
     },
     sourceLayers,
-    crs: crsInfo.output,
-    sourceCrs: crsInfo.original,
-    warnings
+    crs: result.layers[0]?.crs,
+    sourceCrs: result.layers[0]?.sourceCrs,
+    warnings: [...result.layers.flatMap(layer => layer.warnings), ...warnings]
   }
+}
+
+/** shpjs converts coordinates but omits PRJ metadata; read only projection entries. */
+function readProjectionFiles(input: ArrayBuffer | ArrayBufferView): Map<string, string> {
+  const bytes = input instanceof ArrayBuffer ? new Uint8Array(input) : new Uint8Array(input.buffer, input.byteOffset, input.byteLength)
+  if (bytes[0] !== 0x50 || bytes[1] !== 0x4b) return new Map()
+  const entries = unzipSync(bytes, { filter: entry => {
+    if (!entry.name.toLowerCase().endsWith('.prj')) return false
+    if (entry.originalSize > 65536) throw new Error('Shapefile 投影定义过大')
+    return true
+  } })
+  return new Map(Object.entries(entries).map(([name, content]) => [
+    name.replaceAll('\\', '/').slice(0, -4).toLowerCase(), new TextDecoder().decode(content).trim()
+  ]))
+}
+
+function projectionCrsInfo(wkt: string): { output: CrsInfo; original: CrsInfo } {
+  // Only the root CRS authority, not an ellipsoid/unit/nested geographic authority.
+  const code = wkt.match(/(?:AUTHORITY|ID)\s*\[\s*"EPSG"\s*,\s*"?(\d+)"?\s*\]\s*\]\s*$/i)?.[1]
+  return { output: { code: 'EPSG:4326' }, original: { ...(code ? { code: `EPSG:${code}` } : {}), wkt } }
 }
 
 function extractCrsInfo(collection: ShpResult | undefined): { 
