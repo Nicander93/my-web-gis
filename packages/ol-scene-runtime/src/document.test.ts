@@ -17,6 +17,21 @@ function document(): SceneDocument {
 }
 
 describe('v3 OL document factory', () => {
+  it('projects geographic resources into a metre-based view without changing saved coordinates', async () => {
+    const input = document()
+    const resource = input.resources.data
+    if (resource.type !== 'geojson' || !resource.data) throw new Error('Expected inline GeoJSON')
+    resource.data.features[0].geometry = { type: 'Point', coordinates: [116.3975, 39.9085] }
+    const result = await createOlDocumentLayers(input)
+    const layer = result.getLayer('first') as VectorLayer
+    const point = layer.getSource()!.getFeatures()[0].getGeometry() as Point
+    const [x, y] = point.getCoordinates()
+    const radians = Math.PI / 180, radius = 6378137
+    expect(x).toBeCloseTo(radius * 116.3975 * radians, 2)
+    expect(y).toBeCloseTo(radius * Math.log(Math.tan(Math.PI / 4 + 39.9085 * radians / 2)), 2)
+    expect(result.getDocument()).toEqual(input)
+    result.dispose()
+  })
   it('requires explicit authenticated tile handling and cleans installed requests on failure', async () => {
     const input = document()
     input.resources.service = { type: 'wms', url: 'https://example.test/wms', version: '1.3.0', layerNames: ['roads'], authMode: 'runtime', authentication: { mode: 'bearer', credential: 'service' } }

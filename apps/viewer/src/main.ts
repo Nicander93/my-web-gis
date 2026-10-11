@@ -1,11 +1,10 @@
-import { OlDocumentRuntime } from '@desktop-webgis/ol-scene-runtime'
+import { OlDocumentRuntime, toOlLayerStyle } from '@desktop-webgis/ol-scene-runtime'
+import { buildLegendItems } from '@desktop-webgis/ol-style'
 import { bindSceneRuntime, SceneController } from '@desktop-webgis/scene-core'
 import {
   type PopupField,
   type SceneColor,
-  type SceneLayerStyle,
   type SceneDocument,
-  type SceneSymbol,
   type SceneNode
 } from '@desktop-webgis/scene-schema'
 import Overlay from 'ol/Overlay'
@@ -159,7 +158,7 @@ function requireElement<T extends HTMLElement>(id: string): T {
 }
 
 function renderLayerSwitcher(manifest: SceneDocument, setVisible: (layerId: string, visible: boolean) => void): void {
-  if (!manifest.widgets?.layerSwitcher) return
+  if (manifest.widgets?.layerSwitcher === false) return
   layerPanel.hidden = false
   layerList.replaceChildren(
     ...manifest.nodes.filter(node => node.type === 'tile' || node.type === 'vector' || node.type === 'group' && node.scope !== '3d').reverse().map((layer) => {
@@ -192,61 +191,30 @@ function colorToCss(color: SceneColor | undefined, fallback = 'transparent'): st
   return `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`
 }
 
-function primarySymbol(style: SceneLayerStyle): SceneSymbol {
-  if (style.mode === 'single') return style.symbol
-  if (style.mode === 'categorized') return style.categories[0]?.symbol ?? style.fallback
-  return style.breaks[0]?.symbol ?? style.fallback
-}
-
-function symbolKind(symbol: SceneSymbol): 'point' | 'line' | 'polygon' {
-  if (symbol.type === 'circle') return 'point'
-  if (symbol.type === 'solid' && 'width' in symbol && !('fill' in symbol)) return 'line'
-  if (symbol.type === 'mixed') return symbol.point ? 'point' : symbol.line ? 'line' : 'polygon'
-  return 'polygon'
-}
-
-function applyLegendSymbol(element: HTMLSpanElement, symbol: SceneSymbol): void {
-  const kind = symbolKind(symbol)
-  element.className = `legend-symbol legend-symbol--${kind}`
-  if (symbol.type === 'circle') {
-    element.style.background = colorToCss(symbol.fill, '#94a3b8')
-    element.style.borderColor = colorToCss(symbol.stroke, 'transparent')
-    return
-  }
-  if (symbol.type === 'solid' && 'width' in symbol && !('fill' in symbol)) {
-    element.style.background = colorToCss(symbol.color, '#64748b')
-    element.style.height = `${Math.max(2, symbol.width)}px`
-    return
-  }
-  if (symbol.type === 'solid') {
-    if ('width' in symbol) {
-      element.style.background = colorToCss(symbol.color, '#64748b')
-      element.style.height = `${Math.max(2, symbol.width)}px`
-    } else {
-      element.style.background = colorToCss(symbol.fill, '#94a3b8')
-      element.style.borderColor = colorToCss(symbol.stroke, 'transparent')
-    }
-    return
-  }
-  const nested = symbol.point ?? symbol.polygon ?? symbol.line
-  if (nested) applyLegendSymbol(element, nested)
-}
-
 function renderLegend(manifest: SceneDocument): void {
-  if (!manifest.widgets?.legend) return
+  if (manifest.widgets?.legend === false) return
   const vectorLayers = mapNodes(manifest).filter((layer): layer is VectorNode => layer.type === 'vector')
   if (vectorLayers.length === 0) return
   legendPanel.hidden = false
   legendList.replaceChildren(
     ...vectorLayers.map((layer) => {
-      const row = document.createElement('div')
-      row.className = 'legend-row'
-      const symbol = document.createElement('span')
-      applyLegendSymbol(symbol, primarySymbol(layer.style))
-      const name = document.createElement('span')
-      name.textContent = layer.name
-      row.append(symbol, name)
-      return row
+      const group = document.createElement('section')
+      group.className = 'legend-layer'
+      const title = document.createElement('h3')
+      title.textContent = layer.name
+      group.append(title)
+      for (const item of buildLegendItems(toOlLayerStyle(layer.style))) {
+        const row = document.createElement('div')
+        row.className = 'legend-row'
+        const symbol = document.createElement('span')
+        symbol.className = `legend-symbol legend-symbol--${item.kind}`
+        symbol.style.background = colorToCss(item.color)
+        const label = document.createElement('span')
+        label.textContent = item.label
+        row.append(symbol, label)
+        group.append(row)
+      }
+      return group
     })
   )
 }
