@@ -167,8 +167,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }),
   ensureStyleDraft: (layerId, applied) => {
     const existing = get().sessions[layerId]?.styleDraft
-    if (existing) return existing
-    const draft = createDraftFromApplied(applied)
+    if (existing && (existing.dirty || JSON.stringify(existing.style) === JSON.stringify(applied))) return existing
+    const draft = { ...createDraftFromApplied(applied), ...(existing ? { colorRampId: existing.colorRampId } : {}) }
     set((prev) => ({
       sessions: {
         ...prev.sessions,
