@@ -601,7 +601,9 @@ export function AttributeTable({
                               onChange={(e) => setEditValue(e.target.value)}
                               onBlur={commitEdit}
                               onKeyDown={(e) => {
+                                if (e.nativeEvent.isComposing) return
                                 if (e.key === 'Enter') {
+                                  e.preventDefault()
                                   e.stopPropagation()
                                   commitEdit()
                                 }

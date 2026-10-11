@@ -1,8 +1,6 @@
 import { EditorDialog } from '@/components/ui/EditorDialog'
 import type { HelpDialogPage } from '@/app/commands/help.commands'
 import { version } from '../../../package.json'
-import { useProjectStore } from '@/stores/project.store'
-import { getProjectType } from '@/services/project-type'
 
 interface HelpDialogProps {
   page: HelpDialogPage
@@ -10,7 +8,6 @@ interface HelpDialogProps {
 }
 
 export function HelpDialog({ page, onClose }: HelpDialogProps) {
-  const city = useProjectStore(state => getProjectType(state.project) === '3d')
   return <EditorDialog title={page === 'about' ? '关于 Desktop WebGIS' : '操作帮助'} onClose={onClose}>
     <div className="dialog-body help-content">
       {page === 'about' ? <p>Desktop WebGIS · {version}</p> : <>
@@ -19,8 +16,8 @@ export function HelpDialog({ page, onClose }: HelpDialogProps) {
           <dt>打开项目</dt><dd><kbd>Ctrl + O</kbd></dd>
           <dt>保存项目</dt><dd><kbd>Ctrl + S</kbd></dd>
           <dt>另存为</dt><dd><kbd>Ctrl + Shift + S</kbd></dd>
-          <dt>撤销</dt><dd>{city ? <kbd>Ctrl + Z</kbd> : '编辑 → 撤销'}</dd>
-          <dt>重做</dt><dd>{city ? <kbd>Ctrl + Shift + Z</kbd> : '编辑 → 重做'}</dd>
+          <dt>撤销</dt><dd><kbd>Ctrl + Z</kbd></dd>
+          <dt>重做</dt><dd><kbd>Ctrl + Shift + Z</kbd></dd>
         </dl>
         <details><summary>目标与数据范围</summary>
           <p>编辑目标、属性表和检查器分别绑定对象，浏览其他图层不会自动切换它们。</p>

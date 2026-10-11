@@ -155,6 +155,11 @@ test('popup fields are safe, independent of map selection, and close when filter
   await clickFeature(0)
   await expect(popup).toBeVisible()
   await expect(popup.locator('strong')).toHaveText('Point 0')
+  await popup.getByRole('button', { name: '关闭属性弹窗' }).focus()
+  await page.keyboard.press('Escape')
+  await expect(popup).toBeHidden()
+  await clickFeature(0)
+  await expect(popup).toBeVisible()
   await popup.getByRole('button', { name: '关闭属性弹窗' }).click()
   await expect(popup).toBeHidden()
   await clickFeature(0)
@@ -216,6 +221,85 @@ test('popup fields are safe, independent of map selection, and close when filter
   await page.getByRole('button', { name: '开始编辑', exact: true }).click()
   await page.getByRole('button', { name: '绘制要素', exact: true }).click()
   await expect(popup).toBeHidden()
+})
+
+test('table keyboard keeps input history local, commits outside IME, and locates with Enter', async ({ page }) => {
+  await page.getByRole('button', { name: '属性表', exact: true }).click()
+  await page.getByRole('tab', { name: '编辑', exact: true }).click()
+  await page.getByRole('button', { name: '开始编辑', exact: true }).click()
+  const read = () => page.evaluate(async () => {
+    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const state = useProjectStore.getState(), layer = state.project.layers.find(item => item.id === state.selectedLayerId)!
+    return (state.featuresByDataset[layer.datasetId] ?? []).map(item => ({ id: item.id, name: item.properties.name }))
+  })
+  const baseline = await read()
+  const row = page.locator('.table-scroll tbody tr[data-feature-id="point-0"]')
+  await row.locator('td').last().dblclick()
+  const editor = page.locator('.cell-editor')
+  await editor.fill('Draft')
+  await editor.press('Delete')
+  await editor.press('Backspace')
+  await editor.press('Control+z')
+  expect(await read()).toEqual(baseline)
+  await editor.fill('已修改')
+  await editor.dispatchEvent('keydown', { key: 'Enter', code: 'Enter', isComposing: true, bubbles: true })
+  await expect(editor).toBeVisible()
+  expect(await read()).toEqual(baseline)
+  await editor.press('Enter')
+  await expect(editor).toHaveCount(0)
+  await expect.poll(read).toContainEqual({ id: 'point-0', name: '已修改' })
+  const search = page.getByRole('searchbox', { name: '表内搜索' })
+  await search.fill('已修改')
+  await search.press('Delete')
+  await search.press('Backspace')
+  await search.press('Control+z')
+  await expect.poll(read).toContainEqual({ id: 'point-0', name: '已修改' })
+  await search.fill('')
+  await row.focus()
+  await page.keyboard.press('Control+z')
+  await expect.poll(read).toEqual(baseline)
+  await page.keyboard.press('Control+Shift+z')
+  await expect.poll(read).toContainEqual({ id: 'point-0', name: '已修改' })
+  const before = (await mapState(page)).center
+  await row.focus()
+  await page.keyboard.press('Enter')
+  await expect.poll(async () => (await mapState(page)).center).not.toEqual(before)
+  await row.locator('td').last().dblclick()
+  await editor.fill('不应提交')
+  await editor.press('Escape')
+  await expect(editor).toHaveCount(0)
+  await expect.poll(read).toContainEqual({ id: 'point-0', name: '已修改' })
+})
+
+test('escape from a focused map cancels the unfinished drawing without changing data', async ({ page }) => {
+  await page.getByRole('tab', { name: '编辑', exact: true }).click()
+  await page.getByRole('button', { name: '开始编辑', exact: true }).click()
+  await page.evaluate(async () => {
+    const { createProjectSceneController } = await import('/src/features/scene/project-scene-controller.ts')
+    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const { setActiveEditTool } = await import('/src/features/map/map-runtime-host.ts')
+    const controller = createProjectSceneController()
+    try { controller.transaction('Line drawing fixture', draft => {
+      const node = draft.nodes.find(item => item.id === useProjectStore.getState().selectedLayerId)
+      if (node?.type === 'vector') node.style = { mode: 'single', symbol: { type: 'solid', color: { r: 0, g: 80, b: 0, a: 1 }, width: 2 } }
+    }) } finally { controller.dispose() }
+    setActiveEditTool('draw-line')
+  })
+  const before = await mapState(page)
+  const sketchCount = () => page.evaluate(async () => {
+    const { getMapRuntime } = await import('/src/features/map/map-runtime-host.ts')
+    const draw = getMapRuntime()!.getMap().getInteractions().getArray().find(item => 'getOverlay' in item)
+    return draw && 'getOverlay' in draw && typeof draw.getOverlay === 'function'
+      ? draw.getOverlay().getSource().getFeatures().length : -1
+  })
+  const viewport = (await page.locator('.ol-viewport').boundingBox())!
+  await page.mouse.click(viewport.x + 100, viewport.y + 100)
+  await page.mouse.move(viewport.x + 160, viewport.y + 130)
+  await expect.poll(sketchCount).toBeGreaterThan(0)
+  await page.getByRole('region', { name: '地图工作区', exact: true }).focus()
+  await page.keyboard.press('Escape')
+  await expect.poll(async () => (await mapState(page)).positions.length).toBe(before.positions.length)
+  await expect.poll(sketchCount).toBe(0)
 })
 
 test('public scene display edits preserve selection and table through toolbar undo and redo', async ({ page }) => {

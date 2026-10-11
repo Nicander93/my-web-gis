@@ -77,7 +77,12 @@ export function MapPopup() {
   }, [feature, definition, activeTool, close])
 
   return createPortal(<div className="map-popup" role="dialog" aria-label="要素属性弹窗" hidden={!target || !feature || !definition}
-    onPointerDown={event => event.stopPropagation()}>
+    onPointerDown={event => event.stopPropagation()}
+    onKeyDown={event => {
+      if (event.key === 'Escape' && !event.nativeEvent.isComposing) {
+        event.preventDefault(); event.stopPropagation(); close()
+      }
+    }}>
     <header><strong>{definition?.titleField && feature ? displayValue(feature.properties[definition.titleField]) : layer?.name}</strong>
       <button type="button" aria-label="关闭属性弹窗" onClick={close}>×</button></header>
     <dl>{definition?.fields.map(field => <div key={field.field}>
