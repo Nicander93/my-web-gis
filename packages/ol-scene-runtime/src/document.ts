@@ -155,7 +155,10 @@ export async function createOlDocumentLayers(input: unknown, options: OlDocument
           if (ids.has(key)) throw new Error(`Duplicate feature identity in ${node.resource}: ${key}`)
           ids.add(key); feature.id = key
         })
-        const features = format.readFeatures(data, { dataProjection: source.dataProjection ?? 'EPSG:4326' }) as Feature<Geometry>[]
+        const features = format.readFeatures(data, {
+          dataProjection: source.dataProjection ?? 'EPSG:4326',
+          featureProjection: view.getProjection()
+        }) as Feature<Geometry>[]
         features.forEach((feature, index) => {
           const id = portableIds[index]
           if (id !== undefined) featureIds.set(feature, id)

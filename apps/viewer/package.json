@@ -8,14 +8,15 @@
     "dev": "vite"
   },
   "dependencies": {
-    "@desktop-webgis/ol-selection": "workspace:*",
-    "@desktop-webgis/scene-core": "workspace:*",
-    "@desktop-webgis/ol-scene-runtime": "workspace:*",
-    "@desktop-webgis/scene-schema": "workspace:*",
-    "ol": "^10.6.1",
-    "cesium": "^1.145.0",
     "@desktop-webgis/cesium-scene-runtime": "workspace:*",
-    "@desktop-webgis/cesium-scene-schema": "workspace:*"
+    "@desktop-webgis/cesium-scene-schema": "workspace:*",
+    "@desktop-webgis/ol-scene-runtime": "workspace:*",
+    "@desktop-webgis/ol-selection": "workspace:*",
+    "@desktop-webgis/ol-style": "workspace:*",
+    "@desktop-webgis/scene-core": "workspace:*",
+    "@desktop-webgis/scene-schema": "workspace:*",
+    "cesium": "^1.145.0",
+    "ol": "^10.6.1"
   },
   "devDependencies": {
     "typescript": "^5.9.2",
