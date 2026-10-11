@@ -73,7 +73,7 @@ export function Inspector() {
     if (applied) {
       ensureStyleDraft(selectedLayerId, applied)
     }
-  }, [selectedLayerId, getNormalizedLayerStyle, ensureStyleDraft, flags.style])
+  }, [selectedLayerId, selectedLayer?.style, getNormalizedLayerStyle, ensureStyleDraft, flags.style])
 
   // Service tile layers have no local attributes — keep users on the layer tab.
   useEffect(() => {

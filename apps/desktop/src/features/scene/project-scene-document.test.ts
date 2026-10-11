@@ -3,6 +3,7 @@ import { createDefaultLayerStyle, createProject, parseProjectSnapshot, serialize
 import { createCityScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
 import { parseSceneDocument } from '@desktop-webgis/scene-schema'
 import { createProjectFromSceneDocument, createProjectSceneDocument, createProjectSceneProjection } from './project-scene-document'
+import { createCategorizedStyle, createGraduatedStyle } from '@desktop-webgis/ol-style'
 
 function snapshot(): ProjectSnapshot {
   const project = createProject('Complete content')
@@ -32,6 +33,17 @@ function snapshot(): ProjectSnapshot {
 }
 
 describe('full project scene content', () => {
+  it('omits absent optional style fields without hiding invalid numeric values', () => {
+    const input = snapshot()
+    const base = createDefaultLayerStyle('point').symbol
+    input.project.layers[0].style = createCategorizedStyle('value', [{ value: 1, symbol: base, label: undefined }], base)
+    input.project.layers[1].style = createGraduatedStyle('value', 'equal-interval', [{ value: 2, symbol: base, label: undefined }], base)
+    const document = createProjectSceneDocument(input)
+    expect(parseSceneDocument(JSON.parse(JSON.stringify(document)))).toEqual(document)
+    expect(document.nodes.find(node => node.id === 'a')).toMatchObject({ style: { mode: 'categorized' } })
+    input.project.layers[1].style = createGraduatedStyle('value', 'equal-interval', [{ value: NaN, symbol: base }], base)
+    expect(() => createProjectSceneDocument(input)).toThrow()
+  })
   it('retains view constraints and vector interaction when live navigation changes', () => {
     const document = createProjectSceneDocument(snapshot())
     const view = document.views.map

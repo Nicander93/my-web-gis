@@ -54,6 +54,20 @@ function addLayer(datasetId: string, name: string, field: string) {
   return useProjectStore.getState().selectedLayerId!
 }
 
+it('refreshes clean style drafts from applied history while preserving dirty drafts', () => {
+  const id = addLayer('draft-history', 'Draft history', 'name')
+  const original = useProjectStore.getState().getNormalizedLayerStyle(id)!
+  const session = useSessionStore.getState()
+  const initial = session.ensureStyleDraft(id, original)
+  const next = { ...original, label: { field: 'name' } }
+  expect(session.ensureStyleDraft(id, next).style).toEqual(next)
+  session.patchStyleDraft(id, { style: original, dirty: true })
+  const dirty = useSessionStore.getState().sessions[id].styleDraft!
+  expect(session.ensureStyleDraft(id, next)).toBe(dirty)
+  session.setStyleDraft(id, initial)
+  expect(session.ensureStyleDraft(id, next).dirty).toBe(false)
+})
+
 beforeEach(() => {
   unmountMapRuntime()
   vi.clearAllMocks()

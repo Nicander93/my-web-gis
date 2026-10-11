@@ -5,8 +5,13 @@ import { toWmsSceneSource, toWmtsSceneSource } from './compile-project'
 import { getProjectType } from '../../services/project-type'
 
 /** Optional fields on typed project definitions are absent in the JSON protocol. */
-function omitUndefined<T extends object>(value: T): T {
-  return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as T
+function omitUndefined<T>(value: T): T {
+  if (Array.isArray(value)) return value.map(omitUndefined) as T
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)
+      .map(([key, entry]) => [key, omitUndefined(entry)])) as T
+  }
+  return value
 }
 
 function allocate(id: string, used: Set<string>): string {
@@ -103,7 +108,7 @@ export function createProjectSceneProjection(snapshot: ProjectSnapshot): Project
     if (!dataset) throw new Error(`图层 “${id}” 的数据资源不存在`)
     const base = { id: layer.id, name: layer.name, resource: layer.datasetId, visible: layer.visible, opacity: layer.opacity, locked: !layer.editable, ...(parentId ? { parentId } : {}),
       ...(layer.minZoom === undefined ? {} : { minZoom: layer.minZoom }), ...(layer.maxZoom === undefined ? {} : { maxZoom: layer.maxZoom }) }
-    if (dataset.kind === 'vector' || dataset.kind === 'wfs') nodes.push({ ...base, type: 'vector', style: isLegacyStyle(layer.style) ? migrateLegacyStyle(layer.style) : structuredClone(layer.style),
+    if (dataset.kind === 'vector' || dataset.kind === 'wfs') nodes.push({ ...base, type: 'vector', style: omitUndefined(isLegacyStyle(layer.style) ? migrateLegacyStyle(layer.style) : structuredClone(layer.style)),
       ...(layer.interaction === undefined ? {} : { interaction: structuredClone(layer.interaction) }),
       ...(layer.filter ? { filter: layer.filter.map(condition => omitUndefined(structuredClone(condition))) as Extract<SceneNode, { type: 'vector' }>['filter'] } : {}) })
     else nodes.push({ ...base, type: 'tile' })
