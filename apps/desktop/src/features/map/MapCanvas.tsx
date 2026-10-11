@@ -114,6 +114,7 @@ export function MapCanvas({
       className="map-canvas"
       style={{ left: leftOffset, right: rightOffset, bottom: bottomOffset }}
       aria-label="地图工作区"
+      tabIndex={0}
       data-map-runtime={runtimeMounted ? 'mounted' : 'pending'}
       data-selection-runtime={selectionMounted ? 'mounted' : 'pending'}
       data-tool-runtime={toolMounted ? 'mounted' : 'pending'}

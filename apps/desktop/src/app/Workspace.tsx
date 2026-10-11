@@ -21,6 +21,7 @@ import { useWorkspaceStore } from '@/stores/workspace.store'
 import { useWorkbenchStore } from '@/stores/workbench.store'
 import { cancelMapOperation } from '@/features/map/map-runtime-host'
 import { emitCommandStatus } from './commands/status'
+import { editCommands } from './commands/edit.commands'
 
 /** Reserve visible map space for open panels so navigation stays reachable. */
 export function Workspace({
@@ -46,16 +47,11 @@ export function Workspace({
 
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent): void {
-      if (
-        event.key === 'Escape' &&
-        !event.defaultPrevented &&
-        !(
-          event.target instanceof HTMLElement &&
-          event.target.closest(
-            'input, textarea, select, [role="dialog"], [role="menu"], [role="region"]'
-          )
-        )
-      ) {
+      if (event.defaultPrevented || event.isComposing ||
+        (event.target instanceof HTMLElement && event.target.closest(
+          'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="dialog"], [role="menu"]'
+        ))) return
+      if (event.key === 'Escape') {
         if (cancelMapOperation()) {
           event.preventDefault()
           emitCommandStatus('已取消当前操作；已完成的修改可通过撤销恢复')
@@ -63,6 +59,12 @@ export function Workspace({
         return
       }
       const mod = event.ctrlKey || event.metaKey
+      if (mod && event.key.toLowerCase() === 'z' && !event.altKey) {
+        event.preventDefault()
+        if (event.shiftKey) editCommands.redo()
+        else editCommands.undo()
+        return
+      }
       if (!mod || !event.shiftKey) return
       const key = event.key.toLowerCase()
       if (key === 'l') {
