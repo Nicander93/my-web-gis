@@ -31,7 +31,9 @@ main tip：`683344c`（PR #42 合入后）。
 
 ## 3. 下一步（按顺序）
 
-### 3.1 同渲冻结清理（下一刀，尚未开工）
+### 3.1 同渲冻结清理
+
+2026-10-11：已在 `codex/freeze-co-render-cleanup` 实现并验证，等待产品勾选。调用关系、KEEP／REMOVE、历史文件限制及验收记录见 [清理交付记录](freeze-co-render-cleanup.md)。本节下方保留该刀的原始验收范围。
 
 从当前 main 开分支，例如 `chore/freeze-co-render-cleanup`。产品勾选项已经定好：
 

@@ -1,5 +1,7 @@
 # @desktop-webgis/cesium-scene-runtime
 
+当前作为应用内部运行时分层维护，暂不发布公共包。二三维同渲已冻结：二维 `tile`／`vector` 在完整文档里保留，但不在三维工作区显示；三维原生 GeoJSON、影像、模型和 Tileset 继续支持。
+
 组合图层、Popup、编辑器和基础特效的场景运行时，无 React、Zustand、Tauri、OpenLayers 依赖。编辑器和静态 Viewer 共用。
 
 ```ts

@@ -23,7 +23,7 @@ describe('v3 Cesium projection', () => {
     input.nodes[0].visible = true; input.nodes[0].locked = false
     expect(projectCesiumDocument(input).scene.nodes[0]).toMatchObject({ visible: true, locked: false })
   })
-  it('projects shared XYZ tiles and GeoJSON vectors into the city scene', () => {
+  it('retains shared XYZ tiles and GeoJSON vectors without rendering them in the city scene', () => {
     const input = document()
     input.resources.base = { type: 'xyz', url: 'https://example.test/{z}/{x}/{y}.png', attribution: 'Example' }
     input.resources.points = { type: 'geojson', data: { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { name: 'A' }, geometry: { type: 'Point', coordinates: [116.4, 39.9] } }] } }
@@ -33,16 +33,10 @@ describe('v3 Cesium projection', () => {
     )
     const before = JSON.stringify(input)
     const result = projectCesiumDocument(input)
-    expect(result.issues.filter(issue => issue.code === 'cesium.unsupported')).toEqual([])
+    expect(result.issues.filter(issue => issue.code === 'cesium.unsupported').map(issue => issue.path)).toEqual(['$.nodes.map-base', '$.nodes.points'])
     expect(result.document).toEqual(input)
     expect(JSON.stringify(input)).toBe(before)
-    expect(result.scene.nodes).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'imagery', id: 'map-base', url: 'https://example.test/{z}/{x}/{y}.png', attribution: 'Example', visible: true }),
-      expect.objectContaining({ type: 'geojson', id: 'points', asset: 'points', color: '#ff0000', visible: true }),
-      expect.objectContaining({ type: '3dtiles', id: 'blocks' })
-    ]))
-    expect(result.scene.assets.points).toMatchObject({ type: 'geojson' })
-    expect(result.scene.assets.points.data).toBeDefined()
+    expect(result.scene.nodes.map(node => node.id)).toEqual(['blocks'])
   })
 
   it('keeps unsupported tile providers in the document without projecting them', () => {
