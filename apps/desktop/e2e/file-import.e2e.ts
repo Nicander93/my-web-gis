@@ -93,3 +93,78 @@ test('CSV preview identifies invalid coordinates and imports only valid records'
   await expect(table).not.toContainText('经度无效')
   await page.screenshot({ path: info.outputPath('csv-valid-records.png') })
 })
+
+test('GeoJSON rejects malformed input and preserves duplicate source IDs and null properties', async ({ page }) => {
+  await page.locator('input[type=file]').setInputFiles({ name: 'broken.geojson', mimeType: 'application/json', buffer: Buffer.from('{broken') })
+  const dialog = page.getByRole('dialog', { name: '添加数据', exact: true })
+  await expect(dialog.locator('.import-error')).toBeVisible()
+  await expect(page.locator('.layer-name-button')).toHaveCount(0)
+  const fixture = fileURLToPath(new URL('../../../examples/phase-1/features-with-issues.geojson', import.meta.url))
+  await page.locator('input[type=file]').setInputFiles(fixture)
+  await expect(dialog).toContainText('重复')
+  await dialog.getByRole('button', { name: '确认导入', exact: true }).click()
+  const features = await page.evaluate(async () => {
+    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const state = useProjectStore.getState()
+    return state.featuresByDataset[state.project.layers[0].datasetId]
+  })
+  expect(features).toHaveLength(5)
+  expect(new Set(features.map(feature => feature.id)).size).toBe(5)
+  expect(features.filter(feature => feature.properties.id === 'duplicate-1')).toHaveLength(2)
+  expect(features.find(feature => feature.properties.id === 'null-name')!.properties.name).toBeNull()
+  expect(features.find(feature => feature.properties.id === 'missing-name')!.properties).not.toHaveProperty('name')
+  await page.locator('.layer-name-button').click()
+  await page.getByRole('tab', { name: '地图', exact: true }).click()
+  await page.getByRole('button', { name: '属性表', exact: true }).click()
+  await expect(page.locator('.table-scroll tbody tr')).toHaveCount(5)
+  await expect(page.locator('.table-scroll')).toContainText('第一个重复ID')
+  await expect(page.locator('.table-scroll')).toContainText('第二个重复ID')
+})
+
+test('DXF requires coordinate configuration and retains curve approximation warnings', async ({ page }, info) => {
+  const fixture = fileURLToPath(new URL('../../../examples/phase-1/basic-entities.dxf', import.meta.url))
+  await page.locator('input[type=file]').setInputFiles(fixture)
+  const dialog = page.getByRole('dialog', { name: '添加数据', exact: true })
+  await expect(dialog).toContainText('配置 DXF 导入')
+  await dialog.locator('.crs-select').selectOption('EPSG:3857')
+  await dialog.getByRole('button', { name: '取消全选', exact: true }).click()
+  await expect(dialog.getByRole('button', { name: '导入 0 个图层', exact: true })).toBeDisabled()
+  await dialog.getByRole('checkbox', { name: 'Geometry', exact: true }).check()
+  await dialog.getByRole('button', { name: '导入 1 个图层', exact: true }).click()
+  await expect(dialog).toContainText('2 个圆弧实体已近似为 64 段折线')
+  await dialog.getByRole('button', { name: '确认导入', exact: true }).click()
+  const features = await page.evaluate(async () => {
+    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const state = useProjectStore.getState()
+    return state.featuresByDataset[state.project.layers[0].datasetId]
+  })
+  expect(features).toHaveLength(5)
+  expect(features.map(feature => feature.properties.entityType)).toEqual(['POINT', 'LINE', 'LWPOLYLINE', 'CIRCLE', 'ARC'])
+  expect(features[0].metadata?.sourceCrs).toBe('EPSG:3857')
+  expect(features[0].geometry).toMatchObject({ coordinates: [expect.closeTo(0.000898315, 8), expect.closeTo(0.001796631, 8), 0] })
+  await page.locator('.layer-name-button').click()
+  await page.getByRole('tab', { name: '地图', exact: true }).click()
+  await page.getByRole('button', { name: '属性表', exact: true }).click()
+  await expect(page.locator('.table-scroll tbody tr')).toHaveCount(5)
+  await expect(page.locator('.table-scroll')).toContainText('LWPOLYLINE')
+  await page.screenshot({ path: info.outputPath('dxf-basic-entities.png') })
+})
+
+test('DXF reports skipped bulged polylines before confirming supported entities', async ({ page }) => {
+  const content = ['0', 'SECTION', '2', 'ENTITIES', '0', 'POINT', '8', 'Geometry', '10', '100', '20', '200',
+    '0', 'LWPOLYLINE', '8', 'Geometry', '90', '2', '70', '0', '10', '0', '20', '0', '42', '0.5',
+    '10', '100', '20', '100', '0', 'ENDSEC', '0', 'EOF'].join('\n')
+  await page.locator('input[type=file]').setInputFiles({ name: 'bulged.dxf', mimeType: 'application/dxf', buffer: Buffer.from(content) })
+  const dialog = page.getByRole('dialog', { name: '添加数据', exact: true })
+  await dialog.locator('.crs-select').selectOption('EPSG:3857')
+  await dialog.getByRole('button', { name: '导入 1 个图层', exact: true }).click()
+  await expect(dialog).toContainText('跳过了 1 个不支持的 LWPOLYLINE 实体')
+  await dialog.getByRole('button', { name: '确认导入', exact: true }).click()
+  const features = await page.evaluate(async () => {
+    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const state = useProjectStore.getState()
+    return state.featuresByDataset[state.project.layers[0].datasetId]
+  })
+  expect(features).toHaveLength(1)
+  expect(features[0].properties.entityType).toBe('POINT')
+})
