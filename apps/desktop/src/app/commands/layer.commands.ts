@@ -10,6 +10,7 @@ import {
   zoomMapToLayer
 } from '@/features/map/map-runtime-host'
 import { refreshWfsLayer } from '@/services/wfs-commands'
+import { createProjectSceneController } from '@/features/scene/project-scene-controller'
 import {
   capabilitiesForDataset,
   cloneValue,
@@ -134,6 +135,16 @@ function openInspector(id: string, tab: 'layer' | 'style' | 'label'): void {
 
 /** 图层相关命令，供 Header 按钮与 Layer Context Menu 共用。 */
 export const layerCommands = {
+  setSelectable(layerId: string, selectable: boolean): void {
+    if (!getLayerCapabilities(layerId).canAttributeTable) return
+    const controller = createProjectSceneController()
+    try {
+      controller.transaction('设置地图可选择', draft => {
+        const node = draft.nodes.find(node => node.id === layerId)
+        if (node?.type === 'vector') node.interaction = { ...node.interaction, selectable }
+      })
+    } finally { controller.dispose() }
+  },
   openProperties(layerId: string): void {
     layerCommands.properties(layerId)
   },

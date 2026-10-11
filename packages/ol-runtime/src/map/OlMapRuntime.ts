@@ -38,6 +38,8 @@ export interface PointerInfo {
   scaleText: string
 }
 
+const GIS_SELECTABLE_KEY = 'gis.selectable'
+
 export class OlMapRuntime {
   readonly registry = new OlLayerRegistry()
   private map: OlMap | null = null
@@ -152,6 +154,7 @@ export class OlMapRuntime {
           if (node.type !== 'vector' && node.type !== 'tile') continue
           const layer = mounted.getLayer(node.id)
           if (!layer) continue
+          if (node.type === 'vector') layer.set(GIS_SELECTABLE_KEY, node.interaction?.selectable !== false)
           const resource = document.resources[node.resource]
           if ((resource.type === 'wms' || resource.type === 'wmts') && resource.bboxWgs84) layer.set(GIS_WMS_EXTENT_KEY, [...resource.bboxWgs84])
           if (node.type !== 'tile' || node.role !== 'basemap') this.registry.register(node.id, node.resource, layer)
@@ -185,6 +188,11 @@ export class OlMapRuntime {
 
   isFeatureIncluded(layerId: string, feature: Feature<Geometry>): boolean {
     return this.documentRuntime?.isFeatureIncluded(layerId, feature) ?? true
+  }
+
+  /** Restricts map picking only; table selection and location remain host actions. */
+  isLayerSelectable(layerId: string): boolean {
+    return this.registry.getVector(layerId)?.get(GIS_SELECTABLE_KEY) !== false
   }
 
   isLayerVisible(layerId: string): boolean {

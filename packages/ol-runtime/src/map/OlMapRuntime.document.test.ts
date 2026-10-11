@@ -41,6 +41,26 @@ function fixture() {
 }
 
 describe('Desktop portable OL document synchronization', () => {
+  it('changes map picking policy without replacing features or dropping popup configuration', async () => {
+    const { runtime, document, features } = fixture()
+    await runtime.syncDocument(document, { data: features })
+    const layer = runtime.registry.getVector('first')!, source = layer.getSource()
+    expect(runtime.isLayerSelectable('first')).toBe(true)
+    const node = document.nodes.find(node => node.id === 'first')
+    if (node?.type !== 'vector') throw new Error('expected vector')
+    node.interaction = { selectable: false, popup: { fields: [{ field: 'value' }] } }
+    await runtime.syncDocument(document, { data: features })
+    expect(runtime.isLayerSelectable('first')).toBe(false)
+    expect(runtime.isLayerSelectable('second')).toBe(true)
+    expect(runtime.registry.getVector('first')).toBe(layer)
+    expect(layer.getSource()).toBe(source)
+    expect(source?.getFeatures()).toHaveLength(2)
+    node.interaction.selectable = true
+    await runtime.syncDocument(document, { data: features })
+    expect(runtime.isLayerSelectable('first')).toBe(true)
+    expect(node.interaction.popup).toEqual({ fields: [{ field: 'value' }] })
+    runtime.unmount()
+  })
   it('releases each host source once when closing during asynchronous preparation', async () => {
     const { runtime, document, features } = fixture()
     await runtime.syncDocument(document, { data: features })

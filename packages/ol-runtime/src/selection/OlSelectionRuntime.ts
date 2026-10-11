@@ -9,18 +9,20 @@ export class OlSelectionRuntime {
   private controller: SelectionController
   private callback?: (state: SelectionState, request: SelectionRequest) => void
   private activeLayerId: string | null = null
+  private active = false
   private targetLayer: ReturnType<OlMapRuntime['registry']['getVector']>
 
   constructor(private readonly mapRuntime: OlMapRuntime) {
     this.controller = createSelectionController({
       map: mapRuntime.getMap(), targets: [], style: createSelectionStyle(),
-      getFeatureId: (feature, target) => mapRuntime.isLayerVisible(target.layerKey) && mapRuntime.isFeatureIncluded(target.layerKey, feature) ? feature.get('domainFeatureId') ?? feature.getId() : undefined,
+      getFeatureId: (feature, target) => mapRuntime.isLayerSelectable(target.layerKey) && mapRuntime.isLayerVisible(target.layerKey) && mapRuntime.isFeatureIncluded(target.layerKey, feature) ? feature.get('domainFeatureId') ?? feature.getId() : undefined,
       resolveSelectedFeature: ref => {
         const layer = mapRuntime.registry.getVector(ref.layerKey)
         const feature = mapRuntime.isLayerVisible(ref.layerKey) ? layer?.getSource()?.getFeatureById(ref.featureId) : undefined
         return feature instanceof Feature && mapRuntime.isFeatureIncluded(ref.layerKey, feature) ? feature : undefined
       },
       onSelectionRequest: request => {
+        if (!this.activeLayerId || !mapRuntime.isLayerSelectable(this.activeLayerId)) return
         this.callback?.({ layerId: this.activeLayerId, featureIds: request.selection.map(ref => String(ref.featureId)) }, request)
       }
     })
@@ -29,20 +31,22 @@ export class OlSelectionRuntime {
   activate(layerId: string | null, callback: (state: SelectionState, request: SelectionRequest) => void): void {
     this.activeLayerId = layerId
     this.callback = callback
+    this.active = true
     this.setTarget(layerId)
-    this.controller.setActive(true)
+    this.controller.setActive(Boolean(this.targetLayer))
   }
 
   private setTarget(layerId: string | null): void {
-    const layer = layerId ? this.mapRuntime.registry.getVector(layerId) : undefined
+    const layer = layerId && this.mapRuntime.isLayerSelectable(layerId) ? this.mapRuntime.registry.getVector(layerId) : undefined
     if (layer === this.targetLayer && this.targetKey === layerId) return
     this.targetLayer = layer
     this.targetKey = layerId
     this.controller.setTargets(layer && layerId ? [{ layerKey: layerId, layer }] : [])
+    this.controller.setActive(this.active && Boolean(layer))
   }
   private targetKey: string | null = null
 
-  deactivate(): void { this.controller.setActive(false) }
+  deactivate(): void { this.active = false; this.controller.setActive(false) }
   cancelGesture(): boolean { return this.controller.cancelGesture() }
   dispose(): void { this.controller.dispose() }
 
