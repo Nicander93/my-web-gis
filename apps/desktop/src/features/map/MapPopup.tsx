@@ -72,6 +72,7 @@ export function MapPopup() {
   }, [close, element])
 
   useEffect(() => { overlay.current?.setPosition(target?.coordinate) }, [target])
+  useEffect(() => { close() }, [project.crs, close])
   useEffect(() => {
     if (!feature || !definition?.fields.length || !['select', 'pan'].includes(activeTool)) close()
   }, [feature, definition, activeTool, close])

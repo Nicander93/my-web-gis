@@ -223,6 +223,65 @@ test('popup fields are safe, independent of map selection, and close when filter
   await expect(popup).toBeHidden()
 })
 
+test('domestic view projections keep selection, CSV coordinates and document history consistent', async ({ page }, info) => {
+  const initial = await mapState(page), pixel = initial.positions[0].pixel
+  await drag(page, [pixel[0] - 12, pixel[1] - 12], [pixel[0] + 12, pixel[1] + 12])
+  const picker = page.getByRole('combobox', { name: '地图视图投影', exact: true })
+  await picker.selectOption('EPSG:4527')
+  const read = () => page.evaluate(async () => {
+    const { getMapRuntime } = await import('/src/features/map/map-runtime-host.ts')
+    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const { createProjectSceneDocument } = await import('/src/features/scene/project-scene-document.ts')
+    const state = useProjectStore.getState(), runtime = getMapRuntime()!, view = runtime.getMap().getView()
+    const layer = state.project.layers.find(item => item.id === state.selectedLayerId)!
+    return { code: view.getProjection().getCode(), stored: state.project.crs,
+      point: runtime.registry.getVector(layer.id)!.getSource()!.getFeatureById('point-0')!.getGeometry()!.getExtent(),
+      data: state.featuresByDataset[layer.datasetId][0].geometry,
+      document: createProjectSceneDocument(state.getSnapshot()), selection: state.selection.featureIds }
+  })
+  await expect.poll(async () => (await read()).code).toBe('EPSG:4527')
+  const projected = await read()
+  expect(projected.point[0]).toBeGreaterThan(39_000_000)
+  expect(projected.data).toMatchObject({ type: 'Point', coordinates: [116.4, 39.9] })
+  expect(projected.document.views.map).toMatchObject({ projection: 'EPSG:4527' })
+  expect(projected.selection).toEqual(['point-0'])
+  await expect(page.locator('.table-scroll tbody tr')).toHaveCount(1)
+  const exported = await page.evaluate(async () => {
+    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const { serializeVectorExport } = await import('/src/features/export/serializeVectorExport.ts')
+    const state = useProjectStore.getState(), layer = state.project.layers.find(item => item.id === state.selectedLayerId)!
+    const content = serializeVectorExport(state.featuresByDataset[layer.datasetId], 'coordinate-csv', state.project.crs).content
+    const [header, first] = content.trim().split(/\r?\n/).map(line => line.split(','))
+    return { x: Number(first[header.indexOf('x')]), y: Number(first[header.indexOf('y')]), crs: first[header.indexOf('crs')] }
+  })
+  expect(exported.crs).toBe('EPSG:4527')
+  expect(exported.x).toBeCloseTo(projected.point[0], 3)
+  expect(exported.y).toBeCloseTo(projected.point[1], 3)
+  const restored = await page.evaluate(async () => {
+    const { createProjectFromSceneDocument } = await import('/src/features/scene/project-scene-document.ts')
+    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const { createProjectSceneDocument } = await import('/src/features/scene/project-scene-document.ts')
+    const snapshot = createProjectFromSceneDocument(JSON.parse(JSON.stringify(createProjectSceneDocument(useProjectStore.getState().getSnapshot()))))
+    return { code: snapshot.project.crs, geometry: Object.values(snapshot.featuresByDataset)[0][0].geometry }
+  })
+  expect(restored.code).toBe('EPSG:4527')
+  expect(restored.geometry).toEqual(projected.data)
+  // UI selection remains usable in the projected native source, not just in the saved document.
+  await waitForMapResize(page)
+  const current = await mapState(page), second = current.positions[1].pixel
+  await drag(page, [second[0] - 12, second[1] - 12], [second[0] + 12, second[1] + 12])
+  await expect.poll(async () => (await mapState(page)).selection).toEqual(['point-1'])
+  await picker.selectOption('EPSG:4490')
+  await expect.poll(async () => (await read()).code).toBe('EPSG:4490')
+  expect((await read()).point[0]).toBeCloseTo(116.4, 6)
+  await page.getByRole('button', { name: '撤销', exact: true }).first().click()
+  await expect.poll(async () => (await read()).code).toBe('EPSG:4527')
+  await picker.selectOption('EPSG:4513')
+  await expect(picker).toHaveValue('EPSG:4527')
+  await expect(page.getByRole('status').last()).toContainText('分带')
+  await page.screenshot({ path: info.outputPath('domestic-projection.png') })
+})
+
 test('table keyboard keeps input history local, commits outside IME, and locates with Enter', async ({ page }) => {
   await page.getByRole('button', { name: '属性表', exact: true }).click()
   await page.getByRole('tab', { name: '编辑', exact: true }).click()

@@ -2,9 +2,26 @@ import { useWorkspaceStore } from '@/stores/workspace.store'
 import { useWorkbenchStore } from '@/stores/workbench.store'
 import { useProjectStore } from '@/stores/project.store'
 import { emitCommandStatus } from './status'
+import { getMapRuntime } from '@/features/map/map-runtime-host'
+import { projectedMapView } from '@/features/map/map-projections'
+import { createProjectSceneController } from '@/features/scene/project-scene-controller'
 
 /** 视图命令直接操作 Workspace Store，供 Header、快捷键和菜单复用。 */
 export const viewCommands = {
+  setMapProjection(code: string): void {
+    const runtime = getMapRuntime()
+    if (!runtime || code === useProjectStore.getState().project.crs) return
+    if (useWorkbenchStore.getState().editLayerId) { emitCommandStatus('请先结束图层编辑再切换投影'); return }
+    const controller = createProjectSceneController()
+    try {
+      const previous = controller.getDocument().views.map
+      const view = projectedMapView(runtime.getMap().getView(), code, previous?.type === '2d' ? previous : {})
+      runtime.getMap().getView().cancelAnimations()
+      controller.setView('map', view)
+      emitCommandStatus(`地图投影已切换为 ${code}`)
+    } catch (error) { emitCommandStatus(error instanceof Error ? error.message : '地图投影切换失败') }
+    finally { controller.dispose() }
+  },
   toggleLayers(): void {
     const state = useWorkspaceStore.getState()
     const open = !state.left.open

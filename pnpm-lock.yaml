@@ -74,6 +74,9 @@ importers:
       ol:
         specifier: ^10.6.1
         version: 10.10.0
+      proj4:
+        specifier: ^2.22.0
+        version: 2.22.0
       react:
         specifier: ^19.2.8
         version: 19.2.8
