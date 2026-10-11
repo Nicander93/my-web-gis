@@ -872,3 +872,4 @@
 .map-popup dl div { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 8px; padding: 3px 0; }
 .map-popup dt { color: var(--color-text-secondary); }
 .map-popup dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.map-projection-control { max-width: 130px; height: 22px; border: 0; background: transparent; color: inherit; font-size: inherit; }

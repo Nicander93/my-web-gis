@@ -2,6 +2,7 @@ import { MousePointer2 } from 'lucide-react'
 import type { EditTool } from '@desktop-webgis/gis-core'
 import { useWorkbenchStore } from '@/stores/workbench.store'
 import { useProjectStore } from '@/stores/project.store'
+import { MapProjectionControl } from '@/features/map/MapProjectionControl'
 
 const TOOL_LABELS: Record<EditTool, string> = {
   none: '浏览',
@@ -37,8 +38,9 @@ export function StatusBar({ message }: { message: string }) {
         <span className="status-item">选中 {selection.featureIds.length}</span>
       )}
       <span className="status-item status-coordinate">
-        {readout || '移动指针查看坐标'} · EPSG:3857
+        {readout || '移动指针查看坐标'}
       </span>
+      <MapProjectionControl />
       <span className="status-item">{dirty ? '未保存' : '已保存'}</span>
     </footer>
   )

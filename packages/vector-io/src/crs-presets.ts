@@ -13,13 +13,13 @@ export interface CrsPreset {
 /** GRS80 / CGCS2000 ellipsoid (EPSG ellipsoid 1024). No grid-shift datum transform. */
 const GRS80_ELLPS = '+ellps=GRS80'
 
-function gaussKruger3Cm(lon0: number): string {
-  return `+proj=tmerc +lat_0=0 +lon_0=${lon0} +k=1 +x_0=500000 +y_0=0 ${GRS80_ELLPS} +units=m +no_defs`
+function gaussKruger3Cm(lon0: number, falseEasting = 500000): string {
+  return `+proj=tmerc +lat_0=0 +lon_0=${lon0} +k=1 +x_0=${falseEasting} +y_0=0 ${GRS80_ELLPS} +units=m +no_defs`
 }
 
 /**
  * Built-in CRS presets for import / export pickers.
- * China coverage: CGCS2000 geographic (4490) and 3° Gauss-Kruger CM 75°E–135°E (EPSG:4534–4554).
+ * China coverage: CGCS2000 geographic (4490), 3° zones 25–45 (4513–4533), and CM series (4534–4554).
  * Datum grids are not loaded; 4490↔4326 is ellipsoid-only, matching the existing Proj4js stack.
  */
 export const CRS_PRESETS: readonly CrsPreset[] = [
@@ -42,7 +42,8 @@ export const CRS_PRESETS: readonly CrsPreset[] = [
     kind: 'geographic',
     proj4: `+proj=longlat ${GRS80_ELLPS} +no_defs`
   },
-  ...buildCgcs2000ThreeDegreeCmPresets()
+  ...buildCgcs2000ThreeDegreeCmPresets(),
+  ...buildCgcs2000ThreeDegreeZonePresets()
 ]
 
 function buildCgcs2000ThreeDegreeCmPresets(): CrsPreset[] {
@@ -53,12 +54,20 @@ function buildCgcs2000ThreeDegreeCmPresets(): CrsPreset[] {
     const code = `EPSG:${4534 + i}`
     presets.push({
       code,
-      name: `CGCS2000 3°带 CM ${lon0}°E`,
+      name: `CGCS2000 3° 无带号 CM ${lon0}°E`,
       kind: 'projected',
       proj4: gaussKruger3Cm(lon0)
     })
   }
   return presets
+}
+
+function buildCgcs2000ThreeDegreeZonePresets(): CrsPreset[] {
+  return Array.from({ length: 21 }, (_, index) => {
+    const zone = 25 + index
+    return { code: `EPSG:${4513 + index}`, name: `CGCS2000 3° 带号 ${zone}（CM ${zone * 3}°E）`,
+      kind: 'projected', proj4: gaussKruger3Cm(zone * 3, zone * 1000000 + 500000) }
+  })
 }
 
 let registered = false

@@ -92,6 +92,7 @@ export function MapCanvas({
         state.featuresByDataset !== previous.featuresByDataset
 
       if (projectChanged) syncMapFromProject()
+      if (state.project.crs !== previous.project.crs) useWorkbenchStore.getState().setMapReadout('')
       if (projectChanged || state.selectedLayerId !== previous.selectedLayerId) setHint(toolHint(getActiveEditTool()))
     })
     return unsubscribe

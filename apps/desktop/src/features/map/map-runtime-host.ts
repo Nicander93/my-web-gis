@@ -21,6 +21,9 @@ import { useWorkbenchStore } from '@/stores/workbench.store'
 import { useWorkspaceStore } from '@/stores/workspace.store'
 import { createProjectSceneDocument } from '../scene/project-scene-document'
 import { configureMapServiceLayer } from './map-service-requests'
+import { registerMapProjections } from './map-projections'
+
+registerMapProjections()
 
 let runtime: OlMapRuntime | null = null
 let selectionRuntime: OlSelectionRuntime | null = null
