@@ -101,7 +101,7 @@ export interface GeoJsonNode extends NodeBase {
   color?: string
 }
 
-/** XYZ template imagery projected from shared SceneDocument tile nodes. */
+/** Native city imagery with an XYZ URL template. */
 export interface ImageryNode extends NodeBase {
   type: 'imagery'
   url: string

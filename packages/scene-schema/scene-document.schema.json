@@ -3007,6 +3007,55 @@
         ]
       }
     },
+    "cityImagery": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "name": {
+          "type": "string"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "popup": {
+          "$ref": "#/$defs/cityPopup"
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "type": {
+          "const": "imagery"
+        },
+        "url": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "attribution": {
+          "type": "string"
+        },
+        "maximumLevel": {
+          "type": "number",
+          "minimum": 0
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "parentId": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "visible",
+        "type",
+        "url"
+      ]
+    },
     "group": {
       "type": "object",
       "properties": {
@@ -3059,6 +3108,9 @@
         },
         {
           "$ref": "#/$defs/cityGeoJson"
+        },
+        {
+          "$ref": "#/$defs/cityImagery"
         },
         {
           "$ref": "#/$defs/cityWater"

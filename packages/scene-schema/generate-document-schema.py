@@ -44,7 +44,12 @@ defs['resource'] = {'oneOf': [ref(name) for name in resource_names]}
 defs['filter'] = obj(dict(field=text, op={'enum': ['eq', 'neq', 'contains', 'lt', 'lte', 'gt', 'gte', 'is-empty', 'is-not-empty']}, value={}), ['field', 'op'])
 defs['filter']['if'] = {'properties': {'op': {'enum': ['is-empty', 'is-not-empty']}}}
 defs['filter']['else'] = {'required': ['value']}
-node_names = ['tileLayer', 'vectorLayer', 'cityTileset', 'cityModel', 'cityGeoJson', 'cityWater', 'cityGraphic']
+defs['cityImagery'] = copy.deepcopy(defs['cityGeoJson'])
+defs['cityImagery']['properties'].pop('asset', None)
+defs['cityImagery']['properties'].pop('color', None)
+defs['cityImagery']['properties'].update(type={'const': 'imagery'}, url=text, attribution=string, maximumLevel={'type': 'number', 'minimum': 0}, opacity={'type': 'number', 'minimum': 0, 'maximum': 1})
+defs['cityImagery']['required'] = ['url' if key == 'asset' else key for key in defs['cityImagery']['required']]
+node_names = ['tileLayer', 'vectorLayer', 'cityTileset', 'cityModel', 'cityGeoJson', 'cityImagery', 'cityWater', 'cityGraphic']
 for name in node_names:
     definition = defs[name]
     props = definition['properties']

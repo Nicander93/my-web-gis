@@ -27,8 +27,10 @@
 - [第一阶段进度交接](plans/phase-1-progress.md)
 - [第二阶段：空间处理工作流](plans/phase-2-spatial-processing.md)
 - [二维编辑捕捉](plans/editing-snapping.md)
-- [选择、图层与统一场景 API 实施计划](plans/selection-layer-scene-public-api.md) — Select／框选、公共包提取审查、图层工厂、二维／三维场景往返；实施中
-- [选择、图层与场景 API 实施记录](plans/selection-layer-scene-implementation.md) — 逐阶段代码、验证证据及尚未完成的验收
+- [下一步计划](plans/next-steps-2026-10-10.md) — 当前执行范围：冻结同渲、内部包维护、按小 PR 推进
+- [同渲冻结清理](plans/freeze-co-render-cleanup.md) — 默认行为、KEEP／REMOVE 清单与验收记录
+- [选择、图层与统一场景 API 实施计划](plans/selection-layer-scene-public-api.md) — 历史方案，保留作对照，不再整包执行
+- [选择、图层与场景 API 实施记录](plans/selection-layer-scene-implementation.md) — 历史验证证据及未签收项
 - [GeoLibre 对标与下一阶段建议](plans/geolibre-gap-review-2026-10-03.md)
 - [城市编辑器产品与核心能力演进](plans/city-editor-product-and-core.md) — 功能区交互、Mars3D 风格 API 与绘制/编辑/可视化路线讨论稿
 - [P21 全阶段验收证据（受阻）](plans/p21-phase-acceptance-evidence.md) — 绑定 SHA "d310b\；**不**表示阶段已完成

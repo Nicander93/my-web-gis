@@ -7,6 +7,9 @@ it('ships a self-contained v3 schema with resolvable references for both engines
   expect(schema.additionalProperties).toBe(false)
   expect(schema.$defs.cityAsset.properties.type.enum).toEqual(['3dtiles', 'glb'])
   expect(schema.$defs.vectorLayer.properties.style).toEqual({ $ref: '#/$defs/layerStyle' })
+  expect(schema.$defs.cityImagery.properties.type.const).toBe('imagery')
+  expect(schema.$defs.cityImagery.required).toContain('url')
+  expect(schema.$defs.cityImagery.properties.resource).toBeUndefined()
   expect(schema.$defs.geoJsonFeatureCollection.properties.features.items).toEqual({ $ref: '#/$defs/geoJsonFeature' })
   const walk = (value: unknown): void => {
     if (!value || typeof value !== 'object') return

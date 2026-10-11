@@ -26,6 +26,11 @@ test('city document runtime retains a real model through edits, history and a fa
   test.setTimeout(90_000)
   await page.route('**/*tile.openstreetmap.org/**', route => route.abort())
   let modelRequests = 0, retryRequests = 0, available = false
+  const mapRequests: string[] = []
+  await page.route('**/frozen-map/**', route => {
+    mapRequests.push(route.request().url())
+    return route.abort()
+  })
   page.on('response', response => { if (response.url().endsWith('/city-sample/tower.glb')) modelRequests++ })
   await page.route('**/retry-model.glb', route => {
     retryRequests++
@@ -36,9 +41,13 @@ test('city document runtime retains a real model through edits, history and a fa
   await page.getByRole('button', { name: /^三维场景/ }).click()
   await expect(page.locator('.city-footer__state')).toHaveText('就绪', { timeout: 30_000 })
   const document = { version: 3, id: 'city-runtime', title: 'City runtime', activeView: 'city', resources: {
-    tower: { type: 'glb', url: './city-sample/tower.glb' }
+    tower: { type: 'glb', url: './city-sample/tower.glb' },
+    map: { type: 'geojson', data: { type: 'FeatureCollection', features: [{ type: 'Feature', id: 'map-point', properties: { name: 'Map point' }, geometry: { type: 'Point', coordinates: [116.391, 39.907] } }] } },
+    tiles: { type: 'xyz', url: 'https://example.test/frozen-map/{z}/{x}/{y}.png' }
   }, nodes: [{ type: 'model', id: 'tower', name: 'Tower', visible: true, resource: 'tower', position: [116.391, 39.907, 0],
-    transform: { translation: [0, 0, 0], rotation: [0, 0, 0], scale: 1 } }], views: {
+    transform: { translation: [0, 0, 0], rotation: [0, 0, 0], scale: 1 } },
+    { type: 'vector', id: 'map-points', name: 'Map points', visible: true, resource: 'map', style: { mode: 'single', symbol: { type: 'circle', radius: 3 } } },
+    { type: 'tile', id: 'map-tiles', name: '底图', role: 'basemap', visible: true, resource: 'tiles' }], views: {
     city: { type: '3d', heightReference: 'ellipsoid', camera: { position: [116.391, 39.907, 2500], heading: 0, pitch: -45, roll: 0 } }
   } }
   await page.getByRole('button', { name: '未命名三维场景', exact: true }).click()
@@ -72,7 +81,14 @@ test('city document runtime retains a real model through edits, history and a fa
   await page.getByRole('menuitem', { name: '导出完整场景', exact: true }).click()
   const path = testInfo.outputPath('city-edited.scene.json')
   await (await download).saveAs(path)
-  expect(JSON.parse(readFileSync(path, 'utf8')).nodes.find((node: { id: string }) => node.id === 'tower').transform.scale).toBe(2)
+  const exported = JSON.parse(readFileSync(path, 'utf8'))
+  expect(exported.nodes.find((node: { id: string }) => node.id === 'tower').transform.scale).toBe(2)
+  expect(exported.nodes.find((node: { id: string }) => node.id === 'map-points')).toMatchObject(document.nodes[1])
+  expect(exported.resources.map).toMatchObject(document.resources.map)
+  // Desktop normalizes the basemap identity; its source must survive unchanged.
+  const basemap = exported.nodes.find((node: { role?: string }) => node.role === 'basemap')
+  expect(exported.resources[basemap.resource]).toMatchObject(document.resources.tiles)
+  expect(mapRequests).toEqual([])
   await objectMenu(page, '数据源')
   await page.getByRole('textbox', { name: '资源地址', exact: true }).fill('./retry-model.glb')
   await page.getByRole('button', { name: '更新地址', exact: true }).click()
@@ -86,6 +102,7 @@ test('city document runtime retains a real model through edits, history and a fa
   await expect(page.getByRole('button', { name: '重试加载', exact: true })).toHaveCount(0)
   expect(retryRequests).toBe(2)
   expect(modelRequests).toBe(1)
+  expect(mapRequests).toEqual([])
   await expect.poll(() => hasModelPixels(page)).toBe(true)
   await page.screenshot({ path: testInfo.outputPath('city-resource-recovered.png') })
 })

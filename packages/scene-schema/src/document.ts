@@ -107,7 +107,7 @@ function json(value: unknown, parents = new Set<object>(), depth = 0): boolean {
 
 const ROOT_FIELDS = new Set(['version', 'id', 'title', 'description', 'resources', 'nodes', 'views', 'activeView', 'environment', 'credentials', 'widgets', 'theme', 'presentation', 'metadata', 'extensions'])
 const FILTER_OPERATIONS = new Set(['eq', 'neq', 'contains', 'lt', 'lte', 'gt', 'gte', 'is-empty', 'is-not-empty'])
-const CITY_TYPES = new Set(['3dtiles', 'model', 'geojson', 'graphic', 'water'])
+const CITY_TYPES = new Set(['3dtiles', 'model', 'geojson', 'imagery', 'graphic', 'water'])
 
 /** Validates JSON structure, engine contracts and references before allocating any runtime object. */
 export function validateSceneDocument(input: unknown): ValidationResult {
@@ -271,26 +271,6 @@ export function migrateSceneDocument(input: unknown, identity = { id: 'city-scen
       const id = allocateId(group.id, nodeIds); groups.set(group.id, id); nodes.push({ ...group, id, type: 'group', scope: '3d' })
     }
     for (const node of city.nodes) {
-      if (node.type === 'imagery') {
-        const resourceId = allocateId(`${node.id}-xyz`, resourceIds)
-        resources[resourceId] = {
-          type: 'xyz',
-          url: node.url,
-          ...(node.attribution ? { attribution: node.attribution } : {}),
-          ...(node.maximumLevel !== undefined ? { maxZoom: node.maximumLevel } : {})
-        }
-        nodes.push({
-          type: 'tile',
-          id: allocateId(node.id, nodeIds),
-          name: node.name,
-          visible: node.visible,
-          resource: resourceId,
-          ...(node.locked !== undefined ? { locked: node.locked } : {}),
-          ...(node.opacity !== undefined ? { opacity: node.opacity } : {}),
-          ...(node.groupId ? { parentId: groups.get(node.groupId) } : {})
-        })
-        continue
-      }
       const { groupId, ...definition } = node
       const migrated = { ...structuredClone(definition), id: allocateId(node.id, nodeIds), ...(groupId ? { parentId: groups.get(groupId) } : {}) }
       if ('asset' in migrated) {

@@ -1,5 +1,7 @@
 # 统一场景文档 v3（实施中的协议）
 
+当前范围以 [下一步计划](../plans/next-steps-2026-10-10.md) 为准：共享文档用于内容保留及 JSON／ZIP 导入导出，不承诺二三维同渲。二维 `vector`／`tile` 仅在二维工作区显示，三维原生 `geojson`／影像节点继续在三维工作区显示。
+
 实现入口：[scene-schema/document.ts](../../packages/scene-schema/src/document.ts)，纯操作入口：[scene-core/document.ts](../../packages/scene-core/src/document.ts)。本规范对应 S04 的第一批可执行实现，尚未满足 S04 的全部验收，不作为已稳定发布的公共协议。
 
 ## 文档与兼容入口
