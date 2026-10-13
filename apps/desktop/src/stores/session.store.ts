@@ -20,6 +20,8 @@ interface AttributeTableState {
   sortDirection: 'asc' | 'desc'
   /** Field currently shown in stats panel. */
   statsField: string | null
+  hiddenFields: string[]
+  fieldOrder: string[]
 }
 
 /** 样式草稿：改草稿不改项目，应用后才写入图层配置 */
@@ -129,6 +131,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           [layerId]: {
             ...existing,
             attributeTable: {
+              hiddenFields: updates.hiddenFields ?? current?.hiddenFields ?? [],
+              fieldOrder: updates.fieldOrder ?? current?.fieldOrder ?? [],
               filterOpen: updates.filterOpen ?? current?.filterOpen ?? false,
               statisticsOpen:
                 updates.statisticsOpen ?? current?.statisticsOpen ?? false,

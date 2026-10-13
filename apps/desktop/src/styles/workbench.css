@@ -233,6 +233,28 @@
 .workspace-panel .panel-body {
   flex: 1;
 }
+.attribute-table-host, .attribute-table-tab-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.attribute-table-tab-panel[hidden] { display: none; }
+.attribute-table-tab-bar { display: flex; flex-shrink: 0; min-width: 0; align-items: center; border-bottom: 1px solid var(--color-border); }
+.attribute-table-tab-bar .table-target-picker { max-width: 160px; min-width: 80px; height: 28px; }
+.attribute-table-tabs { display: flex; flex-shrink: 0; overflow-x: auto; border-bottom: 1px solid var(--color-border); }
+.attribute-table-tab { display: flex; flex-shrink: 0; border-right: 1px solid var(--color-border); }
+.attribute-table-tab button { height: 28px; padding: 0 8px; background: transparent; border: 0; color: inherit; cursor: pointer; }
+.attribute-table-tab [aria-selected="true"] { background: var(--color-accent-soft); box-shadow: inset 0 -2px var(--color-accent); }
+.attr-field-calculator, .attr-columns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px; border-bottom: 1px solid var(--color-border); max-height: 150px; overflow: auto; }
+.attr-field-calculator label, .attr-columns > div { display: flex; align-items: center; gap: 4px; }
+.attr-field-calculator input:not([type="checkbox"]) { width: 150px; }
+.attr-field-calculator .attr-expression { flex: 1; min-width: 240px; }
+.attr-field-calculator .attr-expression input { flex: 1; min-width: 0; }
+.attr-field-calculator small, .attr-field-calculator [role] { flex-basis: 100%; }
+.attr-columns > div { padding-right: 8px; border-right: 1px solid var(--color-border); }
+.attr-columns span { color: var(--color-text-secondary); font-size: 11px; }
 .attribute-table-content {
   display: flex;
   flex-direction: column;

@@ -13,6 +13,8 @@ import { capabilitiesForDataset, getEffectiveLocked } from '@desktop-webgis/gis-
 import { useSessionStore } from '@/stores/session.store'
 import { Button } from '@/components/ui/Button'
 import { zoomMapToFeature, zoomMapToSelected } from '@/features/map/map-runtime-host'
+import { FieldCalculator } from './FieldCalculator'
+import { parseCellValue, resolveDatasetFields } from './field-edits'
 
 const PAGE_SIZE = 100
 
@@ -35,13 +37,18 @@ function needsValue(op: FieldFilterOp): boolean {
 interface AttributeTableProps {
   targetPicker?: ReactNode
   onClose?: () => void
+  layerId?: string
+  active?: boolean
 }
 
 export function AttributeTable({
   targetPicker,
-  onClose
+  onClose,
+  layerId,
+  active = true
 }: AttributeTableProps = {}) {
-  const selectedLayerId = useWorkbenchStore((state) => state.tableLayerId)
+  const tableLayerId = useWorkbenchStore((state) => state.tableLayerId)
+  const selectedLayerId = layerId ?? tableLayerId
   const editLayerId = useWorkbenchStore((state) => state.editLayerId)
   const project = useProjectStore((state) => state.project)
   const featuresByDataset = useProjectStore((state) => state.featuresByDataset)
@@ -65,11 +72,11 @@ export function AttributeTable({
   const tableState = layerSession?.attributeTable
   const scrollRef = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
-    if (!selectedLayerId || !scrollRef.current) return
+    if (!active || !selectedLayerId || !scrollRef.current) return
     const saved = useSessionStore.getState().sessions[selectedLayerId]?.attributeTable
     scrollRef.current.scrollTop = saved?.scrollTop ?? 0
     scrollRef.current.scrollLeft = saved?.scrollLeft ?? 0
-  }, [selectedLayerId])
+  }, [selectedLayerId, active])
 
   const searchQuery = tableState?.searchQuery ?? ''
   const currentPage = tableState?.currentPage ?? 1
@@ -89,6 +96,9 @@ export function AttributeTable({
   } | null>(null)
   const [editValue, setEditValue] = useState('')
   const cancelledEdit = useRef(false)
+  const [cellError, setCellError] = useState('')
+  const [calculatorOpen, setCalculatorOpen] = useState(false)
+  const [columnsOpen, setColumnsOpen] = useState(false)
 
   const selectedLayer = selectedLayerId
     ? project.layers.find((layer) => layer.id === selectedLayerId)
@@ -105,6 +115,7 @@ export function AttributeTable({
   const allFeatures = selectedLayer
     ? (featuresByDataset[selectedLayer.datasetId] ?? [])
     : []
+  const dataset = project.datasets.find((item) => item.id === selectedLayer?.datasetId)
   const layerFilter = selectedLayer?.filter
   const appliedFilter = layerFilter ?? []
   const [filterDraft, setFilterDraft] =
@@ -126,13 +137,11 @@ export function AttributeTable({
     return new Set(selection.featureIds)
   }, [selectedLayerId, selection.layerId, selection.featureIds])
 
-  const fieldNames = useMemo(() => {
-    const keys = new Set<string>()
-    for (const feature of allFeatures) {
-      for (const key of Object.keys(feature.properties)) keys.add(key)
-    }
-    return Array.from(keys).sort((a, b) => a.localeCompare(b))
-  }, [allFeatures])
+  const fields = useMemo(() => resolveDatasetFields(allFeatures, dataset?.fields), [allFeatures, dataset?.fields])
+  const fieldNames = fields.map((field) => field.name)
+  const orderedFields = [...(tableState?.fieldOrder ?? []).filter((name) => fieldNames.includes(name)),
+    ...fieldNames.filter((name) => !tableState?.fieldOrder?.includes(name))]
+  const visibleFields = orderedFields.filter((name) => !tableState?.hiddenFields?.includes(name))
 
   const viewFeatures = useMemo(() => {
     let rows = filteredFeatures
@@ -216,8 +225,9 @@ export function AttributeTable({
   function startEdit(featureId: string, field: string, current: unknown): void {
     if (!canEditCells) return
     cancelledEdit.current = false
+    setCellError('')
     setEditing({ featureId, field })
-    setEditValue(current == null ? '' : String(current))
+    setEditValue(current == null ? '' : typeof current === 'object' ? JSON.stringify(current) : String(current))
   }
 
   function commitEdit(): void {
@@ -235,11 +245,15 @@ export function AttributeTable({
       setEditing(null)
       return
     }
-    const next = {
-      ...feature.properties,
-      [editing.field]: coerceDraftValue(editValue)
+    try {
+      const field = fields.find((item) => item.name === editing.field)
+      if (!field) throw new Error('编辑字段已不存在')
+      const next = { ...feature.properties, [editing.field]: parseCellValue(field, editValue) }
+      if (!updateFeatureProperties(selectedLayerId, editing.featureId, next)) throw new Error('当前记录未能写入')
+      setCellError('')
+    } catch (error) {
+      setCellError(error instanceof Error ? error.message : String(error))
     }
-    updateFeatureProperties(selectedLayerId, editing.featureId, next)
     setEditing(null)
   }
 
@@ -327,17 +341,33 @@ export function AttributeTable({
           <Button
             variant="ghost"
             aria-expanded={filterOpen}
-            onClick={() => patchTable({ filterOpen: !filterOpen })}
+            onClick={() => {
+              patchTable({ filterOpen: !filterOpen, statisticsOpen: false })
+              setCalculatorOpen(false); setColumnsOpen(false)
+            }}
           >
             图层过滤{appliedFilter.length ? ` (${appliedFilter.length})` : ''}
           </Button>
           <Button
             variant="ghost"
             aria-expanded={statisticsOpen}
-            onClick={() => patchTable({ statisticsOpen: !statisticsOpen })}
+            onClick={() => {
+              patchTable({ statisticsOpen: !statisticsOpen, filterOpen: false })
+              setCalculatorOpen(false); setColumnsOpen(false)
+            }}
           >
             字段统计
           </Button>
+          <Button variant="ghost" aria-expanded={calculatorOpen}
+            onClick={() => {
+              setCalculatorOpen(!calculatorOpen); setColumnsOpen(false)
+              patchTable({ filterOpen: false, statisticsOpen: false })
+            }}>字段计算</Button>
+          <Button variant="ghost" aria-expanded={columnsOpen}
+            onClick={() => {
+              setColumnsOpen(!columnsOpen); setCalculatorOpen(false)
+              patchTable({ filterOpen: false, statisticsOpen: false })
+            }}>字段列表</Button>
         </>}
         {onClose && (
           <Button variant="icon" aria-label="收起属性表" title="收起属性表" onClick={onClose}>
@@ -345,6 +375,30 @@ export function AttributeTable({
           </Button>
         )}
       </div>
+
+      {cellError && <div role="alert">{cellError}；原值未改变</div>}
+      {selectedLayerId && calculatorOpen && <FieldCalculator layerId={selectedLayerId}
+        filteredFeatures={filteredFeatures} selectedIds={selectionIds} onClose={() => setCalculatorOpen(false)} />}
+      {selectedLayerId && columnsOpen && <section className="attr-columns" aria-label="字段列表">
+        {orderedFields.map((name, index) => <div key={name}>
+          <label><input type="checkbox" checked={!tableState?.hiddenFields?.includes(name)}
+            onChange={(event) => patchTable({ hiddenFields: event.target.checked
+              ? (tableState?.hiddenFields ?? []).filter((field) => field !== name)
+              : [...(tableState?.hiddenFields ?? []), name] })} />{name}</label>
+          <span>{fields.find((field) => field.name === name)?.type}</span>
+          <button type="button" aria-label={`上移字段 ${name}`} disabled={index === 0} onClick={() => {
+            const order = [...orderedFields]
+            ;[order[index - 1], order[index]] = [order[index], order[index - 1]]
+            patchTable({ fieldOrder: order })
+          }}>↑</button>
+          <button type="button" aria-label={`下移字段 ${name}`} disabled={index === orderedFields.length - 1} onClick={() => {
+            const order = [...orderedFields]
+            ;[order[index + 1], order[index]] = [order[index], order[index + 1]]
+            patchTable({ fieldOrder: order })
+          }}>↓</button>
+        </div>)}
+        <button type="button" onClick={() => patchTable({ hiddenFields: [], fieldOrder: [] })}>重置列显示</button>
+      </section>}
 
       {selectedLayer && filterOpen && (
         <div className="attr-filter-bar" aria-label="图层字段过滤">
@@ -500,7 +554,7 @@ export function AttributeTable({
                 >
                   ID
                 </th>
-                {fieldNames.map((field) => (
+                {visibleFields.map((field) => (
                   <th
                     key={field}
                     className="sortable"
@@ -578,7 +632,7 @@ export function AttributeTable({
                         <LocateFixed size={12} />
                       </button>{feature.id}
                     </td>
-                    {fieldNames.map((field) => {
+                    {visibleFields.map((field) => {
                       const value = feature.properties[field]
                       const isEditing =
                         editing?.featureId === feature.id &&

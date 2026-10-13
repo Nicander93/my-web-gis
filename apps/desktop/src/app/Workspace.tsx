@@ -8,9 +8,9 @@ import { BottomPanel } from './BottomPanel'
 import { LeftPanel } from './LeftPanel'
 import { RightPanel } from './RightPanel'
 import { viewCommands } from './commands/view.commands'
-import { layerCommands, getLayerCapabilities } from './commands/layer.commands'
+import { layerCommands } from './commands/layer.commands'
 import { useProjectStore } from '@/stores/project.store'
-import { AttributeTable } from '@/features/attribute-table/AttributeTable'
+import { AttributeTableHost } from '@/features/attribute-table/AttributeTableHost'
 import { Inspector } from '@/features/inspector/Inspector'
 import { LayerPanel } from '@/features/layers/LayerPanel'
 import { MapCanvas } from '@/features/map/MapCanvas'
@@ -30,7 +30,6 @@ export function Workspace({
 }) {
   const project = useProjectStore((state) => state.project)
   const inspectorId = useWorkbenchStore((state) => state.inspectorLayerId)
-  const tableId = useWorkbenchStore((state) => state.tableLayerId)
   const inspectorLayer = project.layers.find(
     (layer) => layer.id === inspectorId
   )
@@ -167,32 +166,7 @@ export function Workspace({
         {processing || <Inspector key={inspectorId} />}
       </RightPanel>
       <BottomPanel>
-        <AttributeTable
-          key={tableId}
-          targetPicker={
-            <select
-              className="table-target-picker"
-              aria-label="属性表图层"
-              value={tableId ?? ''}
-              onChange={(event) =>
-                layerCommands.openAttributeTable(event.target.value)
-              }
-            >
-              <option value="" disabled>
-                选择图层
-              </option>
-              {project.layers
-                .filter(
-                  (layer) => getLayerCapabilities(layer.id).canAttributeTable
-                )
-                .map((layer) => (
-                  <option key={layer.id} value={layer.id}>
-                    {layer.name}
-                  </option>
-                ))}
-            </select>
-          }
-        />
+        <AttributeTableHost />
       </BottomPanel>
     </main>
   )

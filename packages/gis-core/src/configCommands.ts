@@ -6,7 +6,7 @@ import type { LayerStyle } from '@desktop-webgis/ol-style'
 import { cloneValue } from './clone'
 import type { EditCommand, EditContext } from './editHistory'
 import type { FieldFilterCondition } from './filter'
-import type { Dataset, GisFeature, Layer, LayerGroup, LayerTreeEntry, Project, ProjectSnapshot } from './types'
+import type { Dataset, DatasetField, GisFeature, Layer, LayerGroup, LayerTreeEntry, Project, ProjectSnapshot } from './types'
 
 export interface ProjectEditContext extends EditContext {
   getProject(): Project
@@ -35,6 +35,34 @@ function replaceLayer(project: Project, layerId: string, patch: Partial<Layer>):
   return {
     ...project,
     layers: project.layers.map((layer) => (layer.id === layerId ? { ...layer, ...patch } : layer))
+  }
+}
+
+export interface DatasetContent {
+  fields?: DatasetField[]
+  features: GisFeature[]
+}
+
+/** Writes validated fields and rows together, retaining table sessions and stable IDs. */
+export class SetDatasetContentCommand implements EditCommand {
+  private readonly before: DatasetContent
+  private readonly after: DatasetContent
+  constructor(readonly id: string, readonly label: string,
+    private readonly datasetId: string, before: DatasetContent, after: DatasetContent) {
+    this.before = cloneValue(before)
+    this.after = cloneValue(after)
+  }
+  execute(context: EditContext): void { this.apply(context, this.after) }
+  undo(context: EditContext): void { this.apply(context, this.before) }
+  private apply(context: EditContext, content: DatasetContent): void {
+    const ctx = requireProjectContext(context)
+    const project = ctx.getProject()
+    if (!project.datasets.some((dataset) => dataset.id === this.datasetId)) {
+      throw new Error('字段编辑的目标数据集已不存在')
+    }
+    ctx.featureStore.setAll(this.datasetId, cloneValue(content.features))
+    ctx.replaceProject({ ...project, datasets: project.datasets.map((dataset) =>
+      dataset.id === this.datasetId ? { ...dataset, fields: cloneValue(content.fields) } : dataset) })
   }
 }
 

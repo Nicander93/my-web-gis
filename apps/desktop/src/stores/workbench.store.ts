@@ -6,6 +6,7 @@ interface WorkbenchState {
   editLayerId: string | null
   inspectorLayerId: string | null
   tableLayerId: string | null
+  tableLayerIds: string[]
   activeTool: EditTool
   rightTask: 'inspector' | 'processing'
   pendingInspector: { layerId: string; tab: 'layer' | 'style' | 'label' } | null
@@ -16,6 +17,7 @@ interface WorkbenchState {
   setEditLayer(layerId: string | null): void
   bindInspector(layerId: string | null): void
   bindTable(layerId: string | null): void
+  closeTable(layerId: string): void
   setActiveTool(tool: EditTool): void
   clearLayer(layerId: string): void
   reset(): void
@@ -25,6 +27,7 @@ const initial = {
   editLayerId: null,
   inspectorLayerId: null,
   tableLayerId: null,
+  tableLayerIds: [] as string[],
   activeTool: 'none' as EditTool,
   rightTask: 'inspector' as const,
   pendingInspector: null,
@@ -39,14 +42,31 @@ export const useWorkbenchStore = create<WorkbenchState>((set) => ({
   setEditLayer: (editLayerId) => set({ editLayerId }),
   bindInspector: (inspectorLayerId) =>
     set({ inspectorLayerId, rightTask: 'inspector' }),
-  bindTable: (tableLayerId) => set({ tableLayerId }),
+  bindTable: (tableLayerId) => set((state) => ({
+    tableLayerId,
+    tableLayerIds: tableLayerId && !state.tableLayerIds.includes(tableLayerId)
+      ? [...state.tableLayerIds, tableLayerId] : state.tableLayerIds
+  })),
+  closeTable: (layerId) => set((state) => {
+    const index = state.tableLayerIds.indexOf(layerId)
+    const tableLayerIds = state.tableLayerIds.filter((id) => id !== layerId)
+    return {
+      tableLayerIds,
+      tableLayerId: state.tableLayerId === layerId
+        ? tableLayerIds[Math.min(index, tableLayerIds.length - 1)] ?? null
+        : state.tableLayerId
+    }
+  }),
   setActiveTool: (activeTool) => set({ activeTool }),
   clearLayer: (layerId) =>
     set((state) => ({
       editLayerId: state.editLayerId === layerId ? null : state.editLayerId,
       inspectorLayerId:
         state.inspectorLayerId === layerId ? null : state.inspectorLayerId,
-      tableLayerId: state.tableLayerId === layerId ? null : state.tableLayerId,
+      tableLayerId: state.tableLayerId === layerId
+        ? state.tableLayerIds.filter((id) => id !== layerId)[0] ?? null
+        : state.tableLayerId,
+      tableLayerIds: state.tableLayerIds.filter((id) => id !== layerId),
       pendingInspector:
         state.inspectorLayerId === layerId ||
         state.pendingInspector?.layerId === layerId
