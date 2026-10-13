@@ -16,7 +16,8 @@ import {
   capabilitiesForDataset,
   cloneValue,
   isLegacyStyle,
-  migrateLegacyStyle
+  migrateLegacyStyle,
+  getEffectiveLocked
 } from '@desktop-webgis/gis-core'
 import type { LayerStyle } from '@desktop-webgis/ol-style'
 
@@ -100,15 +101,15 @@ export function getLayerCapabilities(layerId: string | null): {
     isVector,
     isService,
     hasFeatures,
-    canStyle: flags.style,
-    canLabel: flags.style,
+    canStyle: flags.style && !getEffectiveLocked(state.project, layerId),
+    canLabel: flags.style && !getEffectiveLocked(state.project, layerId),
     canAttributeTable: flags.queryAttributes,
     canFilter: flags.filter,
     canExport: flags.exportVector,
     canCopy: flags.copyToLocal,
-    canEditGeometry: flags.editGeometry,
-    canRename: true,
-    canRemove: true,
+    canEditGeometry: flags.editGeometry && !getEffectiveLocked(state.project, layerId),
+    canRename: !getEffectiveLocked(state.project, layerId),
+    canRemove: !getEffectiveLocked(state.project, layerId),
     canZoom: true,
     canRetry:
       dataset?.kind === 'wms' ||
@@ -365,6 +366,7 @@ export const layerCommands = {
    */
   applyStyle(layerId: string, style: LayerStyle): boolean {
     const projectState = useProjectStore.getState()
+    if (getEffectiveLocked(projectState.project, layerId)) { emitCommandStatus('父文件夹已锁定，请先解锁再应用样式'); return false }
     const layer = projectState.project.layers.find(
       (item) => item.id === layerId
     )

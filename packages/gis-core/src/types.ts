@@ -289,9 +289,14 @@ export interface LayerGroup {
   visible: boolean
   /** Ordered child layer IDs (references only — never copies Datasets). */
   layerIds: string[]
+  /** Optional for legacy single-level projects. */
+  parentId?: string
+  locked?: boolean
+  /** Mixed folder/layer sibling order; legacy layerIds remain membership references. */
+  childOrder?: LayerTreeEntry[]
 }
 
-/** Top-level LayerPanel entry: an ungrouped layer or a single-level group. */
+/** Tree entry: a layer or a freely nested folder. */
 export type LayerTreeEntry =
   | { type: 'layer'; id: string }
   | { type: 'group'; id: string }
@@ -310,7 +315,7 @@ export interface Project {
   sceneDisplay?: Pick<SceneDocument, 'widgets' | 'theme' | 'presentation'>
   datasets: Dataset[]
   layers: Layer[]
-  /** Single-level groups. Absent/empty on legacy projects until normalizeLayerTree. */
+  /** Nested folders; legacy single-level groups remain readable. */
   groups: LayerGroup[]
   /**
    * Top-level list order (ungrouped layers + groups).

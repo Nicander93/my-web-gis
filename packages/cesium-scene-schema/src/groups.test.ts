@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createCityScene, getCityNodeState, moveCityNodes, parseCityScene, removeCityGroup } from './index'
+import { createCityScene, getCityNodeState, getCityDescendantIds, moveCityGroup, moveCityNodes, parseCityScene, removeCityGroup } from './index'
 import type { CityScene, GraphicNode } from './index'
 
 function scene(): CityScene {
@@ -9,6 +9,25 @@ function scene(): CityScene {
   return city
 }
 describe('city groups contract', () => {
+  it('retains nested folders through JSON and rejects cycles or missing parents before mutation', () => {
+    const city = scene()
+    city.groups![1].parentId = 'g'; city.nodes[0].groupId = 'h'
+    city.groups![0].visible = false; city.groups![0].locked = true
+    expect(parseCityScene(JSON.stringify(city))).toEqual(city)
+    expect(getCityDescendantIds(city, 'g')).toEqual(['a'])
+    expect(getCityNodeState(city, city.nodes[0])).toEqual({ visible: false, locked: true })
+    expect(city.nodes[0].visible).toBe(true)
+    city.groups![0].locked = false
+    const before = structuredClone(city)
+    expect(() => moveCityGroup(city, 'g', 'h')).toThrow('后代')
+    expect(() => parseCityScene({ ...city, groups: [{ ...city.groups![0], parentId: 'h' }, city.groups![1]] })).toThrow('成环')
+    expect(() => parseCityScene({ ...city, groups: [{ ...city.groups![0], parentId: 'missing' }, city.groups![1]] })).toThrow('不存在')
+    expect(city).toEqual(before)
+    const dissolved = removeCityGroup(city, 'g')
+    expect(dissolved.groups![0]).toMatchObject({ id: 'h', visible: false })
+    expect(dissolved.groups![0].parentId).toBeUndefined()
+    expect(dissolved.nodes[0]).toMatchObject({ id: 'a', groupId: 'h', visible: true })
+  })
   it('rejects duplicate/conflicting IDs, missing references and v1 group extensions', () => {
     const city = scene(); city.nodes[0].groupId = 'g'
     expect(parseCityScene(JSON.stringify(city))).toEqual(city)

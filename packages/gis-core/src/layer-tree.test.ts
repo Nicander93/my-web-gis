@@ -10,6 +10,9 @@ import {
   layerListZIndex,
   layersWithEffectiveVisibility,
   normalizeLayerTree,
+  moveLayerTreeEntry,
+  dissolveLayerGroup,
+  getEffectiveLocked,
   parseProjectSnapshot,
   serializeProjectSnapshot,
   createDefaultLayerStyle,
@@ -30,6 +33,28 @@ function layer(id: string, name = id): Layer {
 }
 
 describe('P14 layer tree / groups', () => {
+  it('preserves mixed nested sibling order, ancestor state and JSON round trips', () => {
+    let project = createProject('Nested')
+    project.layers = [layer('a'), layer('b'), layer('c')]
+    project.groups = [{ id: 'outer', name: 'Outer', visible: false, locked: true, layerIds: ['b'], childOrder: [{ type: 'group', id: 'inner' }, { type: 'layer', id: 'b' }] }, { id: 'inner', parentId: 'outer', name: 'Inner', visible: true, layerIds: ['a'] }]
+    project.rootOrder = [{ type: 'layer', id: 'c' }, { type: 'group', id: 'outer' }]
+    project = normalizeLayerTree(project)
+    expect(flattenLayerIds(project)).toEqual(['c', 'a', 'b'])
+    expect(getEffectiveVisible(project, 'a')).toBe(false)
+    expect(getEffectiveLocked(project, 'a')).toBe(true)
+    const restored = parseProjectSnapshot(serializeProjectSnapshot({ project, featuresByDataset: {} })).project
+    expect(restored.groups).toEqual(project.groups)
+    expect(restored.layers[0].visible).toBe(true)
+    expect(() => moveLayerTreeEntry(project, { type: 'layer', id: 'a' })).toThrow('锁定')
+    project.groups[0].locked = false
+    expect(() => moveLayerTreeEntry(project, { type: 'group', id: 'outer' }, 'inner')).toThrow('后代')
+    const dissolved = dissolveLayerGroup(project, 'outer')
+    expect(flattenLayerIds(dissolved)).toEqual(['c', 'a', 'b'])
+    expect(dissolved.groups).toHaveLength(1)
+    expect(dissolved.groups[0].parentId).toBeUndefined()
+    expect(getEffectiveVisible(dissolved, 'a')).toBe(false)
+    expect(dissolved.layers.find(layer => layer.id === 'b')?.visible).toBe(false)
+  })
   it('normalizes legacy projects without groups/rootOrder from layers array order', () => {
     const legacy = {
       id: 'p1',

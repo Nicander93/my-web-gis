@@ -9,7 +9,7 @@
 - 实施分支：`codex/desktop-productization-v1`，从上述 main 创建。
 - 开始时 `apps/desktop/src-tauri/Cargo.toml` 已被修改；本阶段保留，不纳入提交。
 - 继续使用 React / Zustand / Tauri / OpenLayers / Cesium；二维、三维项目保持独立。
-- 未修改 ProjectSnapshot、CityScene v1/v2、SceneDocument v3 的序列化格式。
+- M1 未修改 ProjectSnapshot、CityScene v1/v2、SceneDocument v3 的序列化格式。M2/M3 的文件夹批次随后增加兼容的可选层级字段，保留旧版本读取与原有 ID。
 
 基线命令：
 
@@ -50,12 +50,38 @@ rtk pnpm --filter @desktop-webgis/desktop test:e2e --project=desktop
 
 ## 功能审计与后续阶段
 
+### M2/M3 文件夹与兼容批次
+
+实现文件：`packages/gis-core/src/layer-tree.ts`、`packages/cesium-scene-schema/src/{index,groups}.ts`、`packages/scene-schema/src/document.ts`、Desktop 的 `LayerPanel`、`CitySceneTree`、树命令与 `project-scene-document` 桥。
+
+- 二维 `LayerGroup` 增加可选 `parentId/locked/childOrder`；旧 `layerIds/rootOrder` 继续读取。嵌套层级与混合兄弟顺序参与实际渲染顺序。
+- 三维 `CityGroup` 增加可选 `parentId`，沿用 CityScene v2 并继续读取 v1/v2。JSON Schema 同步记录该字段。
+- 两种树都可创建子文件夹、拖动跨父目录、搜索深层对象并展示父路径；循环、缺失父级、重复 ID 和不支持的树对象在提交前报错。
+- 父级显隐/锁定只参与有效状态计算；不写入子对象自己的设置。二维锁定禁止进入几何编辑、表格属性修改和样式应用，并取消受影响的活动地图编辑工具。
+- 二维重命名、移动、显隐、锁定、解散和子树删除接入单次撤销命令；子树删除保存全部数据快照，撤销一次即可恢复。删除不会清理无关的未使用数据集。
+- 解散文件夹保留后代，在原位置提升直接子项；隐藏文件夹解散后仍保留原实际显隐。
+- SceneDocument v3 导入/导出保留二维和三维嵌套关系；三维命名空间与二维发生 ID 冲突时，父引用与节点引用一起重映射。
+- 二维树双击图层改为定位；重命名仍通过右键菜单显式进入。
+
+验证：
+
+```powershell
+rtk pnpm build
+rtk pnpm test
+rtk pnpm --filter @desktop-webgis/desktop test:e2e --project=desktop
+rtk pnpm --filter @desktop-webgis/desktop test:e2e folders.e2e.ts --project=desktop --project=laptop --project=wide
+```
+
+全仓构建和测试通过；Desktop 216 通过、5 个原有环境项跳过；gis-core 73、cesium-scene-schema 19、scene-schema 26 个测试通过。完整 Desktop 主尺寸 E2E 44 通过；文件夹专项三个尺寸 6 通过。运行中源码热更新曾使两项浏览器用例异常重载，冻结源码重新执行后全部通过，没有跳过失败用例。
+
+截图：[二维嵌套文件夹](../design/desktop-productization/evidence/laptop-nested-2d.png)、[三维嵌套文件夹](../design/desktop-productization/evidence/laptop-nested-3d.png)。本批只完成文件夹层级与对应兼容链路；三维对象/文件夹混排、固定 ID 的完整属性窗口、CRS 命令、拓扑编辑等仍按总目标继续实施。
+
 | 阶段 | 已有可保留能力 | 本方案仍需实现/签收 |
 |---|---|---|
 | M0 | 构建/单测/E2E 基线；旧项目和公开 SceneDocument 转换测试 | 原生截图、完整依赖/能力审计仍须随阶段补齐 |
 | M1 | 首批三行 Shell、两引擎覆盖式窗口、布局恢复 | 全局工具会话协调；工具箱/日志/诊断独立窗口随后续阶段接入 |
-| M2 | 点线面编辑、捕捉、选择、CRS/导出 | 任意深度二维 Folder、明确 CRS 赋值工作流及复杂拓扑编辑 |
-| M3 | 模型/Tileset 选择、整体 Gizmo、专业 Inspector、旧 CityScene 兼容 | 嵌套三维 Folder；固定 ID 的独立 Apply/OK/Cancel 属性窗；检查器固定 |
+| M2 | 点线面编辑、捕捉、选择、CRS/导出；已接入嵌套 Folder 与原子树命令 | 明确 CRS 赋值工作流及复杂拓扑编辑、专业选择能力 |
+| M3 | 模型/Tileset 选择、整体 Gizmo、专业 Inspector、旧 CityScene 兼容；已接入嵌套 Folder | 文件夹/对象混排；固定 ID 的独立 Apply/OK/Cancel 属性窗；检查器固定 |
 | M4 | 分页、搜索、过滤、统计、属性单元格、处理算法/取消 | 多数据集 Tab、表内原子字段计算器、面合并属性策略 |
 | M5 | point/polyline/polygon Graphic、几何编辑、对象独立样式 | 共享 Graphic 渲染池、连续 POI、Billboard/Label/rectangle/ellipse 等及 500 对象验收 |
 | M6 | 本地二维文件、WMS/WMTS/WFS、三维资源加载、失败重试 | 二三维添加数据壳、基于项目路径的资源引用/另存重算、父目录重定位 |

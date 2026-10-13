@@ -232,7 +232,10 @@ export function compileProjectToScene(
     id: g.id,
     name: g.name,
     visible: g.visible,
-    layerIds: [...g.layerIds]
+    layerIds: [...g.layerIds],
+    ...(g.parentId ? { parentId: g.parentId } : {}),
+    ...(g.locked === undefined ? {} : { locked: g.locked }),
+    ...(g.childOrder ? { childOrder: structuredClone(g.childOrder) } : {})
   }))
 
   const layerMeta: Record<string, unknown> = {}

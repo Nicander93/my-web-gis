@@ -1,5 +1,5 @@
 import { createId, SetCitySceneCommand } from '@desktop-webgis/gis-core'
-import { createCityScene, createTransform, getCityNodeState, moveCityNodes, removeCityGroup } from '@desktop-webgis/cesium-scene-schema'
+import { createCityScene, createTransform, getCityNodeState, getCityGroupState, moveCityNodes, moveCityGroup, removeCityGroup } from '@desktop-webgis/cesium-scene-schema'
 import type { CityGroup, CityNode, CityScene, GeoPosition } from '@desktop-webgis/cesium-scene-schema'
 import { useProjectStore } from '@/stores/project.store'
 
@@ -57,7 +57,7 @@ export function setCityNodesVisible(ids: readonly string[], visible: boolean): v
 export function setCityNodesLocked(ids: readonly string[], locked: boolean): void {
   updateCity('批量设置对象锁定', scene => {
     const nodes = selectedNodes(scene, ids)
-    if (!locked && nodes.some(node => scene.groups?.find(group => group.id === node.groupId)?.locked)) throw new Error('请先解锁对象所属分组')
+    if (!locked && nodes.some(node => getCityGroupState(scene, node.groupId).locked)) throw new Error('请先解锁对象所属分组（文件夹）及其父级')
     nodes.forEach(node => { node.locked = locked }); return scene
   })
 }
@@ -80,19 +80,20 @@ export function copyCityNodes(ids: readonly string[]): string[] {
       while (names.has(name)) name = `${base} ${suffix++}`
       names.add(name)
       copy.id = createId('city'); copy.name = name; copy.locked = false
-      if (scene.groups?.find(group => group.id === copy.groupId)?.locked) { copy.visible = getCityNodeState(scene, node).visible; delete copy.groupId }
+      if (getCityGroupState(scene, copy.groupId).locked) { copy.visible = getCityNodeState(scene, node).visible; delete copy.groupId }
       copied.push(copy.id); return copy
     })
     scene.nodes.push(...copies); return scene
   })
   return copied
 }
-export function addCityGroup(name: string, ids: readonly string[] = []): string {
+export function addCityGroup(name: string, ids: readonly string[] = [], parentId?: string): string {
   if (!name.trim()) throw new Error('分组名称不能为空')
   const id = createId('city-group')
   updateCity('创建场景分组', scene => {
     const nodes = ids.length ? selectedNodes(scene, ids, true) : []
-    scene.groups ??= []; scene.groups.push({ id, name: name.trim(), visible: true })
+    if (getCityGroupState(scene, parentId).locked) throw new Error('目标文件夹或其父级已锁定')
+    scene.groups ??= []; scene.groups.push({ id, name: name.trim(), visible: true, ...(parentId ? { parentId } : {}) })
     nodes.forEach(node => { node.groupId = id }); return scene
   })
   return id
@@ -101,6 +102,7 @@ export function patchCityGroup(id: string, patch: Partial<Pick<CityGroup, 'name'
   updateCity('设置场景分组', scene => {
     const group = scene.groups?.find(group => group.id === id)
     if (!group) throw new Error('分组不存在')
+    if (getCityGroupState(scene, group.parentId).locked) throw new Error('请先解锁父文件夹')
     if (patch.name !== undefined && (group.locked || !patch.name.trim())) throw new Error(group.locked ? '请先解锁分组' : '分组名称不能为空')
     Object.assign(group, patch); return scene
   })
@@ -109,3 +111,16 @@ export function moveCitySelection(ids: readonly string[], groupId?: string, befo
   updateCity('移动场景对象', scene => moveCityNodes(scene, ids, groupId, beforeId))
 }
 export function dissolveCityGroup(id: string): void { updateCity('解散场景分组', scene => removeCityGroup(scene, id)) }
+export function moveCityFolder(id: string, parentId?: string, beforeId?: string): void {
+  updateCity('移动场景文件夹', scene => moveCityGroup(scene, id, parentId, beforeId))
+}
+export function reorderCityFolder(id: string, direction: -1 | 1): void {
+  updateCity('调整文件夹顺序', scene => {
+    const group = scene.groups?.find(group => group.id === id)
+    if (!group) throw new Error('文件夹不存在')
+    const siblings = scene.groups?.filter(item => item.parentId === group.parentId) ?? []
+    const index = siblings.findIndex(item => item.id === id)
+    if (index + direction < 0 || index + direction >= siblings.length) return scene
+    return moveCityGroup(scene, id, group.parentId, direction < 0 ? siblings[index - 1].id : siblings[index + 2]?.id)
+  })
+}

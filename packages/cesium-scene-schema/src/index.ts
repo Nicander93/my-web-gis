@@ -122,7 +122,7 @@ export interface WaterNode extends NodeBase {
 }
 
 export type CityNode = TilesetNode | ModelNode | GeoJsonNode | ImageryNode | WaterNode | GraphicNode
-export interface CityGroup { id: string; name: string; visible: boolean; locked?: boolean }
+export interface CityGroup { id: string; name: string; visible: boolean; locked?: boolean; parentId?: string }
 export interface CityScene {
   version: 1 | 2
   camera: CityCamera
@@ -211,6 +211,19 @@ export function validateCityScene(input: unknown, root = '$'): CityValidationIss
       if (typeof group.id === 'string') groupIds.add(group.id)
       check(typeof group.name === 'string' && !!group.name.trim() && typeof group.visible === 'boolean' && (group.locked === undefined || typeof group.locked === 'boolean'), path, '分组名称、显隐或锁定状态无效')
     })
+    if (Array.isArray(input.groups)) {
+      const parents = new Map(input.groups.filter(record).map(group => [group.id, group.parentId]))
+      input.groups.forEach((group: unknown, i: number) => {
+        if (!record(group)) return
+        if (group.parentId !== undefined) check(typeof group.parentId === 'string' && groupIds.has(group.parentId), `groups[${i}].parentId`, '父文件夹不存在')
+        const seen = new Set<unknown>([group.id])
+        let parent = group.parentId
+        while (parent !== undefined && parents.has(parent)) {
+          if (seen.has(parent)) { check(false, `groups[${i}].parentId`, '文件夹层级不能成环'); break }
+          seen.add(parent); parent = parents.get(parent)
+        }
+      })
+    }
   }
   if (!Array.isArray(input.nodes)) { check(false, 'nodes', '对象必须是数组'); return issues }
   const ids = new Set<string>()
@@ -265,4 +278,4 @@ export function parseCityScene(input: unknown): CityScene {
   return structuredClone(decoded) as CityScene
 }
 
-export { getCityNodeState, moveCityNodes, removeCityGroup } from './groups.js'
+export { getCityNodeState, getCityGroupState, getCityDescendantIds, moveCityNodes, moveCityGroup, removeCityGroup } from './groups.js'

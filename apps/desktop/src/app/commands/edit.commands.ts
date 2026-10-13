@@ -1,7 +1,7 @@
 import { emitCommandStatus } from './status'
 import { useProjectStore } from '@/stores/project.store'
 import { useWorkbenchStore } from '@/stores/workbench.store'
-import { capabilitiesForDataset } from '@desktop-webgis/gis-core'
+import { capabilitiesForDataset, getEffectiveLocked } from '@desktop-webgis/gis-core'
 import {
   isToolRuntimeMounted,
   setActiveEditTool
@@ -21,6 +21,7 @@ export const editCommands = {
     )
     if (
       !layer ||
+      getEffectiveLocked(state.project, layer.id) ||
       !capabilitiesForDataset(
         state.project.datasets.find((item) => item.id === layer.datasetId)
       ).editGeometry

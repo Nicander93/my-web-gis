@@ -268,7 +268,11 @@ export function migrateSceneDocument(input: unknown, identity = { id: 'city-scen
       }
     }
     for (const group of city.groups ?? []) {
-      const id = allocateId(group.id, nodeIds); groups.set(group.id, id); nodes.push({ ...group, id, type: 'group', scope: '3d' })
+      groups.set(group.id, allocateId(group.id, nodeIds))
+    }
+    for (const group of city.groups ?? []) {
+      const { parentId, ...definition } = group
+      nodes.push({ ...definition, id: groups.get(group.id)!, type: 'group', scope: '3d', ...(parentId ? { parentId: groups.get(parentId)! } : {}) })
     }
     for (const node of city.nodes) {
       const { groupId, ...definition } = node

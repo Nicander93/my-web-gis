@@ -17,6 +17,11 @@ import {
   createLayerGroup,
   findGroupForLayer,
   layersWithEffectiveVisibility,
+  getLayerTreeChildren,
+  getLayerGroupState,
+  getEffectiveLocked,
+  moveLayerTreeEntry,
+  dissolveLayerGroup,
   SetLayerStyleCommand,
   SetLayerFilterCommand,
   SetLayerOpacityCommand,
@@ -135,7 +140,9 @@ interface ProjectState {
   renameGroup(groupId: string, name: string): void
   moveLayer(layerId: string, direction: 'up' | 'down'): void
   moveRootEntry(entry: LayerTreeEntry, direction: 'up' | 'down'): void
-  createGroup(name?: string, layerIds?: string[]): string | null
+  createGroup(name?: string, layerIds?: string[], parentId?: string): string | null
+  relocateGroup(groupId: string, parentId?: string, index?: number): void
+  setGroupLocked(groupId: string, locked: boolean): void
   /** removeChildren=false keeps children as ungrouped top-level layers. */
   removeGroup(groupId: string, removeChildren: boolean): void
   /**
@@ -509,7 +516,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   updateFeatureProperties: (layerId, featureId, nextProperties) => {
     const state = get()
     const layer = state.project.layers.find((item) => item.id === layerId)
-    if (!layer) return false
+    if (!layer || getEffectiveLocked(state.project, layerId)) return false
     const features = state.featuresByDataset[layer.datasetId] ?? []
     const feature = features.find((item) => item.id === featureId)
     if (!feature) return false
@@ -635,183 +642,81 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     )
   },
 
-  setGroupVisible: (groupId, visible) =>
-    set((state) => ({
-      project: normalizeLayerTree({
-        ...state.project,
-        groups: (state.project.groups ?? []).map((group) =>
-          group.id === groupId ? { ...group, visible } : group
-        )
-      }),
-      dirty: true
-    })),
-
-  renameLayer: (layerId, name) => {
-    const trimmed = name.trim()
-    if (!trimmed) return
-    set((state) => ({
-      project: {
-        ...state.project,
-        layers: state.project.layers.map((layer) =>
-          layer.id === layerId ? { ...layer, name: trimmed } : layer
-        )
-      },
-      dirty: true
-    }))
+  setGroupVisible: (id, visible) => {
+    const state = get(), project = structuredClone(state.project), group = project.groups.find(group => group.id === id)
+    if (!group || group.visible === visible) return
+    group.visible = visible
+    state.executeEditCommand(new SetLayerTreeCommand(createId('cmd'), '设置文件夹显隐', snapshotLayerTree(state.project), snapshotLayerTree(project)))
   },
-
-  renameGroup: (groupId, name) => {
-    const trimmed = name.trim()
-    if (!trimmed) return
-    set((state) => ({
-      project: normalizeLayerTree({
-        ...state.project,
-        groups: (state.project.groups ?? []).map((group) =>
-          group.id === groupId ? { ...group, name: trimmed } : group
-        )
-      }),
-      dirty: true
-    }))
+  setGroupLocked: (id, locked) => {
+    const state = get(), project = structuredClone(state.project), group = project.groups.find(group => group.id === id)
+    if (!group) return
+    if (getLayerGroupState(project, group.parentId).locked) throw new Error('请先解锁父文件夹')
+    group.locked = locked
+    state.executeEditCommand(new SetLayerTreeCommand(createId('cmd'), '设置文件夹锁定', snapshotLayerTree(state.project), snapshotLayerTree(project)))
   },
-
-  moveRootEntry: (entry, direction) =>
-    set((state) => {
-      const project = normalizeLayerTree(state.project)
-      const order = [...(project.rootOrder ?? [])]
-      const index = order.findIndex((item) => item.type === entry.type && item.id === entry.id)
-      if (index < 0) return state
-      const swapWith = direction === 'up' ? index - 1 : index + 1
-      if (swapWith < 0 || swapWith >= order.length) return state
-      ;[order[index], order[swapWith]] = [order[swapWith]!, order[index]!]
-      return {
-        project: { ...project, rootOrder: order },
-        dirty: true
-      }
-    }),
-
-  moveLayer: (layerId, direction) => {
-    const state = get()
-    const project = normalizeLayerTree(state.project)
-    const group = findGroupForLayer(project, layerId)
-    if (group) {
-      const ids = [...group.layerIds]
-      const index = ids.indexOf(layerId)
-      const swapWith = direction === 'up' ? index - 1 : index + 1
-      if (index < 0 || swapWith < 0 || swapWith >= ids.length) {
-        // At group edge: move out to root before/after the group.
-        const rootIndex = (project.rootOrder ?? []).findIndex(
-          (e) => e.type === 'group' && e.id === group.id
-        )
-        if (rootIndex < 0) return
-        const insertAt = direction === 'up' ? rootIndex : rootIndex + 1
-        const nextGroupIds = ids.filter((id) => id !== layerId)
-        const nextGroups = (project.groups ?? []).map((g) =>
-          g.id === group.id ? { ...g, layerIds: nextGroupIds } : g
-        )
-        const nextRoot = [...(project.rootOrder ?? [])]
-        nextRoot.splice(insertAt, 0, { type: 'layer', id: layerId })
-        set({
-          project: normalizeLayerTree({
-            ...project,
-            groups: nextGroups,
-            rootOrder: nextRoot
-          }),
-          dirty: true
-        })
-        return
-      }
-      ;[ids[index], ids[swapWith]] = [ids[swapWith]!, ids[index]!]
-      set({
-        project: normalizeLayerTree({
-          ...project,
-          groups: (project.groups ?? []).map((g) =>
-            g.id === group.id ? { ...g, layerIds: ids } : g
-          )
-        }),
-        dirty: true
-      })
-      return
-    }
-    get().moveRootEntry({ type: 'layer', id: layerId }, direction)
+  renameLayer: (id, name) => {
+    const state = get(), project = structuredClone(state.project), layer = project.layers.find(layer => layer.id === id)
+    if (!layer || !name.trim() || layer.name === name.trim()) return
+    if (getEffectiveLocked(project, id)) throw new Error('父文件夹已锁定')
+    layer.name = name.trim()
+    state.executeEditCommand(new SetLayerTreeCommand(createId('cmd'), '重命名图层', snapshotLayerTree(state.project), snapshotLayerTree(project)))
   },
-
-  createGroup: (name = '新建组', layerIds = []) => {
-    const beforeTree = snapshotLayerTree(get().project)
-    const state = get()
-    const project = normalizeLayerTree(state.project)
-    const validIds = layerIds.filter((id) => project.layers.some((l) => l.id === id))
-    const group = createLayerGroup(name, validIds)
-
-    // Remove members from other groups / root.
-    let groups = (project.groups ?? []).map((g) => ({
-      ...g,
-      layerIds: g.layerIds.filter((id) => !validIds.includes(id))
-    }))
-    groups = [...groups, group]
-    const rootOrder = [
-      { type: 'group' as const, id: group.id },
-      ...(project.rootOrder ?? []).filter(
-        (entry) => !(entry.type === 'layer' && validIds.includes(entry.id))
-      )
-    ]
-
-    const afterProject = normalizeLayerTree({ ...project, groups, rootOrder })
-    editHistory.execute(
-      new SetLayerTreeCommand(
-        createId('cmd'),
-        '创建图层组',
-        beforeTree,
-        snapshotLayerTree(afterProject)
-      ),
-      projectEditContext()
-    )
+  renameGroup: (id, name) => {
+    const state = get(), project = structuredClone(state.project), group = project.groups.find(group => group.id === id)
+    if (!group || !name.trim() || group.name === name.trim()) return
+    if (getLayerGroupState(project, id).locked) throw new Error('文件夹或其父级已锁定')
+    group.name = name.trim()
+    state.executeEditCommand(new SetLayerTreeCommand(createId('cmd'), '重命名文件夹', snapshotLayerTree(state.project), snapshotLayerTree(project)))
+  },
+  moveRootEntry: (entry, direction) => {
+    const state = get(), project = normalizeLayerTree(state.project)
+    const parent = entry.type === 'group' ? project.groups.find(group => group.id === entry.id)?.parentId : findGroupForLayer(project, entry.id)?.id
+    const siblings = getLayerTreeChildren(project, parent), index = siblings.findIndex(item => item.type === entry.type && item.id === entry.id)
+    const target = index + (direction === 'up' ? -1 : 1)
+    if (index < 0 || target < 0 || target >= siblings.length) return
+    const after = moveLayerTreeEntry(project, entry, parent, target)
+    state.executeEditCommand(new SetLayerTreeCommand(createId('cmd'), '调整树对象顺序', snapshotLayerTree(project), snapshotLayerTree(after)))
+  },
+  moveLayer: (id, direction) => get().moveRootEntry({ type: 'layer', id }, direction),
+  relocateGroup: (id, parentId, index) => {
+    const state = get(), after = moveLayerTreeEntry(state.project, { type: 'group', id }, parentId, index)
+    state.executeEditCommand(new SetLayerTreeCommand(createId('cmd'), '移动文件夹', snapshotLayerTree(state.project), snapshotLayerTree(after)))
+  },
+  createGroup: (name = '新建组', ids = [], parentId) => {
+    const state = get(), before = normalizeLayerTree(state.project)
+    if (getLayerGroupState(before, parentId).locked) throw new Error('目标文件夹或其父级已锁定')
+    const group = createLayerGroup(name.trim() || '新建文件夹')
+    let after = normalizeLayerTree({ ...structuredClone(before), groups: [...before.groups, group] })
+    after = moveLayerTreeEntry(after, { type: 'group', id: group.id }, parentId, 0)
+    for (const id of ids) if (before.layers.some(layer => layer.id === id)) after = moveLayerTreeEntry(after, { type: 'layer', id }, group.id)
+    state.executeEditCommand(new SetLayerTreeCommand(createId('cmd'), '创建文件夹', snapshotLayerTree(before), snapshotLayerTree(after)))
     return group.id
   },
-
-  removeGroup: (groupId, removeChildren) => {
+  removeGroup: (id, removeChildren) => {
     const state = get()
-    const project = normalizeLayerTree(state.project)
-    const group = (project.groups ?? []).find((g) => g.id === groupId)
-    if (!group) return
-
-    if (removeChildren) {
-      for (const layerId of [...group.layerIds]) {
-        get().removeLayer(layerId)
-      }
-      // refresh after removals
-      const after = normalizeLayerTree(get().project)
-      set({
-        project: normalizeLayerTree({
-          ...after,
-          groups: (after.groups ?? []).filter((g) => g.id !== groupId),
-          rootOrder: (after.rootOrder ?? []).filter((e) => !(e.type === 'group' && e.id === groupId))
-        }),
-        dirty: true
-      })
+    if (!removeChildren) {
+      const after = dissolveLayerGroup(state.project, id)
+      state.executeEditCommand(new SetLayerTreeCommand(createId('cmd'), '解散文件夹', snapshotLayerTree(state.project), snapshotLayerTree(after)))
       return
     }
-
-    // Keep children: insert them in place of the group in rootOrder.
-    const rootOrder: LayerTreeEntry[] = []
-    for (const entry of project.rootOrder ?? []) {
-      if (entry.type === 'group' && entry.id === groupId) {
-        for (const layerId of group.layerIds) {
-          rootOrder.push({ type: 'layer', id: layerId })
-        }
-        continue
-      }
-      rootOrder.push(entry)
+    const after = state.getSnapshot(), groups = new Set([id])
+    if (!after.project.groups.some(group => group.id === id)) return
+    for (let changed = true; changed;) {
+      changed = false
+      for (const group of after.project.groups) if (group.parentId && groups.has(group.parentId) && !groups.has(group.id)) { groups.add(group.id); changed = true }
     }
-    set({
-      project: normalizeLayerTree({
-        ...project,
-        groups: (project.groups ?? []).filter((g) => g.id !== groupId),
-        rootOrder
-      }),
-      dirty: true
-    })
+    if ([...groups].some(groupId => getLayerGroupState(after.project, groupId).locked)) throw new Error('请先解锁文件夹及其后代')
+    const removedLayers = new Set(after.project.groups.filter(group => groups.has(group.id)).flatMap(group => group.layerIds))
+    const removedDatasets = new Set(after.project.layers.filter(layer => removedLayers.has(layer.id)).map(layer => layer.datasetId))
+    after.project.layers = after.project.layers.filter(layer => !removedLayers.has(layer.id))
+    after.project.groups = after.project.groups.filter(group => !groups.has(group.id))
+    const retainedDatasets = new Set(after.project.layers.map(layer => layer.datasetId))
+    after.project.datasets = after.project.datasets.filter(dataset => !removedDatasets.has(dataset.id) || retainedDatasets.has(dataset.id))
+    for (const datasetId of removedDatasets) if (!retainedDatasets.has(datasetId)) delete after.featuresByDataset[datasetId]
+    after.project = normalizeLayerTree(after.project)
+    state.applySnapshotAsEdit(after, '删除文件夹及其内容')
   },
-
   removeLayer: (layerId) => {
     const state = get()
     const project = normalizeLayerTree(state.project)
@@ -862,64 +767,16 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     return true
   },
 
-  relocateLayer: (layerId, target) =>
-    set((state) => {
-      const project = normalizeLayerTree(state.project)
-      if (!project.layers.some((l) => l.id === layerId)) return state
-
-      // Detach from current group / root.
-      let groups = (project.groups ?? []).map((g) => ({
-        ...g,
-        layerIds: g.layerIds.filter((id) => id !== layerId)
-      }))
-      let rootOrder = (project.rootOrder ?? []).filter(
-        (entry) => !(entry.type === 'layer' && entry.id === layerId)
-      )
-
-      if (target.kind === 'root') {
-        const index = Math.max(0, Math.min(target.index, rootOrder.length))
-        rootOrder = [
-          ...rootOrder.slice(0, index),
-          { type: 'layer', id: layerId },
-          ...rootOrder.slice(index)
-        ]
-      } else {
-        groups = groups.map((g) => {
-          if (g.id !== target.groupId) return g
-          const ids = [...g.layerIds]
-          const index = Math.max(0, Math.min(target.index, ids.length))
-          ids.splice(index, 0, layerId)
-          return { ...g, layerIds: ids }
-        })
-      }
-
-      return {
-        project: normalizeLayerTree({ ...project, groups, rootOrder }),
-        dirty: true
-      }
-    }),
-
-  addLayersToGroup: (groupId, layerIds) =>
-    set((state) => {
-      const project = normalizeLayerTree(state.project)
-      if (!project.groups.some((g) => g.id === groupId)) return state
-      const valid = layerIds.filter((id) => project.layers.some((l) => l.id === id))
-      let groups = (project.groups ?? []).map((g) => ({
-        ...g,
-        layerIds: g.layerIds.filter((id) => !valid.includes(id))
-      }))
-      groups = groups.map((g) =>
-        g.id === groupId ? { ...g, layerIds: [...g.layerIds, ...valid] } : g
-      )
-      const rootOrder = (project.rootOrder ?? []).filter(
-        (entry) => !(entry.type === 'layer' && valid.includes(entry.id))
-      )
-      return {
-        project: normalizeLayerTree({ ...project, groups, rootOrder }),
-        dirty: true
-      }
-    }),
-
+  relocateLayer: (id, target) => {
+    const state = get(), after = moveLayerTreeEntry(state.project, { type: 'layer', id }, target.kind === 'group' ? target.groupId : undefined, target.index)
+    state.executeEditCommand(new SetLayerTreeCommand(createId('cmd'), '移动图层', snapshotLayerTree(state.project), snapshotLayerTree(after)))
+  },
+  addLayersToGroup: (groupId, ids) => {
+    const state = get()
+    let after = state.project
+    for (const id of ids) after = moveLayerTreeEntry(after, { type: 'layer', id }, groupId)
+    state.executeEditCommand(new SetLayerTreeCommand(createId('cmd'), '移动图层到文件夹', snapshotLayerTree(state.project), snapshotLayerTree(after)))
+  },
   _resetAttributeHistoryForTests: () => {
     editHistory.clear()
   },

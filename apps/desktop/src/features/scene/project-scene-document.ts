@@ -1,4 +1,4 @@
-import { createProject, isLegacyStyle, migrateLegacyStyle, normalizeLayerTree, type BasemapConfig, type Dataset, type GisFeature, type ProjectSnapshot, type ServiceSource } from '@desktop-webgis/gis-core'
+import { createProject, isLegacyStyle, migrateLegacyStyle, normalizeLayerTree, getLayerTreeChildren, type LayerTreeEntry, type BasemapConfig, type Dataset, type GisFeature, type ProjectSnapshot, type ServiceSource } from '@desktop-webgis/gis-core'
 import { createCityScene, parseCityScene, type CityNode } from '@desktop-webgis/cesium-scene-schema'
 import { getUnsupportedSceneExtensions, migrateSceneDocument, parseSceneDocument, type GeoJsonFeatureCollection, type JsonValue, type SceneDocument, type SceneNode, type SceneResource, type SceneResourceMetadata } from '@desktop-webgis/scene-schema'
 import { toWmsSceneSource, toWmtsSceneSource } from './compile-project'
@@ -113,14 +113,15 @@ export function createProjectSceneProjection(snapshot: ProjectSnapshot): Project
       ...(layer.filter ? { filter: layer.filter.map(condition => omitUndefined(structuredClone(condition))) as Extract<SceneNode, { type: 'vector' }>['filter'] } : {}) })
     else nodes.push({ ...base, type: 'tile' })
   }
-  for (const entry of [...project.rootOrder].reverse()) {
-    if (entry.type === 'layer') addLayer(entry.id)
+  function addTreeEntry(entry: LayerTreeEntry, parentId?: string): void {
+    if (entry.type === 'layer') addLayer(entry.id, parentId)
     else {
       const group = project.groups.find(group => group.id === entry.id)!
-      nodes.push({ type: 'group', id: group.id, name: group.name, visible: group.visible, scope: '2d' })
-      for (const id of [...group.layerIds].reverse()) addLayer(id, group.id)
+      nodes.push({ type: 'group', id: group.id, name: group.name, visible: group.visible, scope: '2d', ...(group.locked === undefined ? {} : { locked: group.locked }), ...(parentId ? { parentId } : {}) })
+      for (const child of [...getLayerTreeChildren(project, group.id)].reverse()) addTreeEntry(child, group.id)
     }
   }
+  for (const entry of [...project.rootOrder].reverse()) addTreeEntry(entry)
   const city = project.city ? migrateSceneDocument(project.city, { id: project.id, title: project.name }, { resourceIds: [...usedResources], nodeIds: [...usedNodes] }) : undefined
   Object.assign(resources, city?.resources)
   const cityNodeIds = new Map<string, string>(), hostCityNodeIds = new Map<string, string>()
@@ -247,13 +248,24 @@ export function createProjectFromSceneDocument(input: unknown): ProjectSnapshot 
       style: node.type === 'vector' ? node.style : { kind: 'mixed', stroke: '#000000', fill: '#000000', width: 1, pointRadius: 4 }, ...(node.type === 'vector' && node.filter ? { filter: node.filter } : {}) })
     if (node.parentId) grouped.add(node.id)
   }
-  const groups = document.nodes.filter((node): node is Extract<SceneNode, { type: 'group' }> => node.type === 'group' && (node.scope === '2d' || node.scope === undefined && mapViews.length > 0 && cityViews.length === 0 || document.nodes.some(child => child.parentId === node.id && (child.type === 'tile' || child.type === 'vector'))))
+  const mapGroupIds = new Set(document.nodes.filter(node => node.type === 'group' && (node.scope === '2d' || node.scope === undefined && mapViews.length > 0 && cityViews.length === 0)).map(node => node.id))
+  for (const node of mapNodes) if (node.parentId) mapGroupIds.add(node.parentId)
+  for (let changed = true; changed;) {
+    changed = false
+    for (const node of document.nodes) if (node.type === 'group') {
+      if (mapGroupIds.has(node.id) && node.parentId && !mapGroupIds.has(node.parentId)) { mapGroupIds.add(node.parentId); changed = true }
+      if (node.scope !== '3d' && node.parentId && mapGroupIds.has(node.parentId) && !mapGroupIds.has(node.id)) { mapGroupIds.add(node.id); changed = true }
+    }
+  }
+  const groups = document.nodes.filter((node): node is Extract<SceneNode, { type: 'group' }> => node.type === 'group' && mapGroupIds.has(node.id))
   for (const group of groups) {
-    if (group.parentId || group.locked) throw new Error('当前二维工程不支持嵌套或锁定分组')
-    project.groups.push({ id: group.id, name: group.name, visible: group.visible, layerIds: project.layers.filter(layer => document.nodes.find(node => node.id === layer.id)?.parentId === group.id).map(layer => layer.id) })
+    const children = [...document.nodes].reverse().filter(node => node.parentId === group.id && (node.type === 'group' || project.layers.some(layer => layer.id === node.id)))
+    project.groups.push({ id: group.id, name: group.name, visible: group.visible, ...(group.parentId ? { parentId: group.parentId } : {}), ...(group.locked === undefined ? {} : { locked: group.locked }),
+      layerIds: children.filter(node => node.type !== 'group').map(node => node.id),
+      ...(children.some(node => node.type === 'group') ? { childOrder: children.map(node => ({ type: node.type === 'group' ? 'group' as const : 'layer' as const, id: node.id })) } : {}) })
   }
   for (const node of [...document.nodes].reverse()) {
-    if (groups.some(group => group.id === node.id)) project.rootOrder.push({ type: 'group', id: node.id })
+    if (groups.some(group => group.id === node.id) && !node.parentId) project.rootOrder.push({ type: 'group', id: node.id })
     else if (project.layers.some(layer => layer.id === node.id) && !grouped.has(node.id)) project.rootOrder.push({ type: 'layer', id: node.id })
   }
   const hasCityResources = Object.entries(document.resources).some(([id, resource]) => resource.type === '3dtiles' || resource.type === 'glb' || resource.type === 'geojson' && resource.url && !mapNodes.some(node => node.resource === id))
@@ -262,8 +274,8 @@ export function createProjectFromSceneDocument(input: unknown): ProjectSnapshot 
     if (cityViews[0]) city.camera = cityViews[0].camera
     Object.assign(city, document.environment)
     city.groups = document.nodes.filter(node => node.type === 'group' && !mapGroups.has(node.id)).map(node => {
-      if (node.type !== 'group' || node.parentId) throw new Error('当前三维工程不支持嵌套分组')
-      return { id: node.id, name: node.name, visible: node.visible, ...(node.locked === undefined ? {} : { locked: node.locked }) }
+      if (node.type !== 'group') throw new Error('三维文件夹结构无效')
+      return { id: node.id, name: node.name, visible: node.visible, ...(node.locked === undefined ? {} : { locked: node.locked }), ...(node.parentId ? { parentId: node.parentId } : {}) }
     })
     city.nodes = document.nodes.filter(node => !['tile', 'vector', 'group'].includes(node.type)).map(node => {
       const { parentId, ...definition } = node

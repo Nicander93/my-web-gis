@@ -9,7 +9,7 @@ import {
 } from '@desktop-webgis/gis-core'
 import { useProjectStore } from '@/stores/project.store'
 import { useWorkbenchStore } from '@/stores/workbench.store'
-import { capabilitiesForDataset } from '@desktop-webgis/gis-core'
+import { capabilitiesForDataset, getEffectiveLocked } from '@desktop-webgis/gis-core'
 import { useSessionStore } from '@/stores/session.store'
 import { Button } from '@/components/ui/Button'
 import { zoomMapToFeature, zoomMapToSelected } from '@/features/map/map-runtime-host'
@@ -94,6 +94,7 @@ export function AttributeTable({
     ? project.layers.find((layer) => layer.id === selectedLayerId)
     : null
   const canEditCells =
+    !!selectedLayerId && !getEffectiveLocked(project, selectedLayerId) &&
     editLayerId === selectedLayerId &&
     capabilitiesForDataset(
       project.datasets.find(

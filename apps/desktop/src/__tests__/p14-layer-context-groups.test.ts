@@ -39,6 +39,29 @@ describe('P14 layer context menu / groups', () => {
   beforeEach(() => {
     resetStores()
   })
+  it('undoes nested folder moves, inherited locks, dissolution and subtree deletion atomically', () => {
+    const state = useProjectStore.getState()
+    state.addLayer('nested-data', 'Nested layer', [feat('nested')], 'point')
+    const id = useProjectStore.getState().project.layers[0].id
+    const outer = state.createGroup('Outer')!, inner = state.createGroup('Inner', [id], outer)!
+    expect(useProjectStore.getState().project.groups.find(group => group.id === inner)?.parentId).toBe(outer)
+    state.setGroupLocked(outer, true)
+    expect(getLayerCapabilities(id).canEditGeometry).toBe(false)
+    expect(() => state.relocateGroup(inner)).toThrow('锁定')
+    state.undoEdit()
+    expect(getLayerCapabilities(id).canEditGeometry).toBe(true)
+    const before = useProjectStore.getState().getSnapshot()
+    expect(() => state.relocateGroup(outer, inner)).toThrow('后代')
+    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
+    state.removeGroup(outer, true)
+    expect(useProjectStore.getState().project.layers).toHaveLength(0)
+    state.undoEdit()
+    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
+    state.removeGroup(outer, false)
+    expect(useProjectStore.getState().project.groups.find(group => group.id === inner)?.parentId).toBeUndefined()
+    state.undoEdit()
+    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
+  })
 
   it('persists visibility and order across serialize/parse', () => {
     const store = useProjectStore.getState()

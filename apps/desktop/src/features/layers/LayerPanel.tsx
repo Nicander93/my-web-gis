@@ -11,17 +11,23 @@ import {
   X,
   ArrowUp,
   ArrowDown,
-  Trash2
+  Trash2,
+  FolderPlus,
+  Pencil,
+  LockKeyhole
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/Button'
 import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
 import {
-  flattenLayerIds,
   isLegacyStyle,
   migrateLegacyStyle,
   normalizeLayerTree,
+  getLayerTreeChildren,
+  getLayerGroupLayerIds,
+  getLayerGroupState,
+  getEffectiveLocked,
   type Layer,
   type LayerGroup,
   type LayerTreeEntry
@@ -39,6 +45,7 @@ import { EditorDialog } from '@/components/ui/EditorDialog'
 import { projectCommands } from '@/app/commands/project.commands'
 import { layerCommands } from '@/app/commands/layer.commands'
 import { useWorkbenchStore } from '@/stores/workbench.store'
+import { emitCommandStatus } from '@/app/commands/status'
 
 function previewFromSymbol(symbol: Symbol): {
   kind: 'point' | 'line' | 'polygon'
@@ -121,6 +128,8 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
     Record<string, boolean>
   >({})
   const [dragLayerId, setDragLayerId] = useState<string | null>(null)
+  const [dragGroupId, setDragGroupId] = useState<string | null>(null)
+  const [renamingGroup, setRenamingGroup] = useState<LayerGroup | null>(null)
 
   const tree = useMemo(() => normalizeLayerTree(project), [project])
   const rootOrder = tree.rootOrder
@@ -180,9 +189,12 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
       | { kind: 'root'; index: number }
       | { kind: 'group'; groupId: string; index: number }
   ): void {
-    if (!dragLayerId) return
-    relocateLayer(dragLayerId, target)
+    try {
+      if (dragGroupId) useProjectStore.getState().relocateGroup(dragGroupId, target.kind === 'group' ? target.groupId : undefined, target.index)
+      else if (dragLayerId) relocateLayer(dragLayerId, target)
+    } catch (error) { emitCommandStatus(error instanceof Error ? error.message : '移动失败') }
     setDragLayerId(null)
+    setDragGroupId(null)
   }
 
   function matchesQuery(layer: Layer): boolean {
@@ -190,11 +202,17 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
     return layer.name.includes(q)
   }
 
+  function matchesTreeEntry(entry: LayerTreeEntry): boolean {
+    if (entry.type === 'layer') { const layer = layerById.get(entry.id); return !!layer && matchesQuery(layer) }
+    const group = groupById.get(entry.id)
+    return !!group && (group.name.includes(q) || getLayerTreeChildren(tree, group.id).some(matchesTreeEntry))
+  }
+
   function renderLayerRow(
     layer: Layer,
-    options?: { indent?: boolean; groupId?: string; indexInGroup?: number }
+    options?: { indent?: boolean; groupId?: string; indexInGroup?: number; showAll?: boolean }
   ): ReactNode {
-    if (!matchesQuery(layer)) return null
+    if (!options?.showAll && !matchesQuery(layer)) return null
     const isActive = selectedLayerId === layer.id
     const isLoading = Boolean(sessions[layer.id]?.loading)
     const selectedCount =
@@ -209,12 +227,13 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
       <div
         key={layer.id}
         className={`layer-item${isActive ? ' is-active' : ''}${isLoading ? ' is-loading' : ''}${indent}`}
-        draggable
-        onDragStart={() => setDragLayerId(layer.id)}
+        draggable={!getEffectiveLocked(tree, layer.id)}
+        onDragStart={event => { event.stopPropagation(); setDragLayerId(layer.id) }}
         onDragEnd={() => setDragLayerId(null)}
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => {
           event.preventDefault()
+          event.stopPropagation()
           if (options?.groupId != null && options.indexInGroup != null) {
             onDropLayer({
               kind: 'group',
@@ -260,7 +279,7 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
             className="layer-name-button"
             type="button"
             onClick={() => setSelectedLayer(layer.id)}
-            onDoubleClick={() => beginRename(layer.id)}
+            onDoubleClick={() => layerCommands.zoomToLayer(layer.id)}
           >
             <span
               className={`layer-symbol layer-symbol-${preview.kind}`}
@@ -306,27 +325,30 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
 
   function renderRootEntry(
     entry: LayerTreeEntry,
-    _rootIndex: number
+    index: number,
+    parentId?: string,
+    showAll = false
   ): ReactNode {
     if (entry.type === 'layer') {
       const layer = layerById.get(entry.id)
       if (!layer) return null
-      return renderLayerRow(layer)
+      return renderLayerRow(layer, { groupId: parentId, indexInGroup: index, indent: !!parentId, showAll })
     }
 
     const group = groupById.get(entry.id)
     if (!group) return null
-    const collapsed = collapsedGroups[group.id]
-    const childLayers = group.layerIds
-      .map((id) => layerById.get(id))
-      .filter((layer): layer is Layer => layer != null && matchesQuery(layer))
-
-    if (q && childLayers.length === 0) return null
+    const collapsed = !q && collapsedGroups[group.id]
+    const childIds = getLayerGroupLayerIds(tree, group.id)
+    const groupMatch = group.name.includes(q)
+    if (q && !showAll && !matchesTreeEntry(entry)) return null
 
     return (
       <div key={group.id} className="layer-group">
         <div
           className="layer-group-header"
+          draggable={!getLayerGroupState(tree, group.id).locked}
+          onDragStart={event => { event.stopPropagation(); setDragGroupId(group.id) }}
+          onDragEnd={() => setDragGroupId(null)}
           onContextMenu={(event) => {
             event.preventDefault()
             setMenu(null)
@@ -335,10 +357,11 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => {
             event.preventDefault()
+            event.stopPropagation()
             onDropLayer({
               kind: 'group',
               groupId: group.id,
-              index: group.layerIds.length
+              index: getLayerTreeChildren(tree, group.id).length
             })
           }}
         >
@@ -368,7 +391,8 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
           </Button>
           <Folder size={14} />
           <span className="layer-group-name">{group.name}</span>
-          <span className="layer-group-count">{group.layerIds.length}</span>
+          <span className="layer-group-count">{childIds.length}</span>
+          {getLayerGroupState(tree, group.id).locked && <LockKeyhole size={12} aria-label="文件夹已锁定" />}
           <Button
             variant="icon"
             title="组操作"
@@ -383,25 +407,12 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
             <MoreHorizontal size={14} />
           </Button>
         </div>
-        {!collapsed &&
-          group.layerIds.map((layerId, index) => {
-            const layer = layerById.get(layerId)
-            if (!layer) return null
-            return renderLayerRow(layer, {
-              indent: true,
-              groupId: group.id,
-              indexInGroup: index
-            })
-          })}
+        {!collapsed && <div className="layer-folder-children">{getLayerTreeChildren(tree, group.id).map((child, index) => renderRootEntry(child, index, group.id, showAll || !!q && groupMatch))}</div>}
       </div>
     )
   }
 
-  const filteredEmpty =
-    flattenLayerIds(tree).filter((id) => {
-      const layer = layerById.get(id)
-      return layer ? matchesQuery(layer) : false
-    }).length === 0
+  const filteredEmpty = !rootOrder.some(matchesTreeEntry)
 
   return (
     <div className="feature-panel layer-manager">
@@ -436,6 +447,7 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => {
           event.preventDefault()
+          event.stopPropagation()
           onDropLayer({ kind: 'root', index: rootOrder.length })
         }}
       >
@@ -510,6 +522,10 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
           label="组菜单"
           onClose={() => setGroupMenu(null)}
         >
+          <MenuItem icon={FolderPlus} label="新建子文件夹" disabled={getLayerGroupState(tree, groupMenu.group.id).locked} onClick={() => { useProjectStore.getState().createGroup('新建文件夹', [], groupMenu.group.id); setGroupMenu(null) }} />
+          <MenuItem icon={Pencil} label="重命名文件夹" disabled={getLayerGroupState(tree, groupMenu.group.id).locked} onClick={() => { setRenamingGroup(groupMenu.group); setRenameValue(groupMenu.group.name); setGroupMenu(null) }} />
+          <MenuItem icon={LockKeyhole} label={groupMenu.group.locked ? '解锁文件夹' : '锁定文件夹'} disabled={getLayerGroupState(tree, groupMenu.group.parentId).locked} onClick={() => { useProjectStore.getState().setGroupLocked(groupMenu.group.id, !groupMenu.group.locked); setGroupMenu(null) }} />
+          {groupMenu.group.parentId && <MenuItem label="移到根目录" disabled={getLayerGroupState(tree, groupMenu.group.id).locked} onClick={() => { useProjectStore.getState().relocateGroup(groupMenu.group.id); setGroupMenu(null) }} />}
           <MenuItem
             icon={ArrowUp}
             label="上移组"
@@ -536,6 +552,7 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
           />
         </LayerPopupMenu>
       ) : null}
+      {renamingGroup && <EditorDialog title="重命名文件夹" onClose={() => setRenamingGroup(null)}><form onSubmit={event => { event.preventDefault(); useProjectStore.getState().renameGroup(renamingGroup.id, renameValue); setRenamingGroup(null) }}><div className="dialog-body"><label className="editor-field">名称<input autoFocus required value={renameValue} onChange={event => setRenameValue(event.target.value)} /></label></div><footer className="dialog-footer"><button type="button" onClick={() => setRenamingGroup(null)}>取消</button><button className="button-primary" disabled={!renameValue.trim()}>应用</button></footer></form></EditorDialog>}
     </div>
   )
 }

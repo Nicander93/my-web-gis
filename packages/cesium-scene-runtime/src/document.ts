@@ -70,6 +70,6 @@ export function projectCesiumDocument(input: unknown, viewId?: string): CesiumDo
       scene.nodes.push({ ...definition, visible, locked } as CityNode)
     }
   }
-  // The legacy renderer has flat groups. Derived ancestor state is confined to this projection.
+  // Render objects use derived ancestor flags; the document retains the full editorial hierarchy.
   return { scene: parseCityScene(scene), document, issues }
 }

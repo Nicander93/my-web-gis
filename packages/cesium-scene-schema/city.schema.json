@@ -19,6 +19,10 @@
         },
         "locked": {
           "type": "boolean"
+        },
+        "parentId": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [

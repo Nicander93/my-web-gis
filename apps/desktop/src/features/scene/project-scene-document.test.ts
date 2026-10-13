@@ -33,6 +33,24 @@ function snapshot(): ProjectSnapshot {
 }
 
 describe('full project scene content', () => {
+  it('round trips nested 2D and 3D folders with colliding host IDs without flattening hierarchy', () => {
+    const input = snapshot()
+    input.project.groups.push({ id: 'child', name: 'Map child', parentId: 'group', visible: true, locked: true, layerIds: ['a'] })
+    input.project.groups[0].layerIds = ['b']
+    input.project.groups[0].childOrder = [{ type: 'group', id: 'child' }, { type: 'layer', id: 'b' }]
+    input.project.city!.groups!.push({ id: 'child', name: 'City child', parentId: 'group', visible: false })
+    input.project.city!.nodes[0].groupId = 'child'
+    const document = createProjectSceneDocument(input)
+    expect(document.nodes.find(node => node.id === 'child')).toMatchObject({ type: 'group', parentId: 'group', locked: true })
+    const cityChild = document.nodes.find(node => node.name === 'City child')!
+    const cityParent = document.nodes.find(node => node.name === 'City group')!
+    expect(cityChild.parentId).toBe(cityParent.id)
+    const restored = createProjectFromSceneDocument(document)
+    expect(restored.project.groups.find(group => group.id === 'child')).toMatchObject({ parentId: 'group', locked: true, layerIds: ['a'] })
+    expect(restored.project.city?.groups?.find(group => group.id === cityChild.id)?.parentId).toBe(cityParent.id)
+    const again = createProjectSceneDocument(parseProjectSnapshot(serializeProjectSnapshot(restored)))
+    expect(again.nodes.find(node => node.name === 'City child')?.parentId).toBe(again.nodes.find(node => node.name === 'City group')?.id)
+  })
   it('omits absent optional style fields without hiding invalid numeric values', () => {
     const input = snapshot()
     const base = createDefaultLayerStyle('point').symbol

@@ -5,7 +5,7 @@ import type {
   MapState,
   SelectionState
 } from '@desktop-webgis/gis-core'
-import { capabilitiesForDataset, isLegacyStyle } from '@desktop-webgis/gis-core'
+import { capabilitiesForDataset, getEffectiveLocked, isLegacyStyle } from '@desktop-webgis/gis-core'
 import {
   OlMapRuntime,
   OlSelectionRuntime,
@@ -175,6 +175,11 @@ export function syncMapFromProject(): void {
 
   const current = runtime
   const target = useWorkbenchStore.getState().editLayerId
+  if (target && getEffectiveLocked(project, target)) {
+    toolRuntime?.deactivate()
+    useWorkbenchStore.getState().setEditLayer(null)
+    setActiveEditTool('select')
+  }
   const previousSource = target ? current.registry.getVector(target)?.getSource() : undefined
   void current.syncDocument(createProjectSceneDocument(state.getSnapshot()), featuresByDataset, {
     credentials: collectBasemapCredentials(project.basemap), configureServiceLayer: (layer, resource) => configureMapServiceLayer(layer, resource)
@@ -355,7 +360,7 @@ export function setActiveEditTool(tool: EditTool): boolean {
   const dataset = layer
     ? project.datasets.find((item) => item.id === layer.datasetId)
     : undefined
-  if (!capabilitiesForDataset(dataset).editGeometry) {
+  if (!capabilitiesForDataset(dataset).editGeometry || getEffectiveLocked(project, layerId)) {
     toolRuntime.deactivate()
     activeTool = 'none'
     useWorkbenchStore.getState().setActiveTool('none')
