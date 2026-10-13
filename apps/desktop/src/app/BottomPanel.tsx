@@ -1,42 +1,7 @@
 import type { ReactNode } from 'react'
-import { ResizeHandle } from '@/components/ui/ResizeHandle'
-import { useWorkspaceStore } from '@/stores/workspace.store'
+import { DockWindow } from './docking/DockWindow'
 
-interface BottomPanelProps {
-  leftOffset: number
-  rightOffset: number
-  children: ReactNode
-}
-
-/** 底部固定承载 Attribute Table，并按左右面板开关动态避让。 */
-export function BottomPanel({
-  leftOffset,
-  rightOffset,
-  children
-}: BottomPanelProps) {
-  const bottom = useWorkspaceStore((state) => state.bottom)
-  const setHeight = useWorkspaceStore((state) => state.setBottomHeight)
-
-  return (
-    <aside
-      className="workspace-panel panel-bottom"
-      style={{
-        left: leftOffset,
-        right: rightOffset,
-        height: bottom.height,
-        display: bottom.open ? undefined : 'none'
-      }}
-      aria-label="属性表面板"
-      aria-hidden={!bottom.open}
-    >
-      <ResizeHandle
-        orientation="vertical"
-        label="调整属性表面板高度"
-        onResize={(delta) =>
-          setHeight(useWorkspaceStore.getState().bottom.height - delta)
-        }
-      />
-      <div className="panel-body">{children}</div>
-    </aside>
-  )
+/** 属性表默认横跨工作区，也可以停靠侧边、浮动或最大化。 */
+export function BottomPanel({ children }: { children: ReactNode }) {
+  return <DockWindow id="bottom" title="属性表" label="属性表面板">{children}</DockWindow>
 }

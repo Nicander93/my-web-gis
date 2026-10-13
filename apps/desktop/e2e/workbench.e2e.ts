@@ -102,8 +102,9 @@ test('table pagination, selected-only and selection commands retain their scope'
   await footer.getByRole('button', { name: '下一页' }).click()
   await expect(page.locator('.table-scroll tbody tr')).toHaveCount(5)
   await expect(footer).toContainText('2 / 2')
-  await page.getByRole('button', { name: '收起属性表' }).click()
-  await page.getByRole('button', { name: '恢复属性表' }).click()
+  await page.getByRole('button', { name: '关闭属性表窗口', exact: true }).click()
+  await page.getByRole('button', { name: '窗口', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: '属性表', exact: true }).click()
   await expect(footer).toContainText('2 / 2')
   await page.locator('.table-scroll tbody input[type=checkbox]').first().check()
   await page.getByLabel('仅选中', { exact: true }).check()
@@ -140,8 +141,8 @@ test('default layout leaves the map dominant and restores panels explicitly', as
     .getByRole('region', { name: '地图工作区' })
     .boundingBox()
   expect(map!.width).toBeGreaterThan((page.viewportSize()?.width ?? 0) * 0.6)
-  await page.getByRole('tab', { name: '视图', exact: true }).click()
-  await page.getByRole('button', { name: '图层属性', exact: true }).click()
+  await page.getByRole('button', { name: '窗口', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: '检查器', exact: true }).click()
   await expect(
     page.getByRole('complementary', { name: '检查器面板' })
   ).toBeVisible()
@@ -166,7 +167,8 @@ test('table binding survives browsing; filters apply explicitly and scope stays 
   await expect(page.locator('.panel-bottom .panel-header')).toHaveCount(0)
   const panelBounds = (await page.getByRole('complementary', { name: '属性表面板' }).boundingBox())!
   const mapBounds = (await page.getByRole('region', { name: '地图工作区' }).boundingBox())!
-  expect(Math.abs(panelBounds.y - mapBounds.y - mapBounds.height)).toBeLessThanOrEqual(2)
+  expect(Math.abs(panelBounds.y + panelBounds.height - mapBounds.y - mapBounds.height)).toBeLessThanOrEqual(2)
+  expect(panelBounds.width).toBe(mapBounds.width)
   await page.getByLabel('表内搜索').fill('does-not-match')
   await expect(footer).toContainText('显示 0')
   await expect(page.locator('.table-scroll')).toContainText('无匹配记录')
@@ -263,7 +265,7 @@ test('three-dimensional workspace keeps scene capabilities and shared panel rule
   await expect(
     page.getByRole('complementary', { name: '检查器面板' })
   ).toBeHidden()
-  await page.getByRole('button', { name: '场景', exact: true }).click()
+  await page.getByRole('tab', { name: '场景', exact: true }).click()
   await page.getByRole('button', { name: '光照与时间', exact: true }).click()
   await expect(
     page.getByText('光照与时间', { exact: true }).last()

@@ -9,28 +9,37 @@ import { CityMenu } from '@/features/city/CityMenu'
 import { useProjectStore } from '@/stores/project.store'
 import { getProjectType } from '@/services/project-type'
 
-export type MenuId = 'project' | 'data' | 'layer' | 'edit' | 'view' | 'help'
+export type MenuId = 'project' | 'view' | 'settings' | 'help'
 
 const menus: Array<{ id: MenuId; label: string }> = [
-  { id: 'project', label: '项目' },
-  { id: 'data', label: '数据' },
-  { id: 'layer', label: '图层' },
-  { id: 'edit', label: '编辑' },
-  { id: 'view', label: '视图' },
+  { id: 'project', label: '文件' },
+  { id: 'view', label: '窗口' },
+  { id: 'settings', label: '设置' },
   { id: 'help', label: '帮助' }
 ]
 
 const menuComponents: Record<MenuId, React.ComponentType<{ onClose(): void }>> = {
   project: ProjectMenu,
-  data: DataMenu,
-  layer: LayerMenu,
-  edit: EditMenu,
   view: ViewMenu,
+  settings: SettingsMenu,
   help: HelpMenu
 }
 
-export function MenuBar() {
+/** 原有低频命令保留在设置分类中，避免重组 Shell 时丢失入口。 */
+function SettingsMenu({ onClose }: { onClose(): void }) {
   const city = useProjectStore(state => getProjectType(state.project) === '3d')
+  return <div className="menu-content">
+    {(['data', 'layer', 'edit'] as const).map((section, index) => {
+      const Component = [DataMenu, LayerMenu, EditMenu][index]
+      return <details key={section} className="application-settings-section"><summary>{['数据操作', city ? '对象操作' : '图层操作', '编辑操作'][index]}</summary>
+        {city ? <CityMenu section={section} onClose={onClose} /> : <Component onClose={onClose} />}
+      </details>
+    })}
+    {city && <CityMenu section="view" onClose={onClose} />}
+  </div>
+}
+
+export function MenuBar() {
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null)
   const menuBarRef = useRef<HTMLDivElement>(null)
 
@@ -68,7 +77,7 @@ export function MenuBar() {
 
   return (
     <nav className="menu-bar" ref={menuBarRef}>
-      {menus.filter(menu => !city || menu.id === 'project' || menu.id === 'help').map((menu) => {
+      {menus.map((menu) => {
         const isOpen = openMenu === menu.id
         const MenuComponent = menuComponents[menu.id]
 
@@ -81,11 +90,11 @@ export function MenuBar() {
               aria-haspopup="true"
               onClick={() => toggleMenu(menu.id)}
             >
-              {city && menu.id === 'layer' ? '对象' : menu.label}
+              {menu.label}
             </button>
             {isOpen && (
-              <div className="menu-dropdown">
-                {city && menu.id !== 'project' ? <CityMenu section={menu.id} onClose={closeMenu} /> : <MenuComponent onClose={closeMenu} />}
+              <div className="menu-dropdown" role="menu" aria-label={`${menu.label}菜单`}>
+                <MenuComponent onClose={closeMenu} />
               </div>
             )}
           </div>

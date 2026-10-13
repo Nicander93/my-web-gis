@@ -56,6 +56,9 @@ test.beforeEach(async ({ page }) => {
   await page.getByRole('tab', { name: '地图', exact: true }).click()
   await page.getByRole('button', { name: '定位图层', exact: true }).click()
   await page.waitForTimeout(350)
+  // 覆盖窗口允许遮挡地图；地图输入验收先通过真实菜单关闭树。
+  await page.getByRole('button', { name: '窗口', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: '图层面板', exact: true }).click()
 })
 
 test('box selection links the accepted rows; modifiers, empty selection and row locate work', async ({ page }, info) => {
@@ -196,9 +199,13 @@ test('popup fields are safe, independent of map selection, and close when filter
     return !!close && !!map && close.x >= map.x && close.x + close.width <= map.x + map.width
   }).toBe(true)
   await page.screenshot({ path: info.outputPath('popup-safe-text.png') })
+  await page.getByRole('button', { name: '窗口', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: '图层面板', exact: true }).click()
   await page.getByRole('button', { name: '隐藏selection', exact: true }).click()
   await expect(popup).toBeHidden()
   await page.getByRole('button', { name: '显示selection', exact: true }).click()
+  await page.getByRole('button', { name: '窗口', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: '图层面板', exact: true }).click()
   await waitForMapResize(page)
   await clickFeature(1)
   await expect(popup).toBeVisible()

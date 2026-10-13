@@ -40,15 +40,7 @@ function toolHint(tool: string): string {
 }
 
 /** Workspace map surface: mounts OlMapRuntime + selection/tool runtimes and keeps project layers in sync. */
-export function MapCanvas({
-  leftOffset = 0,
-  rightOffset = 0,
-  bottomOffset = 0
-}: {
-  leftOffset?: number
-  rightOffset?: number
-  bottomOffset?: number
-}) {
+export function MapCanvas() {
   const viewportRef = useRef<HTMLDivElement>(null)
   const snapped = useSnappingStore((s) => s.snapped)
   const snappingEnabled = useSnappingStore((s) => s.options.enabled)
@@ -113,7 +105,6 @@ export function MapCanvas({
   return (
     <section
       className="map-canvas"
-      style={{ left: leftOffset, right: rightOffset, bottom: bottomOffset }}
       aria-label="地图工作区"
       tabIndex={0}
       data-map-runtime={runtimeMounted ? 'mounted' : 'pending'}

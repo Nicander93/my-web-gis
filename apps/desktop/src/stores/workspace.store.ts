@@ -47,10 +47,6 @@ function getBottomMaxHeight(): number {
   return Math.max(140, Math.floor(window.innerHeight * 0.5))
 }
 
-function getMinMapWidth(): number {
-  return 320
-}
-
 /** 保存 Desktop Workspace 的布局设置，不承载 GIS 业务状态。 */
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
@@ -95,7 +91,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set({
           left: { open: true, width: 260 },
           right: { open: false, width: 320 },
-          bottom: { open: false, height: 280 }
+          bottom: { open: false, height: 280 },
+          focusMode: false,
+          savedLayout: null
         }),
       enterFocusMode: () => {
         const state = get()
@@ -127,30 +125,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const state = get()
         if (typeof window === 'undefined') return
 
-        const minMapWidth = getMinMapWidth()
         const windowWidth = window.innerWidth
-        const leftWidth = state.left.open ? state.left.width : 0
-        const rightWidth = state.right.open ? state.right.width : 0
-        const availableForPanels = windowWidth - minMapWidth
-
-        if (leftWidth + rightWidth > availableForPanels) {
-          const ratio = leftWidth / (leftWidth + rightWidth)
-          let targetLeftWidth = Math.floor(availableForPanels * ratio)
-          let targetRightWidth = availableForPanels - targetLeftWidth
-
-          if (targetLeftWidth < 220) {
-            targetLeftWidth = 220
-            targetRightWidth = availableForPanels - 220
-          } else if (targetRightWidth < 260) {
-            targetRightWidth = 260
-            targetLeftWidth = availableForPanels - 260
-          }
-
-          set({
-            left: { ...state.left, width: clamp(targetLeftWidth, 220, 380) },
-            right: { ...state.right, width: clamp(targetRightWidth, 260, 420) }
-          })
-        }
+        // 覆盖式面板独立约束；不再从地图宽度中扣除左右窗口。
+        set({
+          left: { ...state.left, width: Math.min(state.left.width, windowWidth) },
+          right: { ...state.right, width: Math.min(state.right.width, windowWidth) }
+        })
 
         const maxBottomHeight = getBottomMaxHeight()
         if (state.bottom.height > maxBottomHeight) {
@@ -167,7 +147,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       name: 'desktop-webgis.workspace-layout',
       version: 1,
       migrate: (stored) => ({ left: (stored as Partial<WorkspaceState>).left ?? { open:true, width:260 }, right: { open:false, width:320 }, bottom: { open:false, height:280 }, ribbonCategory:'edit', ribbonExpanded:true }),
-      partialize: (state) => ({ left: state.left, right: state.right, bottom: state.bottom, ribbonCategory: state.ribbonCategory, ribbonExpanded: state.ribbonExpanded })
+      partialize: (state) => ({ ...(state.focusMode && state.savedLayout ? state.savedLayout : { left: state.left, right: state.right, bottom: state.bottom }), ribbonCategory: state.ribbonCategory, ribbonExpanded: state.ribbonExpanded })
     }
   )
 )

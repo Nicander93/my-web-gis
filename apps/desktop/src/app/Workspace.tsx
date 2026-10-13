@@ -1,8 +1,5 @@
 import {
   FolderPlus,
-  Layers2,
-  PanelBottom,
-  PanelRight,
   Search
 } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
@@ -23,7 +20,7 @@ import { cancelMapOperation } from '@/features/map/map-runtime-host'
 import { emitCommandStatus } from './commands/status'
 import { editCommands } from './commands/edit.commands'
 
-/** Reserve visible map space for open panels so navigation stays reachable. */
+/** 面板覆盖完整地图视口，不改变地图尺寸和定位中心。 */
 export function Workspace({
   processing,
   onCloseProcessing
@@ -39,11 +36,6 @@ export function Workspace({
   )
   const [layerSearchOpen, setLayerSearchOpen] = useState(false)
   const layerSearchButtonRef = useRef<HTMLButtonElement>(null)
-  const left = useWorkspaceStore((state) => state.left)
-  const right = useWorkspaceStore((state) => state.right)
-  const bottom = useWorkspaceStore((state) => state.bottom)
-  const leftOffset = left.open ? left.width : 0
-  const rightOffset = right.open ? right.width : 0
 
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent): void {
@@ -59,6 +51,11 @@ export function Workspace({
         return
       }
       const mod = event.ctrlKey || event.metaKey
+      if (mod && event.key.toLowerCase() === 'y' && !event.altKey) {
+        event.preventDefault()
+        editCommands.redo()
+        return
+      }
       if (mod && event.key.toLowerCase() === 'z' && !event.altKey) {
         event.preventDefault()
         if (event.shiftKey) editCommands.redo()
@@ -100,11 +97,7 @@ export function Workspace({
 
   return (
     <main className="workspace" aria-label="GIS Workspace">
-      <MapCanvas
-        leftOffset={leftOffset}
-        rightOffset={rightOffset}
-        bottomOffset={bottom.open ? bottom.height : 0}
-      />
+      <MapCanvas />
       <LeftPanel
         actions={
           <>
@@ -141,17 +134,6 @@ export function Workspace({
           }}
         />
       </LeftPanel>
-      {!left.open && (
-        <Button
-          className="restore-trigger restore-left"
-          variant="icon"
-          title="恢复图层面板"
-          aria-label="恢复图层面板"
-          onClick={() => useWorkspaceStore.getState().restoreLeft()}
-        >
-          <Layers2 size={15} />
-        </Button>
-      )}
       <RightPanel
         title={processing ? '空间处理' : '图层属性'}
         actions={
@@ -184,21 +166,9 @@ export function Workspace({
       >
         {processing || <Inspector key={inspectorId} />}
       </RightPanel>
-      {!right.open && (
-        <Button
-          className="restore-trigger restore-right"
-          variant="icon"
-          title="恢复检查器"
-          aria-label="恢复检查器"
-          onClick={viewCommands.toggleInspector}
-        >
-          <PanelRight size={15} />
-        </Button>
-      )}
-      <BottomPanel leftOffset={leftOffset} rightOffset={rightOffset}>
+      <BottomPanel>
         <AttributeTable
           key={tableId}
-          onClose={() => useWorkspaceStore.getState().setBottomOpen(false)}
           targetPicker={
             <select
               className="table-target-picker"
@@ -224,17 +194,6 @@ export function Workspace({
           }
         />
       </BottomPanel>
-      {!bottom.open && (
-        <Button
-          className="restore-trigger restore-bottom"
-          variant="icon"
-          title="恢复属性表"
-          aria-label="恢复属性表"
-          onClick={viewCommands.toggleAttributeTable}
-        >
-          <PanelBottom size={15} />
-        </Button>
-      )}
     </main>
   )
 }

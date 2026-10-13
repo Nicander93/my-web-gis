@@ -95,7 +95,7 @@ describe('view commands', () => {
     expect(state.bottom).toEqual({ open: false, height: 280 })
   })
 
-  it('constrains panel sizes when window shrinks to prevent map squeeze', () => {
+  it('constrains overlay panels individually without subtracting their widths from the map', () => {
     useWorkspaceStore.setState({
       left: { open: true, width: 350 },
       right: { open: true, width: 400 },
@@ -118,8 +118,8 @@ describe('view commands', () => {
     useWorkspaceStore.getState().constrainPanelSizes()
 
     const state = useWorkspaceStore.getState()
-    const totalWidth = state.left.width + state.right.width
-    expect(totalWidth).toBeLessThanOrEqual(800 - 320)
+    expect(state.left.width).toBe(350)
+    expect(state.right.width).toBe(400)
     expect(state.bottom.height).toBeLessThanOrEqual(300)
   })
 })

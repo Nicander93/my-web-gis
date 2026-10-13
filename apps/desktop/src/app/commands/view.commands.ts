@@ -1,4 +1,5 @@
 import { useWorkspaceStore } from '@/stores/workspace.store'
+import { useDockingStore } from '@/stores/docking.store'
 import { useWorkbenchStore } from '@/stores/workbench.store'
 import { useProjectStore } from '@/stores/project.store'
 import { emitCommandStatus } from './status'
@@ -58,6 +59,7 @@ export const viewCommands = {
   },
   resetLayout(): void {
     useWorkspaceStore.getState().resetLayout()
+    useDockingStore.getState().reset()
     emitCommandStatus('Workspace 布局已重置')
   },
   toggleFocusMode(): void {

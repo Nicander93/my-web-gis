@@ -33,6 +33,7 @@ import { StyleDraftDialog } from '@/features/inspector/StyleDraftDialog'
 import { SceneDraftDialog } from '@/features/inspector/SceneDraftDialog'
 import { HelpDialog } from '@/features/help/HelpDialog'
 import { registerHelpDialog, type HelpDialogPage } from './commands/help.commands'
+import { viewCommands } from './commands/view.commands'
 
 const CityWorkspace = lazy(() =>
   import('@/features/city/CityWorkspace').then((module) => ({
@@ -122,11 +123,18 @@ export default function App() {
   useEffect(() => {
     function shortcut(event: KeyboardEvent): void {
       if (
+        event.defaultPrevented || event.isComposing ||
         !(event.ctrlKey || event.metaKey) ||
         (event.target instanceof HTMLElement &&
           event.target.closest('[role="dialog"]'))
       )
         return
+      if (event.shiftKey && getProjectType(useProjectStore.getState().project) === '3d' &&
+        !(event.target instanceof HTMLElement && event.target.closest('input,textarea,select,[contenteditable="true"],[role="menu"]'))) {
+        const shortcuts: Partial<Record<string, () => void>> = { l: viewCommands.toggleLayers, i: viewCommands.toggleInspector, '0': viewCommands.resetLayout, f: viewCommands.toggleFocusMode }
+        const action = shortcuts[event.key.toLowerCase()]
+        if (action) { event.preventDefault(); action(); return }
+      }
       if (event.key.toLowerCase() === 'n') {
         event.preventDefault()
         setNewProjectOpen(true)
@@ -212,7 +220,7 @@ export default function App() {
     <div
       className={`desktop-app${sceneMode === '3d' ? ' desktop-app--city' : ''}`}
     >
-      {(!hasProject || sceneMode === '2d') && <Header showToolbar={hasProject} />}
+      <Header showToolbar={hasProject} />
       {!hasProject ? (
         <ProjectStartScreen />
       ) : sceneMode === '2d' ? (

@@ -50,7 +50,7 @@ test('city document runtime retains a real model through edits, history and a fa
     { type: 'tile', id: 'map-tiles', name: '底图', role: 'basemap', visible: true, resource: 'tiles' }], views: {
     city: { type: '3d', heightReference: 'ellipsoid', camera: { position: [116.391, 39.907, 2500], heading: 0, pitch: -45, roll: 0 } }
   } }
-  await page.getByRole('button', { name: '未命名三维场景', exact: true }).click()
+  await page.getByRole('button', { name: '文件', exact: true }).click()
   const chooser = page.waitForEvent('filechooser')
   await page.getByRole('menuitem', { name: '导入场景', exact: true }).click()
   await (await chooser).setFiles({ name: 'city.scene.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(document)) })
@@ -76,7 +76,7 @@ test('city document runtime retains a real model through edits, history and a fa
   await page.getByRole('button', { name: '重做', exact: true }).click()
   await expect(scale).toHaveValue('2')
   expect(modelRequests).toBe(1)
-  await page.getByRole('button', { name: 'City runtime', exact: true }).click()
+  await page.getByRole('button', { name: '文件', exact: true }).click()
   const download = page.waitForEvent('download')
   await page.getByRole('menuitem', { name: '导出完整场景', exact: true }).click()
   const path = testInfo.outputPath('city-edited.scene.json')

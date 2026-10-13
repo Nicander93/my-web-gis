@@ -23,7 +23,7 @@
 .city-add-button { margin-right: 5px; }
 .city-toolbar__spacer { flex: 1; }
 .city-file-input { display: none; }
-.city-workspace__body { flex: 1; min-height: 0; display: flex; }
+.city-workspace__body { flex: 1; min-height: 0; position: relative; overflow: hidden; }
 .city-panel { display: flex; flex-direction: column; position: relative; flex-shrink: 0; min-height: 0; background: var(--color-panel); }
 .city-panel--layers { border-right: 1px solid var(--color-border); }
 .city-panel--inspector { border-left: 1px solid var(--color-border); }
@@ -117,7 +117,7 @@
 .city-info { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 2px; color: var(--color-text-secondary); border-radius: 2px; flex-shrink: 0; }
 .city-info:hover, .city-info:focus-visible { color: var(--color-accent); background: var(--color-accent-soft); }
 .city-info-tooltip { position: fixed; z-index: 100; width: 260px; padding: 8px 10px; font-size: 11px; font-weight: 400; line-height: 1.6; color: var(--color-text-primary); background: var(--color-panel); border: 1px solid var(--color-border-strong); border-radius: 3px; box-shadow: 0 3px 12px rgb(0 0 0 / .12); pointer-events: none; }
-.city-canvas { position: relative; flex: 1; min-width: 0; min-height: 0; background: #12202c; }
+.city-canvas { position: absolute; inset: 0; min-width: 0; min-height: 0; background: #12202c; }
 .city-canvas__viewport { position: absolute; inset: 0; }
 .city-canvas--drawing .cesium-widget canvas { cursor: crosshair; }
 .city-panel-restore { position: absolute; top: 10px; padding: 6px; background: var(--color-panel); border: 1px solid var(--color-border); }

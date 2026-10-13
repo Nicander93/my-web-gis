@@ -67,4 +67,51 @@ rtk pnpm --filter @desktop-webgis/desktop test:e2e --project=desktop
 
 ## 验证记录
 
-本阶段测试结果和截图在完成后补充。原生 Tauri 文件选择/保存、Windows 125% 缩放及物理 GPU 压平不由浏览器矩形测试签收。
+M0 资料/基线提交：`41a57e0`。
+
+M1 首批验证：
+
+```powershell
+rtk pnpm --filter @desktop-webgis/desktop build
+rtk pnpm --filter @desktop-webgis/desktop test
+rtk pnpm --filter @desktop-webgis/desktop test:e2e --project=desktop --project=laptop --project=wide
+rtk pnpm --filter @desktop-webgis/desktop test:e2e docking.e2e.ts --project=desktop --project=compact --project=laptop --project=wide
+```
+
+- Desktop 生产构建成功；单测 214 通过、5 个原有宿主/凭据环境项跳过。
+- Desktop 全量 E2E：1440×900 / 1366×768 / 1920×1080 三个尺寸共 126 通过。
+- 首批窗口专测：1024×680 / 1366×768 / 1440×900 / 1920×1080 共 12 通过。后续增加三维专注模式快捷键后，三个主尺寸已随 126 项回归验证。
+- 最后补跑 compact 窗口专测 3 通过，覆盖三维专注模式快捷键。最终源码生产构建再次成功。
+- `git diff --check` 通过。
+- 原有导入、服务、二维选择/绘制/Undo/Redo、字段/主题样式、空间处理、项目保存重开、三维真实 GLB/资源失败重试仍由这些 E2E 覆盖。
+
+浏览器运行截图（1366×768）：[窗口浮动](../design/desktop-productization/evidence/laptop-docking-2d.png)、[二维数据/属性工作流](../design/desktop-productization/evidence/laptop-workbench.png)、[三维窗口](../design/desktop-productization/evidence/laptop-docking-3d.png)、[GLB 资源故障恢复后的实际模型](../design/desktop-productization/evidence/laptop-city-resource-recovered.png)。模型截图来自真实 GLB 测试，不是城市效果、裁剪或压平验收。
+
+原生 Tauri 文件选择/保存、Windows 125% 缩放及物理 GPU 压平不由浏览器矩形测试签收。未建立最终 PR，因为全量 M0–M9 Gate 尚未满足。
+
+## 20 项验收矩阵的当前证据
+
+“部分”表示已有自动化覆盖部分行为，不等于该条完整签收。
+
+| ID | 当前状态 | 证据/未完成项 |
+|---|---|---|
+| E01 | 部分 | 真实 GeoJSON、CSV、SHP、DXF 导入 E2E 通过；本方案完整多图层配置闭环待签收 |
+| E02 | 部分 | 绘制、取消、Undo/Redo E2E 通过；多要素顶点编辑完整矩阵待补 |
+| E03 | 待实现 | 面合并的原图层原子命令及属性策略 |
+| E04 | 部分 | 表格选择/定位/键盘/单元格编辑已有回归；多 Tab 会话尚未接入 |
+| E05 | 待实现 | 表内字段计算的原子提交与非法表达式回滚 |
+| E06 | 部分 | 真实缓冲结果层及处理算法单测通过；四组空间处理专项矩阵待补 |
+| E07 | 部分 | 国内地图投影、导出 CRS、历史一致性通过；源 CRS 赋值工作流待接入 |
+| E08 | 部分 | 实际 GLB 像素、变换、撤销、导出、资源重试通过；Tileset Gizmo 原生签收待补 |
+| E09 | 待实现 | 连续 POI 放置与 Esc |
+| E10 | 待实现 | 500 Graphic 共享渲染池及批量编辑 |
+| E11 | 待实现 | 目标 Tileset 独立裁剪与恢复 |
+| E12 | 待实现 | 正确坐标/高度/LOD 的局部压平及 GPU 清理 |
+| E13 | 浏览器通过 | `docking.e2e.ts` 验证画布不变、整宽属性表 |
+| E14 | 待实现 | 固定对象 ID 的非模态完整属性窗口 |
+| E15 | 部分 | 导入场景草稿/项目替换保护回归通过；新建/打开完整原生组合待补 |
+| E16 | 部分 | GLB URL 失效、保留节点和修改地址重试通过；本地路径重定位未签收 |
+| E17 | 浏览器通过 | 浮动位置、可见性、重启与重置的本机布局回归 |
+| E18 | 待实现 | 崩溃恢复草稿 |
+| E19 | 部分 | IME/表内输入/地图 Esc/窗口手势取消通过；所有三维工具完整焦点矩阵待补 |
+| E20 | 待实现 | 引擎实际指标诊断与空闲状态 |

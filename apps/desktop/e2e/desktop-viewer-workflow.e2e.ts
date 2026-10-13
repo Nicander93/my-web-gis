@@ -28,7 +28,7 @@ test('exported Desktop classification renders unchanged in Viewer with complete 
     const { getMapRuntime } = await import('/src/features/map/map-runtime-host.ts')
     return getMapRuntime()!.getMap().getView().getAnimating()
   })).toBe(false)
-  await page.getByRole('button', { name: '项目', exact: true }).click()
+  await page.getByRole('button', { name: '文件', exact: true }).click()
   const downloadEvent = page.waitForEvent('download')
   await page.getByRole('menuitem', { name: '导出完整场景', exact: true }).click()
   const download = await downloadEvent

@@ -46,7 +46,7 @@ test('WMS and WMTS catalog selection, order and opacity survive a project file r
   const saved = JSON.parse(body.toString('utf8'))
   expect(saved.project.datasets.map(dataset => dataset.kind).sort()).toEqual(['wms', 'wmts'])
   await page.reload()
-  await page.getByRole('button', { name: '项目', exact: true }).click()
+  await page.getByRole('button', { name: '文件', exact: true }).click()
   const chooserEvent = page.waitForEvent('filechooser')
   await page.getByRole('menuitem', { name: /^打开/ }).click()
   await (await chooserEvent).setFiles({ name: 'services.webgis.json', mimeType: 'application/json', buffer: body })

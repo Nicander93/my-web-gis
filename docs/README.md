@@ -21,6 +21,8 @@
 
 ### 阶段计划与验收
 
+- [2026-10-13 Desktop 产品化实施记录](plans/desktop-productization-implementation.md)：采用用户交付包的 M0–M9 方案，首批 Shell/Docking 改动、回归基线及尚未实施的范围。
+
 位于 [\plans/\](plans/)：
 
 - [第一阶段执行计划](plans/phase-1-gis-workbench.md)

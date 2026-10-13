@@ -15,6 +15,7 @@ import { MenuItem } from '@/app/header/menus/MenuItem'
 import { LeftPanel } from '@/app/LeftPanel'
 import { RightPanel } from '@/app/RightPanel'
 import { projectCommands } from '@/app/commands/project.commands'
+import { viewCommands } from '@/app/commands/view.commands'
 import { exportCityScene } from '@/services/city-scene-export'
 import { EditorDialog } from '@/components/ui/EditorDialog'
 import { addCityAsset, addCityGroup, copyCityNodes, deleteCityNodes, dissolveCityGroup, loadCitySample, moveCitySelection, patchCityGroup, setCityNodesLocked, setCityNodesVisible, updateCity } from './city-commands'
@@ -77,7 +78,7 @@ export function CityWorkspace() {
   const [deleting, setDeleting] = useState(false)
   const [preview, setPreview] = useState(false)
   const [inspectorSection, setInspectorSection] = useState<CityInspectorSection>('object')
-  const leftVisible = left.open && !preview, rightVisible = right.open && !preview
+
   const selectedNodes = city.nodes.filter(candidate => selectedIds.includes(candidate.id))
   const liveIds = selectedNodes.map(node => node.id)
   const definition = selectedNodes.length === 1 ? selectedNodes[0] : undefined
@@ -279,7 +280,7 @@ export function CityWorkspace() {
     command('new-group', '新建分组', FolderPlus, () => setCreatingGroup(true)),
     command('left', '场景树', Layers2, () => useWorkspaceStore.getState().setLeftOpen(!left.open), undefined, left.open),
     command('right', '属性面板', PanelRightClose, () => useWorkspaceStore.getState().setRightOpen(!right.open), undefined, right.open),
-    command('reset', '恢复布局', PanelLeftClose, () => useWorkspaceStore.getState().resetLayout())
+    command('reset', '恢复布局', PanelLeftClose, viewCommands.resetLayout)
   ]
   const handleAction = useRef<(action: CityAction) => void>(() => {})
   handleAction.current = action => {
@@ -293,16 +294,17 @@ export function CityWorkspace() {
     else if (action === 'redo') history(true)
     else if (action === 'delete' && liveIds.length > 0 && !hasLocked) setDeleting(true)
     else if (action === 'scene-settings') { setInspectorTab('scene'); useWorkspaceStore.getState().setRightOpen(true) }
-    else if (action === 'reset-layout') useWorkspaceStore.getState().resetLayout()
+    else if (action === 'reset-layout') viewCommands.resetLayout()
     else if (action === 'initial-view') runtime.current?.setCamera(city.camera)
   }
   useEffect(() => {
     function onAction(event: Event): void { handleAction.current((event as CustomEvent<CityAction>).detail) }
     function onHistory(event: KeyboardEvent): void {
-      if (event.defaultPrevented) return
+      if (event.defaultPrevented || event.isComposing) return
       if (event.target instanceof HTMLElement && (event.target.closest('[role="dialog"]') || event.target.closest('input,textarea,select,[contenteditable="true"],[role="menu"]'))) return
       if (event.key === 'Escape') { if (preview) togglePreview(); else { drawing.cancel(); stopEditing(); notify('已退出当前工具') }; return }
       if (preview) return
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') { event.preventDefault(); handleAction.current('redo') }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); handleAction.current(event.shiftKey ? 'redo' : 'undo') }
       if (event.key === 'Delete') { event.preventDefault(); handleAction.current('delete') }
     }
@@ -317,7 +319,7 @@ export function CityWorkspace() {
   return <main className="city-workspace" aria-label="三维场景编辑器">
     <CityRibbon target={group?.name ?? (liveIds.length > 1 ? `${liveIds.length} 个对象` : node?.name ?? '未设置')} commands={commands} preview={preview} onPreview={togglePreview} onUndo={() => history()} onRedo={() => history(true)} onSave={() => { void projectCommands.saveProject() }} canUndo={canUndo} canRedo={canRedo} />
     <div className="city-workspace__body">
-      {leftVisible && <LeftPanel title="场景对象" actions={<><button aria-label="新建场景分组" onClick={() => setCreatingGroup(true)}><FolderPlus size={15} /></button><button aria-label="搜索对象" aria-expanded={searchOpen} onClick={() => { setSearchOpen(!searchOpen); setSearch('') }}><Search size={15} /></button></>} footer={<footer className="city-panel-footer">Ctrl 多选 · Shift 范围 · 拖动整理</footer>}>
+      {!preview && <LeftPanel title="场景对象" actions={<><button aria-label="新建场景分组" onClick={() => setCreatingGroup(true)}><FolderPlus size={15} /></button><button aria-label="搜索对象" aria-expanded={searchOpen} onClick={() => { setSearchOpen(!searchOpen); setSearch('') }}><Search size={15} /></button></>} footer={<footer className="city-panel-footer">Ctrl 多选 · Shift 范围 · 拖动整理</footer>}>
         {searchOpen && <label className="city-search"><Search size={14} aria-hidden="true" /><input aria-label="搜索场景对象" placeholder="搜索对象名称…" value={search} onChange={event => setSearch(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') { setSearchOpen(false); setSearch('') } }} /></label>}
         <div className="city-panel__scroll">
           {!city.nodes.length && <div className="city-empty"><Layers2 size={28} aria-hidden="true" /><strong>还没有场景对象</strong><p>添加城市模型或地理数据，开始搭建场景。</p><button className="button-secondary" onClick={() => setAdding(true)}>添加资源</button><button className="city-text-action" onClick={sample}>使用城市示例</button></div>}
@@ -335,11 +337,9 @@ export function CityWorkspace() {
         <div className="city-canvas__viewport" ref={target} />
         {editing && !preview && <div className="city-drawing-bar"><Move size={16} aria-hidden="true" /><span>{editing === 'translate' ? '移动' : editing === 'rotate' ? '旋转' : '等比缩放'}</span><CityInfo label="变换工具">{`${editing === 'translate' ? '红：东向，绿：北向，蓝：高度；黄色框：水平移动。' : editing === 'rotate' ? '拖动对象局部轴环。' : '拖动白色箭头等比缩放。'}松开应用，Esc 取消本次拖动。`}</CityInfo><button className="button-secondary" onClick={() => { stopEditing(); notify('已退出模型编辑') }}>结束编辑</button></div>}
         {graphicEditing.state && <div className="city-drawing-bar"><Shapes size={16} aria-hidden="true" /><span>编辑几何 · {graphicEditing.state.geometry.positions.length} 个顶点</span><button className="button-primary" onClick={graphicEditing.finish}><Check size={14} aria-hidden="true" />应用修改</button><button className="button-secondary" onClick={() => { stopEditing(); notify('已取消几何编辑，原几何已恢复') }}>取消编辑</button></div>}
-        {!leftVisible && !preview && <button className="city-panel-restore city-panel-restore--left" aria-label="展开对象面板" onClick={() => useWorkspaceStore.getState().setLeftOpen(true)}><Layers2 size={16} aria-hidden="true" /></button>}
-        {!rightVisible && !preview && <button className="city-panel-restore city-panel-restore--right" aria-label="展开属性面板" onClick={() => useWorkspaceStore.getState().setRightOpen(true)}><PanelRightClose size={16} aria-hidden="true" /></button>}
         {drawing.drawing && <div className="city-drawing-bar"><DrawingIcon size={16} aria-hidden="true" /><span>{drawing.kind ? drawLabels[drawing.kind] : "绘制"} · {drawing.count} 个顶点</span><button className="button-primary" disabled={drawing.count < drawing.minimum} onClick={drawing.finish}><Check size={14} aria-hidden="true" />完成</button><button className="button-secondary" onClick={() => { drawing.cancel(); notify('已取消绘制') }}>取消</button></div>}
       </section>
-      {rightVisible && <RightPanel showHeader={false}>
+      {!preview && <RightPanel showHeader={false}>
         <header className="city-inspector-header"><span>属性</span><div className="city-inspector-tabs" role="tablist" aria-label="属性范围"><button role="tab" aria-selected={inspectorTab === 'object'} onClick={() => setInspectorTab('object')}>对象</button><button role="tab" aria-selected={inspectorTab === 'scene'} onClick={() => setInspectorTab('scene')}>场景</button></div><button className="city-inspector-close" aria-label="收起检查器" onClick={() => useWorkspaceStore.getState().setRightOpen(false)}><PanelRightClose size={14} aria-hidden="true" /></button></header>
         <div key={JSON.stringify([inspectorTab, inspectorSection, selectedGroup, liveIds, !!graphicEditing.state])} className="city-panel__scroll" role="tabpanel" aria-label={inspectorTab === 'object' ? '对象属性' : '场景设置'}>
           {inspectorTab === 'scene' ? <SceneSettings city={city} onSaveCamera={saveCamera} onApply={patch => { stopEditing(); updateCity('设置场景环境', scene => ({ ...scene, ...patch })); notify('场景设置已应用') }} /> : graphicEditing.state ? <GraphicVertexInspector state={graphicEditing.state} onSelect={graphicEditing.selectVertex} onPosition={graphicEditing.setPosition} onInsert={graphicEditing.insertVertex} onRemove={graphicEditing.removeVertex} /> : group ? <CityGroupInspector key={JSON.stringify(group)} city={city} group={group} onPatch={patch => organize(() => patchCityGroup(group.id, patch), '分组设置已应用')} onSelectMembers={() => { const ids = city.nodes.filter(node => node.groupId === group.id).map(node => node.id); setSelectedGroup(null); setSelectedIds(ids); anchor.current = ids[0] ?? null }} onDissolve={() => organize(() => { dissolveCityGroup(group.id); setSelectedGroup(null) }, '分组已解散，对象保留，可撤销恢复')} onReorder={direction => organize(() => updateCity('调整分组顺序', scene => { const index = scene.groups?.findIndex(item => item.id === group.id) ?? -1; if (!scene.groups || index < 0 || index + direction < 0 || index + direction >= scene.groups.length) return scene; const [moved] = scene.groups.splice(index, 1); scene.groups.splice(index + direction, 0, moved); return scene }), '分组顺序已更新')} /> : liveIds.length > 1 ? <CityBatchInspector city={city} nodes={selectedNodes} onVisible={visible => organize(() => setCityNodesVisible(liveIds, visible), '批量显隐已应用')} onLock={locked => organize(() => setCityNodesLocked(liveIds, locked), '批量锁定已应用')} onMove={id => organize(() => moveCitySelection(liveIds, id), '对象分组已更新')} onCopy={copyNode} onDelete={() => setDeleting(true)} /> : node ? <CityInspector groups={city.groups} onMoveGroup={id => organize(() => moveCitySelection(liveIds, id), '对象分组已更新')} pickedProperties={pickedProperties} section={inspectorSection} node={node} assetUrl={node.type !== 'water' && node.type !== 'graphic' && node.type !== 'imagery' && 'asset' in node ? city.assets[node.asset]?.url : undefined} error={states[node.id]?.error} onPatch={patchNode} onReload={reload} onResource={url => { if (node.type === 'water' || node.type === 'graphic') return; updateCity('更新三维资源地址', scene => ({ ...scene, assets: { ...scene.assets, ...('asset' in node ? { [node.asset]: { ...scene.assets[node.asset], url } } : {}) } })); notify('资源地址已更新，正在加载…') }} onDrawBoundary={() => startWater(node.id)} onEditGeometry={startGraphicEditing} geometryDisabled={!!selectionReason} onDelete={() => setDeleting(true)} /> : <div className="city-empty"><MousePointer2 size={24} aria-hidden="true" /><strong>选择一个对象</strong><p>在视图中单击模型，或在左侧对象列表中选择。</p><button className="city-text-action" onClick={() => setInspectorTab('scene')}>编辑场景环境</button></div>}

@@ -2,6 +2,10 @@
 
 Lightweight 2D desktop GIS workspace based on Tauri 2, React, TypeScript and OpenLayers.
 
+The desktop also supports independent Cesium 3D projects. The current [productization implementation record](docs/plans/desktop-productization-implementation.md) tracks the supplied M0–M9 plan and distinguishes implemented workflows from pending work.
+
+The shared shell uses **File / Window / Settings / Help**, task tabs and one compact tool row. Panels overlay the full map viewport. Drag a panel title to float it, use its docking selector to move it to an edge, or maximize it. Closed panels reopen from **Window**; **Window → Reset layout** restores the default. Floating title bars support arrow keys (Shift for larger steps); focused resize handles support arrow keys; Esc cancels an active window drag. Layout is saved locally and never changes project data or undo history.
+
 ## What is included
 
 - `packages/gis-core`: project, dataset, layer, feature, selection, GeoJSON, edit commands and undo/redo history.

@@ -3,12 +3,9 @@ import {
   Check,
   Download,
   Filter,
-  Layers2,
   MapPinned,
   MousePointer2,
   Move,
-  PanelBottom,
-  PanelRight,
   Pencil,
   Plus,
   Redo2,
@@ -34,17 +31,15 @@ import {
   getLayerCapabilities
 } from '@/app/commands/layer.commands'
 import { processingCommands } from '@/app/commands/processing.commands'
-import { viewCommands } from '@/app/commands/view.commands'
 import { useProjectStore } from '@/stores/project.store'
 import { useWorkbenchStore } from '@/stores/workbench.store'
 import { useSessionStore } from '@/stores/session.store'
 
 const tabs = [
   ['map', '地图'],
-  ['data', '数据'],
   ['edit', '编辑'],
-  ['analysis', '分析'],
-  ['view', '视图']
+  ['data', '数据'],
+  ['analysis', '分析']
 ] as const
 type Tab = (typeof tabs)[number][0]
 function Group({ label, children }: { label: string; children: ReactNode }) {
@@ -341,39 +336,7 @@ export function Toolbar() {
             </Group>
           </>
         )}
-        {tab === 'view' && (
-          <>
-            <Group label="面板">
-              <ToolbarButton
-                icon={Layers2}
-                label="图层"
-                onClick={viewCommands.toggleLayers}
-              />
-              <ToolbarButton
-                icon={PanelRight}
-                label="图层属性"
-                onClick={viewCommands.toggleInspector}
-              />
-              <ToolbarButton
-                icon={PanelBottom}
-                label="属性表"
-                onClick={viewCommands.toggleAttributeTable}
-              />
-            </Group>
-            <Group label="布局">
-              <ToolbarButton
-                icon={Scan}
-                label="专注地图"
-                onClick={viewCommands.toggleFocusMode}
-              />
-              <ToolbarButton
-                icon={RotateCcw}
-                label="重置布局"
-                onClick={viewCommands.resetLayout}
-              />
-            </Group>
-          </>
-        )}
+
       </div>
     </section>
   )

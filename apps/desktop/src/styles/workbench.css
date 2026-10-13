@@ -1,4 +1,10 @@
-/* 工作台以地图为主：两行功能区、连续面板、克制的状态色。 */
+/* 工作台以地图为主：应用菜单、任务页签、工具三个层次。 */
+:root {
+  --color-panel: #fafbf9;
+  --color-app-bg: #f7f9f6;
+  --color-border: #dfe4e2;
+  --color-accent: #2f695b;
+}
 .workbench-ribbon {
   background: var(--color-panel);
 }
@@ -62,7 +68,7 @@
 .workbench-ribbon-commands {
   display: flex;
   align-items: center;
-  height: 44px;
+  height: 50px;
   padding: 4px 10px;
   gap: 12px;
   overflow-x: auto;
@@ -873,3 +879,24 @@
 .map-popup dt { color: var(--color-text-secondary); }
 .map-popup dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 .map-projection-control { max-width: 130px; height: 22px; border: 0; background: transparent; color: inherit; font-size: inherit; }
+
+/* 方案基准：菜单与项目身份共占第一行，页签、工具各占一行。 */
+:root { --color-app-bg: #f7f9f6; --color-panel: #fafbf9; --color-border: #dfe4e2; --color-accent: #2f695b; --color-accent-hover: #265747; }
+.window-bar { height: 36px; padding: 0 12px; background: var(--color-panel); }
+.window-bar .menu-bar { height: 35px; padding: 0; border: 0; }
+.window-bar .menu-trigger { height: 35px; min-height: 35px; padding: 0 12px; font-size: 12px; }
+.window-context { min-width: 0; gap: 10px; }
+.window-context .workspace-name { max-width: 250px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.workbench-ribbon-top { min-height: 33px; }
+.workbench-ribbon-commands { height: 50px; }
+.workbench-ribbon .ribbon-command { display: inline-flex; align-items: center; flex-shrink: 0; gap: 5px; padding: 0 7px; height: 30px; font-size: 11px; }
+.ribbon-more { position: relative; flex-shrink: 0; }
+.ribbon-more summary { display: flex; align-items: center; justify-content: center; cursor: pointer; height: 30px; padding: 0 5px; }
+.ribbon-more .menu-dropdown { position: fixed; top: 115px; left: auto; right: 15px; }
+.ribbon-unavailable { color: var(--color-text-secondary); font-size: 11px; }
+.application-settings-section summary { padding: 8px 12px; cursor: pointer; }
+.application-settings-section .menu-content { border-bottom: 1px solid var(--color-border); }
+.city-workspace__body { position: relative; display: block; overflow: hidden; }
+.city-canvas { position: absolute; inset: 0; }
+.city-workspace .workbench-ribbon { flex: 0 0 auto; }
+.city-workspace__body > .workspace-panel.dock-window { position: absolute; }

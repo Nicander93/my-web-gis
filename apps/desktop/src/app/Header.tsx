@@ -18,6 +18,9 @@ export function Header({ showToolbar = true }: { showToolbar?: boolean }) {
           </span>
           <strong>Desktop WebGIS</strong>
           <span className="window-separator" />
+          <MenuBar />
+        </div>
+        <div className="window-context">
           <span
             className="workspace-name"
             title={showToolbar ? project.name : undefined}
@@ -40,7 +43,6 @@ export function Header({ showToolbar = true }: { showToolbar?: boolean }) {
           )}
         </div>
       </div>
-      <MenuBar />
       {type === '2d' && showToolbar && <Toolbar />}
     </header>
   )
