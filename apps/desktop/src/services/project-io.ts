@@ -25,6 +25,16 @@ export const PROJECT_FILE_FILTER = {
 
 let currentProjectPath: string | null = null
 let pathEpoch: number | null = null
+let resourceBase: { epoch: number; path: string } | null = null
+
+/** A recovered unsaved copy may still resolve resources from its original project folder. */
+export function setProjectResourceBasePath(path: string | null): void {
+  resourceBase = path ? { epoch: useProjectStore.getState().projectEpoch, path } : null
+}
+
+export function getProjectResourceBasePath(): string | null {
+  return getCurrentProjectPath() ?? (resourceBase?.epoch === useProjectStore.getState().projectEpoch ? resourceBase.path : null)
+}
 
 export function getCurrentProjectPath(): string | null {
   return pathEpoch === useProjectStore.getState().projectEpoch ? currentProjectPath : null

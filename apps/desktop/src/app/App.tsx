@@ -44,6 +44,7 @@ const CityWorkspace = lazy(() =>
 
 export default function App() {
   const project = useProjectStore((state) => state.project)
+  const projectEpoch = useProjectStore((state) => state.projectEpoch)
   const sceneMode = getProjectType(project)
   const hasProject = Boolean(
     project.settings?.workspaceType ||
@@ -229,7 +230,7 @@ export default function App() {
         />
       ) : (
         <Suspense fallback={<p role="status">正在加载三维组件…</p>}>
-          <CityWorkspace key={project.id} />
+          <CityWorkspace key={`${project.id}:${projectEpoch}`} />
         </Suspense>
       )}
       {hasProject && sceneMode === '2d' && <StatusBar message={status} />}

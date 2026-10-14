@@ -41,6 +41,8 @@ import { useCityRenderPreferences } from './CityRenderSettings'
 import { CityInfo } from './CityPropertyGroup'
 import 'cesium/Build/Cesium/Widgets/widgets.css'
 import './city-editor.css'
+import { createLocalResourceSession } from '@/services/local-resource-session'
+import { getProjectResourceBasePath } from '@/services/project-io'
 
 interface LayerState { state: 'loading' | 'ready' | 'error'; error?: string }
 const drawLabels = { point: '点', polyline: '线', polygon: '面', water: '水面边界' }
@@ -105,8 +107,9 @@ export function CityWorkspace() {
     let active = true
     let unregisterCamera: (() => void) | undefined
     const controller = createProjectSceneController()
+    const localResources = createLocalResourceSession({ projectPath: getProjectResourceBasePath })
     try {
-      documentSession.current = createCityDocumentSession({ target: target.current, controller, readSnapshot: () => useProjectStore.getState().getSnapshot(), renderQuality, cesiumBaseUrl: new URL('cesium/', document.baseURI).href,
+      documentSession.current = createCityDocumentSession({ target: target.current, controller, resolveReference: localResources.resolve, readSnapshot: () => useProjectStore.getState().getSnapshot(), renderQuality, cesiumBaseUrl: new URL('cesium/', document.baseURI).href,
         onSelect: (id, properties, mode) => { if (active) handlePick.current(id, properties, mode) },
         onEdit: event => { updateCity('变换三维模型', current => ({ ...current, nodes: current.nodes.map(n => n.id === event.id && (n.type === '3dtiles' || n.type === 'model') ? { ...n, transform: event.after } : n) })); notify('模型变换已应用，可撤销恢复') },
         onState: state => {
@@ -132,7 +135,7 @@ export function CityWorkspace() {
         }
       })
     } catch (reason) { report(reason) }
-    return () => { active = false; unregisterCamera?.(); documentSession.current?.destroy(); documentSession.current = undefined; controller.dispose(); runtime.current = undefined }
+    return () => { active = false; unregisterCamera?.(); documentSession.current?.destroy(); documentSession.current = undefined; controller.dispose(); runtime.current = undefined; void localResources.destroy().catch(reason => console.error('释放本地资源授权失败', reason)) }
   }, [])
 
   useEffect(() => { if (runtime.current) { try { runtime.current.setRenderQuality(renderQuality) } catch (reason) { report(reason) } } }, [renderQuality, ready])

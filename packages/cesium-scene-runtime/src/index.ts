@@ -10,6 +10,8 @@ import { applyRenderQuality, defaultRenderQuality } from './render-quality.js'
 import type { RenderQuality } from './render-quality.js'
 import { projectCesiumDocument, type CesiumDocumentIssue } from './document.js'
 import type { SceneDocument } from '@desktop-webgis/scene-schema'
+import { resolveSceneResourceReferences, type ResourceReferenceResolver } from './resource-references.js'
+export type { ResourceReferenceResolver } from './resource-references.js'
 import type { ImageryProvider, TerrainProvider } from 'cesium'
 export { defaultRenderQuality, isRenderQuality } from './render-quality.js'
 export type { RenderQuality } from './render-quality.js'
@@ -440,8 +442,9 @@ export interface CesiumDocumentRuntime {
 }
 
 /** Creates and loads a native projection; low-level native edits still require host document updates. */
-export async function createCesiumDocumentRuntime(options: Omit<CityRuntimeOptions, 'scene'> & { document: unknown; viewId?: string; signal?: AbortSignal }): Promise<CesiumDocumentRuntime> {
+export async function createCesiumDocumentRuntime(options: Omit<CityRuntimeOptions, 'scene'> & { document: unknown; viewId?: string; signal?: AbortSignal; resolveReference?: ResourceReferenceResolver }): Promise<CesiumDocumentRuntime> {
   let projection = projectCesiumDocument(options.document, options.viewId)
+  projection.scene = await resolveSceneResourceReferences(projection.scene, options.resolveReference, options.signal)
   const runtime = createRuntime({ ...options, scene: projection.scene }, false)
   try { await runtime.replaceScene(projection.scene, options.signal) }
   catch (error) { runtime.destroy(); throw error }
@@ -454,10 +457,12 @@ export async function createCesiumDocumentRuntime(options: Omit<CityRuntimeOptio
       if (destroyed) throw new Error('CesiumDocumentRuntime 已销毁')
       signal?.throwIfAborted()
       const next = projectCesiumDocument(document, options.viewId)
-      const cameraChanged = projection.document.id !== next.document.id || JSON.stringify(projection.scene.camera) !== JSON.stringify(next.scene.camera)
-      const nativeChanged = JSON.stringify(projection.scene) !== JSON.stringify(next.scene)
       const current = ++revision
       runtime.cancelPreparation()
+      next.scene = await resolveSceneResourceReferences(next.scene, options.resolveReference, signal)
+      if (destroyed || revision !== current) throw new DOMException('Scene projection superseded', 'AbortError')
+      const cameraChanged = projection.document.id !== next.document.id || JSON.stringify(projection.scene.camera) !== JSON.stringify(next.scene.camera)
+      const nativeChanged = JSON.stringify(projection.scene) !== JSON.stringify(next.scene)
       if (updateOptions?.reload || nativeChanged && !runtime.updatePresentation(next.scene)) await runtime.replaceScene(next.scene, signal, { preserveCamera: !cameraChanged })
       else if (projection.document.id !== next.document.id) { runtime.cancelDraw(); runtime.stopEditing(); runtime.setCamera(next.scene.camera) }
       signal?.throwIfAborted()

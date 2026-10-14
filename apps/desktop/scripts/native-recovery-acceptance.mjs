@@ -298,7 +298,28 @@ try {
   await expect(row.locator('small')).toHaveText('模型', { timeout: 60_000 })
   await poll(async () => await modelPixels() > 100, 'Real GLB model pixels were not rendered')
   const formal3d = join(output, 'formal-3d.webgis.json')
+  const localModel = join(output, '本地模型', '塔楼 #%.glb')
+  await mkdir(dirname(localModel), { recursive: true })
+  await copyFile(resolve(desktop, '../../examples/city-3d/city-sample/tower.glb'), localModel)
+  await page.evaluate(async ({ formal3d, localModel }) => {
+    const io = await import('/src/services/project-io.ts')
+    io.setCurrentProjectPath(formal3d)
+    const commands = await import('/src/features/city/city-commands.ts')
+    commands.updateCity('切换本地模型引用', scene => {
+      const node = scene.nodes.find(node => node.name === 'Native Tower')
+      const asset = scene.assets[node.asset]
+      delete asset.url
+      asset.reference = { kind: 'absolute', path: localModel.replace(/\\/g, '/') }
+      return scene
+    })
+  }, { formal3d, localModel })
+  await expect(row.locator('small')).toHaveText('模型', { timeout: 60_000 })
+  await poll(async () => await modelPixels() > 100, 'Local referenced GLB pixels were not rendered')
   const baseline3d = await saveTo(formal3d)
+  const baselineAsset = Object.values(baseline3d.project.city.assets).find(asset => asset.reference)
+  assert.equal(baselineAsset.reference.kind, 'relative')
+  assert.equal(baselineAsset.url, undefined)
+  report.localModelReference = baselineAsset.reference
   const cityBytes = await readFile(formal3d)
   await row.locator('.city-layer-row__select').click({ button: 'right' })
   await page.getByRole('menuitem', { name: '对象属性', exact: true }).click()
@@ -327,7 +348,11 @@ try {
   const restored3d = await saveTo(join(output, 'restored-3d.webgis.json'))
   assert.equal(restored3d.project.id, baseline3d.project.id)
   assert.deepEqual(restored3d.project.city.nodes, draft3d.snapshot.project.city.nodes)
-  assert.deepEqual(restored3d.project.city.assets, draft3d.snapshot.project.city.assets)
+  const resolvedRestored = await page.evaluate(async ({ snapshot, path }) => {
+    const io = await import('/src/services/project-resource-references.ts')
+    return io.resolveProjectResourceReferences(snapshot, path)
+  }, { snapshot: restored3d, path: join(output, 'restored-3d.webgis.json') })
+  assert.deepEqual(resolvedRestored.project.city.assets, draft3d.snapshot.project.city.assets)
   assert.deepEqual(await readFile(formal3d), cityBytes)
   await page.screenshot({ path: join(output, 'native-city-restored.png') })
   report.scenarios.push({ name: '3D real GLB transform, native process termination and restore', passed: true })

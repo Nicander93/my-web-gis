@@ -8,7 +8,8 @@ import { useProjectStore, getProjectContentVersion } from '@/stores/project.stor
 import { projectRecovery, recoveryOwner, type RecoveryCandidate } from '@/services/project-recovery'
 import { startRecoveryTracking } from '@/services/recovery-tracking'
 import { readTextFile } from '@/services/files'
-import { setCurrentProjectPath } from '@/services/project-io'
+import { setCurrentProjectPath, setProjectResourceBasePath } from '@/services/project-io'
+import { resolveProjectResourceReferences } from '@/services/project-resource-references'
 import { collectCredentialRefKeys, hydrateCredentialsFromRefs } from '@/services/credentials'
 import { emitCommandStatus } from '@/app/commands/status'
 
@@ -29,7 +30,7 @@ export function RecoveryDraftHost() {
         for (const entry of await projectRecovery.list()) {
           if (isTauri() && entry.draft?.sourcePath) {
             try {
-              const formal = parseProjectSnapshot(await readTextFile(entry.draft.sourcePath))
+              const formal = resolveProjectResourceReferences(parseProjectSnapshot(await readTextFile(entry.draft.sourcePath)), entry.draft.sourcePath)
               if (serializeProjectSnapshot(formal) === serializeProjectSnapshot(entry.draft.snapshot)) {
                 if (await projectRecovery.discard(entry)) continue
               }
@@ -65,6 +66,7 @@ export function RecoveryDraftHost() {
       if (epoch !== useProjectStore.getState().projectEpoch || version !== getProjectContentVersion() || useProjectStore.getState().dirty) throw new Error('恢复期间工程已改变，当前内容已保留；草稿仍在缓存中')
       useProjectStore.getState().loadSnapshot(entry.draft.snapshot)
       setCurrentProjectPath(null)
+      if (isTauri()) setProjectResourceBasePath(entry.draft.sourcePath)
       useProjectStore.getState().setDirty(true)
       setHidden(true)
       void hydrateCredentialsFromRefs(collectCredentialRefKeys(entry.draft.snapshot.project.datasets.filter((dataset) => dataset.kind !== 'vector')))

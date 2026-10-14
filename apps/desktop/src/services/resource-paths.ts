@@ -26,6 +26,16 @@ function projectDirectory(path: string): WindowsPath {
 
 export function normalizeLocalResourcePath(path: string): string { return format(absolutePath(path)) }
 
+export function localProjectDirectory(path: string): string { return format(projectDirectory(path)) }
+
+/** Segment comparison avoids granting siblings whose names merely share a prefix. */
+export function resourcePathWithinDirectory(path: string, directory: string): string | null {
+  const file = absolutePath(path), root = absolutePath(directory)
+  if (file.root.toLowerCase() !== root.root.toLowerCase() || file.parts.length <= root.parts.length ||
+    !root.parts.every((part, index) => part === file.parts[index])) return null
+  return file.parts.slice(root.parts.length).join('/')
+}
+
 /** Resolves against the project file, never document.baseURI. This does not grant filesystem access. */
 export function resolveResourceReference(reference: ResourceReference, projectPath: string | null): ResourceReference {
   if (!validateResourceReference(reference)) throw new Error('资源引用无效')

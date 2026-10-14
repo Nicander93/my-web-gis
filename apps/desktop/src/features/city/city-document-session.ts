@@ -1,4 +1,4 @@
-import { createCesiumDocumentRuntime, type CesiumDocumentRuntime, type CityRuntimeOptions, type CitySceneRuntime } from '@desktop-webgis/cesium-scene-runtime'
+import { createCesiumDocumentRuntime, type CesiumDocumentRuntime, type CityRuntimeOptions, type CitySceneRuntime, type ResourceReferenceResolver } from '@desktop-webgis/cesium-scene-runtime'
 import { bindSceneRuntime, type SceneController, type SceneRuntimeBinding } from '@desktop-webgis/scene-core'
 import type { ProjectSnapshot } from '@desktop-webgis/gis-core'
 import { createProjectSceneProjection, type ProjectSceneProjection } from '../scene/project-scene-document'
@@ -11,6 +11,7 @@ export interface CityDocumentState {
 }
 
 interface CityDocumentSessionOptions extends Omit<CityRuntimeOptions, 'scene' | 'onLayerState'> {
+  resolveReference?: ResourceReferenceResolver
   controller: SceneController
   readSnapshot(): ProjectSnapshot
   onState(state: CityDocumentState): void
