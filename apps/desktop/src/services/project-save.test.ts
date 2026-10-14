@@ -1,17 +1,17 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import { createProject, createDefaultLayerStyle } from '@desktop-webgis/gis-core'
-import { createCityScene, type CityCamera } from '@desktop-webgis/cesium-scene-schema'
+import { createCesiumScene, type CesiumSceneCamera } from '@desktop-webgis/cesium-scene-schema'
 import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
 import { useSaveStore } from '@/stores/save.store'
 import { getCurrentProjectPath, setCurrentProjectPath } from './project-io'
 import { requestProjectSave } from './project-save'
 
-const probe = vi.hoisted(() => ({ write: vi.fn(), pick: vi.fn(), status: vi.fn(), cleanup: vi.fn(), camera: null as CityCamera | null }))
+const probe = vi.hoisted(() => ({ write: vi.fn(), pick: vi.fn(), status: vi.fn(), cleanup: vi.fn(), camera: null as CesiumSceneCamera | null }))
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
 vi.mock('@/services/files', () => ({ pickSaveFile: probe.pick, writeTextFile: probe.write }))
 vi.mock('@/features/map/map-runtime-host', () => ({ getLiveMapState: () => null }))
-vi.mock('@/features/city/city-runtime-host', () => ({ getLiveCityCamera: () => probe.camera }))
+vi.mock('@/features/scene3d/scene3d-runtime-host', () => ({ getLiveSceneCamera: () => probe.camera }))
 vi.mock('@/app/commands/status', () => ({ emitCommandStatus: probe.status }))
 vi.mock('./project-recovery', () => ({ projectRecovery: { clearSaved: probe.cleanup }, recoveryOwner: (epoch: number) => `test:${epoch}` }))
 
@@ -147,7 +147,7 @@ it('keeps the working file association across undoable full-scene content replac
 })
 
 it('ignores only insignificant Cesium camera noise without rounding bytes written to the file', async () => {
-  const snapshot = useProjectStore.getState().getSnapshot(); snapshot.project.city = createCityScene()
+  const snapshot = useProjectStore.getState().getSnapshot(); snapshot.project.city = createCesiumScene()
   useProjectStore.getState().loadSnapshot(snapshot); setCurrentProjectPath('D:/scene.webgis.json')
   useProjectStore.getState().setDirty(true); probe.camera = structuredClone(snapshot.project.city.camera)
   const original = structuredClone(probe.camera), gate = deferred()
@@ -162,7 +162,7 @@ it('ignores only insignificant Cesium camera noise without rounding bytes writte
 })
 
 it('retains dirty when a real live-camera movement occurs during saving', async () => {
-  const snapshot = useProjectStore.getState().getSnapshot(); snapshot.project.city = createCityScene()
+  const snapshot = useProjectStore.getState().getSnapshot(); snapshot.project.city = createCesiumScene()
   useProjectStore.getState().loadSnapshot(snapshot); setCurrentProjectPath('D:/scene.webgis.json')
   useProjectStore.getState().setDirty(true); probe.camera = structuredClone(snapshot.project.city.camera)
   const gate = deferred(); probe.write.mockImplementationOnce(() => gate.promise)

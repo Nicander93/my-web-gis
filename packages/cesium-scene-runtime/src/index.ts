@@ -3,9 +3,9 @@ import { BaseLayer, DrawSession, GeoJsonLayer, GraphicLayer, ImageryTemplateLaye
 import type { DrawOptions, EditSession, GraphicEditOptions } from '@desktop-webgis/cesium-layer'
 import { TilesetEditor } from '@desktop-webgis/cesium-tileset-edit'
 import type { EditMode, TransformEditEvent } from '@desktop-webgis/cesium-tileset-edit'
-import { CityEffects, WaterLayer } from '@desktop-webgis/cesium-effects'
-import { getCityNodeState, parseCityScene } from '@desktop-webgis/cesium-scene-schema'
-import type { CityCamera, CityNode, CityScene } from '@desktop-webgis/cesium-scene-schema'
+import { SceneEffects, WaterLayer } from '@desktop-webgis/cesium-effects'
+import { getCesiumSceneNodeState, parseCesiumScene } from '@desktop-webgis/cesium-scene-schema'
+import type { CesiumSceneCamera, CesiumSceneNode, CesiumScene } from '@desktop-webgis/cesium-scene-schema'
 import { applyRenderQuality, defaultRenderQuality } from './render-quality.js'
 import type { RenderQuality } from './render-quality.js'
 import { projectCesiumDocument, type CesiumDocumentIssue } from './document.js'
@@ -16,16 +16,16 @@ import type { ImageryProvider, TerrainProvider } from 'cesium'
 export { defaultRenderQuality, isRenderQuality } from './render-quality.js'
 export type { RenderQuality } from './render-quality.js'
 export type { EditMode, TransformEditEvent } from '@desktop-webgis/cesium-tileset-edit'
-export type { CityScene, CityNode, Transform } from '@desktop-webgis/cesium-scene-schema'
+export type { CesiumScene, CesiumSceneNode, Transform } from '@desktop-webgis/cesium-scene-schema'
 export type { DrawOptions, DrawResult } from '@desktop-webgis/cesium-layer'
 export type { EditState, GraphicEditOptions, GraphicEditResult } from '@desktop-webgis/cesium-layer'
 export * from './document.js'
 
-export interface CityRuntimeOptions {
+export interface CesiumSceneRuntimeOptions {
   target?: HTMLElement | string
   /** Existing viewer is caller-owned unless ownsViewer is explicitly true. */
   viewer?: Viewer
-  scene: CityScene
+  scene: CesiumScene
   /** Direct constructor defaults to owning the viewer for compatibility. */
   ownsViewer?: boolean
   /** Base URL of scene.json; resolves relative asset and terrain URLs. */
@@ -42,13 +42,13 @@ export interface CityRuntimeOptions {
 interface PreparedEnvironment { key: string; imagery: ImageryProvider; terrain: TerrainProvider }
 
 /** Composes independent packages; editing and read-only viewers share this renderer. */
-export class CitySceneRuntime {
+export class CesiumSceneRuntime {
   readonly layers: LayerCollection
   private readonly editor: TilesetEditor
-  private readonly effects: CityEffects
-  private readonly nodes = new Map<string, CityNode>()
+  private readonly effects: SceneEffects
+  private readonly nodes = new Map<string, CesiumSceneNode>()
   private readonly nativeKeys = new Map<string, string>()
-  private scene: CityScene
+  private scene: CesiumScene
   private editingId?: string
   private drawing?: DrawSession
   private graphicEditing?: EditSession
@@ -65,12 +65,12 @@ export class CitySceneRuntime {
   private readonly originalLighting: { sunlight: boolean; shadows: boolean; time: JulianDate }
   private readonly originalTerrain: Viewer['terrainProvider']
 
-  constructor(readonly viewer: Viewer, private readonly options: CityRuntimeOptions) {
-    this.scene = parseCityScene(options.scene)
+  constructor(readonly viewer: Viewer, private readonly options: CesiumSceneRuntimeOptions) {
+    this.scene = parseCesiumScene(options.scene)
     this.originalTerrain = viewer.terrainProvider
     this.originalLighting = { sunlight: viewer.scene.globe?.enableLighting ?? false, shadows: viewer.shadows ?? false, time: JulianDate.clone(viewer.clock?.currentTime ?? JulianDate.now()) }
     this.layers = new LayerCollection(viewer)
-    this.effects = new CityEffects(viewer)
+    this.effects = new SceneEffects(viewer)
     this.editor = new TilesetEditor(viewer, {
       translationSnap: 0,
       onStart: () => { this.layers.pickingEnabled = false; this.layers.layers.forEach(l => l.closePopup()) },
@@ -79,9 +79,9 @@ export class CitySceneRuntime {
     })
   }
 
-  async updateScene(input: CityScene): Promise<void> {
-    if (this.destroyed) throw new Error('CitySceneRuntime 已销毁')
-    const scene = parseCityScene(input)
+  async updateScene(input: CesiumScene): Promise<void> {
+    if (this.destroyed) throw new Error('CesiumSceneRuntime 已销毁')
+    const scene = parseCesiumScene(input)
     this.cancelPreparation()
     const revision = ++this.sceneRevision
     // Cancel an in-flight gesture before applying authoritative state (undo/import/hide).
@@ -102,7 +102,7 @@ export class CitySceneRuntime {
       this.layers.removeLayer(id); this.nodes.delete(id); this.nativeKeys.delete(id); this.currentLayers.delete(id)
     }
     for (const definition of scene.nodes) {
-      const node = { ...definition, ...getCityNodeState(scene, definition) }
+      const node = { ...definition, ...getCesiumSceneNodeState(scene, definition) }
       const previous = this.nodes.get(node.id)
       let layer = this.layers.getLayer(node.id)
       if (layer && previous && (layer.state === 'error' || this.nativeKeys.get(node.id) !== nativeKey(node, scene))) {
@@ -159,14 +159,14 @@ export class CitySceneRuntime {
   }
 
   /** Load hidden candidates before replacing owned content; failed preparation preserves the current scene. */
-  async replaceScene(input: CityScene, signal?: AbortSignal, options: { preserveCamera?: boolean } = {}): Promise<void> {
-    if (this.destroyed) throw new Error('CitySceneRuntime 已销毁')
-    const scene = parseCityScene(input)
+  async replaceScene(input: CesiumScene, signal?: AbortSignal, options: { preserveCamera?: boolean } = {}): Promise<void> {
+    if (this.destroyed) throw new Error('CesiumSceneRuntime 已销毁')
+    const scene = parseCesiumScene(input)
     this.cancelPreparation()
     const operation = new AbortController()
     this.preparation = operation
     const prepared = new Map<string, BaseLayer>()
-    const definitions = new Map(scene.nodes.map(node => [node.id, { ...node, ...getCityNodeState(scene, node) }]))
+    const definitions = new Map(scene.nodes.map(node => [node.id, { ...node, ...getCesiumSceneNodeState(scene, node) }]))
     let committed = false, committing = false
     const abort = (): void => operation.abort(signal?.reason)
     const release = (): void => { if (!committed && !committing) prepared.forEach(layer => layer.destroy()) }
@@ -194,7 +194,7 @@ export class CitySceneRuntime {
       const environment = this.prepareEnvironment(scene)
       const [nextEnvironment] = await Promise.race([Promise.all([environment, ...loads]), canceled])
       operation.signal.throwIfAborted()
-      if (this.destroyed || this.viewer.isDestroyed()) throw new Error('CitySceneRuntime 已销毁')
+      if (this.destroyed || this.viewer.isDestroyed()) throw new Error('CesiumSceneRuntime 已销毁')
       const custom = this.layers.layers.filter(layer => !this.nodes.has(layer.id))
       const previousManaged = this.layers.layers.filter(layer => this.nodes.has(layer.id))
       const nextLayers = [...custom, ...prepared.values()]
@@ -241,9 +241,9 @@ export class CitySceneRuntime {
   }
 
   /** Updates ready native objects without reloading resources or resetting an unchanged camera. */
-  updatePresentation(input: CityScene): boolean {
-    if (this.destroyed) throw new Error('CitySceneRuntime 已销毁')
-    const scene = parseCityScene(input)
+  updatePresentation(input: CesiumScene): boolean {
+    if (this.destroyed) throw new Error('CesiumSceneRuntime 已销毁')
+    const scene = parseCesiumScene(input)
     if (JSON.stringify([scene.basemap, scene.terrain]) !== this.environmentKey) return false
     if (scene.nodes.length !== this.nodes.size || scene.nodes.some(node => {
       const layer = this.layers.getLayer(node.id)
@@ -254,7 +254,7 @@ export class CitySceneRuntime {
     this.cancelPreparation(); this.sceneRevision++
     this.cancelDraw(); this.cancelGraphicEditing(); this.editor.cancel()
     for (const definition of scene.nodes) {
-      const node = { ...definition, ...getCityNodeState(scene, definition) }, layer = this.layers.getLayer(node.id)!
+      const node = { ...definition, ...getCesiumSceneNodeState(scene, definition) }, layer = this.layers.getLayer(node.id)!
       this.nodes.set(node.id, structuredClone(node))
       layer.name = node.name; layer.show = node.visible
       if ((!node.visible || node.locked) && this.editingId === node.id) this.stopEditing()
@@ -292,7 +292,7 @@ export class CitySceneRuntime {
   }
   stopEditing(): void { this.cancelGraphicEditing(); this.editor.stopEditing(); this.editingId = undefined; this.layers.pickingEnabled = true }
   startGraphicEditing(id: string, options: GraphicEditOptions = {}): EditSession {
-    if (this.destroyed) throw new Error('CitySceneRuntime 已销毁')
+    if (this.destroyed) throw new Error('CesiumSceneRuntime 已销毁')
     const layer = this.layers.getLayer(id)
     if (!(layer instanceof GraphicLayer)) throw new Error('请选择已加载的标绘图形')
     const definition = layer.getGraphic(id)?.toJSON()
@@ -317,7 +317,7 @@ export class CitySceneRuntime {
     }
   }
   startDraw(options: DrawOptions): DrawSession {
-    if (this.destroyed) throw new Error('CitySceneRuntime 已销毁')
+    if (this.destroyed) throw new Error('CesiumSceneRuntime 已销毁')
     this.stopEditing(); this.cancelDraw()
     const drawing = new DrawSession(this.viewer, options)
     this.drawing = drawing; this.layers.pickingEnabled = false; this.layers.layers.forEach(layer => layer.closePopup())
@@ -329,10 +329,10 @@ export class CitySceneRuntime {
   setEditMode(mode: EditMode): void { this.editor.setMode(mode) }
   setRenderQuality(quality: RenderQuality): void { applyRenderQuality(this.viewer, quality) }
   async flyTo(id: string): Promise<void> { await this.layers.getLayer(id)?.flyTo() }
-  setCamera(camera: CityCamera): void {
+  setCamera(camera: CesiumSceneCamera): void {
     this.viewer.camera.setView({ destination: Cartesian3.fromDegrees(...camera.position), orientation: { heading: CesiumMath.toRadians(camera.heading), pitch: CesiumMath.toRadians(camera.pitch), roll: CesiumMath.toRadians(camera.roll) } })
   }
-  getCamera(): CityCamera {
+  getCamera(): CesiumSceneCamera {
     const camera = this.viewer.camera, p = camera.positionCartographic
     return { position: [CesiumMath.toDegrees(p.longitude), CesiumMath.toDegrees(p.latitude), p.height], heading: CesiumMath.toDegrees(camera.heading), pitch: CesiumMath.toDegrees(camera.pitch), roll: CesiumMath.toDegrees(camera.roll) }
   }
@@ -356,7 +356,7 @@ export class CitySceneRuntime {
     const resolved = new URL(url, this.options.sceneUrl ?? document.baseURI).href
     return this.options.resolveResource?.(resolved) ?? new Resource({ url: resolved })
   }
-  private createLayer(node: CityNode, scene: CityScene): BaseLayer {
+  private createLayer(node: CesiumSceneNode, scene: CesiumScene): BaseLayer {
     const base = { id: node.id, name: node.name, show: node.visible }
     if (node.type === 'graphic') return new GraphicLayer({ ...base, graphics: [node] })
     if (node.type === 'water') return new WaterLayer({ ...base, ...node })
@@ -377,7 +377,7 @@ export class CitySceneRuntime {
     return new GeoJsonLayer({ ...base, data: asset.data ?? this.resource(resourceUrl!), color: node.color })
   }
 
-  private async updateEnvironment(scene: CityScene): Promise<void> {
+  private async updateEnvironment(scene: CesiumScene): Promise<void> {
     const key = JSON.stringify([scene.basemap, scene.terrain])
     if (key === this.environmentKey) return
     const revision = ++this.environmentRevision
@@ -386,7 +386,7 @@ export class CitySceneRuntime {
     this.installEnvironment(prepared)
   }
 
-  private async prepareEnvironment(scene: CityScene): Promise<PreparedEnvironment> {
+  private async prepareEnvironment(scene: CesiumScene): Promise<PreparedEnvironment> {
     const imagery = scene.basemap
       ? new UrlTemplateImageryProvider({ url: this.resource(scene.basemap.url), credit: scene.basemap.attribution })
       : await TileMapServiceImageryProvider.fromUrl(buildModuleUrl('Assets/Textures/NaturalEarthII'))
@@ -406,7 +406,7 @@ export class CitySceneRuntime {
   }
 }
 
-function nativeKey(node: CityNode, scene: CityScene): string {
+function nativeKey(node: CesiumSceneNode, scene: CesiumScene): string {
   if (node.type === 'graphic') return 'graphic'
   if (node.type === 'imagery') return JSON.stringify({ url: node.url, attribution: node.attribution, maximumLevel: node.maximumLevel })
   if (node.type === 'geojson') return JSON.stringify([node.asset, scene.assets[node.asset]])
@@ -416,14 +416,14 @@ function nativeKey(node: CityNode, scene: CityScene): string {
   return JSON.stringify([assetNode, scene.assets[node.asset]])
 }
 
-export function createCityRuntime(options: CityRuntimeOptions): CitySceneRuntime { return createRuntime(options, true) }
+export function createCesiumSceneRuntime(options: CesiumSceneRuntimeOptions): CesiumSceneRuntime { return createRuntime(options, true) }
 
-function createRuntime(options: CityRuntimeOptions, initializeCamera: boolean): CitySceneRuntime {
-  const scene = parseCityScene(options.scene)
+function createRuntime(options: CesiumSceneRuntimeOptions, initializeCamera: boolean): CesiumSceneRuntime {
+  const scene = parseCesiumScene(options.scene)
   if (options.cesiumBaseUrl) (globalThis as typeof globalThis & { CESIUM_BASE_URL: string }).CESIUM_BASE_URL = options.cesiumBaseUrl
   if (!options.viewer && !options.target) throw new Error('Provide a viewer or target')
   const viewer = options.viewer ?? new Viewer(options.target!, { animation: false, timeline: false, baseLayerPicker: false, geocoder: false, homeButton: false, sceneModePicker: false, navigationHelpButton: false, fullscreenButton: false, selectionIndicator: false, infoBox: false, baseLayer: false, requestRenderMode: true, maximumRenderTimeChange: Infinity })
-  const runtime = new CitySceneRuntime(viewer, { ...options, scene, ownsViewer: options.ownsViewer ?? !options.viewer })
+  const runtime = new CesiumSceneRuntime(viewer, { ...options, scene, ownsViewer: options.ownsViewer ?? !options.viewer })
   try {
     if (options.renderQuality || !options.viewer) runtime.setRenderQuality(options.renderQuality ?? defaultRenderQuality)
     if (initializeCamera) runtime.setCamera(scene.camera)
@@ -432,9 +432,9 @@ function createRuntime(options: CityRuntimeOptions, initializeCamera: boolean): 
 }
 
 export interface CesiumDocumentRuntime {
-  readonly runtime: CitySceneRuntime
+  readonly runtime: CesiumSceneRuntime
   readonly issues: readonly CesiumDocumentIssue[]
-  /** Full input content, including definitions unsupported by the native city projection. */
+  /** Full input content, including definitions unsupported by the native Cesium projection. */
   getDocument(): SceneDocument
   /** Applies a validated snapshot; aborted preparation cannot publish obsolete native content. */
   updateDocument(document: unknown, signal?: AbortSignal, options?: { reload?: boolean }): Promise<void>
@@ -442,7 +442,7 @@ export interface CesiumDocumentRuntime {
 }
 
 /** Creates and loads a native projection; low-level native edits still require host document updates. */
-export async function createCesiumDocumentRuntime(options: Omit<CityRuntimeOptions, 'scene'> & { document: unknown; viewId?: string; signal?: AbortSignal; resolveReference?: ResourceReferenceResolver }): Promise<CesiumDocumentRuntime> {
+export async function createCesiumDocumentRuntime(options: Omit<CesiumSceneRuntimeOptions, 'scene'> & { document: unknown; viewId?: string; signal?: AbortSignal; resolveReference?: ResourceReferenceResolver }): Promise<CesiumDocumentRuntime> {
   let projection = projectCesiumDocument(options.document, options.viewId)
   projection.scene = await resolveSceneResourceReferences(projection.scene, options.resolveReference, options.signal)
   const runtime = createRuntime({ ...options, scene: projection.scene }, false)
@@ -472,3 +472,5 @@ export async function createCesiumDocumentRuntime(options: Omit<CityRuntimeOptio
     destroy() { if (destroyed) return; destroyed = true; revision++; runtime.destroy() }
   }
 }
+
+export * from './compat-city.js'

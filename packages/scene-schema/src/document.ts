@@ -1,4 +1,4 @@
-import { createCityScene, parseCityScene, validateCityScene, validateResourceReference, type ResourceReference, type CityCamera, type CityNode, type CityScene } from '@desktop-webgis/cesium-scene-schema'
+import { createCesiumScene, parseCesiumScene, validateCesiumScene, validateResourceReference, type ResourceReference, type CesiumSceneCamera, type CesiumSceneNode, type CesiumScene } from '@desktop-webgis/cesium-scene-schema'
 import { parseScene, SceneValidationError } from './parse.js'
 import { validateScene } from './validate.js'
 import type { GeoJsonFeatureCollection, JsonValue, SceneManifest, SceneSource, SceneView, TileLayer, VectorLayer, ValidationIssue, ValidationResult } from './types.js'
@@ -56,9 +56,9 @@ export interface SceneGroupNode {
 }
 
 type MapNode<T> = T extends TileLayer | VectorLayer ? Omit<T, 'source'> & { resource: string; parentId?: string; locked?: boolean; filter?: SceneFilterCondition[] } : never
-type CityDocumentNode<T> = T extends CityNode ? Omit<T, 'asset' | 'groupId'> & { parentId?: string } & (T extends { asset: string } ? { resource: string } : {}) : never
-export type SceneNode = SceneGroupNode | MapNode<TileLayer | VectorLayer> | CityDocumentNode<CityNode>
-export type SceneDocumentView = ({ type: '2d' } & SceneView) | { type: '3d'; camera: CityCamera; heightReference: 'ellipsoid' }
+type CesiumDocumentNode<T> = T extends CesiumSceneNode ? Omit<T, 'asset' | 'groupId'> & { parentId?: string } & (T extends { asset: string } ? { resource: string } : {}) : never
+export type SceneNode = SceneGroupNode | MapNode<TileLayer | VectorLayer> | CesiumDocumentNode<CesiumSceneNode>
+export type SceneDocumentView = ({ type: '2d' } & SceneView) | { type: '3d'; camera: CesiumSceneCamera; heightReference: 'ellipsoid' }
 
 export interface SceneDocumentExtension {
   version: number
@@ -78,10 +78,10 @@ export interface SceneDocument {
   views: Record<string, SceneDocumentView>
   activeView: string
   environment?: {
-    basemap?: CityScene['basemap']
-    terrain?: CityScene['terrain']
-    effects?: CityScene['effects']
-    lighting?: CityScene['lighting']
+    basemap?: CesiumScene['basemap']
+    terrain?: CesiumScene['terrain']
+    effects?: CesiumScene['effects']
+    lighting?: CesiumScene['lighting']
   }
   credentials?: SceneManifest['credentials']
   widgets?: SceneManifest['widgets']
@@ -223,14 +223,14 @@ export function validateSceneDocument(input: unknown): ValidationResult {
       issues.push(...validateScene({ ...mapBase, layers: [], view: definition }).issues.filter(issue => issue.path.startsWith('$.view')).map(issue => ({ ...issue, path: issue.path.replace('$.view', `$.views.${id}`) })))
     } else if (record(view) && view.type === '3d') {
       check(view.heightReference === 'ellipsoid', `$.views.${id}.heightReference`, 'view.heightReference', '三维相机高度使用椭球米')
-      issues.push(...validateCityScene({ ...createCityScene(), camera: view.camera }).map(issue => ({ ...issue, code: 'city.validation', path: issue.path.replace('$.camera', `$.views.${id}.camera`) })))
+      issues.push(...validateCesiumScene({ ...createCesiumScene(), camera: view.camera }).map(issue => ({ ...issue, code: 'city.validation', path: issue.path.replace('$.camera', `$.views.${id}.camera`) })))
     } else check(false, `$.views.${id}`, 'view.type', '视图类型必须是 2d 或 3d')
   }
   const environment = input.environment === undefined ? {} : input.environment
   check(record(environment), '$.environment', 'type.object', '环境必须是对象')
   if (record(environment)) for (const key of Object.keys(environment)) check(['basemap', 'terrain', 'effects', 'lighting'].includes(key), `$.environment.${key}`, 'field.unknown', '未知环境字段')
-  const city = { ...createCityScene(), ...(record(environment) ? environment : {}), assets, nodes: cityNodes }
-  issues.push(...validateCityScene(city).map(issue => ({ ...issue, code: 'city.validation', path: issue.path.replace('$.assets', '$.resources').replace('$.nodes', '$.cityNodes') })))
+  const city = { ...createCesiumScene(), ...(record(environment) ? environment : {}), assets, nodes: cityNodes }
+  issues.push(...validateCesiumScene(city).map(issue => ({ ...issue, code: 'city.validation', path: issue.path.replace('$.assets', '$.resources').replace('$.nodes', '$.cityNodes') })))
   if (input.extensions !== undefined) {
     check(record(input.extensions), '$.extensions', 'type.object', '扩展必须是字典')
     if (record(input.extensions)) for (const [name, extension] of Object.entries(input.extensions)) {
@@ -248,7 +248,7 @@ function allocateId(id: string, used: Set<string>): string {
 }
 
 /** Migrates old map manifests and standalone city scenes into one resource/node namespace. */
-export function migrateSceneDocument(input: unknown, identity = { id: 'city-scene', title: '三维场景' }, reserved: { nodeIds?: readonly string[]; resourceIds?: readonly string[] } = {}): SceneDocument {
+export function migrateSceneDocument(input: unknown, identity = { id: 'scene3d-scene', title: '三维场景' }, reserved: { nodeIds?: readonly string[]; resourceIds?: readonly string[] } = {}): SceneDocument {
   let decoded: unknown = input
   if (typeof input === 'string') {
     try { decoded = JSON.parse(input) as unknown }
@@ -256,7 +256,7 @@ export function migrateSceneDocument(input: unknown, identity = { id: 'city-scen
   }
   if (record(decoded) && decoded.version === 3) return parseSceneDocument(decoded)
   const manifest = record(decoded) && Object.hasOwn(decoded, 'sources') ? parseScene(decoded) : undefined
-  const city = manifest?.city ?? (manifest ? undefined : parseCityScene(decoded))
+  const city = manifest?.city ?? (manifest ? undefined : parseCesiumScene(decoded))
   const resources: Record<string, SceneResource> = manifest ? structuredClone(manifest.sources) : Object.create(null)
   const nodes: SceneNode[] = manifest ? manifest.layers.map(({ source, ...layer }) => ({ ...layer, resource: source })) : []
   const views: Record<string, SceneDocumentView> = manifest ? { map: { type: '2d', ...manifest.view } } : {}

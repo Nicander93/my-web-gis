@@ -48,7 +48,7 @@ if (result.status === 'completed') {
 const savedGraphics = annotations.toJSON()
 ```
 
-单击采集，线至少 2 点、面至少 3 点；点单击后完成。Enter/右键或 `draw.finish()` 完成，Esc/失焦或 `draw.cancel()` 取消，Backspace 移除最后一点。同一 Viewer 的绘制和顶点编辑共用一个输入所有者，新会话取消旧会话；隐藏或移除图形层也会取消。绘制完成返回纯配置，**不会自动入层**，历史和保存由宿主接入。使用 LayerCollection 时，宿主应在会话期间关闭 `pickingEnabled`，结束后恢复；CitySceneRuntime 已协调此行为。
+单击采集，线至少 2 点、面至少 3 点；点单击后完成。Enter/右键或 `draw.finish()` 完成，Esc/失焦或 `draw.cancel()` 取消，Backspace 移除最后一点。同一 Viewer 的绘制和顶点编辑共用一个输入所有者，新会话取消旧会话；隐藏或移除图形层也会取消。绘制完成返回纯配置，**不会自动入层**，历史和保存由宿主接入。使用 LayerCollection 时，宿主应在会话期间关闭 `pickingEnabled`，结束后恢复；CesiumSceneRuntime 已协调此行为。
 
 `ground` 拾取地形/椭球并贴地渲染；绘制时 `absolute` 优先深度拾取模型表面，失败时拾取地表，并保留椭球高度。坐标统一为 WGS84 `[经度,纬度,高度]`。样式包括颜色、线宽、点大小和标签；`style.labelField` 读取文本、数字、布尔属性，缺失、null 或结构化值使用 `style.label` 作为后备。`resolveGraphicLabel(node)` 可独立计算标签，数字 0 和布尔 false 不会被丢弃。分类样式和吸附仍待实现。
 

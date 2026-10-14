@@ -36,9 +36,9 @@ import { registerHelpDialog, type HelpDialogPage } from './commands/help.command
 import { viewCommands } from './commands/view.commands'
 import { RecoveryDraftHost } from '@/features/project/RecoveryDraftHost'
 
-const CityWorkspace = lazy(() =>
-  import('@/features/city/CityWorkspace').then((module) => ({
-    default: module.CityWorkspace
+const SceneWorkspace = lazy(() =>
+  import('@/features/scene3d/SceneWorkspace').then((module) => ({
+    default: module.SceneWorkspace
   }))
 )
 
@@ -209,7 +209,7 @@ export default function App() {
 
   return (
     <div
-      className={`desktop-app${sceneMode === '3d' ? ' desktop-app--city' : ''}`}
+      className={`desktop-app${sceneMode === '3d' ? ' desktop-app--scene3d' : ''}`}
     >
       <Header showToolbar={hasProject} />
       {!hasProject ? (
@@ -230,7 +230,7 @@ export default function App() {
         />
       ) : (
         <Suspense fallback={<p role="status">正在加载三维组件…</p>}>
-          <CityWorkspace key={`${project.id}:${projectEpoch}`} />
+          <SceneWorkspace key={`${project.id}:${projectEpoch}`} />
         </Suspense>
       )}
       {hasProject && sceneMode === '2d' && <StatusBar message={status} />}

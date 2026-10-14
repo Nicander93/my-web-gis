@@ -1,4 +1,4 @@
-/** Serializable city scenes. Coordinates use WGS84 degrees and ellipsoid metres. */
+/** Serializable Cesium 3D scenes. Coordinates use WGS84 degrees and ellipsoid metres. */
 import { validateResourceReference, type ResourceReference } from './resource-reference.js'
 export { isRuntimeResourceUrl, validateResourceReference, type ResourceReference } from './resource-reference.js'
 export type GeoPosition = [longitude: number, latitude: number, height: number]
@@ -12,7 +12,7 @@ export interface Transform {
   scale: number
 }
 
-export interface CityCamera {
+export interface CesiumSceneCamera {
   position: GeoPosition
   heading: number
   pitch: number
@@ -25,7 +25,7 @@ export interface PopupDefinition {
   fields: Array<{ field: string; label?: string }>
 }
 
-export interface CityAsset {
+export interface CesiumSceneAsset {
   type: '3dtiles' | 'glb' | 'geojson'
   /** Legacy HTTP(S) or relative URL. Local references are resolved separately by the host. */
   url?: string
@@ -104,7 +104,7 @@ export interface GeoJsonNode extends NodeBase {
   color?: string
 }
 
-/** Native city imagery with an XYZ URL template. */
+/** Native scene imagery with an XYZ URL template. */
 export interface ImageryNode extends NodeBase {
   type: 'imagery'
   url: string
@@ -124,26 +124,26 @@ export interface WaterNode extends NodeBase {
   speed: number
 }
 
-export type CityNode = TilesetNode | ModelNode | GeoJsonNode | ImageryNode | WaterNode | GraphicNode
-export interface CityGroup { id: string; name: string; visible: boolean; locked?: boolean; parentId?: string }
-export interface CityScene {
+export type CesiumSceneNode = TilesetNode | ModelNode | GeoJsonNode | ImageryNode | WaterNode | GraphicNode
+export interface CesiumSceneGroup { id: string; name: string; visible: boolean; locked?: boolean; parentId?: string }
+export interface CesiumScene {
   version: 1 | 2
-  camera: CityCamera
+  camera: CesiumSceneCamera
   basemap?: { url: string; attribution?: string }
   terrain?: { url: string }
-  assets: Record<string, CityAsset>
-  nodes: CityNode[]
-  groups?: CityGroup[]
+  assets: Record<string, CesiumSceneAsset>
+  nodes: CesiumSceneNode[]
+  groups?: CesiumSceneGroup[]
   effects: { fog: number; bloom: boolean }
   lighting?: { sunlight: boolean; shadows: boolean; time: string }
 }
 
-export interface CityValidationIssue { path: string; message: string }
+export interface CesiumSceneValidationIssue { path: string; message: string }
 export function createTransform(): Transform {
   return { translation: [0, 0, 0], rotation: [0, 0, 0], scale: 1 }
 }
 
-export function createCityScene(): CityScene {
+export function createCesiumScene(): CesiumScene {
   return {
     version: 2,
     camera: { position: [116.391, 39.907, 2500], heading: 0, pitch: -45, roll: 0 },
@@ -160,7 +160,7 @@ function position(value: unknown): value is GeoPosition {
   return triple(value) && Math.abs(value[0]) <= 180 && Math.abs(value[1]) <= 90
 }
 /** Accepts local relative URLs and HTTP(S), without embedded credentials. */
-export function isCityResourceUrl(value: unknown): value is string {
+export function isSceneResourceUrl(value: unknown): value is string {
   if (typeof value !== 'string' || !value.trim() || /[\\\u0000-\u0020]/.test(value)) return false
   if (/^https?:\/\//i.test(value)) {
     try {
@@ -178,16 +178,16 @@ export function validateTransform(value: unknown): value is Transform {
 }
 
 /** Validate before creating GPU resources or persisting untrusted scenes. */
-export function validateCityScene(input: unknown, root = '$'): CityValidationIssue[] {
-  const issues: CityValidationIssue[] = []
+export function validateCesiumScene(input: unknown, root = '$'): CesiumSceneValidationIssue[] {
+  const issues: CesiumSceneValidationIssue[] = []
   function check(valid: boolean, path: string, message: string): void { if (!valid) issues.push({ path: `${root}.${path}`, message }) }
   if (!record(input)) return [{ path: root, message: '三维场景必须是对象' }]
-  check(input.version === 1 || input.version === 2, 'version', '只支持 CityScene version 1 或 2')
+  check(input.version === 1 || input.version === 2, 'version', '只支持 CesiumScene version 1 或 2')
   if (input.lighting !== undefined) check(input.version === 2 && record(input.lighting) && typeof input.lighting.sunlight === 'boolean' && typeof input.lighting.shadows === 'boolean' && typeof input.lighting.time === 'string' && Number.isFinite(Date.parse(input.lighting.time)), 'lighting', '光照需要 version 2、有效时间和布尔设置')
   const camera = input.camera
   check(record(camera) && position(camera.position) && finite(camera.heading) && finite(camera.pitch) && Math.abs(camera.pitch) <= 90 && finite(camera.roll), 'camera', '相机必须使用有效的经纬度、高度和角度')
-  if (input.basemap !== undefined) check(record(input.basemap) && isCityResourceUrl(input.basemap.url), 'basemap', '底图 URL 无效')
-  if (input.terrain !== undefined) check(record(input.terrain) && isCityResourceUrl(input.terrain.url), 'terrain', '地形 URL 无效')
+  if (input.basemap !== undefined) check(record(input.basemap) && isSceneResourceUrl(input.basemap.url), 'basemap', '底图 URL 无效')
+  if (input.terrain !== undefined) check(record(input.terrain) && isSceneResourceUrl(input.terrain.url), 'terrain', '地形 URL 无效')
   check(record(input.effects) && finite(input.effects.fog) && input.effects.fog >= 0 && input.effects.fog <= 1 && typeof input.effects.bloom === 'boolean', 'effects', '雾浓度必须在 0–1 之间，辉光必须是布尔值')
   const assets = record(input.assets) ? input.assets : {}
   check(record(input.assets), 'assets', '资源必须是字典')
@@ -196,14 +196,14 @@ export function validateCityScene(input: unknown, root = '$'): CityValidationIss
       check(false, `assets.${id}`, '资源类型或 URL 无效'); continue
     }
     if (asset.type === 'geojson') {
-      const hasUrl = asset.url !== undefined && isCityResourceUrl(asset.url)
+      const hasUrl = asset.url !== undefined && isSceneResourceUrl(asset.url)
       const hasData = asset.data !== undefined && record(asset.data)
       check(hasUrl || hasData || validateResourceReference(asset.reference), `assets.${id}`, 'GeoJSON 资源需要有效 URL、引用或内联 data')
-      if (asset.url !== undefined) check(isCityResourceUrl(asset.url), `assets.${id}.url`, '资源 URL 无效')
+      if (asset.url !== undefined) check(isSceneResourceUrl(asset.url), `assets.${id}.url`, '资源 URL 无效')
     } else {
-      check(asset.url !== undefined && isCityResourceUrl(asset.url) || asset.reference !== undefined && validateResourceReference(asset.reference), `assets.${id}`, '资源需要有效 URL 或引用')
+      check(asset.url !== undefined && isSceneResourceUrl(asset.url) || asset.reference !== undefined && validateResourceReference(asset.reference), `assets.${id}`, '资源需要有效 URL 或引用')
     }
-    if (asset.url !== undefined) check(isCityResourceUrl(asset.url), `assets.${id}.url`, '资源 URL 无效')
+    if (asset.url !== undefined) check(isSceneResourceUrl(asset.url), `assets.${id}.url`, '资源 URL 无效')
     if (asset.reference !== undefined) check(validateResourceReference(asset.reference), `assets.${id}.reference`, '资源引用无效')
   }
   const groupIds = new Set<string>()
@@ -249,7 +249,7 @@ export function validateCityScene(input: unknown, root = '$'): CityValidationIss
       return
     }
     if (node.type === 'imagery') {
-      check(isCityResourceUrl(node.url), `${path}.url`, '影像 URL 无效')
+      check(isSceneResourceUrl(node.url), `${path}.url`, '影像 URL 无效')
       if (node.attribution !== undefined) check(typeof node.attribution === 'string', `${path}.attribution`, '归属信息必须是字符串')
       if (node.maximumLevel !== undefined) check(finite(node.maximumLevel) && node.maximumLevel >= 0, `${path}.maximumLevel`, '最大级别必须是非负数')
       if (node.opacity !== undefined) check(finite(node.opacity) && node.opacity >= 0 && node.opacity <= 1, `${path}.opacity`, '透明度必须在 0–1 之间')
@@ -275,12 +275,14 @@ export function validateCityScene(input: unknown, root = '$'): CityValidationIss
   return issues
 }
 
-export function parseCityScene(input: unknown): CityScene {
+export function parseCesiumScene(input: unknown): CesiumScene {
   const decoded: unknown = typeof input === 'string' ? JSON.parse(input) : input
-  const issues = validateCityScene(decoded)
+  const issues = validateCesiumScene(decoded)
   if (issues.length) throw new Error(issues.map(i => `${i.path}: ${i.message}`).join('\n'))
   // Validation establishes the complete serializable contract.
-  return structuredClone(decoded) as CityScene
+  return structuredClone(decoded) as CesiumScene
 }
 
-export { getCityNodeState, getCityGroupState, getCityDescendantIds, moveCityNodes, moveCityGroup, removeCityGroup } from './groups.js'
+export { getCesiumSceneNodeState, getCesiumSceneGroupState, getCesiumSceneDescendantIds, moveCesiumSceneNodes, moveCesiumSceneGroup, removeCesiumSceneGroup } from './groups.js'
+
+export * from './compat-city.js'

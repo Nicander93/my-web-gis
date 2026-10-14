@@ -1,6 +1,6 @@
 import { createProject } from '@desktop-webgis/gis-core'
 import type { Project } from '@desktop-webgis/gis-core'
-import { createCityScene } from '@desktop-webgis/cesium-scene-schema'
+import { createCesiumScene } from '@desktop-webgis/cesium-scene-schema'
 
 export type ProjectType = '2d' | '3d'
 
@@ -13,6 +13,6 @@ export function getProjectType(project: Project): ProjectType {
 export function createEditorProject(type: ProjectType, name: string): Project {
   const project = createProject(name.trim() || (type === '3d' ? '未命名三维场景' : '未命名二维地图'))
   project.settings.workspaceType = type
-  if (type === '3d') project.city = createCityScene()
+  if (type === '3d') project.city = createCesiumScene()
   return project
 }

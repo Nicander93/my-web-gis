@@ -61,8 +61,8 @@ async function start(): Promise<void> {
     const cityView = active.type === '3d' ? scene.activeView : Object.entries(scene.views).find(([, view]) => view.type === '3d')?.[0]
     const mode = new URLSearchParams(window.location.search).get('mode')
     if (cityView && mode !== '2d' && (mode === '3d' || active.type === '3d')) {
-      const { renderCityViewer } = await import('./city-viewer')
-      await renderCityViewer(scene, sceneUrl, cityView)
+      const { renderSceneViewer } = await import('./scene3d-viewer')
+      await renderSceneViewer(scene, sceneUrl, cityView)
       return
     }
     if (!mapView) throw new Error('场景没有二维视图')

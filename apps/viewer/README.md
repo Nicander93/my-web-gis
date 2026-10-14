@@ -1,6 +1,6 @@
 # Viewer scene documents
 
-The read-only Viewer loads canonical SceneDocument v3, legacy SceneManifest v1/v2 and standalone CityScene v1/v2 through the shared schema migration. It uses `OlDocumentRuntime` for maps and `createCesiumDocumentRuntime` for native city content. There is no Desktop or React dependency.
+The read-only Viewer loads canonical SceneDocument v3, legacy SceneManifest v1/v2 and standalone CesiumScene v1/v2 through the shared schema migration. It uses `OlDocumentRuntime` for maps and `createCesiumDocumentRuntime` for native city content. There is no Desktop or React dependency.
 
 After workspace dependencies and package builds are available:
 

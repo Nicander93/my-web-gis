@@ -1,7 +1,7 @@
-import type { CityGroup, CityNode, CityScene } from './index.js'
+import type { CesiumSceneGroup, CesiumSceneNode, CesiumScene } from './index.js'
 
 /** Ancestor flags are combined at render/edit time, never copied into children. */
-export function getCityGroupState(scene: CityScene, id?: string): { visible: boolean; locked: boolean } {
+export function getCesiumSceneGroupState(scene: CesiumScene, id?: string): { visible: boolean; locked: boolean } {
   let visible = true, locked = false
   const seen = new Set<string>()
   while (id) {
@@ -15,13 +15,13 @@ export function getCityGroupState(scene: CityScene, id?: string): { visible: boo
   return { visible, locked }
 }
 
-export function getCityNodeState(scene: CityScene, node: CityNode): { visible: boolean; locked: boolean } {
-  const group = getCityGroupState(scene, node.groupId)
+export function getCesiumSceneNodeState(scene: CesiumScene, node: CesiumSceneNode): { visible: boolean; locked: boolean } {
+  const group = getCesiumSceneGroupState(scene, node.groupId)
   return { visible: node.visible && group.visible, locked: !!node.locked || group.locked }
 }
 
 /** Stable descendant object IDs support selection, search and subtree operations. */
-export function getCityDescendantIds(scene: CityScene, groupId: string): string[] {
+export function getCesiumSceneDescendantIds(scene: CesiumScene, groupId: string): string[] {
   const descendants = new Set([groupId])
   for (let changed = true; changed;) {
     changed = false
@@ -33,11 +33,11 @@ export function getCityDescendantIds(scene: CityScene, groupId: string): string[
 }
 
 /** Move/reorder a selection atomically. No UI, viewer or project-store dependency. */
-export function moveCityNodes(scene: CityScene, ids: readonly string[], groupId?: string, beforeId?: string): CityScene {
+export function moveCesiumSceneNodes(scene: CesiumScene, ids: readonly string[], groupId?: string, beforeId?: string): CesiumScene {
   const selected = new Set(ids), nodes = scene.nodes.filter(node => selected.has(node.id))
   if (!nodes.length || nodes.length !== selected.size) throw new Error('请选择存在的对象')
-  if (nodes.some(node => getCityNodeState(scene, node).locked)) throw new Error('选中对象或其文件夹已锁定')
-  if (getCityGroupState(scene, groupId).locked) throw new Error('目标文件夹或其父级已锁定')
+  if (nodes.some(node => getCesiumSceneNodeState(scene, node).locked)) throw new Error('选中对象或其文件夹已锁定')
+  if (getCesiumSceneGroupState(scene, groupId).locked) throw new Error('目标文件夹或其父级已锁定')
   if (beforeId && !selected.has(beforeId) && !scene.nodes.some(node => node.id === beforeId && node.groupId === groupId)) throw new Error('排序目标不在目标文件夹中')
   if (beforeId && selected.has(beforeId)) return structuredClone(scene)
   const rest = scene.nodes.filter(node => !selected.has(node.id)).map(node => structuredClone(node))
@@ -47,10 +47,10 @@ export function moveCityNodes(scene: CityScene, ids: readonly string[], groupId?
   return { ...structuredClone(scene), version: 2, nodes: rest }
 }
 
-export function moveCityGroup(scene: CityScene, id: string, parentId?: string, beforeId?: string): CityScene {
+export function moveCesiumSceneGroup(scene: CesiumScene, id: string, parentId?: string, beforeId?: string): CesiumScene {
   const source = scene.groups?.find(group => group.id === id)
   if (!source) throw new Error('文件夹不存在')
-  if (getCityGroupState(scene, id).locked || getCityGroupState(scene, parentId).locked) throw new Error('文件夹或其父级已锁定')
+  if (getCesiumSceneGroupState(scene, id).locked || getCesiumSceneGroupState(scene, parentId).locked) throw new Error('文件夹或其父级已锁定')
   let parent = parentId
   while (parent) {
     if (parent === id) throw new Error('不能将文件夹移入自身或后代')
@@ -59,7 +59,7 @@ export function moveCityGroup(scene: CityScene, id: string, parentId?: string, b
   if (beforeId === id) return structuredClone(scene)
   if (beforeId && !scene.groups?.some(group => group.id === beforeId && group.parentId === parentId)) throw new Error('排序目标不在目标文件夹中')
   const next = structuredClone(scene)
-  const moved: CityGroup = { ...source }
+  const moved: CesiumSceneGroup = { ...source }
   if (parentId) moved.parentId = parentId; else delete moved.parentId
   const rest = next.groups?.filter(group => group.id !== id) ?? []
   rest.splice(beforeId ? rest.findIndex(group => group.id === beforeId) : rest.length, 0, moved)
@@ -67,10 +67,10 @@ export function moveCityGroup(scene: CityScene, id: string, parentId?: string, b
 }
 
 /** Dissolve a folder in place, retaining descendants and their effective visibility. */
-export function removeCityGroup(scene: CityScene, id: string): CityScene {
+export function removeCesiumSceneGroup(scene: CesiumScene, id: string): CesiumScene {
   const group = scene.groups?.find(group => group.id === id)
   if (!group) throw new Error('分组不存在')
-  if (getCityGroupState(scene, id).locked) throw new Error('请先解锁文件夹及其父级')
+  if (getCesiumSceneGroupState(scene, id).locked) throw new Error('请先解锁文件夹及其父级')
   const next = structuredClone(scene)
   next.groups = next.groups?.filter(item => item.id !== id).map(child => {
     if (child.parentId !== id) return child

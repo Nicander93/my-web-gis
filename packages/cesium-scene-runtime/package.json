@@ -1,7 +1,7 @@
 {
   "name": "@desktop-webgis/cesium-scene-runtime",
   "version": "0.1.0",
-  "description": "Independent cesium-scene-runtime API for Cesium city scenes",
+  "description": "Independent runtime API for general Cesium 3D scenes",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",

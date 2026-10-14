@@ -42,6 +42,16 @@ async function drag(page: Page, from: number[], to: number[], key?: 'Shift' | 'A
   if (key) await page.keyboard.up(key)
 }
 
+async function revealMapTarget(page: Page, pixel: number[]): Promise<void> {
+  const bounds = (await page.locator('.ol-viewport').boundingBox())!
+  const targetIsVisible = await page.evaluate(([x, y]) =>
+    !!document.elementFromPoint(x, y)?.closest('.ol-viewport'),
+  [bounds.x + pixel[0], bounds.y + pixel[1]] as [number, number])
+  if (targetIsVisible) return
+  const closeTable = page.getByRole('button', { name: '关闭属性表窗口', exact: true })
+  if (await closeTable.count()) await closeTable.click()
+}
+
 test.beforeEach(async ({ page }) => {
   await page.route('**/*tile.openstreetmap.org/**', route => route.abort())
   await page.goto('/')
@@ -79,8 +89,10 @@ test('box selection links the accepted rows; modifiers, empty selection and row 
   await page.waitForTimeout(350)
   state = await mapState(page)
   const second = state.positions[1].pixel
+  await revealMapTarget(page, second)
   await drag(page, [second[0] - 12, second[1] - 12], [second[0] + 12, second[1] + 12], 'Shift')
   await expect(page.locator('.table-scroll tbody tr')).toHaveCount(2)
+  await revealMapTarget(page, second)
   await drag(page, [second[0] - 12, second[1] - 12], [second[0] + 12, second[1] + 12], 'Alt')
   await expect(page.locator('.table-scroll tbody tr')).toHaveCount(1)
   await drag(page, [20, 20], [40, 40])
@@ -276,6 +288,7 @@ test('domestic view projections keep selection, CSV coordinates and document his
   // UI selection remains usable in the projected native source, not just in the saved document.
   await waitForMapResize(page)
   const current = await mapState(page), second = current.positions[1].pixel
+  await revealMapTarget(page, second)
   await drag(page, [second[0] - 12, second[1] - 12], [second[0] + 12, second[1] + 12])
   await expect.poll(async () => (await mapState(page)).selection).toEqual(['point-1'])
   await picker.selectOption('EPSG:4490')
@@ -488,6 +501,7 @@ test('a deliberate click after a box is accepted and keeps selection on pan', as
   const state = await mapState(page)
   const bounds = (await page.locator('.ol-viewport').boundingBox())!
   const point = state.positions[1]
+  await revealMapTarget(page, point.pixel)
   await page.mouse.click(bounds.x + point.pixel[0], bounds.y + point.pixel[1])
   await expect.poll(async () => (await mapState(page)).selection).toEqual([point.id])
   await page.getByRole('button', { name: '平移', exact: true }).click()

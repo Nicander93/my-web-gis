@@ -1,5 +1,5 @@
 import { createProject, isLegacyStyle, migrateLegacyStyle, normalizeLayerTree, getLayerTreeChildren, type LayerTreeEntry, type BasemapConfig, type Dataset, type GisFeature, type ProjectSnapshot, type ServiceSource } from '@desktop-webgis/gis-core'
-import { createCityScene, parseCityScene, type CityNode } from '@desktop-webgis/cesium-scene-schema'
+import { createCesiumScene, parseCesiumScene, type CesiumSceneNode } from '@desktop-webgis/cesium-scene-schema'
 import { getUnsupportedSceneExtensions, migrateSceneDocument, parseSceneDocument, type GeoJsonFeatureCollection, type JsonValue, type SceneDocument, type SceneNode, type SceneResource, type SceneResourceMetadata } from '@desktop-webgis/scene-schema'
 import { toWmsSceneSource, toWmtsSceneSource } from './compile-project'
 import { getProjectType } from '../../services/project-type'
@@ -59,10 +59,10 @@ export function createProjectSceneDocument(snapshot: ProjectSnapshot): SceneDocu
 export interface ProjectSceneProjection {
   document: SceneDocument
   /** Host city IDs and portable document IDs may differ when the two engines share an ID. */
-  cityNodeIds: ReadonlyMap<string, string>
-  hostCityNodeIds: ReadonlyMap<string, string>
-  cityResourceIds: ReadonlyMap<string, string>
-  hostCityResourceIds: ReadonlyMap<string, string>
+  scene3dNodeIds: ReadonlyMap<string, string>
+  hostSceneNodeIds: ReadonlyMap<string, string>
+  scene3dResourceIds: ReadonlyMap<string, string>
+  hostSceneResourceIds: ReadonlyMap<string, string>
 }
 
 /** Builds the document and its host identity mapping together, without changing the project. */
@@ -124,19 +124,19 @@ export function createProjectSceneProjection(snapshot: ProjectSnapshot): Project
   for (const entry of [...project.rootOrder].reverse()) addTreeEntry(entry)
   const city = project.city ? migrateSceneDocument(project.city, { id: project.id, title: project.name }, { resourceIds: [...usedResources], nodeIds: [...usedNodes] }) : undefined
   Object.assign(resources, city?.resources)
-  const cityNodeIds = new Map<string, string>(), hostCityNodeIds = new Map<string, string>()
-  const cityResourceIds = new Map<string, string>(), hostCityResourceIds = new Map<string, string>()
+  const scene3dNodeIds = new Map<string, string>(), hostSceneNodeIds = new Map<string, string>()
+  const scene3dResourceIds = new Map<string, string>(), hostSceneResourceIds = new Map<string, string>()
   const migratedResourceIds = Object.keys(city?.resources ?? {})
   Object.keys(project.city?.assets ?? {}).forEach((id, index) => {
     const documentId = migratedResourceIds[index]
-    cityResourceIds.set(id, documentId); hostCityResourceIds.set(documentId, id)
+    scene3dResourceIds.set(id, documentId); hostSceneResourceIds.set(documentId, id)
   })
-  // City migration emits groups first and then objects in their original order.
-  const hostCityNodes = [...project.city?.groups ?? [], ...project.city?.nodes ?? []]
-  hostCityNodes.forEach((node, index) => {
+  // Legacy 3D migration emits groups first and then objects in their original order.
+  const hostSceneNodes = [...project.city?.groups ?? [], ...project.city?.nodes ?? []]
+  hostSceneNodes.forEach((node, index) => {
     const documentId = city!.nodes[index].id
-    cityNodeIds.set(node.id, documentId)
-    hostCityNodeIds.set(documentId, node.id)
+    scene3dNodeIds.set(node.id, documentId)
+    hostSceneNodeIds.set(documentId, node.id)
   })
   const document = parseSceneDocument({ version: 3, id: project.id, title: project.name, resources, nodes: [...nodes, ...city?.nodes ?? []],
     ...(project.description === undefined ? {} : { description: project.description }),
@@ -144,7 +144,7 @@ export function createProjectSceneProjection(snapshot: ProjectSnapshot): Project
     ...structuredClone(project.sceneDisplay ?? {}),
     views: { map: { type: '2d', projection: project.crs, ...project.mapState, ...project.mapViewConstraints }, ...city?.views }, activeView: city && getProjectType(project) === '3d' ? 'city' : 'map',
     ...(city?.environment ? { environment: city.environment } : {}), ...(Object.keys(credentials).length ? { credentials } : {}) })
-  return { document, cityNodeIds, hostCityNodeIds, cityResourceIds, hostCityResourceIds }
+  return { document, scene3dNodeIds, hostSceneNodeIds, scene3dResourceIds, hostSceneResourceIds }
 }
 
 function restoreAuthentication(resource: SceneResource, document: SceneDocument): Pick<ServiceSource, 'authMode' | 'tokenParam' | 'credentialRef'> {
@@ -268,9 +268,9 @@ export function createProjectFromSceneDocument(input: unknown): ProjectSnapshot 
     if (groups.some(group => group.id === node.id) && !node.parentId) project.rootOrder.push({ type: 'group', id: node.id })
     else if (project.layers.some(layer => layer.id === node.id) && !grouped.has(node.id)) project.rootOrder.push({ type: 'layer', id: node.id })
   }
-  const hasCityResources = Object.entries(document.resources).some(([id, resource]) => resource.type === '3dtiles' || resource.type === 'glb' || resource.type === 'geojson' && (resource.url || resource.reference) && !mapNodes.some(node => node.resource === id))
-  if (cityViews.length || hasCityResources || document.nodes.some(node => !['tile', 'vector'].includes(node.type) && (node.type !== 'group' || node.scope === '3d'))) {
-    const city = createCityScene(), mapGroups = new Set(groups.map(group => group.id))
+  const hasSceneResources = Object.entries(document.resources).some(([id, resource]) => resource.type === '3dtiles' || resource.type === 'glb' || resource.type === 'geojson' && (resource.url || resource.reference) && !mapNodes.some(node => node.resource === id))
+  if (cityViews.length || hasSceneResources || document.nodes.some(node => !['tile', 'vector'].includes(node.type) && (node.type !== 'group' || node.scope === '3d'))) {
+    const city = createCesiumScene(), mapGroups = new Set(groups.map(group => group.id))
     if (cityViews[0]) city.camera = cityViews[0].camera
     Object.assign(city, document.environment)
     city.groups = document.nodes.filter(node => node.type === 'group' && !mapGroups.has(node.id)).map(node => {
@@ -283,12 +283,12 @@ export function createProjectFromSceneDocument(input: unknown): ProjectSnapshot 
         const { resource: id, ...rest } = definition, resource = document.resources[id]
         if (resource.type !== '3dtiles' && resource.type !== 'glb' && resource.type !== 'geojson') throw new Error('三维对象资源类型不受支持')
         city.assets[id] = { type: resource.type, ...(resource.url === undefined ? {} : { url: resource.url }), ...(resource.reference ? { reference: structuredClone(resource.reference) } : {}), ...(resource.type === 'geojson' && resource.data ? { data: structuredClone(resource.data) } : {}) }
-        return { ...rest, asset: id, ...(parentId ? { groupId: parentId } : {}) } as CityNode
+        return { ...rest, asset: id, ...(parentId ? { groupId: parentId } : {}) } as CesiumSceneNode
       }
-      return { ...definition, ...(parentId ? { groupId: parentId } : {}) } as CityNode
+      return { ...definition, ...(parentId ? { groupId: parentId } : {}) } as CesiumSceneNode
     })
     for (const [id, resource] of Object.entries(document.resources)) if (resource.type === '3dtiles' || resource.type === 'glb' || resource.type === 'geojson' && (resource.url || resource.reference) && !mapNodes.some(node => node.resource === id)) city.assets[id] = { type: resource.type, ...(resource.url === undefined ? {} : { url: resource.url }), ...(resource.reference ? { reference: structuredClone(resource.reference) } : {}), ...(resource.type === 'geojson' && resource.data ? { data: structuredClone(resource.data) } : {}) }
-    project.city = parseCityScene(city)
+    project.city = parseCesiumScene(city)
   }
   return { project, featuresByDataset }
 }

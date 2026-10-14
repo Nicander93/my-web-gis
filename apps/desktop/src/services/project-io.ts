@@ -12,7 +12,7 @@ import {
 } from '@desktop-webgis/gis-core'
 import { pickFile, pickSaveFile, readTextFile, writeTextFile } from '@/services/files'
 import { getLiveMapState } from '@/features/map/map-runtime-host'
-import { getLiveCityCamera } from '@/features/city/city-runtime-host'
+import { getLiveSceneCamera } from '@/features/scene3d/scene3d-runtime-host'
 import { useProjectStore } from '@/stores/project.store'
 import { isTauri } from '@tauri-apps/api/core'
 import { downloadProject, pickBrowserProject } from './browser-project-files'
@@ -53,7 +53,7 @@ export function createSnapshotFromState(
   const projectWithView = liveMapState
     ? { ...project, mapState: liveMapState }
     : project
-  const camera = getLiveCityCamera()
+  const camera = getLiveSceneCamera()
   const snapshot = buildPersistedSnapshot(projectWithView.city && camera
     ? { ...projectWithView, city: { ...projectWithView.city, camera } } : projectWithView, featuresByDataset)
   assertNoSecretValues(snapshot)

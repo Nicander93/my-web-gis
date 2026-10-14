@@ -1,0 +1,73 @@
+{
+  "identifier": "com.desktop-webgis.recovery-acceptance-1791981102458",
+  "output": "D:\\my-code-repo\\my-web-gis\\apps\\desktop\\test-results\\native-recovery-1791981102458",
+  "scenarios": [
+    {
+      "name": "Native directory protocol, external GLTF mesh/texture, ranges and revocation",
+      "passed": true
+    },
+    {
+      "name": "2D native process termination, startup restore and native save",
+      "passed": true
+    },
+    {
+      "name": "3D real GLB transform, native process termination and restore",
+      "passed": true
+    }
+  ],
+  "nativeFileChooser": "Not automated: fixture working paths are assigned; Save uses the real native bridge.",
+  "windowsScale125": "Not verified",
+  "appData": "C:\\Users\\PC\\AppData\\Local\\com.desktop-webgis.recovery-acceptance-1791981102458",
+  "viewport": {
+    "width": 1036,
+    "height": 648,
+    "devicePixelRatio": 1.5927083492279053
+  },
+  "localProtocol": {
+    "matched": true,
+    "imageSize": [
+      1,
+      1
+    ],
+    "externalBuffers": 2,
+    "statuses": {
+      "model": 200,
+      "mesh": 200,
+      "image": 200,
+      "part": 206,
+      "suffix": 206,
+      "head": 200,
+      "missing": 404,
+      "traversal": 403
+    },
+    "revoked": 403,
+    "partBytes": [
+      0,
+      63,
+      0,
+      0,
+      0,
+      0
+    ],
+    "suffixBytes": [
+      22,
+      0,
+      23,
+      0
+    ],
+    "modelType": "model/gltf+json",
+    "imageType": "image/png",
+    "partRange": "bytes 2-7/648",
+    "headLength": "648"
+  },
+  "localModelReference": {
+    "kind": "relative",
+    "path": "本地模型/塔楼 #%.glb"
+  },
+  "modelVisibilityPixels": {
+    "visible": 65389,
+    "hidden": 17223,
+    "restored": 65379
+  },
+  "recoveredModelPixels": 65332
+}

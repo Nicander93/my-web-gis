@@ -5,7 +5,7 @@ import { openSceneDocument, saveSceneDocument } from '@/services/scene-document-
 import { saveSceneArchive } from '@/services/scene-archive-io'
 import { createProjectSceneDocument } from '@/features/scene/project-scene-document'
 import { replaceSceneDocumentAsEdit } from '@/features/scene/scene-document.commands'
-import { getLiveCityCamera } from '@/features/city/city-runtime-host'
+import { getLiveSceneCamera } from '@/features/scene3d/scene3d-runtime-host'
 import { resolveSceneDrafts } from '@/features/inspector/scene-draft-guard'
 import { emitCommandStatus } from './status'
 import { useSessionStore } from '@/stores/session.store'
@@ -93,7 +93,7 @@ export const projectCommands = {
     try {
       const state = useProjectStore.getState()
       const snapshot = createSnapshotFromState(state.project, state.featuresByDataset)
-      const camera = getLiveCityCamera()
+      const camera = getLiveSceneCamera()
       if (snapshot.project.city && camera) snapshot.project.city.camera = camera
       const result = await saveSceneDocument(createProjectSceneDocument(snapshot), state.project.name)
       emitCommandStatus(result.kind === 'saved' ? `已导出完整场景：${result.path}` : result.kind === 'cancelled' ? '已取消导出场景' : `完整场景下载已发起：${result.name}`)
@@ -103,7 +103,7 @@ export const projectCommands = {
     try {
       const state = useProjectStore.getState()
       const snapshot = createSnapshotFromState(state.project, state.featuresByDataset)
-      const camera = getLiveCityCamera()
+      const camera = getLiveSceneCamera()
       if (snapshot.project.city && camera) snapshot.project.city.camera = camera
       const result = await saveSceneArchive(createProjectSceneDocument(snapshot), state.project.name)
       emitCommandStatus(result.kind === 'saved' ? `已导出场景资源包：${result.path}` : result.kind === 'cancelled' ? '已取消导出资源包' : `场景资源包下载已发起：${result.name}`)

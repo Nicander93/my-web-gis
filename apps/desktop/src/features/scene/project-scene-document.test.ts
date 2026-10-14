@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createDefaultLayerStyle, createProject, parseProjectSnapshot, serializeProjectSnapshot, type ProjectSnapshot } from '@desktop-webgis/gis-core'
-import { createCityScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
+import { createCesiumScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
 import { parseSceneDocument } from '@desktop-webgis/scene-schema'
 import { createProjectFromSceneDocument, createProjectSceneDocument, createProjectSceneProjection } from './project-scene-document'
 import { createCategorizedStyle, createGraduatedStyle } from '@desktop-webgis/ol-style'
@@ -21,7 +21,7 @@ function snapshot(): ProjectSnapshot {
   ]
   project.groups = [{ id: 'group', name: 'Hidden group', visible: false, layerIds: ['a', 'b'] }, { id: 'empty', name: 'Empty group', visible: true, layerIds: [] }]
   project.rootOrder = [{ type: 'group', id: 'group' }, { type: 'layer', id: 'cache' }, { type: 'group', id: 'empty' }]
-  project.city = createCityScene()
+  project.city = createCesiumScene()
   project.city.assets.shared = { type: '3dtiles', url: './city/tileset.json' }
   project.city.assets.unused = { type: 'geojson', url: './city/unused.geojson' }
   project.city.groups = [{ id: 'group', name: 'City group', visible: true, locked: false }]
@@ -34,7 +34,7 @@ function snapshot(): ProjectSnapshot {
 
 describe('full project scene content', () => {
   it('keeps local three-dimensional GeoJSON references and unused assets outside map datasets', () => {
-    const project = createProject(); project.city = createCityScene()
+    const project = createProject(); project.city = createCesiumScene()
     project.city.assets.points = { type: 'geojson', reference: { kind: 'relative', path: '数据/points.geojson' } }
     project.city.assets.unused = { type: 'glb', reference: { kind: 'absolute', path: 'D:/模型/model.glb' } }
     project.city.nodes.push({ type: 'geojson', id: 'points', name: 'Points', visible: true, asset: 'points' })
@@ -114,23 +114,23 @@ describe('full project scene content', () => {
   it('maps city selection and edit identities without confusing colliding map nodes', () => {
     const input = snapshot(), before = structuredClone(input)
     const projection = createProjectSceneProjection(input)
-    expect(projection.cityNodeIds.get('a')).toBe('a-2')
-    expect(projection.cityNodeIds.get('group')).toBe('group-2')
-    expect(projection.hostCityNodeIds.get('a-2')).toBe('a')
-    expect(projection.hostCityNodeIds.get('a')).toBeUndefined()
-    expect(projection.hostCityNodeIds.get('group-2')).toBe('group')
-    expect(projection.cityResourceIds.get('shared')).toBe('shared-2')
-    expect(projection.hostCityResourceIds.get('shared-2')).toBe('shared')
-    expect(projection.hostCityResourceIds.get('shared')).toBeUndefined()
+    expect(projection.scene3dNodeIds.get('a')).toBe('a-2')
+    expect(projection.scene3dNodeIds.get('group')).toBe('group-2')
+    expect(projection.hostSceneNodeIds.get('a-2')).toBe('a')
+    expect(projection.hostSceneNodeIds.get('a')).toBeUndefined()
+    expect(projection.hostSceneNodeIds.get('group-2')).toBe('group')
+    expect(projection.scene3dResourceIds.get('shared')).toBe('shared-2')
+    expect(projection.hostSceneResourceIds.get('shared-2')).toBe('shared')
+    expect(projection.hostSceneResourceIds.get('shared')).toBeUndefined()
     expect(projection.document.nodes.find(node => node.id === 'a-2')).toMatchObject({ type: '3dtiles', parentId: 'group-2' })
     expect(projection.document).toEqual(createProjectSceneDocument(input))
     expect(input).toEqual(before)
     delete input.project.city
     const mapOnly = createProjectSceneProjection(input)
-    expect(mapOnly.cityNodeIds.size).toBe(0)
-    expect(mapOnly.hostCityNodeIds.size).toBe(0)
-    expect(mapOnly.cityResourceIds.size).toBe(0)
-    expect(mapOnly.hostCityResourceIds.size).toBe(0)
+    expect(mapOnly.scene3dNodeIds.size).toBe(0)
+    expect(mapOnly.hostSceneNodeIds.size).toBe(0)
+    expect(mapOnly.scene3dResourceIds.size).toBe(0)
+    expect(mapOnly.hostSceneResourceIds.size).toBe(0)
   })
   it('retains unused city assets and explicitly scoped empty city groups without a city view', () => {
     const input = snapshot()
@@ -138,10 +138,10 @@ describe('full project scene content', () => {
     input.project.settings.workspaceType = '2d'
     const document = createProjectSceneDocument(input)
     document.resources.orphan = { type: 'glb', url: './models/orphan.glb' }
-    document.nodes.push({ type: 'group', id: 'city-empty', name: 'Empty city group', visible: false, scope: '3d' })
+    document.nodes.push({ type: 'group', id: 'scene3d-empty', name: 'Empty city group', visible: false, scope: '3d' })
     const restored = createProjectFromSceneDocument(document)
     expect(restored.project.city?.assets.orphan).toEqual({ type: 'glb', url: './models/orphan.glb' })
-    expect(restored.project.city?.groups).toContainEqual({ id: 'city-empty', name: 'Empty city group', visible: false })
+    expect(restored.project.city?.groups).toContainEqual({ id: 'scene3d-empty', name: 'Empty city group', visible: false })
     expect(restored.project.settings.workspaceType).toBe('2d')
     expect(createProjectSceneDocument(restored).resources.orphan).toEqual(document.resources.orphan)
   })

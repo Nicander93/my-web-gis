@@ -1,7 +1,7 @@
 {
   "name": "@desktop-webgis/cesium-scene-schema",
   "version": "0.1.0",
-  "description": "Independent cesium-scene-schema API for Cesium city scenes",
+  "description": "Independent schema API for Cesium 3D scenes",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",

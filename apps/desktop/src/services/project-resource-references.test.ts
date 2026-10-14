@@ -1,10 +1,10 @@
 import { expect, it } from 'vitest'
 import { createProject } from '@desktop-webgis/gis-core'
-import { createCityScene } from '@desktop-webgis/cesium-scene-schema'
+import { createCesiumScene } from '@desktop-webgis/cesium-scene-schema'
 import { prepareProjectResourceReferences, resolveProjectResourceReferences } from './project-resource-references'
 
 it('keeps resource identity across opening, Save As and reopening without mutating editing state', () => {
-  const project = createProject(); project.city = createCityScene()
+  const project = createProject(); project.city = createCesiumScene()
   project.city.assets.model = { type: 'glb', reference: { kind: 'relative', path: '模型/tower.glb' } }
   project.city.assets.vector = { type: 'geojson', reference: { kind: 'relative', path: '数据/points.geojson' } }
   const original = { project, featuresByDataset: {} }
@@ -19,7 +19,7 @@ it('keeps resource identity across opening, Save As and reopening without mutati
 })
 
 it('rejects temporary grant URLs and unanchored relative files before writing a project', () => {
-  const project = createProject(); project.city = createCityScene()
+  const project = createProject(); project.city = createCesiumScene()
   project.city.assets.model = { type: 'glb', url: 'http://webgis-resource.localhost/key/model.glb' }
   expect(() => prepareProjectResourceReferences({ project, featuresByDataset: {} }, null, 'D:/new.webgis.json')).toThrow('临时')
   project.city.assets.model = { type: 'glb', reference: { kind: 'relative', path: 'model.glb' } }

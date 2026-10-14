@@ -62,7 +62,8 @@ A 完成不代表全部界面迁移完成。逐批记录剩余文件，不将 an
 - 原方案 M3 的 `City*` UI 命名迁移扩展到公开 API。新增及重构后的主接口、类型、示例和文档采用 Scene/CesiumScene 语义；与已有 `SceneDocument` 等名称冲突时明确职责，不机械替换名称。
 - 旧 `City*` 导出作为兼容入口保留并标记弃用，内部复用同一实现；新文档和调用入口优先使用通用名称。名称迁移独立提交，审计包导出、Desktop 调用、示例和测试，避免一次无边界改名。
 - 旧 CityScene v1/v2 与既有项目字段继续读取，保持对象 ID、引用和保存重开等价；API 改名不直接改写持久化协议。新协议的变更另设版本与迁移器。
-- 验收包含新 API 的类型检查及真实调用、旧导出兼容和旧文件回归。该条是后续实施要求，当前仍存在 `City*` 导出，不表示命名迁移已完成。
+- 2026-10-14 已完成主 API 与 Desktop/Viewer 主流程迁移：公开能力采用 `CesiumScene*`、`Scene*`、`SceneWorkspace` 和 `scene3d` 路径；旧 `City*` 符号只从独立 `compat-city` 模块以 `@deprecated` 别名导出。旧 `project.city`、`activeView: 'city'` 与 CityScene v1/v2 文件继续作为持久化兼容边界，不再扩散到产品组件和新 API。
+- 本轮验证覆盖兼容别名真实调用、22 个 workspace 项目的完整单测和生产构建、Desktop 四种视口的浏览器交互，以及 Windows Tauri 本地资源保存恢复。原生报告与截图保存在 `evidence/native-scene-api-report.json` 和 `evidence/native-scene-api-restored.png`。
 
 - Graphic 是独立对象，共享池只复用运行时资源，不向用户暴露人工 GraphicLayer。连续放置/Esc、500 对象和批量编辑均实测。
 - 裁剪/基础压平绑定目标 Tileset，明确局部坐标与高度语义，处理空间变换和 LOD。参考 cesium-demo 算法思路，不将实验效果或 UI 模拟当作生产能力。

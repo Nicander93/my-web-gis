@@ -53,7 +53,7 @@ test('2D windows cover a stable full canvas and retain geometry outside project 
   await page.getByRole('button', { name: '还原属性表', exact: true }).click()
   await page.getByRole('button', { name: '关闭属性表窗口', exact: true }).click()
   await expect(bottom).toBeHidden()
-  await expect(page.locator('.restore-trigger,.city-panel-restore')).toHaveCount(0)
+  await expect(page.locator('.restore-trigger,.scene3d-panel-restore')).toHaveCount(0)
   await windowMenu(page, '属性表')
   expect(await viewport.boundingBox()).toEqual(original)
   const after = await page.evaluate(async () => {
@@ -102,7 +102,7 @@ test('drag cancellation and small-screen restoration keep window controls reacha
 
 test('3D uses the same menus and docking without resizing or recreating Cesium', async ({ page }, info) => {
   await page.getByRole('button', { name: /^三维场景/ }).click()
-  const canvas = page.locator('.city-canvas__viewport canvas')
+  const canvas = page.locator('.scene3d-canvas__viewport canvas')
   await expect(canvas).toBeVisible()
   await expect(page.getByRole('tab')).toHaveText(['场景', '标绘', '编辑', '瓦片', '分析'])
   const original = await canvas.boundingBox()
@@ -116,6 +116,6 @@ test('3D uses the same menus and docking without resizing or recreating Cesium',
   await windowMenu(page, '场景树')
   expect(await canvas.boundingBox()).toEqual(original)
   await expect(canvas).toHaveAttribute('data-identity', identity)
-  await expect(page.locator('.restore-trigger,.city-panel-restore')).toHaveCount(0)
+  await expect(page.locator('.restore-trigger,.scene3d-panel-restore')).toHaveCount(0)
   await page.screenshot({ path: info.outputPath('docking-3d.png') })
 })

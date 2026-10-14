@@ -1,9 +1,9 @@
 import { expect, it } from 'vitest'
-import { createCityScene } from '@desktop-webgis/cesium-scene-schema'
+import { createCesiumScene } from '@desktop-webgis/cesium-scene-schema'
 import { resolveSceneResourceReferences } from './resource-references'
 
 it('resolves only a detached rendering copy and stops aborted reference preparation', async () => {
-  const scene = createCityScene()
+  const scene = createCesiumScene()
   scene.assets.model = { type: 'glb', reference: { kind: 'relative', path: 'model.glb' } }
   const url = 'http://webgis-resource.localhost/key/model.glb'
   expect((await resolveSceneResourceReferences(scene, async () => url)).assets.model.url).toBe(url)

@@ -1,9 +1,9 @@
-import type { CityScene, ResourceReference } from '@desktop-webgis/cesium-scene-schema'
+import type { CesiumScene, ResourceReference } from '@desktop-webgis/cesium-scene-schema'
 
 export type ResourceReferenceResolver = (reference: ResourceReference, signal?: AbortSignal) => Promise<string>
 
 /** Resolve a detached rendering copy; authorization URLs never enter the source document. */
-export async function resolveSceneResourceReferences(scene: CityScene, resolve?: ResourceReferenceResolver, signal?: AbortSignal): Promise<CityScene> {
+export async function resolveSceneResourceReferences(scene: CesiumScene, resolve?: ResourceReferenceResolver, signal?: AbortSignal): Promise<CesiumScene> {
   const result = structuredClone(scene)
   for (const asset of Object.values(result.assets)) {
     signal?.throwIfAborted()

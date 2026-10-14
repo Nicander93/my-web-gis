@@ -12,5 +12,7 @@ export * from './types'
 export * from './capabilities'
 export * from './configCommands'
 export * from './project-share'
-export { SetCitySceneCommand } from './cityCommands'
+export { SetCesiumSceneCommand } from './scene3dCommands'
 export * from './processing'
+
+export * from './compat-city'

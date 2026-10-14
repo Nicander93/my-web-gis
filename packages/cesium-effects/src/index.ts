@@ -53,14 +53,14 @@ export class WaterLayer extends BaseLayer {
 }
 
 /** Restore host settings on disposal instead of overwriting another application's defaults. */
-export class CityEffects {
+export class SceneEffects {
   private readonly original: { density: number; enabled: boolean; bloom: boolean }
   private destroyed = false
   constructor(private readonly viewer: Viewer) {
     this.original = { density: viewer.scene.fog.density, enabled: viewer.scene.fog.enabled, bloom: viewer.scene.postProcessStages.bloom.enabled }
   }
   update(effects: { fog: number; bloom: boolean }): void {
-    if (this.destroyed) throw new Error('CityEffects 已销毁')
+    if (this.destroyed) throw new Error('SceneEffects 已销毁')
     this.viewer.scene.fog.enabled = effects.fog > 0
     this.viewer.scene.fog.density = effects.fog * .002
     this.viewer.scene.postProcessStages.bloom.enabled = effects.bloom
@@ -75,3 +75,5 @@ export class CityEffects {
     this.viewer.scene.postProcessStages.bloom.enabled = this.original.bloom
   }
 }
+
+export * from './compat-city.js'

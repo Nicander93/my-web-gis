@@ -1,9 +1,9 @@
-import { createCityScene, parseCityScene, type CityNode, type CityScene } from '@desktop-webgis/cesium-scene-schema'
+import { createCesiumScene, parseCesiumScene, type CesiumSceneNode, type CesiumScene } from '@desktop-webgis/cesium-scene-schema'
 import { getUnsupportedSceneExtensions, parseSceneDocument, type SceneDocument, type SceneNode } from '@desktop-webgis/scene-schema'
 
 export interface CesiumDocumentIssue { path: string; code: string; message: string }
 export interface CesiumDocumentProjection {
-  scene: CityScene
+  scene: CesiumScene
   document: SceneDocument
   issues: CesiumDocumentIssue[]
 }
@@ -31,7 +31,7 @@ export function projectCesiumDocument(input: unknown, viewId?: string): CesiumDo
     throw new Error(extensions.filter(issue => issue.code === 'extension.required').map(issue => issue.message).join('; '))
   }
   const issues: CesiumDocumentIssue[] = extensions.map(({ path, code, message }) => ({ path, code, message }))
-  const scene = createCityScene()
+  const scene = createCesiumScene()
   scene.camera = structuredClone(view.camera)
   Object.assign(scene, structuredClone(document.environment ?? {}))
   const nodes = new Map(document.nodes.map(node => [node.id, node]))
@@ -66,11 +66,11 @@ export function projectCesiumDocument(input: unknown, viewId?: string): CesiumDo
     if ('resource' in definition) {
       const { resource, ...content } = definition
       if (!scene.assets[resource]) throw new Error(`Resource ${resource} must be prepared for the city renderer`)
-      scene.nodes.push({ ...content, asset: resource, visible, locked } as CityNode)
+      scene.nodes.push({ ...content, asset: resource, visible, locked } as CesiumSceneNode)
     } else {
-      scene.nodes.push({ ...definition, visible, locked } as CityNode)
+      scene.nodes.push({ ...definition, visible, locked } as CesiumSceneNode)
     }
   }
   // Render objects use derived ancestor flags; the document retains the full editorial hierarchy.
-  return { scene: parseCityScene(scene), document, issues }
+  return { scene: parseCesiumScene(scene), document, issues }
 }

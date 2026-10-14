@@ -76,20 +76,20 @@ test('2D nested folders retain datasets, order and inherited locks through file 
 
 test('3D nested folder creation, cycle rejection and saved parent IDs use real scene commands', async ({ page }, info) => {
   await page.getByRole('button', { name: /^三维场景/ }).click()
-  await expect(page.locator('.city-footer__state')).toHaveText('就绪', { timeout: 30_000 })
+  await expect(page.locator('.scene3d-footer__state')).toHaveText('就绪', { timeout: 30_000 })
   for (const name of ['Outer', 'Inner']) {
     await page.getByRole('button', { name: '新建场景分组', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: '新建场景分组', exact: true })
     await dialog.getByRole('textbox').fill(name)
     await dialog.getByRole('button', { name: '创建分组', exact: true }).click()
   }
-  const outerButton = page.locator('.city-scene-group__name').filter({ hasText: 'Outer' })
-  const innerHeader = page.locator('.city-scene-group__header').filter({ hasText: 'Inner' })
+  const outerButton = page.locator('.scene3d-scene-group__name').filter({ hasText: 'Outer' })
+  const innerHeader = page.locator('.scene3d-scene-group__header').filter({ hasText: 'Inner' })
   await outerButton.dragTo(innerHeader)
-  await expect(page.locator('.city-footer__state')).toContainText('后代')
+  await expect(page.locator('.scene3d-footer__state')).toContainText('后代')
   const saved = await roundTrip(page, info)
   const outer = saved.project.city.groups.find((group: { name: string }) => group.name === 'Outer')
   expect(saved.project.city.groups.find((group: { name: string }) => group.name === 'Inner').parentId).toBe(outer.id)
-  await expect(page.locator('.city-scene-group__name').filter({ hasText: 'Inner' })).toBeVisible()
+  await expect(page.locator('.scene3d-scene-group__name').filter({ hasText: 'Inner' })).toBeVisible()
   await page.screenshot({ path: info.outputPath('nested-3d.png') })
 })

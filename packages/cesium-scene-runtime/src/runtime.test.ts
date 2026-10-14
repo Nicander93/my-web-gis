@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EntityCollection, JulianDate } from 'cesium'
 import type { Viewer } from 'cesium'
-import { createCityScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
-import { CitySceneRuntime, createCesiumDocumentRuntime } from './index'
+import { createCesiumScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
+import { CesiumSceneRuntime, createCesiumDocumentRuntime } from './index'
 import { migrateSceneDocument } from '@desktop-webgis/scene-schema'
 
 const probe = vi.hoisted(() => ({ created: 0, released: 0, nativeGate: undefined as Promise<void> | undefined, editors: [] as Array<{ stopEditing: ReturnType<typeof vi.fn>; cancel: ReturnType<typeof vi.fn> }> }))
@@ -33,11 +33,11 @@ afterEach(() => vi.unstubAllGlobals())
 const preparationProbe = vi.hoisted(() => ({ gates: [] as Promise<void>[], visibility: [] as boolean[], environment: undefined as Promise<void> | undefined }))
 beforeEach(() => { preparationProbe.gates = []; preparationProbe.visibility = []; preparationProbe.environment = undefined })
 function setup() {
-  const scene = createCityScene()
+  const scene = createCesiumScene()
   scene.assets.blocks = { type: '3dtiles', url: './city/tileset.json' }
   scene.nodes.push({ id: 'blocks', name: 'Blocks', type: '3dtiles', asset: 'blocks', visible: true, transform: createTransform() })
   const viewer = { canvas: {}, isDestroyed: () => false, destroy: vi.fn(), camera: { setView: vi.fn() }, scene: { requestRender: vi.fn(), fog: { density: 0, enabled: false }, postProcessStages: { bloom: { enabled: false } } }, imageryLayers: { addImageryProvider: vi.fn(), remove: vi.fn() } } as unknown as Viewer
-  return { scene, viewer, runtime: new CitySceneRuntime(viewer, { target: 'map', scene }) }
+  return { scene, viewer, runtime: new CesiumSceneRuntime(viewer, { target: 'map', scene }) }
 }
 describe('v3 document updates', () => {
   it('retains native interaction when content outside the city projection changes', async () => {
@@ -311,7 +311,7 @@ describe('incremental scene reconciliation', () => {
     const s = setup()
     s.runtime.destroy()
     vi.mocked(s.viewer.destroy).mockClear()
-    const runtime = new CitySceneRuntime(s.viewer, { target: 'map', scene: s.scene, ownsViewer: false })
+    const runtime = new CesiumSceneRuntime(s.viewer, { target: 'map', scene: s.scene, ownsViewer: false })
     await runtime.updateScene(s.scene)
     const before = probe.released
     runtime.destroy(); runtime.destroy()

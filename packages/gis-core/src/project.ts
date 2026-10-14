@@ -1,5 +1,5 @@
 import { createId } from './id'
-import { parseCityScene } from '@desktop-webgis/cesium-scene-schema'
+import { parseCesiumScene } from '@desktop-webgis/cesium-scene-schema'
 import { cloneValue } from './clone'
 import type { LegacyLayerStyle, Project, ProjectSnapshot, Layer, LayerStyleKind } from './types'
 import { normalizeLayerTree } from './layer-tree'
@@ -195,7 +195,7 @@ export function parseProjectSnapshot(json: string): ProjectSnapshot {
     throw new Error('Unsupported or invalid project file.')
   }
   project.basemap ??= { type: 'osm' }
-  if (project.city !== undefined) project.city = parseCityScene(project.city)
+  if (project.city !== undefined) project.city = parseCesiumScene(project.city)
   project.groups ??= []
   // Legacy projects only had `layers` order — rebuild rootOrder from that array.
   if (!project.rootOrder) {

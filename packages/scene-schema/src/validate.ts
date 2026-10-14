@@ -9,7 +9,7 @@ import type {
   ValidationResult
 } from './types.js'
 import { SCENE_MANIFEST_VERSION, SCENE_MANIFEST_VERSION_V1 } from './types.js'
-import { validateCityScene } from '@desktop-webgis/cesium-scene-schema'
+import { validateCesiumScene } from '@desktop-webgis/cesium-scene-schema'
 
 type UnknownRecord = Record<string, unknown>
 
@@ -763,7 +763,7 @@ export function validateScene(input: unknown): ValidationResult {
   validateView(input.view, '$.view', issues)
   if (input.city !== undefined) {
     if (version !== 2) issue(issues, '$.city', 'version.city', '三维扩展仅支持 SceneManifest version 2')
-    for (const entry of validateCityScene(input.city, '$.city')) issue(issues, entry.path, 'city.invalid', entry.message)
+    for (const entry of validateCesiumScene(input.city, '$.city')) issue(issues, entry.path, 'city.invalid', entry.message)
   }
 
   const credentialIds = validateCredentials(input.credentials, '$.credentials', issues)

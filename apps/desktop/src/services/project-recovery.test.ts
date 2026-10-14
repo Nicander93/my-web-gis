@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { createProject, createDefaultLayerStyle, type ProjectSnapshot } from '@desktop-webgis/gis-core'
-import { createCityScene } from '@desktop-webgis/cesium-scene-schema'
+import { createCesiumScene } from '@desktop-webgis/cesium-scene-schema'
 import { ProjectRecovery, parseRecoveryEntry, recoveryKey } from './project-recovery'
 import { RECOVERY_RETENTION_MS, type RecoveryCache } from './recovery-cache'
 
@@ -29,7 +29,7 @@ it('persists detached 2D/3D snapshots by collision-free IDs without UI bookkeepi
   const cache = new Cache(), recovery = new ProjectRecovery(cache), source = snapshot('../二维:project')
   const first = await recovery.write(source, 'D:/a.webgis.json', 'session:1')
   source.featuresByDataset.d[0].properties.value = 99
-  const city = snapshot('city'); city.project.city = createCityScene()
+  const city = snapshot('city'); city.project.city = createCesiumScene()
   await recovery.write(city, null, 'session:2')
   expect((await recovery.list())).toHaveLength(2)
   const saved = parseRecoveryEntry({ key: first.key, text: cache.entries.get(first.key)! }).draft!

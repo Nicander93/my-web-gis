@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseProjectSnapshot, serializeProjectSnapshot } from '@desktop-webgis/gis-core'
-import { createCityScene } from '@desktop-webgis/cesium-scene-schema'
+import { createCesiumScene } from '@desktop-webgis/cesium-scene-schema'
 import { createEditorProject, getProjectType } from './project-type'
 
 describe('persisted editor workspace type', () => {
@@ -21,12 +21,12 @@ describe('persisted editor workspace type', () => {
     const project = createEditorProject('2d', '旧工程')
     project.settings = {}
     expect(getProjectType(project)).toBe('2d')
-    project.city = createCityScene()
+    project.city = createCesiumScene()
     expect(getProjectType(project)).toBe('3d')
   })
   it('preserves an explicit 2D workspace when legacy city data exists', () => {
     const project = createEditorProject('2d', '地图')
-    project.city = createCityScene()
+    project.city = createCesiumScene()
     expect(getProjectType(project)).toBe('2d')
   })
 })

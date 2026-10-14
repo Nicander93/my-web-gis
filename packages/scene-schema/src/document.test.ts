@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createCityScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
+import { createCesiumScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
 import { getUnsupportedSceneExtensions, migrateSceneDocument, parseSceneDocument, validateSceneDocument } from './document.js'
 import type { SceneManifestV1 } from './types.js'
 import { parseScene } from './parse.js'
@@ -22,7 +22,7 @@ describe('unified scene document', () => {
     expect(parseSceneDocument(JSON.stringify(document))).toEqual(document)
   })
   it('remaps colliding resources, groups and nodes across 2d and 3d namespaces', () => {
-    const input = parseScene(legacy()), city = createCityScene()
+    const input = parseScene(legacy()), city = createCesiumScene()
     city.assets.shared = { type: '3dtiles', url: './tiles/tileset.json' }
     city.groups = [{ id: 'same', name: 'Buildings', visible: false, locked: true }]
     city.nodes = [{ type: '3dtiles', id: 'same-2', name: 'Building', asset: 'shared', groupId: 'same', visible: true, transform: createTransform(), maximumScreenSpaceError: 8 }]
@@ -35,7 +35,7 @@ describe('unified scene document', () => {
     expect(parseSceneDocument(document)).toEqual(document)
   })
   it('reads standalone legacy city scenes with an explicit document identity', () => {
-    const city = { ...createCityScene(), version: 1 }
+    const city = { ...createCesiumScene(), version: 1 }
     const document = migrateSceneDocument(city, { id: 'old-city', title: 'Old city' })
     expect(document).toMatchObject({ id: 'old-city', title: 'Old city', activeView: 'city', views: { city: { type: '3d' } } })
   })

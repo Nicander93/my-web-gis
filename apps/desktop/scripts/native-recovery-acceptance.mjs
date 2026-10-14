@@ -103,11 +103,11 @@ async function draftWhere(predicate) {
   assert.equal(await readFile(file, 'utf8'), selected.entry.text)
   return selected.draft
 }
-async function waitForCityView() {
-  if (await page.locator('.city-canvas__viewport canvas').count()) {
+async function waitForSceneView() {
+  if (await page.locator('.scene3d-canvas__viewport canvas').count()) {
     let previous, stable = 0
     await poll(async () => {
-      const camera = await page.evaluate(async () => (await import('/src/features/city/city-runtime-host.ts')).getLiveCityCamera())
+      const camera = await page.evaluate(async () => (await import('/src/features/scene3d/scene3d-runtime-host.ts')).getLiveSceneCamera())
       const values = camera && [...camera.position, camera.heading, camera.pitch, camera.roll]
       if (values && previous && values.every((value, index) => Math.abs(value - previous[index]) < (index === 2 ? 1e-5 : 1e-8))) stable++
       else stable = 0
@@ -117,7 +117,7 @@ async function waitForCityView() {
   }
 }
 async function saveTo(path) {
-  await waitForCityView()
+  await waitForSceneView()
   await page.evaluate(async (file) => (await import('/src/services/project-io.ts')).setCurrentProjectPath(file), path)
   await page.getByRole('button', { name: '保存项目', exact: true }).click()
   await expect(page.locator('.project-dirty')).toHaveCount(0)
@@ -125,7 +125,7 @@ async function saveTo(path) {
   return JSON.parse(await readFile(path, 'utf8'))
 }
 async function modelPixels() {
-  const png = await page.locator('.city-canvas__viewport canvas').screenshot()
+  const png = await page.locator('.scene3d-canvas__viewport canvas').screenshot()
   return page.evaluate(async (bytes) => {
     const bitmap = await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/png' }))
     const canvas = document.createElement('canvas'); canvas.width = bitmap.width; canvas.height = bitmap.height
@@ -287,14 +287,14 @@ try {
   await creating.getByRole('radio', { name: /三维场景/ }).check()
   await creating.getByPlaceholder('例如：中心城区场景').fill('Native city recovery')
   await creating.getByRole('button', { name: '创建项目', exact: true }).click()
-  await expect(page.locator('.city-footer__state')).toHaveText('就绪', { timeout: 60_000 })
+  await expect(page.locator('.scene3d-footer__state')).toHaveText('就绪', { timeout: 60_000 })
   await page.getByRole('button', { name: '添加数据', exact: true }).click()
   const resource = page.getByRole('dialog', { name: '添加三维资源', exact: true })
   await resource.getByRole('radio', { name: 'GLB 模型', exact: true }).check()
   await resource.getByLabel('资源地址', { exact: true }).fill(`${url}/city-sample/tower.glb`)
   await resource.getByLabel('对象名称', { exact: true }).fill('Native Tower')
   await resource.getByRole('button', { name: '添加到场景', exact: true }).click()
-  const row = page.locator('.city-layer-row').filter({ hasText: 'Native Tower' })
+  const row = page.locator('.scene3d-layer-row').filter({ hasText: 'Native Tower' })
   await expect(row.locator('small')).toHaveText('模型', { timeout: 60_000 })
   await poll(async () => await modelPixels() > 100, 'Real GLB model pixels were not rendered')
   const formal3d = join(output, 'formal-3d.webgis.json')
@@ -304,8 +304,8 @@ try {
   await page.evaluate(async ({ formal3d, localModel }) => {
     const io = await import('/src/services/project-io.ts')
     io.setCurrentProjectPath(formal3d)
-    const commands = await import('/src/features/city/city-commands.ts')
-    commands.updateCity('切换本地模型引用', scene => {
+    const commands = await import('/src/features/scene3d/scene3d-commands.ts')
+    commands.updateScene('切换本地模型引用', scene => {
       const node = scene.nodes.find(node => node.name === 'Native Tower')
       const asset = scene.assets[node.asset]
       delete asset.url
@@ -321,19 +321,19 @@ try {
   assert.equal(baselineAsset.url, undefined)
   report.localModelReference = baselineAsset.reference
   const cityBytes = await readFile(formal3d)
-  await row.locator('.city-layer-row__select').click({ button: 'right' })
+  await row.locator('.scene3d-layer-row__select').click({ button: 'right' })
   await page.getByRole('menuitem', { name: '对象属性', exact: true }).click()
   await page.getByRole('spinbutton', { name: '等比缩放', exact: true }).fill('2')
   await page.getByRole('spinbutton', { name: '等比缩放', exact: true }).press('Tab')
   const draft3d = await draftWhere((draft) => draft.snapshot.project.city?.nodes.some((node) => node.name === 'Native Tower' && node.transform.scale === 2))
   await crash(); assert.deepEqual(await readFile(formal3d), cityBytes)
   await launch(); await restore()
-  await expect(page.locator('.city-footer__state')).toHaveText('就绪', { timeout: 60_000 })
-  const recoveredRow = page.locator('.city-layer-row').filter({ hasText: 'Native Tower' })
+  await expect(page.locator('.scene3d-footer__state')).toHaveText('就绪', { timeout: 60_000 })
+  const recoveredRow = page.locator('.scene3d-layer-row').filter({ hasText: 'Native Tower' })
   await expect(recoveredRow.locator('small')).toHaveText('模型', { timeout: 60_000 })
-  await recoveredRow.locator('.city-layer-row__select').dblclick()
+  await recoveredRow.locator('.scene3d-layer-row__select').dblclick()
   await poll(async () => await modelPixels() > 100, 'Recovered GLB model pixels were not rendered')
-  await waitForCityView()
+  await waitForSceneView()
   const visiblePixels = await modelPixels()
   const visibility = page.getByRole('checkbox', { name: '显示Native Tower', exact: true })
   await visibility.uncheck()
@@ -342,7 +342,7 @@ try {
   await visibility.check()
   await poll(async () => await modelPixels() > visiblePixels / 2, 'Showing the recovered model did not restore its pixel signature')
   report.modelVisibilityPixels = { visible: visiblePixels, hidden: hiddenPixels, restored: await modelPixels() }
-  await recoveredRow.locator('.city-layer-row__select').click({ button: 'right' })
+  await recoveredRow.locator('.scene3d-layer-row__select').click({ button: 'right' })
   await page.getByRole('menuitem', { name: '对象属性', exact: true }).click()
   await expect(page.getByRole('spinbutton', { name: '等比缩放', exact: true })).toHaveValue('2')
   const restored3d = await saveTo(join(output, 'restored-3d.webgis.json'))
@@ -354,7 +354,7 @@ try {
   }, { snapshot: restored3d, path: join(output, 'restored-3d.webgis.json') })
   assert.deepEqual(resolvedRestored.project.city.assets, draft3d.snapshot.project.city.assets)
   assert.deepEqual(await readFile(formal3d), cityBytes)
-  await page.screenshot({ path: join(output, 'native-city-restored.png') })
+  await page.screenshot({ path: join(output, 'native-scene3d-restored.png') })
   report.scenarios.push({ name: '3D real GLB transform, native process termination and restore', passed: true })
   report.recoveredModelPixels = await modelPixels()
   console.log('[native-recovery] 3D native recovery passed')

@@ -67,7 +67,7 @@ describe('independent layer selection', () => {
     collection.destroy()
   })
   it('restores tileset styles and model colors exactly after transient highlighting', () => {
-    const tiles = new TilesetLayer({ id: 'city', url: './city.json' }), style = new Cesium3DTileStyle({ color: 'color("red")' })
+    const tiles = new TilesetLayer({ id: 'city', url: './scene3d.json' }), style = new Cesium3DTileStyle({ color: 'color("red")' })
     tiles.tileset = { style, colorBlendMode: Cesium3DTileColorBlendMode.HIGHLIGHT, colorBlendAmount: .5 } as typeof tiles.tileset
     tiles.setHighlighted(true); const highlight = tiles.tileset?.style
     expect(highlight).not.toBe(style); tiles.setHighlighted(true); expect(tiles.tileset?.style).toBe(highlight)

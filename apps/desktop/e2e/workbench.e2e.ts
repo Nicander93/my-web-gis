@@ -266,8 +266,8 @@ test('three-dimensional workspace keeps scene capabilities and shared panel rule
       content: readFileSync(process.env.WORKBENCH_QA_FONT_CSS, 'utf8')
     })
   await page.getByRole('button', { name: /^三维场景/ }).click()
-  await expect(page.locator('.city-workspace .workbench-ribbon')).toBeVisible()
-  await expect(page.locator('.city-canvas__viewport canvas')).toBeVisible()
+  await expect(page.locator('.scene3d-workspace .workbench-ribbon')).toBeVisible()
+  await expect(page.locator('.scene3d-canvas__viewport canvas')).toBeVisible()
   await expect(
     page.getByRole('complementary', { name: '检查器面板' })
   ).toBeHidden()
@@ -277,7 +277,7 @@ test('three-dimensional workspace keeps scene capabilities and shared panel rule
     page.getByText('光照与时间', { exact: true }).last()
   ).toBeVisible()
   await expect(
-    page.locator('.city-properties details').filter({ hasText: '底图与地形' })
+    page.locator('.scene3d-properties details').filter({ hasText: '底图与地形' })
   ).not.toHaveAttribute('open', '')
   await expect(page.getByRole('button', { name: '应用场景设置' })).toHaveCount(0)
   const sunlight = page.getByRole('checkbox', { name: '太阳光照' })
@@ -285,7 +285,7 @@ test('three-dimensional workspace keeps scene capabilities and shared panel rule
   await sunlight.setChecked(!initialSunlight)
   await page.getByRole('button', { name: '撤销', exact: true }).click()
   await expect(sunlight).toBeChecked({ checked: initialSunlight })
-  await page.locator('.city-properties summary').filter({ hasText: '环境效果' }).click()
+  await page.locator('.scene3d-properties summary').filter({ hasText: '环境效果' }).click()
   const fog = page.getByRole('spinbutton', { name: '雾浓度', exact: true })
   await fog.fill('0.2')
   await fog.press('Tab')

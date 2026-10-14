@@ -11,7 +11,7 @@ import {
 function createScene(): SceneManifestV1 {
   return {
     version: 1,
-    id: 'city-report',
+    id: 'scene3d-report',
     title: 'City report',
     view: {
       projection: 'EPSG:3857',

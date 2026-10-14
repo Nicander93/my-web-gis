@@ -2,16 +2,16 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { createCityScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
+import { createCesiumScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
 import { buildStaticScene } from './publisher'
 
 const temporary:string[]=[]
 afterEach(async () => { await Promise.all(temporary.splice(0).map(dir => rm(dir,{recursive:true,force:true}))) })
 async function setup() {
-  const root=await mkdtemp(path.join(os.tmpdir(),'city-publish-'));temporary.push(root)
+  const root=await mkdtemp(path.join(os.tmpdir(),'scene3d-publish-'));temporary.push(root)
   const viewer=path.join(root,'viewer'),data=path.join(root,'data')
   await mkdir(viewer);await mkdir(data);await writeFile(path.join(viewer,'index.html'),'<main>City Viewer</main>')
-  const city=createCityScene();city.assets.city={type:'3dtiles',url:'./models/tileset.json'}
+  const city=createCesiumScene();city.assets.city={type:'3dtiles',url:'./models/tileset.json'}
   city.nodes.push({id:'city',name:'City',visible:true,type:'3dtiles',asset:'city',transform:createTransform()})
   const scene={version:2,id:'city',title:'City',view:{projection:'EPSG:3857',center:[0,0],zoom:2},sources:{},layers:[],city}
   return {root,viewer,data,scene,output:path.join(root,'published')}

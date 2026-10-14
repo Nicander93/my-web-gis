@@ -1,7 +1,7 @@
 import { Viewer, TileMapServiceImageryProvider } from 'cesium'
 import { GraphicLayer, LayerCollection, TilesetLayer } from '@desktop-webgis/cesium-layer'
 import { TilesetEditor } from '@desktop-webgis/cesium-tileset-edit'
-import { CityEffects, WaterLayer } from '@desktop-webgis/cesium-effects'
+import { SceneEffects, WaterLayer } from '@desktop-webgis/cesium-effects'
 import 'cesium/Build/Cesium/Widgets/widgets.css'
 import './style.css'
 
@@ -21,7 +21,7 @@ annotations.on('click', event => {
 const city = new TilesetLayer({ id: 'blocks', name: '城市街区', url: './city-sample/tileset.json' })
 city.bindPopup({ title: '城市样例', fields: [{ field: 'name', label: '名称' }] })
 const water = new WaterLayer({ id: 'water', boundary: [[116.394,39.905,0],[116.397,39.905,0],[116.397,39.91,0],[116.394,39.91,0]], height: 2 })
-const effects = new CityEffects(viewer)
+const effects = new SceneEffects(viewer)
 effects.update({ fog: 0, bloom: false })
 const history = []
 const status = document.getElementById('status')

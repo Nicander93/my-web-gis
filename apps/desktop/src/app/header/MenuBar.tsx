@@ -5,7 +5,7 @@ import { LayerMenu } from './menus/LayerMenu'
 import { EditMenu } from './menus/EditMenu'
 import { ViewMenu } from './menus/ViewMenu'
 import { HelpMenu } from './menus/HelpMenu'
-import { CityMenu } from '@/features/city/CityMenu'
+import { SceneMenu } from '@/features/scene3d/SceneMenu'
 import { useProjectStore } from '@/stores/project.store'
 import { getProjectType } from '@/services/project-type'
 
@@ -32,10 +32,10 @@ function SettingsMenu({ onClose }: { onClose(): void }) {
     {(['data', 'layer', 'edit'] as const).map((section, index) => {
       const Component = [DataMenu, LayerMenu, EditMenu][index]
       return <details key={section} className="application-settings-section"><summary>{['数据操作', city ? '对象操作' : '图层操作', '编辑操作'][index]}</summary>
-        {city ? <CityMenu section={section} onClose={onClose} /> : <Component onClose={onClose} />}
+        {city ? <SceneMenu section={section} onClose={onClose} /> : <Component onClose={onClose} />}
       </details>
     })}
-    {city && <CityMenu section="view" onClose={onClose} />}
+    {city && <SceneMenu section="view" onClose={onClose} />}
   </div>
 }
 

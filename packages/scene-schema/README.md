@@ -23,7 +23,7 @@ const scene = parseScene(await response.json())
 The public JSON Schema is exported as `@desktop-webgis/scene-schema/scene.schema.json` and accepts version `1` or `2`.
 # Unified content documents (v3, in development)
 
-`parseSceneDocument` validates v3 resource/node/view documents. `migrateSceneDocument` imports old SceneManifest v1/v2 or standalone CityScene v1/v2; `parseScene` remains the legacy map-manifest API. Unknown extension JSON is retained and `getUnsupportedSceneExtensions` reports unsupported versions, including required extensions that a runtime must refuse to call fully restored.
+`parseSceneDocument` validates v3 resource/node/view documents. `migrateSceneDocument` imports old SceneManifest v1/v2 or standalone CesiumScene v1/v2; `parseScene` remains the legacy map-manifest API. Unknown extension JSON is retained and `getUnsupportedSceneExtensions` reports unsupported versions, including required extensions that a runtime must refuse to call fully restored.
 
 This is an implementation candidate: v3 JSON Schema parity, full ProjectSnapshot conversion, runtime adoption and external-consumer verification are still pending. See `docs/specs/scene-document-v3.md` for the implemented boundaries and remaining gates. Existing `scene.schema.json` describes the legacy v1/v2 contract only.
 # SceneDocument v3 JSON Schema
@@ -40,7 +40,7 @@ allocate engine objects.
 
 Regenerate the v3 artifact with `python generate-document-schema.py` from this
 package directory after changing the shared structural contracts. The generator
-uses the existing style/city definitions and adds v3 resources, nodes, views and
+uses the existing style/scene3d definitions and adds v3 resources, nodes, views and
 extensions; it has no runtime Python dependency for consumers.
 
 Run `python verify-document-schema.py` with Python `jsonschema` installed to

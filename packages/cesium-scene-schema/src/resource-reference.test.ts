@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { createCityScene, parseCityScene } from './index'
+import { createCesiumScene, parseCesiumScene } from './index'
 import { validateResourceReference } from './resource-reference'
 
 it('distinguishes local paths from HTTP URLs without persisting runtime grants or credentials', () => {
@@ -15,10 +15,10 @@ it('distinguishes local paths from HTTP URLs without persisting runtime grants o
 })
 
 it('keeps typed local references and existing URL scenes readable without changing asset identity', () => {
-  const scene = createCityScene()
+  const scene = createCesiumScene()
   scene.assets.local = { type: 'glb', reference: { kind: 'relative', path: 'models/model.glb' } }
   scene.assets.online = { type: '3dtiles', url: 'https://example.test/tileset.json' }
-  expect(parseCityScene(JSON.stringify(scene)).assets).toEqual(scene.assets)
+  expect(parseCesiumScene(JSON.stringify(scene)).assets).toEqual(scene.assets)
   scene.assets.local.reference = { kind: 'absolute', path: 'D:model.glb' }
-  expect(() => parseCityScene(JSON.stringify(scene))).toThrow()
+  expect(() => parseCesiumScene(JSON.stringify(scene))).toThrow()
 })

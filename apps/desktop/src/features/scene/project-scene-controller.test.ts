@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createProject } from '@desktop-webgis/gis-core'
-import { createCityScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
+import { createCesiumScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
 import type { SceneController } from '@desktop-webgis/scene-core'
 import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
@@ -16,7 +16,7 @@ describe('Project-owned public scene controller', () => {
   it('keeps original city object, group and asset identities when an API edits a mixed project', () => {
     useProjectStore.getState().addLayer('data', 'Map', [], 'point')
     const before = useProjectStore.getState().getSnapshot(), id = before.project.layers[0].id
-    before.project.city = createCityScene()
+    before.project.city = createCesiumScene()
     before.project.city.assets.data = { type: 'glb', url: './model.glb' }
     before.project.city.groups = [{ id: 'group', name: 'City group', visible: true }]
     before.project.groups = [{ id: 'group', name: 'Map group', visible: true, layerIds: [id] }]

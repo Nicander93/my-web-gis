@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { createCityScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
+import { createCesiumScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
 import { migrateSceneDocument } from '@desktop-webgis/scene-schema'
 import { projectCesiumDocument } from './document.js'
 
 function document() {
-  const city = createCityScene()
+  const city = createCesiumScene()
   city.assets.blocks = { type: '3dtiles', url: './city/tileset.json' }
   city.nodes.push({ type: '3dtiles', id: 'blocks', name: 'Blocks', visible: true, asset: 'blocks', transform: createTransform(), maximumScreenSpaceError: 2, cacheBytes: 512 * 1024 * 1024 })
   return migrateSceneDocument(city)
@@ -12,7 +12,7 @@ function document() {
 
 describe('v3 Cesium projection', () => {
   it('preserves local GeoJSON references until the host resolves them without creating page-relative URLs', () => {
-    const city = createCityScene()
+    const city = createCesiumScene()
     city.assets.points = { type: 'geojson', reference: { kind: 'relative', path: '数据/points.geojson' } }
     city.nodes.push({ type: 'geojson', id: 'points', name: 'Points', visible: true, asset: 'points' })
     const input = migrateSceneDocument(city)

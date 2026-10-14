@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { createCityScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
+import { createCesiumScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
 import { migrateSceneDocument } from '@desktop-webgis/scene-schema'
 import { projectCesiumDocument } from './document.js'
 
 describe('frozen map co-rendering', () => {
   it('retains map content while preserving native city nodes using the same GeoJSON resource', () => {
-    const city = createCityScene()
+    const city = createCesiumScene()
     const data = { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { value: 2 }, geometry: { type: 'Point', coordinates: [116.4, 39.9] } }] }
     city.assets.points = { type: 'geojson', url: './city/points.geojson' }
     city.assets.blocks = { type: '3dtiles', url: './city/tileset.json' }

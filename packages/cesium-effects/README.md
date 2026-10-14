@@ -1,15 +1,15 @@
 # @desktop-webgis/cesium-effects
 
-`WaterLayer` 和可恢复宿主设置的 `CityEffects`，无 UI 框架依赖。
+`WaterLayer` 和可恢复宿主设置的 `SceneEffects`，无 UI 框架依赖。
 
 ```ts
-import { WaterLayer, CityEffects } from '@desktop-webgis/cesium-effects'
+import { WaterLayer, SceneEffects } from '@desktop-webgis/cesium-effects'
 const water = new WaterLayer({
   id: 'lake', boundary: [[116.39,39.90,0],[116.40,39.90,0],[116.40,39.91,0]],
   height: 2, color: '#238bafcc', amplitude: 4, frequency: 1000, speed: .02
 })
 await water.addTo(layers)
-const effects = new CityEffects(viewer)
+const effects = new SceneEffects(viewer)
 effects.update({ fog: .2, bloom: true })
 effects.destroy() // 恢复原始 fog/bloom 参数
 ```

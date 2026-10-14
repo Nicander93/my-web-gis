@@ -21,8 +21,8 @@ function prepareProjectEdit(before: ProjectSnapshot, next: SceneDocument): Proje
   const city = candidate.project.city
   if (city) {
     // Existing host identities win; allocate only new IDs that collide with a restored identity.
-    const nodeIds = restoreHostIds([...(city.groups ?? []).map(group => group.id), ...city.nodes.map(node => node.id)], projection.hostCityNodeIds)
-    const resourceIds = restoreHostIds(Object.keys(city.assets), projection.hostCityResourceIds)
+    const nodeIds = restoreHostIds([...(city.groups ?? []).map(group => group.id), ...city.nodes.map(node => node.id)], projection.hostSceneNodeIds)
+    const resourceIds = restoreHostIds(Object.keys(city.assets), projection.hostSceneResourceIds)
     city.groups = city.groups?.map(group => ({ ...group, id: nodeIds.get(group.id)!, ...(group.parentId ? { parentId: nodeIds.get(group.parentId)! } : {}) }))
     city.nodes = city.nodes.map(node => ({ ...node, id: nodeIds.get(node.id)!,
       ...('asset' in node ? { asset: resourceIds.get(node.asset)! } : {}), ...(node.groupId ? { groupId: nodeIds.get(node.groupId)! } : {}) }))

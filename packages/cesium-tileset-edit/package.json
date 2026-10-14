@@ -1,7 +1,7 @@
 {
   "name": "@desktop-webgis/cesium-tileset-edit",
   "version": "0.1.0",
-  "description": "Independent cesium-tileset-edit API for Cesium city scenes",
+  "description": "Independent editing API for Cesium 3D Tiles and models",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createCityScene, parseCityScene, validateGraphic } from './index'
+import { createCesiumScene, parseCesiumScene, validateGraphic } from './index'
 import type { GraphicNode } from './index'
 
 function graphic(): GraphicNode {
@@ -8,19 +8,19 @@ function graphic(): GraphicNode {
 
 describe('serializable graphics', () => {
   it('round trips geometry, style, properties, popup and lock without sharing references', () => {
-    const scene = createCityScene(); scene.nodes.push(graphic())
-    const result = parseCityScene(JSON.stringify(scene))
+    const scene = createCesiumScene(); scene.nodes.push(graphic())
+    const result = parseCesiumScene(JSON.stringify(scene))
     expect(result).toEqual(scene)
     result.nodes[0].name = 'Changed'
     expect(scene.nodes[0].name).toBe('Area')
   })
   it('reads legacy v1 scenes but requires v2 for graphics and lighting', () => {
-    const scene = createCityScene(); scene.version = 1
-    expect(parseCityScene(scene).version).toBe(1)
-    scene.nodes.push(graphic()); expect(() => parseCityScene(scene)).toThrow('version 2')
+    const scene = createCesiumScene(); scene.version = 1
+    expect(parseCesiumScene(scene).version).toBe(1)
+    scene.nodes.push(graphic()); expect(() => parseCesiumScene(scene)).toThrow('version 2')
     scene.nodes = []; scene.lighting = { sunlight: true, shadows: false, time: '2026-10-04T12:00:00Z' }
-    expect(() => parseCityScene(scene)).toThrow('version 2')
-    scene.version = 2; expect(parseCityScene(scene).lighting).toEqual(scene.lighting)
+    expect(() => parseCesiumScene(scene)).toThrow('version 2')
+    scene.version = 2; expect(parseCesiumScene(scene).lighting).toEqual(scene.lighting)
   })
   it('rejects undersized geometry, vertically repeated polygon vertices and invalid style', () => {
     const node = graphic(); node.geometry.positions = [[0,0,0],[0,0,10],[1,1,0]]

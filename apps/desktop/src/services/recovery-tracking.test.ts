@@ -8,7 +8,7 @@ import { discardRecoveryOnReplacement, startRecoveryTracking } from './recovery-
 const probe = vi.hoisted(() => ({ write: vi.fn(), status: vi.fn(), clear: vi.fn() }))
 vi.mock('./project-recovery', () => ({ projectRecovery: { write: probe.write, clearSaved: probe.clear }, recoveryOwner: (epoch: number) => `test:${epoch}` }))
 vi.mock('@/features/map/map-runtime-host', () => ({ getLiveMapState: () => null }))
-vi.mock('@/features/city/city-runtime-host', () => ({ getLiveCityCamera: () => null }))
+vi.mock('@/features/scene3d/scene3d-runtime-host', () => ({ getLiveSceneCamera: () => null }))
 vi.mock('@/app/commands/status', () => ({ emitCommandStatus: probe.status }))
 let stop: (() => void) | undefined
 beforeEach(() => {
