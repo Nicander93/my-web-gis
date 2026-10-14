@@ -1,6 +1,6 @@
 import { createId, SetCitySceneCommand } from '@desktop-webgis/gis-core'
-import { createCityScene, createTransform, getCityNodeState, getCityGroupState, moveCityNodes, moveCityGroup, removeCityGroup } from '@desktop-webgis/cesium-scene-schema'
-import type { CityGroup, CityNode, CityScene, GeoPosition } from '@desktop-webgis/cesium-scene-schema'
+import { createCityScene, createTransform, getCityNodeState, getCityGroupState, moveCityNodes, moveCityGroup, removeCityGroup, validateResourceReference, isCityResourceUrl } from '@desktop-webgis/cesium-scene-schema'
+import type { CityGroup, CityNode, CityScene, GeoPosition, ResourceReference } from '@desktop-webgis/cesium-scene-schema'
 import { useProjectStore } from '@/stores/project.store'
 
 export function updateCity(label: string, update: (scene: CityScene) => CityScene): void {
@@ -12,10 +12,11 @@ export function updateCity(label: string, update: (scene: CityScene) => CityScen
   state.executeEditCommand(new SetCitySceneCommand(createId('cmd'), label, before, after))
 }
 
-export function addCityAsset(type: '3dtiles' | 'model' | 'geojson', url: string, name: string, position: GeoPosition = [116.391,39.907,0]): string {
+export function addCityAsset(type: '3dtiles' | 'model' | 'geojson', source: string | ResourceReference, name: string, position: GeoPosition = [116.391,39.907,0]): string {
+  if (typeof source === 'string' ? !isCityResourceUrl(source) : !validateResourceReference(source)) throw new Error('资源地址或引用无效')
   const id = createId('city'), asset = createId('asset')
   updateCity('添加三维图层', scene => {
-    scene.assets[asset] = { type: type === 'model' ? 'glb' : type, url }
+    scene.assets[asset] = { type: type === 'model' ? 'glb' : type, ...(typeof source === 'string' ? { url: source } : { reference: structuredClone(source) }) }
     const base = { id, name: name.trim() || type, visible: true, asset, popup: { fields: [{ field: 'name', label: '名称' }] } }
     const node: CityNode = type === 'model' ? { ...base, type, position, transform: createTransform() } : type === '3dtiles' ? { ...base, type, transform: createTransform() } : { ...base, type }
     scene.nodes.push(node)

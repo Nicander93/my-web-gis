@@ -43,6 +43,10 @@ import 'cesium/Build/Cesium/Widgets/widgets.css'
 import './city-editor.css'
 import { createLocalResourceSession } from '@/services/local-resource-session'
 import { getProjectResourceBasePath } from '@/services/project-io'
+import { pickFile } from '@/services/files'
+import { localProjectDirectory, normalizeLocalResourcePath } from '@/services/resource-paths'
+import { isTauri } from '@tauri-apps/api/core'
+import type { ResourceReference } from '@desktop-webgis/cesium-scene-schema'
 
 interface LayerState { state: 'loading' | 'ready' | 'error'; error?: string }
 const drawLabels = { point: '点', polyline: '线', polygon: '面', water: '水面边界' }
@@ -52,6 +56,7 @@ export function CityWorkspace() {
   const target = useRef<HTMLDivElement>(null)
   const runtime = useRef<CitySceneRuntime | undefined>(undefined)
   const documentSession = useRef<ReturnType<typeof createCityDocumentSession> | undefined>(undefined)
+  const resourceSession = useRef<ReturnType<typeof createLocalResourceSession> | undefined>(undefined)
   const pendingFocus = useRef<string | undefined>(undefined)
   const defaultScene = useRef(createCityScene())
   const project = useProjectStore(state => state.project)
@@ -108,6 +113,7 @@ export function CityWorkspace() {
     let unregisterCamera: (() => void) | undefined
     const controller = createProjectSceneController()
     const localResources = createLocalResourceSession({ projectPath: getProjectResourceBasePath })
+    resourceSession.current = localResources
     try {
       documentSession.current = createCityDocumentSession({ target: target.current, controller, resolveReference: localResources.resolve, readSnapshot: () => useProjectStore.getState().getSnapshot(), renderQuality, cesiumBaseUrl: new URL('cesium/', document.baseURI).href,
         onSelect: (id, properties, mode) => { if (active) handlePick.current(id, properties, mode) },
@@ -135,7 +141,7 @@ export function CityWorkspace() {
         }
       })
     } catch (reason) { report(reason) }
-    return () => { active = false; unregisterCamera?.(); documentSession.current?.destroy(); documentSession.current = undefined; controller.dispose(); runtime.current = undefined; void localResources.destroy().catch(reason => console.error('释放本地资源授权失败', reason)) }
+    return () => { active = false; unregisterCamera?.(); documentSession.current?.destroy(); documentSession.current = undefined; controller.dispose(); runtime.current = undefined; resourceSession.current = undefined; void localResources.destroy().catch(reason => console.error('释放本地资源授权失败', reason)) }
   }, [])
 
   useEffect(() => { if (runtime.current) { try { runtime.current.setRenderQuality(renderQuality) } catch (reason) { report(reason) } } }, [renderQuality, ready])
@@ -231,10 +237,20 @@ export function CityWorkspace() {
     const p = Cartographic.fromCartesian(cartesian)
     return [CesiumMath.toDegrees(p.longitude), CesiumMath.toDegrees(p.latitude), p.height]
   }
-  function add(type: CityResourceType, url: string, name: string): void {
+  async function chooseLocalResource(type: CityResourceType): Promise<string | null> {
+    const epoch = useProjectStore.getState().projectEpoch, session = resourceSession.current
+    if (!session) throw new Error('场景资源会话尚未准备好')
+    const path = await pickFile([{ name: type === 'model' ? 'GLB / GLTF 模型' : type === '3dtiles' ? '3D Tiles 主文件' : 'GeoJSON', extensions: type === 'model' ? ['glb', 'gltf'] : type === '3dtiles' ? ['json'] : ['geojson', 'json'] }])
+    if (!path) return null
+    if (epoch !== useProjectStore.getState().projectEpoch || resourceSession.current !== session) throw new Error('选择期间项目已切换，未添加资源')
+    const normalized = normalizeLocalResourcePath(path)
+    session.authorizeDirectory(localProjectDirectory(normalized))
+    return normalized
+  }
+  function add(type: CityResourceType, source: string | ResourceReference, name: string): void {
     const canvas = runtime.current?.viewer.canvas
     const position = canvas ? pickGround(canvas.clientWidth / 2, canvas.clientHeight / 2) : undefined
-    const id = addCityAsset(type, url, name, position)
+    const id = addCityAsset(type, source, name, position)
     pendingFocus.current = id; select(id); notify('正在加载资源…')
   }
   function reload(): void {
@@ -370,7 +386,7 @@ export function CityWorkspace() {
       {!!liveIds.length && <><MenuItem icon={Copy} label="复制" onClick={() => { copyNode(); setContext(null) }} /><MenuItem icon={LockKeyhole} label={allLocked ? '解锁' : '锁定'} disabled={allLocked && !!inheritedLock} onClick={() => { toggleLock(); setContext(null) }} /><MenuItem icon={Download} label="导出对象" onClick={() => { void exportObjects(); setContext(null) }} /><MenuItem icon={Trash2} label="删除" disabled={hasLocked} onClick={() => { setDeleting(true); setContext(null) }} /></>}
     </LayerPopupMenu>}
     {renaming && <EditorDialog title="重命名" onClose={() => setRenaming(false)}><div className="dialog-body"><label className="editor-field">名称<input autoFocus value={renameDraft} onChange={event => setRenameDraft(event.target.value)} /></label></div><footer className="dialog-footer"><button className="button-secondary" onClick={() => setRenaming(false)}>取消</button><button className="button-primary" disabled={!renameDraft.trim()} onClick={() => { if (group) organize(() => patchCityGroup(group.id, { name:renameDraft.trim() }), '已重命名分组'); else patchNode({ name:renameDraft.trim() }); setRenaming(false) }}>应用</button></footer></EditorDialog>}
-    {adding && <CityResourceDialog onClose={() => setAdding(false)} onAdd={add} />}
+    {adding && <CityResourceDialog onClose={() => setAdding(false)} onAdd={add} onChooseLocal={isTauri() ? chooseLocalResource : undefined} />}
     {creatingGroup && <CityCreateGroupDialog count={liveIds.length} locked={hasLocked} onClose={() => setCreatingGroup(false)} onCreate={(name, include) => { drawing.cancel(); stopEditing(); const id = addCityGroup(name, include ? liveIds : [], selectedGroup ?? undefined); selectGroup(id); notify('分组已创建，可撤销恢复') }} />}
     {deleting && liveIds.length > 0 && !hasLocked && <EditorDialog title="删除对象" onClose={() => setDeleting(false)}><div className="dialog-body"><p>{liveIds.length === 1 ? `删除「${node?.name}」？` : `删除选中的 ${liveIds.length} 个对象？`}删除后可通过一次撤销全部恢复。</p></div><footer className="dialog-footer"><button className="button-secondary" onClick={() => setDeleting(false)}>取消</button><button className="button-danger" onClick={() => organize(() => { deleteCityNodes(liveIds); setSelectedIds([]); setDeleting(false) }, '所选对象已删除，可撤销恢复')}>删除对象</button></footer></EditorDialog>}
   </main>
