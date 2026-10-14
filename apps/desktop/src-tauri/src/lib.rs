@@ -1,5 +1,16 @@
 mod atomic_file;
 mod recovery_cache;
+mod local_resources;
+
+#[tauri::command]
+fn grant_local_resource_directory(resources: tauri::State<'_, local_resources::LocalResources>, directory: String) -> Result<local_resources::Grant, String> {
+    resources.grant(std::path::Path::new(&directory)).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn revoke_local_resource_directory(resources: tauri::State<'_, local_resources::LocalResources>, key: String) -> Result<bool, String> {
+    resources.revoke(&key).map_err(|error| error.to_string())
+}
 
 fn recovery_root(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     use tauri::Manager;
@@ -233,6 +244,16 @@ fn secure_credential_delete(key: String) -> Result<(), String> {
 
 pub fn run() {
     tauri::Builder::default()
+        .manage(local_resources::LocalResources::default())
+        .register_asynchronous_uri_scheme_protocol("webgis-resource", |context, request, responder| {
+            use tauri::Manager;
+            let app = context.app_handle();
+            let resources = app.state::<local_resources::LocalResources>().inner().clone();
+            let origin = if cfg!(debug_assertions) {
+                app.config().build.dev_url.as_ref().map(|url| url.origin().ascii_serialization()).unwrap_or_else(|| "http://tauri.localhost".into())
+            } else { "http://tauri.localhost".into() };
+            tauri::async_runtime::spawn_blocking(move || responder.respond(resources.serve(&request, &origin)));
+        })
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             read_text_path,
@@ -242,6 +263,8 @@ pub fn run() {
             list_recovery_cache,
             write_recovery_cache,
             remove_recovery_cache,
+            grant_local_resource_directory,
+            revoke_local_resource_directory,
             read_scene_resource,
             persist_scene_archive,
             read_cached_scene_resource,

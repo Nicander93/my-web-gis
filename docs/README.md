@@ -44,6 +44,7 @@
 
 - [代码偏好与维护约定](engineering/code-preferences.md)
 - [项目恢复草稿](engineering/project-recovery.md)：缓存规则、恢复/舍弃操作、自动化入口与原生验收边界。
+- [本地场景资源协议](engineering/local-resource-protocol.md)：受控目录、嵌套依赖、MIME/Range 与当前原生证据。
 
 ### 设计参考图
 

@@ -1,0 +1,69 @@
+{
+  "identifier": "com.desktop-webgis.recovery-acceptance-1791974348928",
+  "output": "D:\\my-code-repo\\my-web-gis\\apps\\desktop\\test-results\\native-recovery-1791974348928",
+  "scenarios": [
+    {
+      "name": "Native directory protocol, external GLTF mesh/texture, ranges and revocation",
+      "passed": true
+    },
+    {
+      "name": "2D native process termination, startup restore and native save",
+      "passed": true
+    },
+    {
+      "name": "3D real GLB transform, native process termination and restore",
+      "passed": true
+    }
+  ],
+  "nativeFileChooser": "Not automated: fixture working paths are assigned; Save uses the real native bridge.",
+  "windowsScale125": "Not verified",
+  "appData": "C:\\Users\\PC\\AppData\\Local\\com.desktop-webgis.recovery-acceptance-1791974348928",
+  "viewport": {
+    "width": 1037,
+    "height": 648,
+    "devicePixelRatio": 1.3899999856948853
+  },
+  "localProtocol": {
+    "matched": true,
+    "imageSize": [
+      1,
+      1
+    ],
+    "externalBuffers": 2,
+    "statuses": {
+      "model": 200,
+      "mesh": 200,
+      "image": 200,
+      "part": 206,
+      "suffix": 206,
+      "head": 200,
+      "missing": 404,
+      "traversal": 403
+    },
+    "revoked": 403,
+    "partBytes": [
+      0,
+      63,
+      0,
+      0,
+      0,
+      0
+    ],
+    "suffixBytes": [
+      22,
+      0,
+      23,
+      0
+    ],
+    "modelType": "model/gltf+json",
+    "imageType": "image/png",
+    "partRange": "bytes 2-7/648",
+    "headLength": "648"
+  },
+  "modelVisibilityPixels": {
+    "visible": 51299,
+    "hidden": 14753,
+    "restored": 51292
+  },
+  "recoveredModelPixels": 51290
+}

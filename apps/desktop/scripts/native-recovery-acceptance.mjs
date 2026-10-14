@@ -146,6 +146,87 @@ async function restore() {
   await expect(page.locator('.project-dirty')).toContainText('未保存')
 }
 
+async function verifyLocalProtocol() {
+  const directory = join(output, 'local-protocol')
+  await mkdir(join(directory, 'nested'), { recursive: true })
+  await mkdir(join(directory, 'bin'), { recursive: true })
+  await mkdir(join(directory, '纹理'), { recursive: true })
+  const glb = await readFile(resolve(desktop, '../../examples/city-3d/city-sample/tower.glb'))
+  const jsonLength = glb.readUInt32LE(12)
+  const document = JSON.parse(glb.subarray(20, 20 + jsonLength).toString('utf8'))
+  const binaryOffset = 20 + jsonLength, binaryLength = glb.readUInt32LE(binaryOffset)
+  const binary = glb.subarray(binaryOffset + 8, binaryOffset + 8 + binaryLength)
+  document.buffers[0].uri = '../bin/mesh.bin'
+  document.images = [{ uri: '../纹理/像素.png' }]; document.textures = [{ source: 0 }]
+  document.materials[0].pbrMetallicRoughness.baseColorTexture = { index: 0 }
+  const expectedUv = []
+  for (const mesh of document.meshes) for (const primitive of mesh.primitives) {
+    const count = document.accessors[primitive.attributes.POSITION].count
+    const uv = Buffer.alloc(count * 2 * 4), name = `uv-${expectedUv.length}.bin`
+    const buffer = document.buffers.length, bufferView = document.bufferViews.length, accessor = document.accessors.length
+    document.buffers.push({ uri: `../bin/${name}`, byteLength: uv.length })
+    document.bufferViews.push({ buffer, byteOffset: 0, byteLength: uv.length, target: 34962 })
+    document.accessors.push({ bufferView, componentType: 5126, count, type: 'VEC2' })
+    primitive.attributes.TEXCOORD_0 = accessor
+    await writeFile(join(directory, 'bin', name), uv)
+    expectedUv.push([...uv])
+  }
+  const pngBase64 = await page.evaluate(() => {
+    const canvas = document.createElement('canvas'); canvas.width = 1; canvas.height = 1
+    const context = canvas.getContext('2d'); context.fillStyle = '#ffffff'; context.fillRect(0, 0, 1, 1)
+    return canvas.toDataURL('image/png').split(',')[1]
+  })
+  const png = Buffer.from(pngBase64, 'base64')
+  await writeFile(join(directory, 'nested', '模型.gltf'), JSON.stringify(document))
+  await writeFile(join(directory, 'bin', 'mesh.bin'), binary)
+  await writeFile(join(directory, '纹理', '像素.png'), png)
+  const result = await page.evaluate(async ({ directory, expectedBinary, expectedImage, expectedUv }) => {
+    const { invoke } = await import('/node_modules/@tauri-apps/api/core.js')
+    const grant = await invoke('grant_local_resource_directory', { directory })
+    try {
+      const root = new URL('nested/模型.gltf', grant.url).href
+      const model = await fetch(root), gltf = await model.json()
+      const meshUrl = new URL(gltf.buffers[0].uri, root).href
+      const imageUrl = new URL(gltf.images[0].uri, root).href
+      const mesh = await fetch(meshUrl), image = await fetch(imageUrl)
+      const meshBytes = [...new Uint8Array(await mesh.arrayBuffer())]
+      const imageBytes = [...new Uint8Array(await image.arrayBuffer())]
+      const bitmap = await createImageBitmap(new Blob([new Uint8Array(imageBytes)], { type: 'image/png' }))
+      const imageSize = [bitmap.width, bitmap.height]; bitmap.close()
+      const uvBuffers = []
+      for (const buffer of gltf.buffers.slice(1)) {
+        const response = await fetch(new URL(buffer.uri, root).href)
+        uvBuffers.push([...new Uint8Array(await response.arrayBuffer())])
+      }
+      const part = await fetch(meshUrl, { headers: { Range: 'bytes=2-7' } })
+      const suffix = await fetch(meshUrl, { headers: { Range: 'bytes=-4' } })
+      const head = await fetch(meshUrl, { method: 'HEAD', headers: { Range: 'bytes=2-7' } })
+      const missing = await fetch(new URL('missing.glb', grant.url).href)
+      const traversal = await fetch(new URL('../../secret.txt', root).href)
+      const partBytes = [...new Uint8Array(await part.arrayBuffer())]
+      const suffixBytes = [...new Uint8Array(await suffix.arrayBuffer())]
+      const matched = JSON.stringify(meshBytes) === JSON.stringify(expectedBinary) && JSON.stringify(imageBytes) === JSON.stringify(expectedImage) && JSON.stringify(uvBuffers) === JSON.stringify(expectedUv)
+      const statuses = { model: model.status, mesh: mesh.status, image: image.status, part: part.status, suffix: suffix.status,
+        head: head.status, missing: missing.status, traversal: traversal.status }
+      await invoke('revoke_local_resource_directory', { key: grant.key })
+      const revoked = await fetch(meshUrl)
+      return { matched, imageSize, externalBuffers: uvBuffers.length + 1, statuses, revoked: revoked.status, partBytes, suffixBytes, modelType: model.headers.get('Content-Type'),
+        imageType: image.headers.get('Content-Type'), partRange: part.headers.get('Content-Range'), headLength: head.headers.get('Content-Length') }
+    } finally { await invoke('revoke_local_resource_directory', { key: grant.key }) }
+  }, { directory, expectedBinary: [...binary], expectedImage: [...png], expectedUv })
+  assert.equal(result.matched, true)
+  assert.deepEqual(result.imageSize, [1, 1])
+  assert.deepEqual(result.statuses, { model: 200, mesh: 200, image: 200, part: 206, suffix: 206, head: 200, missing: 404, traversal: 403 })
+  assert.equal(result.revoked, 403)
+  assert.deepEqual(result.partBytes, [...binary.subarray(2, 8)])
+  assert.deepEqual(result.suffixBytes, [...binary.subarray(binary.length - 4)])
+  assert.equal(result.modelType, 'model/gltf+json'); assert.equal(result.imageType, 'image/png')
+  assert.equal(result.partRange, `bytes 2-7/${binary.length}`); assert.equal(result.headLength, String(binary.length))
+  report.localProtocol = result
+  report.scenarios.push({ name: 'Native directory protocol, external GLTF mesh/texture, ranges and revocation', passed: true })
+  console.log('[native-recovery] controlled local resource protocol passed')
+}
+
 try {
   assert.equal(process.platform, 'win32', 'This acceptance harness requires Windows Tauri/WebView2')
   await mkdir(output, { recursive: true })
@@ -162,6 +243,7 @@ try {
   await poll(async () => await available(serverPort), 'Owned Vite server did not start')
 
   await launch()
+  await verifyLocalProtocol()
   await page.getByRole('button', { name: /^二维地图/ }).click()
   await page.getByRole('tab', { name: '数据', exact: true }).click()
   await page.getByRole('region', { name: '二维功能区' }).getByRole('button', { name: '添加数据', exact: true }).click()

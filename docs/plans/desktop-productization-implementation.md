@@ -236,6 +236,14 @@ Desktop build 通过；`attribute-tabs.e2e.ts`、`field-schema.e2e.ts` 在 1366�
 
 最终脚本运行退出码 0；隔离及普通 debug 原生构建均通过，仅有现有 linker 信息警告；正常 debug 配置已恢复，测试应用/服务均结束。代码范围为验收脚本和证据文档，不修改生产功能或无关 Cargo.toml。[原生报告](../design/desktop-productization/evidence/native-recovery-report.json)、[启动截图](../design/desktop-productization/evidence/native-recovery-startup.png)、[GLB 恢复截图](../design/desktop-productization/evidence/native-city-recovery.png)。E18 增加原生核心流程证据，完整组合继续保持部分签收。
 
+## M6 受控本地资源协议批次（2026-10-14）
+
+新增原生 `webgis-resource` 协议与按目录授权/撤销接口，提供稳定层级的 base URL，支持 GLTF 外部 buffer/纹理及 JSON 子资源。每次读取检查 canonical 路径，拒绝编码遍历和实际 Windows junction 越界；随机 token、来源限制、MIME、单段 Range/HEAD/If-Range、响应大小与授权数量保护均有单测。
+
+21 项 Rust 测试通过；最终真实 Tauri 验收脚本退出码 0，外部几何/UV buffer 字节、1×1 PNG 实际解码、Range/HEAD/MIME、缺失/越界/撤销状态通过，二维/三维原生恢复与模型像素回归仍通过。没有修改 Cargo.toml；普通 debug 配置已恢复。[原生协议报告](../design/desktop-productization/evidence/native-local-resource-protocol-report.json)、[接口及边界](../engineering/local-resource-protocol.md)。
+
+本批为 M6 的原生读资源基础层；产品持久引用、另存重算、父目录重定位与统一添加数据尚未接入，不将其标记为已实现。
+
 ## 20 项验收矩阵的当前证据
 
 “部分”表示已有自动化覆盖部分行为，不等于该条完整签收。
