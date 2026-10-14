@@ -1,11 +1,13 @@
 import { create } from 'zustand'
 import type { LayerStyle } from '@desktop-webgis/ol-style'
 import { cloneValue } from '@desktop-webgis/gis-core'
+import type { FieldFilterCondition } from '@desktop-webgis/gis-core'
 import { useWorkbenchStore } from './workbench.store'
 
 type InspectorTab = 'layer' | 'feature' | 'style' | 'label'
 
 interface AttributeTableState {
+  filterDraft?: FieldFilterCondition[]
   filterOpen: boolean
   statisticsOpen: boolean
   /** Session-only table text search (表内搜索); does not change map filter/selection. */
@@ -131,6 +133,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           [layerId]: {
             ...existing,
             attributeTable: {
+              ...(updates.filterDraft !== undefined ? { filterDraft: cloneValue(updates.filterDraft) }
+                : current?.filterDraft ? { filterDraft: current.filterDraft } : {}),
               hiddenFields: updates.hiddenFields ?? current?.hiddenFields ?? [],
               fieldOrder: updates.fieldOrder ?? current?.fieldOrder ?? [],
               filterOpen: updates.filterOpen ?? current?.filterOpen ?? false,

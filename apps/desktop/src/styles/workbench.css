@@ -260,7 +260,10 @@
 .attr-field-calculator .attr-expression input { flex: 1; min-width: 0; }
 .attr-field-calculator small, .attr-field-calculator [role] { flex-basis: 100%; }
 .attr-columns > div { padding-right: 8px; border-right: 1px solid var(--color-border); }
-.attr-columns span { color: var(--color-text-secondary); font-size: 11px; }
+.attr-columns .attr-field-type { color: var(--color-text-secondary); font-size: 11px; }
+.field-schema-form .ant-form-item { margin-bottom: 12px; }
+.field-schema-form .ant-alert { margin-bottom: 12px; }
+.field-schema-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
 .attribute-table-content {
   display: flex;
   flex-direction: column;

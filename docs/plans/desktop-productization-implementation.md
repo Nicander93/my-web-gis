@@ -84,7 +84,7 @@ rtk pnpm --filter @desktop-webgis/desktop test:e2e folders.e2e.ts --project=desk
 | M1 | 首批三行 Shell、两引擎覆盖式窗口、布局恢复 | 全局工具会话协调；工具箱/日志/诊断独立窗口随后续阶段接入 |
 | M2 | 点线面编辑、捕捉、选择、CRS/导出；已接入嵌套 Folder 与原子树命令 | 明确 CRS 赋值工作流及复杂拓扑编辑、专业选择能力 |
 | M3 | 模型/Tileset 选择、整体 Gizmo、专业 Inspector、旧 CityScene 兼容；已接入嵌套 Folder | 文件夹/对象混排；固定 ID 的独立 Apply/OK/Cancel 属性窗；检查器固定 |
-| M4 | 分页、搜索、过滤、统计、属性单元格、处理算法/取消；新增多图层 Tab、表内原子字段计算、字段类型校验与列显示/排序 | 字段新增/重命名/删除管理、面合并属性策略及完整空间运算验收 |
+| M4 | 分页、搜索、过滤、统计、属性单元格、处理算法/取消；多图层 Tab、原子字段计算、类型校验、字段管理与引用迁移、列显示/排序 | 面合并属性策略、分割、列宽管理、Table 控件迁移及完整空间运算验收 |
 | M5 | point/polyline/polygon Graphic、几何编辑、对象独立样式 | 共享 Graphic 渲染池、连续 POI、Billboard/Label/rectangle/ellipse 等及 500 对象验收 |
 | M6 | 本地二维文件、WMS/WMTS/WFS、三维资源加载、失败重试 | 二三维添加数据壳、基于项目路径的资源引用/另存重算、父目录重定位 |
 | M7 | 项目保存/另存/脏状态保护 | 原子保存、保存期间编辑/换项目竞态、恢复草稿缓存和恢复/舍弃流程 |
@@ -140,6 +140,17 @@ rtk pnpm --filter @desktop-webgis/desktop test:e2e docking.e2e.ts --project=desk
 
 当前证据：Desktop 单测 221 通过、5 个原有环境项跳过；最终源码构建通过，Desktop 主尺寸全量 E2E 45 项通过，1366×768 与 1920×1080 的样式/计算/CSV 焦点/会话专项 8 项通过。Tab/Shift+Tab 循环、触发控件焦点恢复、分页栏留在窗口内、表格滚动/草稿恢复的断言全部保留。[1366×768 Ant Design 字段计算器](../design/desktop-productization/evidence/laptop-antd-field-calculator.png)。
 
+## M4 字段管理批次（2026-10-14）
+
+- 字段列表与新增/重命名/删除事务使用 Ant Design Checkbox/Button/Form/Input/InputNumber/Select/Alert/Modal；只读状态禁用入口。新增字段可指定类型、空值约束及全部记录的默认值，文本前导零不会丢失。
+- 重命名覆盖同一 Dataset 的所有图层过滤、分类/分级样式、标注和弹窗字段。Feature ID、几何、metadata 与字段值保持不变，弹窗格式与用户标签保留。
+- 删除仍被引用的字段默认失败；勾选清理引用后才移除相关配置及过滤草稿。分类/分级样式回退为已有 fallback 符号，不凭空生成新的样式。数据、字段定义和配置用一个命令提交，Undo/Redo 一起恢复。
+- 表格过滤草稿改为按图层会话保存；字段重命名同步草稿、排序/统计字段和列显示/顺序。字段删除暂时停用不存在字段的排序/统计，保留其会话偏好，撤销删除后可继续使用。搜索、滚动与 Tab 不因字段编辑而清空。
+- 共享数据集的任一引用图层被锁定时阻止字段编辑；未应用样式草稿阻止重命名/删除及其历史恢复。目标图层已被重新绑定其他数据集时，核心命令在写入前拒绝，避免半成品。
+- 六个 Desktop 单测覆盖类型/默认值、冲突、共享引用、撤销/重做、草稿和祖先锁；gis-core 补充目标重绑定前置校验。真实浏览器用例从文件导入，经字段管理、过滤、撤销到保存重开，保留了实际文件数据和 schema 断言。
+
+当前全仓构建/单测通过，Desktop 227 通过、5 个原有环境项跳过；gis-core 74 项通过。最终源码 Desktop 构建追加通过，桌面全量 E2E 46 项通过，字段管理专项三种尺寸共 3 项通过。截图：[Ant Design 重命名事务](../design/desktop-productization/evidence/laptop-field-rename.png)、[保存重开后的字段与文本值](../design/desktop-productization/evidence/laptop-field-schema-roundtrip.png)。面合并/分割与 Table 控件迁移仍在后续范围，未将 M4 整体标为完成。
+
 ## 20 项验收矩阵的当前证据
 
 “部分”表示已有自动化覆盖部分行为，不等于该条完整签收。
@@ -149,7 +160,7 @@ rtk pnpm --filter @desktop-webgis/desktop test:e2e docking.e2e.ts --project=desk
 | E01 | 部分 | 真实 GeoJSON、CSV、SHP、DXF 导入 E2E 通过；本方案完整多图层配置闭环待签收 |
 | E02 | 部分 | 绘制、取消、Undo/Redo E2E 通过；多要素顶点编辑完整矩阵待补 |
 | E03 | 待实现 | 面合并的原图层原子命令及属性策略 |
-| E04 | 部分 | 表格选择/定位/键盘/单元格编辑已有回归；已加入多 Tab 独立草稿、搜索和滚动会话；完整字段管理仍待补 |
+| E04 | 部分 | 表格选择/定位/键盘/单元格编辑及多 Tab 会话已有回归；新增字段管理、共享引用迁移；Table 控件与列宽仍待迁移/补齐 |
 | E05 | 浏览器通过 | 表内字段计算原子写入原数据；逐行错误、类型、空值约束提前校验；一个 Undo/Redo 恢复字段定义与记录 |
 | E06 | 部分 | 真实缓冲结果层及处理算法单测通过；四组空间处理专项矩阵待补 |
 | E07 | 部分 | 国内地图投影、导出 CRS、历史一致性通过；源 CRS 赋值工作流待接入 |

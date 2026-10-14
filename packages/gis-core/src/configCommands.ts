@@ -15,6 +15,8 @@ export interface ProjectEditContext extends EditContext {
   replaceSnapshot?(snapshot: ProjectSnapshot): void
   /** Atomic same-project content edit; host preserves unaffected UI sessions. */
   applySnapshotEdit?(snapshot: ProjectSnapshot): void
+  /** Host-only table references follow a field rename/removal without clearing sessions. */
+  onDatasetFieldChange?(datasetId: string, from: string | undefined, to: string | undefined): void
 }
 
 function isProjectEditContext(context: EditContext): context is ProjectEditContext {
@@ -41,27 +43,46 @@ function replaceLayer(project: Project, layerId: string, patch: Partial<Layer>):
 export interface DatasetContent {
   fields?: DatasetField[]
   features: GisFeature[]
+  layers?: Array<Pick<Layer, 'id' | 'filter' | 'style' | 'interaction'>>
 }
 
 /** Writes validated fields and rows together, retaining table sessions and stable IDs. */
 export class SetDatasetContentCommand implements EditCommand {
+  readonly guardedLayerIds: string[]
   private readonly before: DatasetContent
   private readonly after: DatasetContent
   constructor(readonly id: string, readonly label: string,
-    private readonly datasetId: string, before: DatasetContent, after: DatasetContent) {
+    private readonly datasetId: string, before: DatasetContent, after: DatasetContent,
+    private readonly fieldChange?: { before?: string; after?: string }) {
     this.before = cloneValue(before)
     this.after = cloneValue(after)
+    this.guardedLayerIds = [...new Set([...(before.layers ?? []), ...(after.layers ?? [])].map((layer) => layer.id))]
   }
-  execute(context: EditContext): void { this.apply(context, this.after) }
-  undo(context: EditContext): void { this.apply(context, this.before) }
+  execute(context: EditContext): void {
+    this.apply(context, this.after)
+    if (this.fieldChange) requireProjectContext(context).onDatasetFieldChange?.(this.datasetId, this.fieldChange.before, this.fieldChange.after)
+  }
+  undo(context: EditContext): void {
+    this.apply(context, this.before)
+    if (this.fieldChange) requireProjectContext(context).onDatasetFieldChange?.(this.datasetId, this.fieldChange.after, this.fieldChange.before)
+  }
   private apply(context: EditContext, content: DatasetContent): void {
     const ctx = requireProjectContext(context)
     const project = ctx.getProject()
     if (!project.datasets.some((dataset) => dataset.id === this.datasetId)) {
       throw new Error('字段编辑的目标数据集已不存在')
     }
+    const configs = new Map(content.layers?.map((layer) => [layer.id, layer]) ?? [])
+    for (const id of configs.keys()) {
+      if (project.layers.find((layer) => layer.id === id)?.datasetId !== this.datasetId) {
+        throw new Error('字段编辑的图层已不存在或已绑定其他数据集')
+      }
+    }
     ctx.featureStore.setAll(this.datasetId, cloneValue(content.features))
-    ctx.replaceProject({ ...project, datasets: project.datasets.map((dataset) =>
+    ctx.replaceProject({ ...project, layers: project.layers.map((layer) => {
+      const config = configs.get(layer.id)
+      return config ? { ...layer, ...cloneValue(config) } : layer
+    }), datasets: project.datasets.map((dataset) =>
       dataset.id === this.datasetId ? { ...dataset, fields: cloneValue(content.fields) } : dataset) })
   }
 }

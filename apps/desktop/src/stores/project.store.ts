@@ -26,6 +26,7 @@ import {
   SetLayerFilterCommand,
   SetLayerOpacityCommand,
   SetLayerTreeCommand,
+  SetDatasetContentCommand,
   ReplaceProjectSnapshotCommand,
   ApplyProjectSnapshotEditCommand,
   getProjectSnapshotChanges,
@@ -180,7 +181,33 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       featureStore: attributeFeatureStore,
       getProject: () => get().project,
       replaceProject: (project) => {
+        const previous = get().project
+        for (const layer of project.layers) {
+          if (JSON.stringify(layer.style) === JSON.stringify(previous.layers.find((item) => item.id === layer.id)?.style)) continue
+          const session = useSessionStore.getState().sessions[layer.id]
+          if (session?.styleDraft && !session.styleDraft.dirty) {
+            const { styleDraft: _draft, ...retained } = session
+            useSessionStore.setState((state) => ({ sessions: { ...state.sessions, [layer.id]: retained } }))
+          }
+        }
         set({ project: normalizeLayerTree(project), dirty: true })
+      },
+      onDatasetFieldChange: (datasetId, from, to) => {
+        if (!from) return
+        const session = useSessionStore.getState()
+        for (const layer of get().project.layers.filter((item) => item.datasetId === datasetId)) {
+          const table = session.sessions[layer.id]?.attributeTable
+          if (!table) continue
+          const mapNames = (names: string[]) => names.flatMap((name) => name === from ? to ? [to] : [] : [name])
+          session.setAttributeTableState(layer.id, {
+            sortField: to && table.sortField === from ? to : table.sortField,
+            statsField: to && table.statsField === from ? to : table.statsField,
+            fieldOrder: to ? mapNames(table.fieldOrder ?? []) : table.fieldOrder,
+            hiddenFields: to ? mapNames(table.hiddenFields ?? []) : table.hiddenFields,
+            ...(table.filterDraft ? { filterDraft: table.filterDraft.flatMap((condition) => condition.field === from
+              ? to ? [{ ...condition, field: to }] : [] : [condition]) } : {})
+          })
+        }
       },
       applySnapshotEdit: (snapshot) => {
         const state = get(), changes = getProjectSnapshotChanges(state.getSnapshot(), snapshot)
@@ -580,6 +607,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   canUndoEdit: () => editHistory.canUndo,
   getHistoryBlockReason: (direction) => {
     const command = direction === 'undo' ? editHistory.peekUndo() : editHistory.peekRedo()
+    if (command instanceof SetDatasetContentCommand && command.guardedLayerIds.some(id => useSessionStore.getState().sessions[id]?.styleDraft?.dirty))
+      return '请先应用或放弃受影响图层的样式草稿，再恢复字段编辑'
     if (command instanceof ApplyProjectSnapshotEditCommand) return command.guardedLayerIds.some(id => useSessionStore.getState().sessions[id]?.styleDraft?.dirty)
       ? '请先应用或放弃受影响图层的样式草稿，再恢复内容编辑' : null
     return command instanceof ReplaceProjectSnapshotCommand && Object.values(useSessionStore.getState().sessions).some(session => session.styleDraft?.dirty)
@@ -588,6 +617,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   canRedoEdit: () => editHistory.canRedo,
 
   executeEditCommand: (command) => {
+    if (command instanceof SetDatasetContentCommand && command.guardedLayerIds.some(id => useSessionStore.getState().sessions[id]?.styleDraft?.dirty))
+      throw new Error('请先应用或放弃受影响图层的样式草稿，再修改字段')
     const state = get()
     syncStoreFromState(state.featuresByDataset)
     editHistory.execute(command, projectEditContext())

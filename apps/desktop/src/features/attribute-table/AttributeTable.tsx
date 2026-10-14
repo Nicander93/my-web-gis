@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Checkbox } from 'antd'
 import { ChevronLeft, ChevronRight, PanelBottomClose, LocateFixed } from 'lucide-react'
 import {
   applyFieldFilter,
@@ -15,6 +16,7 @@ import { Button } from '@/components/ui/Button'
 import { zoomMapToFeature, zoomMapToSelected } from '@/features/map/map-runtime-host'
 import { FieldCalculator } from './FieldCalculator'
 import { parseCellValue, resolveDatasetFields } from './field-edits'
+import { FieldSchemaDialog } from './FieldSchemaDialog'
 
 const PAGE_SIZE = 100
 
@@ -81,7 +83,7 @@ export function AttributeTable({
   const searchQuery = tableState?.searchQuery ?? ''
   const currentPage = tableState?.currentPage ?? 1
   const selectedOnly = tableState?.selectedOnly ?? false
-  const sortField = tableState?.sortField ?? null
+  const requestedSortField = tableState?.sortField ?? null
   const sortDirection = tableState?.sortDirection ?? 'asc'
   const statsField = tableState?.statsField ?? null
   const filterOpen = tableState?.filterOpen ?? false
@@ -99,6 +101,7 @@ export function AttributeTable({
   const [cellError, setCellError] = useState('')
   const [calculatorOpen, setCalculatorOpen] = useState(false)
   const [columnsOpen, setColumnsOpen] = useState(false)
+  const [fieldEdit, setFieldEdit] = useState<{ mode: 'add' | 'rename' | 'remove'; name?: string } | null>(null)
 
   const selectedLayer = selectedLayerId
     ? project.layers.find((layer) => layer.id === selectedLayerId)
@@ -118,11 +121,16 @@ export function AttributeTable({
   const dataset = project.datasets.find((item) => item.id === selectedLayer?.datasetId)
   const layerFilter = selectedLayer?.filter
   const appliedFilter = layerFilter ?? []
-  const [filterDraft, setFilterDraft] =
-    useState<FieldFilterCondition[]>(appliedFilter)
+  const filterDraft = tableState?.filterDraft ?? appliedFilter
+  const previousFilter = useRef(appliedFilter)
+  function setFilterDraft(draft: FieldFilterCondition[]): void { patchTable({ filterDraft: draft }) }
   useEffect(() => {
-    setFilterDraft(layerFilter ?? [])
-  }, [layerFilter])
+    const current = selectedLayerId ? useSessionStore.getState().sessions[selectedLayerId]?.attributeTable?.filterDraft : undefined
+    if (selectedLayerId && (!current || JSON.stringify(current) === JSON.stringify(previousFilter.current))) {
+      setAttributeTableState(selectedLayerId, { filterDraft: layerFilter ?? [] })
+    }
+    previousFilter.current = layerFilter ?? []
+  }, [layerFilter, selectedLayerId])
   const filterDirty =
     JSON.stringify(filterDraft) !== JSON.stringify(appliedFilter)
 
@@ -139,6 +147,7 @@ export function AttributeTable({
 
   const fields = useMemo(() => resolveDatasetFields(allFeatures, dataset?.fields), [allFeatures, dataset?.fields])
   const fieldNames = fields.map((field) => field.name)
+  const sortField = requestedSortField && fieldNames.includes(requestedSortField) ? requestedSortField : null
   const orderedFields = [...(tableState?.fieldOrder ?? []).filter((name) => fieldNames.includes(name)),
     ...fieldNames.filter((name) => !tableState?.fieldOrder?.includes(name))]
   const visibleFields = orderedFields.filter((name) => !tableState?.hiddenFields?.includes(name))
@@ -182,7 +191,7 @@ export function AttributeTable({
     safePage * PAGE_SIZE
   )
 
-  const statsTargetField = statsField ?? fieldNames[0] ?? null
+  const statsTargetField = statsField && fieldNames.includes(statsField) ? statsField : fieldNames[0] ?? null
   const stats = useMemo(() => {
     if (!statsTargetField) return null
     return computeFieldStats(filteredFeatures, statsTargetField, 'filtered')
@@ -380,25 +389,32 @@ export function AttributeTable({
       {selectedLayerId && calculatorOpen && <FieldCalculator layerId={selectedLayerId}
         filteredFeatures={filteredFeatures} selectedIds={selectionIds} onClose={() => setCalculatorOpen(false)} />}
       {selectedLayerId && columnsOpen && <section className="attr-columns" aria-label="字段列表">
+        <Button variant="primary" disabled={!canEditCells} onClick={() => setFieldEdit({ mode: 'add' })}>新增字段</Button>
         {orderedFields.map((name, index) => <div key={name}>
-          <label><input type="checkbox" checked={!tableState?.hiddenFields?.includes(name)}
+          <Checkbox checked={!tableState?.hiddenFields?.includes(name)}
             onChange={(event) => patchTable({ hiddenFields: event.target.checked
               ? (tableState?.hiddenFields ?? []).filter((field) => field !== name)
-              : [...(tableState?.hiddenFields ?? []), name] })} />{name}</label>
-          <span>{fields.find((field) => field.name === name)?.type}</span>
-          <button type="button" aria-label={`上移字段 ${name}`} disabled={index === 0} onClick={() => {
+              : [...(tableState?.hiddenFields ?? []), name] })}>{name}</Checkbox>
+          <span className="attr-field-type">{fields.find((field) => field.name === name)?.type}</span>
+          <Button variant="icon" aria-label={`上移字段 ${name}`} disabled={index === 0} onClick={() => {
             const order = [...orderedFields]
             ;[order[index - 1], order[index]] = [order[index], order[index - 1]]
             patchTable({ fieldOrder: order })
-          }}>↑</button>
-          <button type="button" aria-label={`下移字段 ${name}`} disabled={index === orderedFields.length - 1} onClick={() => {
+          }}>↑</Button>
+          <Button variant="icon" aria-label={`下移字段 ${name}`} disabled={index === orderedFields.length - 1} onClick={() => {
             const order = [...orderedFields]
             ;[order[index + 1], order[index]] = [order[index], order[index + 1]]
             patchTable({ fieldOrder: order })
-          }}>↓</button>
+          }}>↓</Button>
+          <Button variant="ghost" aria-label={`重命名字段 ${name}`} disabled={!canEditCells}
+            onClick={() => setFieldEdit({ mode: 'rename', name })}>重命名</Button>
+          <Button variant="ghost" aria-label={`删除字段 ${name}`} disabled={!canEditCells}
+            onClick={() => setFieldEdit({ mode: 'remove', name })}>删除</Button>
         </div>)}
-        <button type="button" onClick={() => patchTable({ hiddenFields: [], fieldOrder: [] })}>重置列显示</button>
+        <Button variant="ghost" onClick={() => patchTable({ hiddenFields: [], fieldOrder: [] })}>重置列显示</Button>
       </section>}
+      {selectedLayerId && fieldEdit && <FieldSchemaDialog layerId={selectedLayerId} {...fieldEdit}
+        onClose={() => setFieldEdit(null)} />}
 
       {selectedLayer && filterOpen && (
         <div className="attr-filter-bar" aria-label="图层字段过滤">
