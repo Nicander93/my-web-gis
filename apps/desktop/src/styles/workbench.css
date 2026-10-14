@@ -254,11 +254,16 @@
 .attribute-table-tab button { height: 28px; padding: 0 8px; background: transparent; border: 0; color: inherit; cursor: pointer; }
 .attribute-table-tab [aria-selected="true"] { background: var(--color-accent-soft); box-shadow: inset 0 -2px var(--color-accent); }
 .attr-field-calculator, .attr-columns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px; border-bottom: 1px solid var(--color-border); max-height: 150px; overflow: auto; }
-.attr-field-calculator label, .attr-columns > div { display: flex; align-items: center; gap: 4px; }
+.attr-field-calculator > label:not(.ant-checkbox-wrapper), .attr-columns > div { display: flex; align-items: center; gap: 4px; }
 .attr-field-calculator input:not([type="checkbox"]) { width: 150px; }
 .attr-field-calculator .attr-expression { flex: 1; min-width: 240px; }
 .attr-field-calculator .attr-expression input { flex: 1; min-width: 0; }
-.attr-field-calculator small, .attr-field-calculator [role] { flex-basis: 100%; }
+.attr-field-calculator > small,
+.attr-field-calculator > [role='alert'],
+.attr-field-calculator > [role='status'] { flex-basis: 100%; }
+.attr-field-calculator > small { font-size: 11px; line-height: 16px; color: var(--color-text-secondary); }
+.attr-field-calculator > [role='alert'] { color: var(--color-danger); }
+.attr-field-calculator > [role='status'] { color: var(--color-text-secondary); }
 .attr-columns > div { padding-right: 8px; border-right: 1px solid var(--color-border); }
 .attr-columns .attr-field-type { color: var(--color-text-secondary); font-size: 11px; }
 .field-schema-form .ant-form-item { margin-bottom: 12px; }

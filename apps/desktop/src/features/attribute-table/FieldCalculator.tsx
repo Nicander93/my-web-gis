@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { AutoComplete, Button, Checkbox, Input, Select } from 'antd'
+import { AutoComplete, Checkbox, Input, Select } from 'antd'
+import { Button } from '@/components/ui/Button'
 import { createId, SetDatasetContentCommand, type DatasetField, type GisFeature } from '@desktop-webgis/gis-core'
 import { useProjectStore } from '@/stores/project.store'
 import { useWorkbenchStore } from '@/stores/workbench.store'
@@ -60,7 +61,7 @@ export function FieldCalculator({ layerId, filteredFeatures, selectedIds, onClos
         { value: 'selected', label: '选中记录' }]} /></label><span>{targets.length} 条</span>
     <label className="attr-expression">表达式<Input aria-label="字段计算表达式" value={expression}
       placeholder={'例如 field("人口") * 2'} onChange={(event) => setExpression(event.target.value)} /></label>
-    <Button type="primary" onClick={apply} disabled={!canEdit}>应用计算</Button>
+    <Button variant="primary" onClick={apply} disabled={!canEdit}>应用计算</Button>
     <Button onClick={onClose}>关闭计算器</Button>
     <small>支持 field、coalesce、round、concat 和算术运算；表内搜索不改变计算范围。覆盖已有字段保留原类型。</small>
     {!canEdit && <span>只读：请设置当前图层为编辑目标</span>}

@@ -23,11 +23,12 @@
 .desktop-editor-modal .dialog-footer { background: #fcfdfb; border-color: #ebefeb; padding: 12px 18px; }
 .desktop-editor-modal .ant-btn { min-height: 31px; border-radius: 4px; }
 .desktop-editor-modal .ant-btn-primary:not(:disabled):hover { background: #2a604a; border-color: #2a604a; }
-.ui-button.ant-btn-default { background: #fff; border-color: #d3dfd5; color: #44624d; border-radius: 4px; }
+.ui-button.ant-btn-default:not(:disabled) { background: #fff; border-color: #d3dfd5; color: #44624d; border-radius: 4px; }
 .ui-button.ant-btn-default:not(:disabled):hover { background: #eff7ef; border-color: #bacfc0; color: #346e55; }
-.ui-button.ant-btn-primary { background: #38745a; border-color: #38745a; color: #fff; border-radius: 4px; }
+.ui-button.ant-btn-primary:not(:disabled) { background: #38745a; border-color: #38745a; color: #fff; border-radius: 4px; }
 .ui-button.ant-btn-primary:not(:disabled):hover { background: #2a604a; border-color: #2a604a; color: #fff; }
-.desktop-editor-modal .ant-btn:focus-visible { outline: 2px solid #86aa92; outline-offset: 1px; }
+.ui-button.ant-btn:focus-visible,
+.desktop-editor-modal .ant-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
 .desktop-editor-modal .data-source-layout { display: block; }
 .desktop-editor-modal .data-source-layout .dialog-tabs {
   flex-direction: row;
@@ -40,7 +41,7 @@
 .desktop-editor-modal .data-source-layout .dialog-tab { padding: 9px 14px; height: 35px; }
 .desktop-editor-modal .data-source-layout .dialog-tab.active { background: #eff6ef; color: #2c6b4a; }
 .desktop-editor-modal .file-drop-zone { background: #f9fcf8; border-color: #bacfc0; border-radius: 6px; }
-.desktop-editor-modal .dialog-footer .ant-btn-default { background: #fff; border-color: #d3dfd5; color: #44624d; }
+.desktop-editor-modal .dialog-footer .ant-btn-default:not(:disabled) { background: #fff; border-color: #d3dfd5; color: #44624d; }
 
 .attribute-table-content .attribute-data-table table { table-layout: fixed; width: 100%; border-collapse: separate; }
 .attribute-table-content .attribute-data-table .ant-table-container,
