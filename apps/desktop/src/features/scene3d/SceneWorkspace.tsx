@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, Copy, Download, Eye, FolderPlus, Globe, Layers2, LocateFixed, LockKeyhole, Maximize2, MessageSquare, MousePointer2, Move, Palette, PanelLeftClose, PanelRightClose, Plus, RefreshCw, RotateCw, Scissors, Search, Shapes, SlidersHorizontal, Sun, Table2, Trash2, Waves } from 'lucide-react'
+import { Check, Copy, Download, Eye, FolderPlus, Globe, Layers2, LocateFixed, LockKeyhole, Maximize2, MessageSquare, MousePointer2, Move, MoveDown, Palette, PanelLeftClose, PanelRightClose, Plus, RefreshCw, RotateCw, Scissors, Search, Shapes, SlidersHorizontal, Sun, Table2, Trash2, Waves } from 'lucide-react'
 import type { CesiumSceneRuntime, EditMode } from '@desktop-webgis/cesium-scene-runtime'
 import { createCesiumScene, getCesiumSceneNodeState, getCesiumSceneGroupState, getCesiumSceneDescendantIds } from '@desktop-webgis/cesium-scene-schema'
 import type { CesiumSceneNode, GeoPosition } from '@desktop-webgis/cesium-scene-schema'
@@ -49,7 +49,7 @@ import { isTauri } from '@tauri-apps/api/core'
 import type { ResourceReference } from '@desktop-webgis/cesium-scene-schema'
 
 interface LayerState { state: 'loading' | 'ready' | 'error'; error?: string }
-const drawLabels = { point: '点', polyline: '线', polygon: '面', water: '水面边界', clip: '裁剪范围' }
+const drawLabels = { point: '点', polyline: '线', polygon: '面', water: '水面边界', clip: '裁剪范围', flatten: '压平范围' }
 
 /** General 3D scene editor shell; rendering extensions remain independent of product UI. */
 export function SceneWorkspace() {
@@ -59,6 +59,7 @@ export function SceneWorkspace() {
   const resourceSession = useRef<ReturnType<typeof createLocalResourceSession> | undefined>(undefined)
   const pendingFocus = useRef<string | undefined>(undefined)
   const pendingClip = useRef<{ nodeId: string; effectId?: string } | undefined>(undefined)
+  const pendingFlatten = useRef<{ nodeId: string; effectId?: string } | undefined>(undefined)
   const defaultScene = useRef(createCesiumScene())
   const project = useProjectStore(state => state.project)
   const scene = project.city ?? defaultScene.current
@@ -160,12 +161,29 @@ export function SceneWorkspace() {
         updateScene(pending.effectId ? '重新绘制裁剪范围' : '添加裁剪范围', scene => {
           scene.nodes = scene.nodes.map(item => {
             if (item.id !== pending.nodeId || item.type !== '3dtiles') return item
-            const effect = { id: pending.effectId ?? `clip-${crypto.randomUUID()}`, kind: 'clip-polygon' as const, enabled: true, mode: item.effects?.[0]?.mode ?? 'keep-inside' as const, positions: graphic.geometry.positions }
+            const effect = { id: pending.effectId ?? `clip-${crypto.randomUUID()}`, kind: 'clip-polygon' as const, enabled: true, mode: item.effects?.find(current => current.kind === 'clip-polygon')?.mode ?? 'keep-inside' as const, positions: graphic.geometry.positions }
             return { ...item, effects: pending.effectId ? (item.effects ?? []).map(current => current.id === pending.effectId ? effect : current) : [...(item.effects ?? []), effect] }
           })
           return scene
         })
         notify(pending.effectId ? '裁剪范围已重新绘制，可撤销恢复' : '裁剪范围已添加，可在属性面板管理'); return
+      }
+      if (kind === 'flatten') {
+        const pending = pendingFlatten.current; pendingFlatten.current = undefined
+        if (!pending) return
+        updateScene(pending.effectId ? '重新绘制压平范围' : '添加压平范围', scene => {
+          scene.nodes = scene.nodes.map(item => {
+            if (item.id !== pending.nodeId || item.type !== '3dtiles') return item
+            const found = item.effects?.find(effect => effect.id === pending.effectId)
+            const previous = found?.kind === 'flatten-polygon' ? found : undefined
+            const averageHeight = Number((graphic.geometry.positions.reduce((sum, position) => sum + position[2], 0) / graphic.geometry.positions.length).toFixed(2))
+            const height = previous?.height ?? (Object.is(averageHeight, -0) ? 0 : averageHeight)
+            const effect = { id: pending.effectId ?? `flatten-${crypto.randomUUID()}`, kind: 'flatten-polygon' as const, enabled: true, height, positions: graphic.geometry.positions }
+            return { ...item, effects: pending.effectId ? (item.effects ?? []).map(current => current.id === pending.effectId ? effect : current) : [...(item.effects ?? []), effect] }
+          })
+          return scene
+        })
+        notify(pending.effectId ? '压平范围已重新绘制，可撤销恢复' : '局部压平已应用，可设置目标高程'); return
       }
       if (kind !== 'water') {
         graphic.name = `${drawLabels[kind]} ${scene.nodes.filter(item => item.type === 'graphic').length + 1}`
@@ -221,6 +239,10 @@ export function SceneWorkspace() {
   function startClip(effectId?: string): void {
     if (!node || node.type !== '3dtiles' || selectionReason) return
     pendingClip.current = { nodeId: node.id, effectId }; startDraw('clip')
+  }
+  function startFlatten(effectId?: string): void {
+    if (!node || node.type !== '3dtiles' || selectionReason) return
+    pendingFlatten.current = { nodeId: node.id, effectId }; startDraw('flatten')
   }
   function startGraphicEditing(): void {
     if (!node || node.type !== 'graphic' || node.locked || !node.visible || states[node.id]?.state !== 'ready') return
@@ -320,6 +342,7 @@ export function SceneWorkspace() {
     command('environment', '雾与辉光', SlidersHorizontal, showScene),
     command('quality', '画质与性能', SlidersHorizontal, showScene),
     command('clip', '多边形裁剪', Scissors, () => startClip(), selectionReason ?? (node?.type !== '3dtiles' ? '请选择 3D Tiles 对象' : undefined), drawing.kind === 'clip'),
+    command('flatten', '局部压平', MoveDown, () => startFlatten(), selectionReason ?? (node?.type !== '3dtiles' ? '请选择 3D Tiles 对象' : undefined), drawing.kind === 'flatten'),
     command('camera', '保存初始视角', Eye, saveCamera, ready ? undefined : '场景尚未就绪'),
     command('water', '水面', Waves, () => startWater(), ready ? undefined : '场景尚未就绪', drawing.kind === 'water'),
     command('new-group', '新建分组', FolderPlus, () => setCreatingGroup(true)),
@@ -360,7 +383,7 @@ export function SceneWorkspace() {
     return () => { window.removeEventListener('desktop-webgis:scene3d-action', onAction); window.removeEventListener('keydown', onHistory); window.removeEventListener('resize', onResize); window.removeEventListener('desktop-webgis:command-status', onStatus) }
   }, [preview])
 
-  const DrawingIcon = drawing.kind === 'water' ? Waves : drawing.kind === 'clip' ? Scissors : Shapes
+  const DrawingIcon = drawing.kind === 'water' ? Waves : drawing.kind === 'clip' ? Scissors : drawing.kind === 'flatten' ? MoveDown : Shapes
   return <main className="scene3d-workspace" aria-label="三维场景编辑器">
     <SceneRibbon target={group?.name ?? (liveIds.length > 1 ? `${liveIds.length} 个对象` : node?.name ?? '未设置')} commands={commands} preview={preview} onPreview={togglePreview} onUndo={() => history()} onRedo={() => history(true)} onSave={() => { void projectCommands.saveProject() }} canUndo={canUndo} canRedo={canRedo} />
     <div className="scene3d-workspace__body">
@@ -387,7 +410,7 @@ export function SceneWorkspace() {
       {!preview && <RightPanel showHeader={false}>
         <header className="scene3d-inspector-header"><span>属性</span><div className="scene3d-inspector-tabs" role="tablist" aria-label="属性范围"><button role="tab" aria-selected={inspectorTab === 'object'} onClick={() => setInspectorTab('object')}>对象</button><button role="tab" aria-selected={inspectorTab === 'scene'} onClick={() => setInspectorTab('scene')}>场景</button></div><button className="scene3d-inspector-close" aria-label="收起检查器" onClick={() => useWorkspaceStore.getState().setRightOpen(false)}><PanelRightClose size={14} aria-hidden="true" /></button></header>
         <div key={JSON.stringify([inspectorTab, inspectorSection, selectedGroup, liveIds, !!graphicEditing.state])} className="scene3d-panel__scroll" role="tabpanel" aria-label={inspectorTab === 'object' ? '对象属性' : '场景设置'}>
-          {inspectorTab === 'scene' ? <SceneSettings scene={scene} onSaveCamera={saveCamera} onApply={patch => { stopEditing(); updateScene('设置场景环境', scene => ({ ...scene, ...patch })); notify('场景设置已应用') }} /> : graphicEditing.state ? <GraphicVertexInspector state={graphicEditing.state} onSelect={graphicEditing.selectVertex} onPosition={graphicEditing.setPosition} onInsert={graphicEditing.insertVertex} onRemove={graphicEditing.removeVertex} /> : group ? <SceneGroupInspector key={JSON.stringify(group)} scene={scene} group={group} onPatch={patch => organize(() => patchSceneGroup(group.id, patch), '分组设置已应用')} onSelectMembers={() => { const ids = getCesiumSceneDescendantIds(scene, group.id); setSelectedGroup(null); setSelectedIds(ids); anchor.current = ids[0] ?? null }} onDissolve={() => organize(() => { dissolveSceneGroup(group.id); setSelectedGroup(null) }, '分组已解散，对象保留，可撤销恢复')} onMove={parentId => organize(() => moveSceneFolder(group.id, parentId), '父文件夹已更新')} onReorder={direction => organize(() => reorderSceneFolder(group.id, direction), '文件夹顺序已更新')} /> : liveIds.length > 1 ? <SceneBatchInspector scene={scene} nodes={selectedNodes} onVisible={visible => organize(() => setSceneNodesVisible(liveIds, visible), '批量显隐已应用')} onLock={locked => organize(() => setSceneNodesLocked(liveIds, locked), '批量锁定已应用')} onMove={id => organize(() => moveSceneSelection(liveIds, id), '对象分组已更新')} onCopy={copyNode} onDelete={() => setDeleting(true)} /> : node ? <SceneInspector groups={scene.groups} onMoveGroup={id => organize(() => moveSceneSelection(liveIds, id), '对象分组已更新')} pickedProperties={pickedProperties} section={inspectorSection} node={node} assetUrl={node.type !== 'water' && node.type !== 'graphic' && node.type !== 'imagery' && 'asset' in node ? scene.assets[node.asset]?.url : undefined} error={states[node.id]?.error} onPatch={patchNode} onReload={reload} onResource={url => { if (node.type === 'water' || node.type === 'graphic') return; updateScene('更新三维资源地址', scene => ({ ...scene, assets: { ...scene.assets, ...('asset' in node ? { [node.asset]: { ...scene.assets[node.asset], url } } : {}) } })); notify('资源地址已更新，正在加载…') }} onDrawBoundary={() => startWater(node.id)} onDrawClip={startClip} onEditGeometry={startGraphicEditing} geometryDisabled={!!selectionReason} onDelete={() => setDeleting(true)} /> : <div className="scene3d-empty"><MousePointer2 size={24} aria-hidden="true" /><strong>选择一个对象</strong><p>在视图中单击模型，或在左侧对象列表中选择。</p><button className="scene3d-text-action" onClick={() => setInspectorTab('scene')}>编辑场景环境</button></div>}
+          {inspectorTab === 'scene' ? <SceneSettings scene={scene} onSaveCamera={saveCamera} onApply={patch => { stopEditing(); updateScene('设置场景环境', scene => ({ ...scene, ...patch })); notify('场景设置已应用') }} /> : graphicEditing.state ? <GraphicVertexInspector state={graphicEditing.state} onSelect={graphicEditing.selectVertex} onPosition={graphicEditing.setPosition} onInsert={graphicEditing.insertVertex} onRemove={graphicEditing.removeVertex} /> : group ? <SceneGroupInspector key={JSON.stringify(group)} scene={scene} group={group} onPatch={patch => organize(() => patchSceneGroup(group.id, patch), '分组设置已应用')} onSelectMembers={() => { const ids = getCesiumSceneDescendantIds(scene, group.id); setSelectedGroup(null); setSelectedIds(ids); anchor.current = ids[0] ?? null }} onDissolve={() => organize(() => { dissolveSceneGroup(group.id); setSelectedGroup(null) }, '分组已解散，对象保留，可撤销恢复')} onMove={parentId => organize(() => moveSceneFolder(group.id, parentId), '父文件夹已更新')} onReorder={direction => organize(() => reorderSceneFolder(group.id, direction), '文件夹顺序已更新')} /> : liveIds.length > 1 ? <SceneBatchInspector scene={scene} nodes={selectedNodes} onVisible={visible => organize(() => setSceneNodesVisible(liveIds, visible), '批量显隐已应用')} onLock={locked => organize(() => setSceneNodesLocked(liveIds, locked), '批量锁定已应用')} onMove={id => organize(() => moveSceneSelection(liveIds, id), '对象分组已更新')} onCopy={copyNode} onDelete={() => setDeleting(true)} /> : node ? <SceneInspector groups={scene.groups} onMoveGroup={id => organize(() => moveSceneSelection(liveIds, id), '对象分组已更新')} pickedProperties={pickedProperties} section={inspectorSection} node={node} assetUrl={node.type !== 'water' && node.type !== 'graphic' && node.type !== 'imagery' && 'asset' in node ? scene.assets[node.asset]?.url : undefined} error={states[node.id]?.error} onPatch={patchNode} onReload={reload} onResource={url => { if (node.type === 'water' || node.type === 'graphic') return; updateScene('更新三维资源地址', scene => ({ ...scene, assets: { ...scene.assets, ...('asset' in node ? { [node.asset]: { ...scene.assets[node.asset], url } } : {}) } })); notify('资源地址已更新，正在加载…') }} onDrawBoundary={() => startWater(node.id)} onDrawClip={startClip} onDrawFlatten={startFlatten} onEditGeometry={startGraphicEditing} geometryDisabled={!!selectionReason} onDelete={() => setDeleting(true)} /> : <div className="scene3d-empty"><MousePointer2 size={24} aria-hidden="true" /><strong>选择一个对象</strong><p>在视图中单击模型，或在左侧对象列表中选择。</p><button className="scene3d-text-action" onClick={() => setInspectorTab('scene')}>编辑场景环境</button></div>}
         </div>
       </RightPanel>}
     </div>

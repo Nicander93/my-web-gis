@@ -86,6 +86,21 @@
         "positions"
       ]
     },
+    "tilesetFlattenEffect": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "pattern": "\\S" },
+        "kind": { "const": "flatten-polygon" },
+        "enabled": { "type": "boolean" },
+        "height": { "type": "number" },
+        "positions": {
+          "type": "array",
+          "minItems": 3,
+          "items": { "$ref": "#/$defs/cityPosition" }
+        }
+      },
+      "required": ["id", "kind", "enabled", "height", "positions"]
+    },
     "cityTriple": {
       "type": "array",
       "prefixItems": [
@@ -295,7 +310,10 @@
         "effects": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/tilesetClipEffect"
+            "oneOf": [
+              { "$ref": "#/$defs/tilesetClipEffect" },
+              { "$ref": "#/$defs/tilesetFlattenEffect" }
+            ]
           }
         }
       },

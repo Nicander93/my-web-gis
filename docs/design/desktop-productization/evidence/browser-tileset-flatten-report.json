@@ -1,0 +1,23 @@
+{
+  "date": "2026-10-15",
+  "scope": "M8 browser 3D Tiles local flattening",
+  "command": "pnpm --dir apps/desktop exec playwright test e2e/tileset-clipping.e2e.ts",
+  "result": "12 passed",
+  "projects": ["desktop", "compact", "laptop", "wide"],
+  "verified": [
+    "a real 3D Tiles sample visibly flattens inside a drawn polygon at a configurable WGS84 ellipsoid height",
+    "disabling the effect restores pixels closer to the original rendering",
+    "saving and reopening a project restores the enabled effect, target height and runtime rendering",
+    "two instances translated -180 m and +180 m retain independent shader state and target heights",
+    "the UI reports no runtime error while effects are active"
+  ],
+  "screenshots": [
+    "browser-tileset-flattened.png",
+    "browser-tileset-flatten-restored.png",
+    "browser-tileset-flatten-reopened.png"
+  ],
+  "limitations": [
+    "Playwright used its browser GPU path (SwiftShader on this environment), not a physical Windows GPU",
+    "native Tauri camera movement, LOD transitions and GPU resource metrics remain to be accepted"
+  ]
+}

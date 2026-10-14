@@ -69,13 +69,16 @@ A 完成不代表全部界面迁移完成。逐批记录剩余文件，不将 an
 - 裁剪/基础压平绑定目标 Tileset，明确局部坐标与高度语义，处理空间变换和 LOD。参考 cesium-demo 算法思路，不将实验效果或 UI 模拟当作生产能力。
 - 至少两套不同空间变换、含 LOD 的真实 Tileset 验证效果、恢复/撤销、GPU 资源清理。诊断使用引擎实际指标，不显示编造性能值。
 
-### M8 当前实施状态（2026-10-14）
+### M8 当前实施状态（2026-10-15）
 
 - 已新增独立 `@desktop-webgis/cesium-tileset-effects` 包，并在 `TilesetNode.effects` 中持久化多边形裁剪。实现使用 Cesium 原生 `ClippingPolygonCollection`，每个 Tileset 独立安装，移除、替换场景及销毁时恢复宿主原集合。
 - 已实现多范围、统一的保留内部/外部模式、坐标控制点编辑、重新绘制、启停、删除及项目历史撤销；三维瓦片页使用 Ant Design 的 Button、Select、Switch 和 Input.TextArea。相同配置就地复用原生集合，裁剪更新不重新下载 Tileset。
 - 协议校验覆盖效果 ID、类型、启用状态、模式和至少三个不同有效坐标；运行时在提交替换场景前检查 WebGL 裁剪能力，能力不足时显式报错，不静默降级。
 - 浏览器交互验收使用真实示例 Tileset，完成绘制、停用、撤销、删除、恢复及持久化断言，并确认 `tileset.json` 只请求一次。截图见 `evidence/browser-tileset-clipping.png`。
-- 本批只完成 M8 的原生多边形裁剪子项。局部压平、两个不同变换 Tileset 的相互隔离、项目保存重开和物理 GPU 资源证据仍未签收，因此 M8 尚未完成。
+- 已实现局部 ENU 遮罩压平：每个范围可配置 WGS84 椭球目标高程，Shader 将世界坐标经 Tileset 模型变换正确换算到局部空间；支持多范围和重叠优先级。范围跨度限制为 5 km，遮罩限制为 2048 像素并同时遵守 GPU 最大纹理尺寸，超限时返回明确诊断。
+- 压平纹理、`CustomShader` 和宿主状态按 Tileset 隔离并由管理器确定性释放；调用方已有自定义 Shader 时显式拒绝覆盖。单元测试覆盖双实例隔离、不同高度、超限、冲突和销毁恢复。
+- 浏览器 GPU 路径使用真实示例 Tileset 验收压平、关闭恢复、项目保存重开，以及两个分别平移 -180 m / +180 m 的 Tileset 独立启停。12 项（3 场景 × 4 视口）全部通过，像素差异断言证明运行时几何发生改变而非只更新 UI。证据见 `evidence/browser-tileset-flatten-report.json`、`browser-tileset-flattened.png`、`browser-tileset-flatten-restored.png` 和 `browser-tileset-flatten-reopened.png`。
+- M8 仍未最终签收：当前浏览器由 Playwright/SwiftShader 执行，尚需 Windows Tauri 物理 GPU 下验证相机运动、LOD 切换及资源释放指标；不得把浏览器证据表述成物理 GPU 验收。
 
 ## 7. 每批验证与最终 PR
 

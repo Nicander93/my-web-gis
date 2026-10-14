@@ -1,7 +1,7 @@
 {
   "name": "@desktop-webgis/cesium-tileset-effects",
   "version": "0.1.0",
-  "description": "Independent polygon clipping lifecycle for Cesium 3D Tiles",
+  "description": "Independent polygon clipping and local flattening lifecycle for Cesium 3D Tiles",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",

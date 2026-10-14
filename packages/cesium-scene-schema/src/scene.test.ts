@@ -45,4 +45,13 @@ describe('3D scene contract', () => {
     expect(paths).toContain('$.nodes[0].effects[1].id')
     expect(paths).toContain('$.nodes[0].effects[1].positions')
   })
+  it('accepts a configurable flatten height and rejects non-finite values', () => {
+    const scene = createCesiumScene(); scene.assets.tiles = { type: '3dtiles', url: './tiles/tileset.json' }
+    scene.nodes.push({ id: 'tiles', name: 'Tiles', visible: true, type: '3dtiles', asset: 'tiles', transform: createTransform(), effects: [
+      { id: 'flat', kind: 'flatten-polygon', enabled: true, height: 32.5, positions: [[116.39,39.9,0],[116.4,39.9,0],[116.4,39.91,0]] }
+    ] })
+    expect(validateCesiumScene(scene)).toEqual([])
+    scene.nodes[0].effects![0] = { ...scene.nodes[0].effects![0], height: Number.NaN } as never
+    expect(validateCesiumScene(scene).map(issue => issue.path)).toContain('$.nodes[0].effects[0].height')
+  })
 })

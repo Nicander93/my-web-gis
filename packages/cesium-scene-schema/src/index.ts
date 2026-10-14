@@ -89,7 +89,7 @@ export interface TilesetNode extends NodeBase {
   transform: Transform
   maximumScreenSpaceError?: number
   cacheBytes?: number
-  effects?: TilesetClipEffect[]
+  effects?: TilesetEffect[]
 }
 
 export interface TilesetClipEffect {
@@ -100,6 +100,17 @@ export interface TilesetClipEffect {
   mode: 'keep-inside' | 'keep-outside'
   positions: GeoPosition[]
 }
+
+export interface TilesetFlattenEffect {
+  id: string
+  kind: 'flatten-polygon'
+  enabled: boolean
+  /** WGS84 ellipsoid height in metres at the local flatten frame origin. */
+  height: number
+  positions: GeoPosition[]
+}
+
+export type TilesetEffect = TilesetClipEffect | TilesetFlattenEffect
 
 export interface ModelNode extends NodeBase {
   type: 'model'
@@ -288,9 +299,10 @@ export function validateCesiumScene(input: unknown, root = '$'): CesiumSceneVali
           if (!record(effect)) { check(false, effectPath, '裁剪效果结构无效'); return }
           check(typeof effect.id === 'string' && !!effect.id.trim() && !effectIds.has(effect.id), `${effectPath}.id`, '效果 ID 为空或重复')
           if (typeof effect.id === 'string') effectIds.add(effect.id)
-          check(effect.kind === 'clip-polygon', `${effectPath}.kind`, '只支持 clip-polygon 效果')
+          check(effect.kind === 'clip-polygon' || effect.kind === 'flatten-polygon', `${effectPath}.kind`, '效果类型无效')
           check(typeof effect.enabled === 'boolean', `${effectPath}.enabled`, '启用状态必须是布尔值')
-          check(effect.mode === 'keep-inside' || effect.mode === 'keep-outside', `${effectPath}.mode`, '裁剪模式无效')
+          if (effect.kind === 'clip-polygon') check(effect.mode === 'keep-inside' || effect.mode === 'keep-outside', `${effectPath}.mode`, '裁剪模式无效')
+          if (effect.kind === 'flatten-polygon') check(finite(effect.height), `${effectPath}.height`, '压平目标高程必须是有限数值')
           const validPositions = Array.isArray(effect.positions) && effect.positions.length >= 3 && effect.positions.every(position)
           check(validPositions && new Set((validPositions ? effect.positions as GeoPosition[] : []).map(item => `${item[0]},${item[1]}`)).size >= 3, `${effectPath}.positions`, '裁剪范围需要至少三个不同的有效坐标')
         })
