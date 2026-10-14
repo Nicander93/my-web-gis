@@ -1,0 +1,32 @@
+{
+  "name": "@desktop-webgis/cesium-tileset-effects",
+  "version": "0.1.0",
+  "description": "Independent polygon clipping lifecycle for Cesium 3D Tiles",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@desktop-webgis/cesium-scene-schema": "workspace:*"
+  },
+  "devDependencies": {
+    "cesium": "^1.145.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "peerDependencies": {
+    "cesium": "^1.145.0"
+  }
+}

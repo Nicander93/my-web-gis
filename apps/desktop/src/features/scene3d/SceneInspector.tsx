@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
+import { Button, Input, Select, Switch } from 'antd'
 import { isSceneResourceUrl } from '@desktop-webgis/cesium-scene-schema'
-import type { CesiumSceneGroup, CesiumSceneNode, CesiumScene, GeoPosition, GraphicNode, PopupDefinition, Transform, WaterNode } from '@desktop-webgis/cesium-scene-schema'
+import type { CesiumSceneGroup, CesiumSceneNode, CesiumScene, GeoPosition, GraphicNode, PopupDefinition, TilesetClipEffect, TilesetNode, Transform, WaterNode } from '@desktop-webgis/cesium-scene-schema'
 import { GraphicAttributes } from './GraphicAttributes'
 import { SceneRenderSettings } from './SceneRenderSettings'
 import { SceneInfo, ScenePropertyGroup } from './ScenePropertyGroup'
@@ -19,6 +20,7 @@ interface SceneInspectorProps {
   onResource(url: string): void
   onReload(): void
   onDrawBoundary(): void
+  onDrawClip(effectId?: string): void
   onEditGeometry(): void
   geometryDisabled?: boolean
   groups?: CesiumSceneGroup[]
@@ -26,7 +28,7 @@ interface SceneInspectorProps {
   onDelete(): void
 }
 
-export function SceneInspector({ node, section = 'object', pickedProperties = {}, assetUrl, error, onPatch, onResource, onReload, onDrawBoundary, onEditGeometry, geometryDisabled, groups, onMoveGroup, onDelete }: SceneInspectorProps) {
+export function SceneInspector({ node, section = 'object', pickedProperties = {}, assetUrl, error, onPatch, onResource, onReload, onDrawBoundary, onDrawClip, onEditGeometry, geometryDisabled, groups, onMoveGroup, onDelete }: SceneInspectorProps) {
   const properties = node.type === 'graphic' ? { name: node.name, ...node.properties } : pickedProperties
   return <fieldset className="scene3d-properties scene3d-properties--fields" disabled={node.locked}>
     <section className="scene3d-property-section">
@@ -41,6 +43,7 @@ export function SceneInspector({ node, section = 'object', pickedProperties = {}
       <label className="editor-field">屏幕误差<select value={node.maximumScreenSpaceError ?? 16} onChange={event => onPatch({ maximumScreenSpaceError: Number(event.target.value) } as Partial<CesiumSceneNode>, '设置瓦片显示精度')}>{[1,2,4,8,16,32].map(value => <option key={value} value={value}>{value}{value === 1 ? ' · 最精细' : value === 16 ? ' · 默认' : value === 32 ? ' · 更流畅' : ''}</option>)}</select></label>
       <label className="editor-field">缓存预算<select value={node.cacheBytes ?? 256 * 1024 * 1024} onChange={event => onPatch({ cacheBytes: Number(event.target.value) } as Partial<CesiumSceneNode>, '设置瓦片缓存预算')}>{[128,256,512,1024].map(value => <option key={value} value={value * 1024 * 1024}>{value} MB</option>)}</select></label>
     </ScenePropertyGroup>}
+    {section === 'object' && node.type === '3dtiles' && <TilesetClippingFields key={`${node.id}:${JSON.stringify(node.effects)}`} node={node} disabled={!!node.locked} onPatch={onPatch} onDraw={onDrawClip} />}
     {section === 'object' && node.type === 'water' && <WaterFields key={`${node.id}:${JSON.stringify(node)}`} node={node} onApply={patch => onPatch(patch, '修改水面材质')} onDrawBoundary={onDrawBoundary} />}
     {section === 'object' && node.type === 'graphic' && <section className="scene3d-property-section"><h3>几何</h3><p className="editor-help">{node.geometry.positions.length} 个顶点 · {node.geometry.heightMode === 'ground' ? '贴地' : '绝对高度'}</p><button className="button-secondary" disabled={geometryDisabled} onClick={onEditGeometry}>编辑顶点与坐标</button></section>}
     {node.type === 'graphic' && (section === 'style' || section === 'object') && <GraphicFields key={`${node.id}:${JSON.stringify(node.style)}`} node={node} onPatch={onPatch} />}
@@ -51,6 +54,41 @@ export function SceneInspector({ node, section = 'object', pickedProperties = {}
     {assetUrl && <ResourceFields open={section === 'source'} key={`${node.id}:${assetUrl}`} url={assetUrl} onApply={onResource} onReload={onReload} />}
     <section className="scene3d-property-section scene3d-object-actions"><button className="scene3d-danger-action" onClick={onDelete}><Trash2 size={14} aria-hidden="true" />删除对象</button><SceneInfo label="删除对象">删除后可撤销恢复。</SceneInfo></section>
   </fieldset>
+}
+
+function TilesetClippingFields({ node, disabled, onPatch, onDraw }: { node: TilesetNode; disabled: boolean; onPatch: SceneInspectorProps['onPatch']; onDraw(effectId?: string): void }) {
+  const effects = node.effects ?? []
+  function update(id: string, patch: Partial<TilesetClipEffect>, label: string): void {
+    onPatch({ effects: effects.map(effect => patch.mode !== undefined || effect.id === id ? { ...effect, ...patch } : effect) } as Partial<CesiumSceneNode>, label)
+  }
+  function remove(id: string): void {
+    onPatch({ effects: effects.filter(effect => effect.id !== id) } as Partial<CesiumSceneNode>, '删除裁剪范围')
+  }
+  return <ScenePropertyGroup title="多边形裁剪" hint="基于 WGS84 坐标使用 Cesium 原生多边形裁剪。一个对象可包含多个范围；同一对象的范围使用统一的保留模式。">
+    <div className="scene3d-clip-toolbar"><span>{effects.length ? `${effects.length} 个范围` : '尚未添加范围'}</span><Button type="primary" size="small" icon={<Plus size={13} />} disabled={disabled} onClick={() => onDraw()}>绘制范围</Button></div>
+    {effects.map((effect, index) => <ClipEffectEditor key={effect.id} effect={effect} index={index} disabled={disabled} onUpdate={(patch, label) => update(effect.id, patch, label)} onRedraw={() => onDraw(effect.id)} onRemove={() => remove(effect.id)} />)}
+  </ScenePropertyGroup>
+}
+
+function ClipEffectEditor({ effect, index, disabled, onUpdate, onRedraw, onRemove }: { effect: TilesetClipEffect; index: number; disabled: boolean; onUpdate(patch: Partial<TilesetClipEffect>, label: string): void; onRedraw(): void; onRemove(): void }) {
+  const [coordinates, setCoordinates] = useState(JSON.stringify(effect.positions))
+  const [error, setError] = useState('')
+  function applyCoordinates(): void {
+    try {
+      const parsed: unknown = JSON.parse(coordinates)
+      if (!Array.isArray(parsed) || parsed.length < 3 || !parsed.every(item => Array.isArray(item) && item.length === 3 && item.every(Number.isFinite))) throw new Error('至少输入三个 [经度, 纬度, 高度] 坐标。')
+      onUpdate({ positions: parsed as GeoPosition[] }, '编辑裁剪控制点'); setError('')
+    } catch (reason) { setError(reason instanceof Error ? reason.message : '坐标格式无效') }
+  }
+  return <details className="scene3d-clip-effect" open={index === 0}>
+    <summary><span>范围 {index + 1} · {effect.positions.length} 个控制点</span><Switch size="small" checked={effect.enabled} disabled={disabled} aria-label={`启用裁剪范围 ${index + 1}`} onClick={(_, event) => event.stopPropagation()} onChange={enabled => onUpdate({ enabled }, enabled ? '启用裁剪范围' : '停用裁剪范围')} /></summary>
+    <div className="scene3d-clip-effect__body">
+      <label className="editor-field">保留区域<Select size="small" value={effect.mode} disabled={disabled} options={[{ value: 'keep-inside', label: '范围内部' }, { value: 'keep-outside', label: '范围外部' }]} onChange={mode => onUpdate({ mode }, '设置裁剪模式')} /></label>
+      <label className="scene3d-clip-coordinates">控制点坐标<Input.TextArea value={coordinates} disabled={disabled} autoSize={{ minRows: 3, maxRows: 6 }} spellCheck={false} onChange={event => setCoordinates(event.target.value)} /></label>
+      {error && <p className="editor-error" role="alert">{error}</p>}
+      <div className="scene3d-form-actions"><Button size="small" disabled={disabled} onClick={applyCoordinates}>应用坐标</Button><Button size="small" disabled={disabled} onClick={onRedraw}>重新绘制</Button><Button size="small" danger icon={<Trash2 size={13} />} disabled={disabled} onClick={onRemove}>删除</Button></div>
+    </div>
+  </details>
 }
 
 function GraphicFields({ node, onPatch }: { node: GraphicNode; onPatch: SceneInspectorProps['onPatch'] }) {

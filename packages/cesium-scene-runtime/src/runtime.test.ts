@@ -6,6 +6,7 @@ import { CesiumSceneRuntime, createCesiumDocumentRuntime } from './index'
 import { migrateSceneDocument } from '@desktop-webgis/scene-schema'
 
 const probe = vi.hoisted(() => ({ created: 0, released: 0, nativeGate: undefined as Promise<void> | undefined, editors: [] as Array<{ stopEditing: ReturnType<typeof vi.fn>; cancel: ReturnType<typeof vi.fn> }> }))
+const tilesetEffectProbe = vi.hoisted(() => ({ set: vi.fn(), remove: vi.fn(), destroy: vi.fn(), assert: vi.fn() }))
 vi.mock('cesium', async original => ({ ...await original<typeof import('cesium')>(),
   ScreenSpaceEventHandler: class { setInputAction(): void {} destroy(): void {} },
   Resource: class { constructor(readonly options: { url: string }) {} },
@@ -28,7 +29,11 @@ vi.mock('@desktop-webgis/cesium-tileset-edit', () => ({ TilesetEditor: class {
   constructor(_viewer: Viewer, private options: { onStart(): void }) { probe.editors.push(this) }
   startEditing(): void { this.options.onStart() } setMode(): void {} refresh(): void {} destroy(): void {}
 } }))
-beforeEach(() => { probe.created = 0; probe.released = 0; probe.nativeGate = undefined; probe.editors = []; vi.stubGlobal('document', { baseURI: 'https://local.test/' }); vi.stubGlobal('CESIUM_BASE_URL', 'https://local.test/cesium/') })
+vi.mock('@desktop-webgis/cesium-tileset-effects', () => ({
+  assertTilesetEffectsSupported: tilesetEffectProbe.assert,
+  TilesetEffectManager: class { setEffects = tilesetEffectProbe.set; removeEffects = tilesetEffectProbe.remove; destroy = tilesetEffectProbe.destroy }
+}))
+beforeEach(() => { probe.created = 0; probe.released = 0; probe.nativeGate = undefined; probe.editors = []; Object.values(tilesetEffectProbe).forEach(mock => mock.mockReset()); vi.stubGlobal('document', { baseURI: 'https://local.test/' }); vi.stubGlobal('CESIUM_BASE_URL', 'https://local.test/cesium/') })
 afterEach(() => vi.unstubAllGlobals())
 const preparationProbe = vi.hoisted(() => ({ gates: [] as Promise<void>[], visibility: [] as boolean[], environment: undefined as Promise<void> | undefined }))
 beforeEach(() => { preparationProbe.gates = []; preparationProbe.visibility = []; preparationProbe.environment = undefined })
@@ -194,6 +199,19 @@ describe('incremental scene reconciliation', () => {
     expect(s.runtime.layers.getLayer('blocks')).toBe(layer)
     expect(probe.created).toBe(1)
     s.runtime.destroy()
+  })
+  it('reconciles and releases persistent tileset clipping effects', async () => {
+    const s = setup(); await s.runtime.updateScene(s.scene)
+    const layer = s.runtime.layers.getLayer('blocks') as import('@desktop-webgis/cesium-layer').TilesetLayer
+    layer.tileset = { clippingPolygons: undefined, isDestroyed: () => false } as unknown as NonNullable<typeof layer.tileset>
+    const node = s.scene.nodes[0]
+    if (node.type !== '3dtiles') throw new Error('Unexpected node')
+    node.effects = [{ id: 'clip', kind: 'clip-polygon', enabled: true, mode: 'keep-inside', positions: [[116,39,0],[117,39,0],[117,40,0]] }]
+    await s.runtime.updateScene(s.scene)
+    expect(tilesetEffectProbe.set).toHaveBeenCalledWith('blocks', layer.tileset, node.effects, s.viewer.scene)
+    await s.runtime.updateScene({ ...s.scene, nodes: [] })
+    expect(tilesetEffectProbe.remove).toHaveBeenCalledWith('blocks')
+    s.runtime.destroy(); expect(tilesetEffectProbe.destroy).toHaveBeenCalledOnce()
   })
   it('keeps vector selection after style updates and restores the latest scene color', async () => {
     const s = setup()

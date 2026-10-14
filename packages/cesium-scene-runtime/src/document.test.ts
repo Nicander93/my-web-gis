@@ -32,7 +32,7 @@ describe('v3 Cesium projection', () => {
     input.nodes[0].visible = true; input.nodes[0].locked = false
     expect(projectCesiumDocument(input).scene.nodes[0]).toMatchObject({ visible: true, locked: false })
   })
-  it('retains shared XYZ tiles and GeoJSON vectors without rendering them in the city scene', () => {
+  it('retains shared XYZ tiles and GeoJSON vectors without rendering them in the 3D scene', () => {
     const input = document()
     input.resources.base = { type: 'xyz', url: 'https://example.test/{z}/{x}/{y}.png', attribution: 'Example' }
     input.resources.points = { type: 'geojson', data: { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { name: 'A' }, geometry: { type: 'Point', coordinates: [116.4, 39.9] } }] } }

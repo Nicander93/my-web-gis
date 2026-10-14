@@ -250,6 +250,9 @@ importers:
       '@desktop-webgis/cesium-tileset-edit':
         specifier: workspace:*
         version: link:../cesium-tileset-edit
+      '@desktop-webgis/cesium-tileset-effects':
+        specifier: workspace:*
+        version: link:../cesium-tileset-effects
       '@desktop-webgis/scene-schema':
         specifier: workspace:*
         version: link:../scene-schema
@@ -278,6 +281,22 @@ importers:
       '@desktop-webgis/cesium-layer':
         specifier: workspace:*
         version: link:../cesium-layer
+      '@desktop-webgis/cesium-scene-schema':
+        specifier: workspace:*
+        version: link:../cesium-scene-schema
+    devDependencies:
+      cesium:
+        specifier: ^1.145.0
+        version: 1.145.0
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)
+
+  packages/cesium-tileset-effects:
+    dependencies:
       '@desktop-webgis/cesium-scene-schema':
         specifier: workspace:*
         version: link:../cesium-scene-schema

@@ -247,7 +247,7 @@ function allocateId(id: string, used: Set<string>): string {
   return result
 }
 
-/** Migrates old map manifests and standalone city scenes into one resource/node namespace. */
+/** Migrates old map manifests and standalone 3D scenes into one resource/node namespace. */
 export function migrateSceneDocument(input: unknown, identity = { id: 'scene3d-scene', title: '三维场景' }, reserved: { nodeIds?: readonly string[]; resourceIds?: readonly string[] } = {}): SceneDocument {
   let decoded: unknown = input
   if (typeof input === 'string') {

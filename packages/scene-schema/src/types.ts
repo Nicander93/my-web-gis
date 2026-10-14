@@ -343,7 +343,7 @@ export interface SceneChapter {
 }
 
 interface SceneManifestBase {
-  /** Optional versioned city scene extension. Existing 2D view semantics are unchanged. */
+  /** Optional versioned 3D scene extension stored under the legacy compatibility key. */
   city?: import('@desktop-webgis/cesium-scene-schema').CesiumScene
   $schema?: string
   id: string

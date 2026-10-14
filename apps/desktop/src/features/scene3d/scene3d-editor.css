@@ -81,6 +81,13 @@
 .scene3d-triple input[type="number"] { appearance: textfield; }
 .scene3d-triple input::-webkit-inner-spin-button { display: none; }
 .scene3d-form-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+.scene3d-clip-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; color: var(--color-text-secondary); }
+.scene3d-clip-effect { margin: 5px 0; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-surface); }
+.scene3d-clip-effect > summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px; padding: 0 7px; cursor: pointer; list-style: none; }
+.scene3d-clip-effect > summary::-webkit-details-marker { display: none; }
+.scene3d-clip-effect__body { padding: 6px 7px 8px; border-top: 1px solid var(--color-border); }
+.scene3d-clip-coordinates { display: grid; gap: 5px; margin-top: 6px; color: var(--color-text-secondary); }
+.scene3d-clip-coordinates textarea { min-height: 58px; font: 10px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
 .scene3d-draft-state { font-size: 10px; color: var(--color-warning); }
 .scene3d-boundary-summary { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 11px; margin-bottom: 15px; color: var(--color-text-secondary); }
 .scene3d-pair-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; margin-bottom: 5px; }

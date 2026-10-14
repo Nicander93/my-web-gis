@@ -302,7 +302,7 @@ export type LayerTreeEntry =
   | { type: 'group'; id: string }
 
 export interface Project {
-  /** Optional city scene; legacy 2D projects remain readable. */
+  /** Optional 3D scene stored under the legacy compatibility key. */
   city?: import('@desktop-webgis/cesium-scene-schema').CesiumScene
   id: string
   version: number

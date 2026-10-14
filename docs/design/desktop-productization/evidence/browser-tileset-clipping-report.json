@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-14",
+  "scope": "M8 browser polygon clipping interaction",
+  "command": "pnpm --filter @desktop-webgis/desktop exec playwright test e2e/tileset-clipping.e2e.ts",
+  "result": "passed",
+  "assertions": [
+    "a polygon range is created through Cesium canvas input",
+    "the range is persisted under the selected 3D Tiles node",
+    "disable and delete operations are undoable",
+    "the tileset descriptor is requested once while clipping changes",
+    "Ant Design clipping controls remain visible in the object inspector"
+  ],
+  "viewports": ["1440x900", "1024x680", "1366x768", "1920x1080"],
+  "screenshot": "browser-tileset-clipping.png",
+  "limitations": [
+    "browser SwiftShader evidence is not physical GPU acceptance",
+    "local flattening is not implemented in this batch",
+    "two differently transformed Tilesets are not covered in this batch"
+  ]
+}

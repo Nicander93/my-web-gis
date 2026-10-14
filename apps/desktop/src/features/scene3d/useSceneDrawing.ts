@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { CesiumSceneRuntime } from '@desktop-webgis/cesium-scene-runtime'
 import type { GraphicNode, GraphicType } from '@desktop-webgis/cesium-scene-schema'
 
-export type SceneDrawKind = GraphicType | 'water'
+export type SceneDrawKind = GraphicType | 'water' | 'clip'
 
 /** The core owns Cesium input; React only subscribes and commits completion. */
 export function useSceneDrawing(runtime: CesiumSceneRuntime | undefined, onComplete: (graphic: GraphicNode, kind: SceneDrawKind, id?: string) => void, onError: (reason: unknown) => void, onCancel: () => void) {
@@ -19,7 +19,7 @@ export function useSceneDrawing(runtime: CesiumSceneRuntime | undefined, onCompl
     if (!runtime) return
     cancel()
     try {
-      const drawing = runtime.startDraw({ type: next === 'water' ? 'polygon' : next, onChange: setCount })
+      const drawing = runtime.startDraw({ type: next === 'water' || next === 'clip' ? 'polygon' : next, onChange: setCount })
       session.current = drawing; setKind(next)
       void drawing.result.then(result => {
         if (session.current !== drawing) return

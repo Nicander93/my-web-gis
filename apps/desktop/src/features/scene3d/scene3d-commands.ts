@@ -27,10 +27,10 @@ export function addSceneAsset(type: '3dtiles' | 'model' | 'geojson', source: str
 
 export function loadSceneSample(): string {
   const id = createId('scene3d')
-  updateScene('加载城市样例', scene => {
+  updateScene('加载三维示例', scene => {
     const asset = createId('asset')
     scene.assets[asset] = { type: '3dtiles', url: './city-sample/tileset.json' }
-    scene.nodes.push({ id, name: '城市街区 · 16 栋建筑', type: '3dtiles', asset, visible: true, transform: createTransform(), popup: { title: '城市样例', fields: [{ field: 'name', label: '名称' }] } })
+    scene.nodes.push({ id, name: '建筑场景 · 16 栋建筑', type: '3dtiles', asset, visible: true, transform: createTransform(), popup: { title: '三维示例', fields: [{ field: 'name', label: '名称' }] } })
     scene.camera = { position: [116.391,39.902,850], heading: 0, pitch: -48, roll: 0 }
     return scene
   })

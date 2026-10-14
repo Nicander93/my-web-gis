@@ -1,7 +1,7 @@
 {
   "name": "@desktop-webgis/cesium-effects",
   "version": "0.1.0",
-  "description": "Independent cesium-effects API for Cesium city scenes",
+  "description": "Independent visual effects API for Cesium 3D scenes",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",

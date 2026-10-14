@@ -1,10 +1,10 @@
-# 城市三维样例
+# 三维场景样例
 
-`city-sample` 是本仓库自行生成的 16 栋低模城市街区和独立 GLB 塔楼，无在线服务或 ion token 依赖；用于交互验证，不是真实城市数据。通过 `node examples/city-3d/generate-sample.mjs` 重建。坐标位于北京附近，建筑高度 35–125 米。样例模型与生成器使用 MIT 许可（参见 Cesium 扩展包 LICENSE）。
+`city-sample` 是保留旧资源路径的本地低模建筑与独立 GLB 塔楼，无在线服务或 ion token 依赖；用于通用三维场景交互验证。通过 `node examples/city-3d/generate-sample.mjs` 重建。坐标位于北京附近，建筑高度 35–125 米。样例模型与生成器使用 MIT 许可（参见 Cesium 扩展包 LICENSE）。
 
 ## 编辑器
 
-仓库根目录执行 `pnpm install`、`pnpm build`、`pnpm dev`，切换「城市三维」，点击「加载城市样例」。支持整体 ENU 移动、旋转、缩放、一次拖动一次撤销、参数输入、显隐、Popup、水面参数和边界坐标、雾/辉光、初始视角、保存工程、导入和导出场景。GLB 图层可从列表拖到地图上生成副本。
+仓库根目录执行 `pnpm install`、`pnpm build`、`pnpm dev`，切换「三维场景」，点击「加载三维示例」。支持整体 ENU 移动、旋转、缩放、一次拖动一次撤销、参数输入、显隐、Popup、水面参数和边界坐标、雾/辉光、初始视角、保存工程、导入和导出场景。GLB 图层可从列表拖到地图上生成副本。
 
 导入自有 3D Tiles 时填写 tileset.json 的 HTTP(S) URL，GLB 使用模型 URL，GeoJSON 使用数据 URL。跨域资源需服务端允许 CORS。模型加载失败会显示原因，可点击「重新加载资源」。本阶段不提供本地文件系统资源浏览器；相对资源必须能由当前 Web 服务访问。
 
@@ -29,4 +29,4 @@ node packages/scene-publisher/dist/cli.js --scene examples/city-3d/scene.json --
 
 本地包验证（pnpm 11）：将 tarball 输出到仓库根 `.artifacts/packages`，执行 `node scripts/prepare-scene3d-pack-smoke.mjs`，进入 `.artifacts/packed-consumer` 执行 `pnpm install`、`node smoke.mjs`。该目录独立维护 pnpm-workspace.yaml，通过 overrides 指向尚未发布的本地包，不引用工作区源码。
 
-尚未实现镜面反射水面、单建筑网格编辑、二三维相机/样式实时联动或任意本地城市目录导入。参考 [cesium-demo](https://github.com/Nicander93/cesium-demo) 的交互思路；没有复制其反混淆水面源码。
+尚未实现镜面反射水面、单体网格编辑、二三维相机/样式实时联动或任意本地 3D Tiles 目录导入。参考 [cesium-demo](https://github.com/Nicander93/cesium-demo) 的交互思路；没有复制其反混淆水面源码。

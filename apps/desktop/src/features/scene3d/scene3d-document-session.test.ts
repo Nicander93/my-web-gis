@@ -54,8 +54,8 @@ function attach(callbacks: Pick<CesiumSceneRuntimeOptions, 'onEdit' | 'onSelect'
 }
 async function expectReady(states: SceneDocumentState[]) { await vi.waitFor(() => expect(states.at(-1)?.status).toBe('ready')) }
 
-describe('Desktop city document session', () => {
-  it('maps picks and completed transforms to the city host while undo reprojects the same runtime', async () => {
+describe('Desktop 3D scene document session', () => {
+  it('maps picks and completed transforms to the scene host while undo reprojects the same runtime', async () => {
     let target!: Loaded, nativeOptions!: CesiumSceneRuntimeOptions
     factory.mockImplementation(async (options: CesiumSceneRuntimeOptions & { document: SceneDocument }) => {
       nativeOptions = options; target = loaded(options.document); return target

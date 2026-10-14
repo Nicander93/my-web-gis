@@ -5,7 +5,7 @@ import { pickSaveFile, writeTextFile } from './files'
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
 vi.mock('./files', () => ({ pickSaveFile: vi.fn(), writeTextFile: vi.fn() }))
 
-describe('desktop city scene export', () => {
+describe('desktop 3D scene export', () => {
   beforeEach(() => vi.resetAllMocks())
 
   it('writes the scene before reporting a saved file', async () => {

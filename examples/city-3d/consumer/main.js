@@ -18,8 +18,8 @@ annotations.on('click', event => {
   if (!annotations.getGraphic(id)) return
   selectedGraphic = id; annotations.setSelected([id])
 })
-const city = new TilesetLayer({ id: 'blocks', name: '城市街区', url: './city-sample/tileset.json' })
-city.bindPopup({ title: '城市样例', fields: [{ field: 'name', label: '名称' }] })
+const tileset = new TilesetLayer({ id: 'blocks', name: '建筑场景', url: './city-sample/tileset.json' })
+tileset.bindPopup({ title: '三维示例', fields: [{ field: 'name', label: '名称' }] })
 const water = new WaterLayer({ id: 'water', boundary: [[116.394,39.905,0],[116.397,39.905,0],[116.397,39.91,0],[116.394,39.91,0]], height: 2 })
 const effects = new SceneEffects(viewer)
 effects.update({ fog: 0, bloom: false })
@@ -32,7 +32,7 @@ const editor = new TilesetEditor(viewer, {
 })
 document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => {
   cancelDrawing(); cancelGraphicEditing()
-  try { editor.setMode(button.dataset.mode); editor.startEditing(city); status.textContent = '拖动彩色手柄；Esc 取消' }
+  try { editor.setMode(button.dataset.mode); editor.startEditing(tileset); status.textContent = '拖动彩色手柄；Esc 取消' }
   catch (error) { status.textContent = error.message }
 }))
 document.getElementById('stop').addEventListener('click', () => { cancelDrawing(); cancelGraphicEditing(); editor.stopEditing(); status.textContent = '已结束编辑；未应用的图形修改已恢复' })
@@ -68,12 +68,12 @@ document.querySelectorAll('[data-draw]').forEach(button => button.addEventListen
   } catch (error) { layers.pickingEnabled = true; status.textContent = error.message }
 }))
 document.getElementById('water').addEventListener('click', () => { water.show = !water.show })
-document.getElementById('undo').addEventListener('click', () => { cancelDrawing(); cancelGraphicEditing(); editor.cancel(); const event = history.pop(); if (event) { if (event.kind === 'graphic') annotations.getGraphic(event.id)?.setOptions({ geometry: event.before }); else { city.setTransform(event.before); editor.refresh() }; status.textContent = '已撤销上次修改' } })
+document.getElementById('undo').addEventListener('click', () => { cancelDrawing(); cancelGraphicEditing(); editor.cancel(); const event = history.pop(); if (event) { if (event.kind === 'graphic') annotations.getGraphic(event.id)?.setOptions({ geometry: event.before }); else { tileset.setTransform(event.before); editor.refresh() }; status.textContent = '已撤销上次修改' } })
 window.addEventListener('pagehide', () => { cancelDrawing(); cancelGraphicEditing(); editor.destroy(); layers.destroy(); effects.destroy(); viewer.destroy() }, { once: true })
 try {
   const imagery = await TileMapServiceImageryProvider.fromUrl(new URL('cesium/Assets/Textures/NaturalEarthII', document.baseURI).href)
   viewer.imageryLayers.addImageryProvider(imagery)
-  await Promise.all([city.addTo(layers), water.addTo(layers), annotations.addTo(layers)])
-  await city.flyTo()
-  status.textContent = '城市已加载；选择移动、旋转或缩放'
+  await Promise.all([tileset.addTo(layers), water.addTo(layers), annotations.addTo(layers)])
+  await tileset.flyTo()
+  status.textContent = '三维场景已加载；选择移动、旋转或缩放'
 } catch (error) { status.textContent = error.message }

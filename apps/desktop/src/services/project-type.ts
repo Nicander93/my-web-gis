@@ -4,7 +4,7 @@ import { createCesiumScene } from '@desktop-webgis/cesium-scene-schema'
 
 export type ProjectType = '2d' | '3d'
 
-/** Older projects infer their workspace from the presence of a city scene. */
+/** Older projects infer their workspace from the presence of the legacy 3D scene field. */
 export function getProjectType(project: Project): ProjectType {
   const type = project.settings?.workspaceType
   return type === '2d' || type === '3d' ? type : project.city ? '3d' : '2d'

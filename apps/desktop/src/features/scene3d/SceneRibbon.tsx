@@ -30,7 +30,7 @@ export function SceneRibbon({ commands: all, target, preview, onPreview, onUndo,
     { id:'scene', label:'场景', commands:commands(['select','initial','quality','lighting','surface','environment','camera','new-group']) },
     { id:'draw', label:'标绘', commands:commands(['point','line','polygon','water']) },
     { id:'edit', label:'编辑', commands:commands(['select','vertices','move','rotate','scale','delete']) },
-    { id:'tiles', label:'瓦片', commands:commands(['quality']) },
+    { id:'tiles', label:'瓦片', commands:commands(['quality','clip']) },
     { id:'analysis', label:'分析', commands:[] }
   ]} target={category === 'scene' ? undefined : `编辑目标：${target}`} onAdd={() => add?.execute()} preview={preview}
     quickActions={<><Button variant="icon" aria-label="撤销" disabled={!canUndo} onClick={onUndo}><Undo2 size={16} /></Button><Button variant="icon" aria-label="重做" disabled={!canRedo} onClick={onRedo}><Redo2 size={16} /></Button><Button variant="icon" aria-label="保存项目" disabled={saving} loading={saving} aria-busy={saving} onClick={onSave}><Save size={16} /></Button></>}

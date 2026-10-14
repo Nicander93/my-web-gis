@@ -1,7 +1,7 @@
 {
   "name": "@desktop-webgis/cesium-popup",
   "version": "0.1.0",
-  "description": "Independent cesium-popup API for Cesium city scenes",
+  "description": "Independent popup API for Cesium 3D scenes",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "CityScene v2 (v1 compatible)",
+  "title": "CesiumScene v2 (v1 compatible)",
   "$ref": "#/$defs/cityScene",
   "$defs": {
     "cityGroup": {
@@ -50,6 +50,41 @@
       ],
       "minItems": 3,
       "maxItems": 3
+    },
+    "tilesetClipEffect": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "kind": {
+          "const": "clip-polygon"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "mode": {
+          "enum": [
+            "keep-inside",
+            "keep-outside"
+          ]
+        },
+        "positions": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "$ref": "#/$defs/cityPosition"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "enabled",
+        "mode",
+        "positions"
+      ]
     },
     "cityTriple": {
       "type": "array",
@@ -256,6 +291,12 @@
         "cacheBytes": {
           "type": "number",
           "exclusiveMinimum": 0
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tilesetClipEffect"
+          }
         }
       },
       "required": [

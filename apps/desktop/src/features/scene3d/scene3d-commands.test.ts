@@ -7,7 +7,7 @@ import { useProjectStore } from '@/stores/project.store'
 import { addSceneGroup, copySceneNodes, deleteSceneNodes, dissolveSceneGroup, loadSceneSample, moveSceneSelection, patchSceneGroup, setSceneNodesLocked, setSceneNodesVisible, updateScene } from './scene3d-commands'
 
 beforeEach(() => useProjectStore.getState().loadSnapshot({project:createProject(),featuresByDataset:{}}))
-describe('city workflow in the existing project store',() => {
+describe('3D scene workflow in the existing project store',() => {
   it('groups and batch-edits one selection per command, preserving saved/published state', () => {
     const first = loadSceneSample(), second = loadSceneSample(), store = useProjectStore.getState()
     const before = store.getSnapshot(), id = addSceneGroup('城市模型', [first, second])

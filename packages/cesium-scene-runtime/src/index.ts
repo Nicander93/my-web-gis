@@ -3,6 +3,7 @@ import { BaseLayer, DrawSession, GeoJsonLayer, GraphicLayer, ImageryTemplateLaye
 import type { DrawOptions, EditSession, GraphicEditOptions } from '@desktop-webgis/cesium-layer'
 import { TilesetEditor } from '@desktop-webgis/cesium-tileset-edit'
 import type { EditMode, TransformEditEvent } from '@desktop-webgis/cesium-tileset-edit'
+import { assertTilesetEffectsSupported, TilesetEffectManager } from '@desktop-webgis/cesium-tileset-effects'
 import { SceneEffects, WaterLayer } from '@desktop-webgis/cesium-effects'
 import { getCesiumSceneNodeState, parseCesiumScene } from '@desktop-webgis/cesium-scene-schema'
 import type { CesiumSceneCamera, CesiumSceneNode, CesiumScene } from '@desktop-webgis/cesium-scene-schema'
@@ -46,6 +47,7 @@ export class CesiumSceneRuntime {
   readonly layers: LayerCollection
   private readonly editor: TilesetEditor
   private readonly effects: SceneEffects
+  private readonly tilesetEffects = new TilesetEffectManager()
   private readonly nodes = new Map<string, CesiumSceneNode>()
   private readonly nativeKeys = new Map<string, string>()
   private scene: CesiumScene
@@ -82,6 +84,7 @@ export class CesiumSceneRuntime {
   async updateScene(input: CesiumScene): Promise<void> {
     if (this.destroyed) throw new Error('CesiumSceneRuntime 已销毁')
     const scene = parseCesiumScene(input)
+    this.assertTilesetEffects(scene)
     this.cancelPreparation()
     const revision = ++this.sceneRevision
     // Cancel an in-flight gesture before applying authoritative state (undo/import/hide).
@@ -99,6 +102,7 @@ export class CesiumSceneRuntime {
     for (const id of this.nodes.keys()) {
       if (scene.nodes.some(node => node.id === id)) continue
       if (this.editingId === id) this.stopEditing()
+      this.tilesetEffects.removeEffects(id)
       this.layers.removeLayer(id); this.nodes.delete(id); this.nativeKeys.delete(id); this.currentLayers.delete(id)
     }
     for (const definition of scene.nodes) {
@@ -107,6 +111,7 @@ export class CesiumSceneRuntime {
       let layer = this.layers.getLayer(node.id)
       if (layer && previous && (layer.state === 'error' || this.nativeKeys.get(node.id) !== nativeKey(node, scene))) {
         if (this.editingId === node.id) this.stopEditing()
+        this.tilesetEffects.removeEffects(node.id)
         this.layers.removeLayer(node.id); layer = undefined
       }
       this.nodes.set(node.id, structuredClone(node))
@@ -118,7 +123,10 @@ export class CesiumSceneRuntime {
         if ((!node.visible || node.locked) && this.editingId === node.id) this.stopEditing()
         layer.show = node.visible
         if ((layer instanceof TilesetLayer || layer instanceof ModelLayer) && (node.type === '3dtiles' || node.type === 'model')) layer.setTransform(node.transform)
-        if (layer instanceof TilesetLayer && node.type === '3dtiles') layer.setQuality(node.maximumScreenSpaceError, node.cacheBytes)
+        if (layer instanceof TilesetLayer && node.type === '3dtiles') {
+          layer.setQuality(node.maximumScreenSpaceError, node.cacheBytes)
+          if (layer.tileset) this.tilesetEffects.setEffects(node.id, layer.tileset, node.effects ?? [], this.viewer.scene)
+        }
         if (layer instanceof GraphicLayer && node.type === 'graphic') layer.getGraphic(node.id)?.setOptions(node)
         if (layer instanceof GeoJsonLayer && node.type === 'geojson') layer.setColor(node.color ?? '#55a6ff')
         if (layer instanceof ImageryTemplateLayer && node.type === 'imagery' && node.opacity !== undefined) layer.setOpacity(node.opacity)
@@ -138,7 +146,10 @@ export class CesiumSceneRuntime {
         if (this.destroyed || this.layers.getLayer(node.id) !== mounted) return
         const latest = this.nodes.get(node.id)
         if (latest && (latest.type === '3dtiles' || latest.type === 'model') && (mounted instanceof TilesetLayer || mounted instanceof ModelLayer)) mounted.setTransform(latest.transform)
-        if (latest?.type === '3dtiles' && mounted instanceof TilesetLayer) mounted.setQuality(latest.maximumScreenSpaceError, latest.cacheBytes)
+        if (latest?.type === '3dtiles' && mounted instanceof TilesetLayer) {
+          mounted.setQuality(latest.maximumScreenSpaceError, latest.cacheBytes)
+          if (mounted.tileset) this.tilesetEffects.setEffects(latest.id, mounted.tileset, latest.effects ?? [], this.viewer.scene)
+        }
         if (latest?.type === 'geojson' && mounted instanceof GeoJsonLayer) mounted.setColor(latest.color ?? '#55a6ff')
         this.applySelection(mounted)
         this.options.onLayerState?.(node.id, mounted.state)
@@ -162,6 +173,7 @@ export class CesiumSceneRuntime {
   async replaceScene(input: CesiumScene, signal?: AbortSignal, options: { preserveCamera?: boolean } = {}): Promise<void> {
     if (this.destroyed) throw new Error('CesiumSceneRuntime 已销毁')
     const scene = parseCesiumScene(input)
+    this.assertTilesetEffects(scene)
     this.cancelPreparation()
     const operation = new AbortController()
     this.preparation = operation
@@ -206,6 +218,7 @@ export class CesiumSceneRuntime {
       this.cancelDraw(); this.cancelGraphicEditing(); this.stopEditing()
       if (nextEnvironment) this.installEnvironment(nextEnvironment)
       this.environmentRevision++; this.sceneRevision++
+      for (const node of this.nodes.values()) if (node.type === '3dtiles') this.tilesetEffects.removeEffects(node.id)
       this.layers.replaceMountedLayers(nextLayers)
       previousManaged.forEach(layer => layer.destroy())
       this.scene = scene
@@ -218,6 +231,7 @@ export class CesiumSceneRuntime {
           if (!this.destroyed && this.currentLayers.get(node.id) === layer) this.options.onLayerState?.(node.id, 'error', error)
         })
         layer.show = node.visible
+        if (node.type === '3dtiles' && layer instanceof TilesetLayer && layer.tileset) this.tilesetEffects.setEffects(node.id, layer.tileset, node.effects ?? [], this.viewer.scene)
         this.applySelection(layer)
       }
       this.effects.update(scene.effects)
@@ -249,6 +263,7 @@ export class CesiumSceneRuntime {
       const layer = this.layers.getLayer(node.id)
       return !layer?.isMountedOn(this.viewer) || this.nativeKeys.get(node.id) !== nativeKey(node, scene)
     })) return false
+    this.assertTilesetEffects(scene)
     const cameraChanged = JSON.stringify(scene.camera) !== JSON.stringify(this.scene.camera)
     const time = scene.lighting ? JulianDate.fromIso8601(scene.lighting.time) : JulianDate.clone(this.originalLighting.time)
     this.cancelPreparation(); this.sceneRevision++
@@ -259,7 +274,10 @@ export class CesiumSceneRuntime {
       layer.name = node.name; layer.show = node.visible
       if ((!node.visible || node.locked) && this.editingId === node.id) this.stopEditing()
       if ((layer instanceof TilesetLayer || layer instanceof ModelLayer) && (node.type === '3dtiles' || node.type === 'model')) layer.setTransform(node.transform)
-      if (layer instanceof TilesetLayer && node.type === '3dtiles') layer.setQuality(node.maximumScreenSpaceError, node.cacheBytes)
+      if (layer instanceof TilesetLayer && node.type === '3dtiles') {
+        layer.setQuality(node.maximumScreenSpaceError, node.cacheBytes)
+        if (layer.tileset) this.tilesetEffects.setEffects(node.id, layer.tileset, node.effects ?? [], this.viewer.scene)
+      }
       if (layer instanceof GraphicLayer && node.type === 'graphic') layer.getGraphic(node.id)?.setOptions(node)
       if (layer instanceof GeoJsonLayer && node.type === 'geojson') layer.setColor(node.color ?? '#55a6ff')
         if (layer instanceof ImageryTemplateLayer && node.type === 'imagery' && node.opacity !== undefined) layer.setOpacity(node.opacity)
@@ -340,7 +358,7 @@ export class CesiumSceneRuntime {
   destroy(): void {
     if (this.destroyed) return
     this.destroyed = true; this.cancelPreparation(); this.environmentRevision++; this.sceneRevision++; this.layerReady.clear(); this.currentLayers.clear()
-    this.cancelDraw(); this.cancelGraphicEditing(); this.editor.destroy(); this.layers.destroy(); this.effects.destroy()
+    this.cancelDraw(); this.cancelGraphicEditing(); this.editor.destroy(); this.tilesetEffects.destroy(); this.layers.destroy(); this.effects.destroy()
     if (this.baseLayer) this.viewer.imageryLayers.remove(this.baseLayer, true)
     if (this.options.ownsViewer !== false) this.viewer.destroy()
     else {
@@ -355,6 +373,9 @@ export class CesiumSceneRuntime {
   private resource(url: string): Resource {
     const resolved = new URL(url, this.options.sceneUrl ?? document.baseURI).href
     return this.options.resolveResource?.(resolved) ?? new Resource({ url: resolved })
+  }
+  private assertTilesetEffects(scene: CesiumScene): void {
+    for (const node of scene.nodes) if (node.type === '3dtiles') assertTilesetEffectsSupported(node.effects ?? [], this.viewer.scene)
   }
   private createLayer(node: CesiumSceneNode, scene: CesiumScene): BaseLayer {
     const base = { id: node.id, name: node.name, show: node.visible }
@@ -412,7 +433,7 @@ function nativeKey(node: CesiumSceneNode, scene: CesiumScene): string {
   if (node.type === 'geojson') return JSON.stringify([node.asset, scene.assets[node.asset]])
   const { popup: _popup, visible: _visible, locked: _locked, name: _name, groupId: _groupId, ...rest } = node
   if (node.type === 'water') return JSON.stringify(rest)
-  const { transform: _transform, maximumScreenSpaceError: _error, cacheBytes: _cache, ...assetNode } = rest as typeof rest & { transform?: unknown; maximumScreenSpaceError?: number; cacheBytes?: number }
+  const { transform: _transform, maximumScreenSpaceError: _error, cacheBytes: _cache, effects: _effects, ...assetNode } = rest as typeof rest & { transform?: unknown; maximumScreenSpaceError?: number; cacheBytes?: number; effects?: unknown }
   return JSON.stringify([assetNode, scene.assets[node.asset]])
 }
 

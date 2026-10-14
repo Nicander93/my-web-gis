@@ -89,6 +89,16 @@ export interface TilesetNode extends NodeBase {
   transform: Transform
   maximumScreenSpaceError?: number
   cacheBytes?: number
+  effects?: TilesetClipEffect[]
+}
+
+export interface TilesetClipEffect {
+  id: string
+  kind: 'clip-polygon'
+  enabled: boolean
+  /** keep-inside maps to Cesium inverse clipping; keep-outside clips polygon interiors. */
+  mode: 'keep-inside' | 'keep-outside'
+  positions: GeoPosition[]
 }
 
 export interface ModelNode extends NodeBase {
@@ -270,6 +280,21 @@ export function validateCesiumScene(input: unknown, root = '$'): CesiumSceneVali
     if (node.type === '3dtiles') {
       if (node.maximumScreenSpaceError !== undefined) check(finite(node.maximumScreenSpaceError) && node.maximumScreenSpaceError > 0, `${path}.maximumScreenSpaceError`, '屏幕误差必须为正数')
       if (node.cacheBytes !== undefined) check(finite(node.cacheBytes) && node.cacheBytes > 0, `${path}.cacheBytes`, '缓存预算必须为正数')
+      if (node.effects !== undefined) {
+        check(input.version === 2 && Array.isArray(node.effects), `${path}.effects`, '裁剪效果需要 version 2 和数组配置')
+        const effectIds = new Set<string>()
+        if (Array.isArray(node.effects)) node.effects.forEach((effect: unknown, effectIndex: number) => {
+          const effectPath = `${path}.effects[${effectIndex}]`
+          if (!record(effect)) { check(false, effectPath, '裁剪效果结构无效'); return }
+          check(typeof effect.id === 'string' && !!effect.id.trim() && !effectIds.has(effect.id), `${effectPath}.id`, '效果 ID 为空或重复')
+          if (typeof effect.id === 'string') effectIds.add(effect.id)
+          check(effect.kind === 'clip-polygon', `${effectPath}.kind`, '只支持 clip-polygon 效果')
+          check(typeof effect.enabled === 'boolean', `${effectPath}.enabled`, '启用状态必须是布尔值')
+          check(effect.mode === 'keep-inside' || effect.mode === 'keep-outside', `${effectPath}.mode`, '裁剪模式无效')
+          const validPositions = Array.isArray(effect.positions) && effect.positions.length >= 3 && effect.positions.every(position)
+          check(validPositions && new Set((validPositions ? effect.positions as GeoPosition[] : []).map(item => `${item[0]},${item[1]}`)).size >= 3, `${effectPath}.positions`, '裁剪范围需要至少三个不同的有效坐标')
+        })
+      }
     }
   })
   return issues
