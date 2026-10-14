@@ -1,5 +1,5 @@
 declare module 'jsts/org/locationtech/jts/io/GeoJSONReader.js' {
-  interface TopologyGeometry { getEnvelopeInternal(): unknown }
+  interface TopologyGeometry { getEnvelopeInternal(): unknown; getBoundary(): unknown; getArea(): number }
   export default class GeoJSONReader { read(geometry: unknown): TopologyGeometry }
 }
 declare module 'jsts/org/locationtech/jts/operation/relate/RelateOp.js' {
@@ -27,5 +27,12 @@ declare module 'jsts/org/locationtech/jts/operation/overlay/OverlayOp.js' {
   export default class OverlayOp {
     static union(a: unknown, b: unknown): unknown
     static intersection(a: unknown, b: unknown): unknown
+  }
+}
+
+declare module 'jsts/org/locationtech/jts/operation/polygonize/Polygonizer.js' {
+  export default class Polygonizer {
+    add(geometry: unknown): void
+    getPolygons(): { toArray(): Array<{ getArea(): number }> }
   }
 }

@@ -84,7 +84,7 @@ rtk pnpm --filter @desktop-webgis/desktop test:e2e folders.e2e.ts --project=desk
 | M1 | 首批三行 Shell、两引擎覆盖式窗口、布局恢复 | 全局工具会话协调；工具箱/日志/诊断独立窗口随后续阶段接入 |
 | M2 | 点线面编辑、捕捉、选择、CRS/导出；已接入嵌套 Folder 与原子树命令 | 明确 CRS 赋值工作流及复杂拓扑编辑、专业选择能力 |
 | M3 | 模型/Tileset 选择、整体 Gizmo、专业 Inspector、旧 CityScene 兼容；已接入嵌套 Folder | 文件夹/对象混排；固定 ID 的独立 Apply/OK/Cancel 属性窗；检查器固定 |
-| M4 | 分页、搜索、过滤、统计、属性单元格、处理算法/取消；多图层 Tab、原子字段计算、类型校验、字段管理与引用迁移、列显示/排序 | 面合并属性策略、分割、列宽管理、Table 控件迁移及完整空间运算验收 |
+| M4 | 分页、搜索、过滤、统计、属性单元格、处理算法/取消；多图层 Tab、原子字段计算、字段管理、面合并/分割、列显示/排序 | 列宽管理、Table 控件迁移及完整空间运算验收 |
 | M5 | point/polyline/polygon Graphic、几何编辑、对象独立样式 | 共享 Graphic 渲染池、连续 POI、Billboard/Label/rectangle/ellipse 等及 500 对象验收 |
 | M6 | 本地二维文件、WMS/WMTS/WFS、三维资源加载、失败重试 | 二三维添加数据壳、基于项目路径的资源引用/另存重算、父目录重定位 |
 | M7 | 项目保存/另存/脏状态保护 | 原子保存、保存期间编辑/换项目竞态、恢复草稿缓存和恢复/舍弃流程 |
@@ -130,6 +130,17 @@ rtk pnpm --filter @desktop-webgis/desktop test:e2e docking.e2e.ts --project=desk
 
 运行截图：[添加数据](../design/desktop-productization/evidence/laptop-prototype-aligned-add-data.png)、[合并面弹窗](../design/desktop-productization/evidence/laptop-prototype-aligned-merge-dialog.png)。合并/分割属于正在开发的下一功能批次，本节仅记录其共享 UI 校准与已运行测试。
 
+## M2/M4 原图层面拓扑批次（2026-10-14）
+
+- 编辑 Ribbon 的合并面/分割面绑定当前编辑图层和所选面；打开后固定目标 ID，取消未完成地图工具。
+- 合并调用 spatial-analysis 的 JTS 联合算法，支持相邻、重叠和离散面，保留洞。提供指定要素属性、数值求和、冲突设空三种显式策略；字段类型、有限数值与非空约束在计算前校验。
+- 分割可使用已有线要素或 WGS84 LineString/MultiLineString GeoJSON。边界与切割线节点化后多边形化，保留洞和面积，不使用缓冲带制造缝隙；最大分片保留原 ID，新增分片继承属性并产生唯一 ID。
+- Worker 独占计算资源，成功、失败和取消均终止线程并移除监听。只在全部计算完成后提交一条 SetDatasetContentCommand；不成立的切割、非法几何、取消不会修改原数据或新增历史项。
+- 提交前再次检查工程、编辑目标、数据集及所有共享图层的祖先锁。期间原数据变化会拒绝旧结果，保留新编辑。Undo/Redo 恢复 schema、属性和几何，图层过滤仍参与可见结果。
+- 目前明确支持有效二维经纬度几何；Z/M 和跨日期变更线输入会报错，避免静默丢失信息。临时绘制切割线与更完整空间处理矩阵继续实施，不把本批当作 M2/M4 整体完成。
+
+验证：全仓构建/测试通过后追加边界测试，Desktop 单元测试 233 通过、5 个原有环境项跳过；最终 Desktop 生产构建通过。spatial-analysis 41 项含 8 项真实拓扑单测。原有全量笔记本 E2E 48 通过；最新拓扑专项三个尺寸共 12 项通过，覆盖属性求和、面积、唯一 ID、一步撤销/重做、项目保存重开、真实 Worker 取消、异步旧结果拒绝、无效/无效力切割不写入。[运行中的分割结果](../design/desktop-productization/evidence/laptop-polygon-topology.png)。
+
 ## M4 属性表与字段计算批次
 
 - 一个属性表窗口可打开多个图层 Tab。关闭当前 Tab 自动选择相邻项；删除图层会清理对应项。Tab 按图层 ID 绑定，浏览场景树不改变表格目标。
@@ -172,7 +183,7 @@ rtk pnpm --filter @desktop-webgis/desktop test:e2e docking.e2e.ts --project=desk
 |---|---|---|
 | E01 | 部分 | 真实 GeoJSON、CSV、SHP、DXF 导入 E2E 通过；本方案完整多图层配置闭环待签收 |
 | E02 | 部分 | 绘制、取消、Undo/Redo E2E 通过；多要素顶点编辑完整矩阵待补 |
-| E03 | 待实现 | 面合并的原图层原子命令及属性策略 |
+| E03 | 浏览器通过 | 原图层面合并、显式属性策略、一条命令 Undo/Redo、有效几何与保存重开；见拓扑批次 |
 | E04 | 部分 | 表格选择/定位/键盘/单元格编辑及多 Tab 会话已有回归；新增字段管理、共享引用迁移；Table 控件与列宽仍待迁移/补齐 |
 | E05 | 浏览器通过 | 表内字段计算原子写入原数据；逐行错误、类型、空值约束提前校验；一个 Undo/Redo 恢复字段定义与记录 |
 | E06 | 部分 | 真实缓冲结果层及处理算法单测通过；四组空间处理专项矩阵待补 |

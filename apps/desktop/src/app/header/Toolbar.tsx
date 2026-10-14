@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { ToolbarButton } from './ToolbarButton'
 import { SnappingControl } from './SnappingControl'
+import { PolygonEditControls } from '@/features/editing/PolygonEditControls'
 import { projectCommands } from '@/app/commands/project.commands'
 import { editCommands } from '@/app/commands/edit.commands'
 import { mapCommands } from '@/app/commands/map.commands'
@@ -300,6 +301,7 @@ export function Toolbar() {
                 onClick={editCommands.deleteSelected}
               />
               <SnappingControl />
+              <PolygonEditControls />
             </Group>
           </>
         )}

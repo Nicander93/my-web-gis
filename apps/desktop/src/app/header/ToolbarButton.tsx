@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
+import { Button } from 'antd'
 
 interface ToolbarButtonProps {
   icon: LucideIcon
@@ -16,9 +17,9 @@ export function ToolbarButton({
   onClick
 }: ToolbarButtonProps) {
   return (
-    <button
+    <Button
       className="toolbar-button"
-      type="button"
+      type="text" htmlType="button"
       disabled={disabled}
       title={label}
       aria-label={label}
@@ -27,6 +28,6 @@ export function ToolbarButton({
     >
       <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
       <span className="toolbar-button-label">{label}</span>
-    </button>
+    </Button>
   )
 }

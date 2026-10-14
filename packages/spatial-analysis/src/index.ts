@@ -13,6 +13,7 @@ export { measureGeometry, addGeometryMeasurements } from './measurements.js'
 export type { MeasurementOptions, MeasurementFieldOptions } from './measurements.js'
 export { compileFieldExpression, calculateField } from './field-calculation.js'
 export type { FieldValue, FieldCalculationOptions, CompiledFieldExpression } from './field-calculation.js'
+export { mergePolygonGeometries, splitPolygonGeometry } from './topology-edits.js'
 
 export type AnalysisGeometry = Point | MultiPoint | LineString | MultiLineString | Polygon | MultiPolygon
 
