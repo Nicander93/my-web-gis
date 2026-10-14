@@ -204,6 +204,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
             statsField: to && table.statsField === from ? to : table.statsField,
             fieldOrder: to ? mapNames(table.fieldOrder ?? []) : table.fieldOrder,
             hiddenFields: to ? mapNames(table.hiddenFields ?? []) : table.hiddenFields,
+            columnWidths: to ? Object.fromEntries(Object.entries(table.columnWidths ?? {}).map(([name, width]) =>
+              [name === from ? to : name, width])) : table.columnWidths,
             ...(table.filterDraft ? { filterDraft: table.filterDraft.flatMap((condition) => condition.field === from
               ? to ? [{ ...condition, field: to }] : [] : [condition]) } : {})
           })

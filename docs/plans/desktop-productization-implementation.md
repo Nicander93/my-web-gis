@@ -84,7 +84,7 @@ rtk pnpm --filter @desktop-webgis/desktop test:e2e folders.e2e.ts --project=desk
 | M1 | 首批三行 Shell、两引擎覆盖式窗口、布局恢复 | 全局工具会话协调；工具箱/日志/诊断独立窗口随后续阶段接入 |
 | M2 | 点线面编辑、捕捉、选择、CRS/导出；已接入嵌套 Folder 与原子树命令 | 明确 CRS 赋值工作流及复杂拓扑编辑、专业选择能力 |
 | M3 | 模型/Tileset 选择、整体 Gizmo、专业 Inspector、旧 CityScene 兼容；已接入嵌套 Folder | 文件夹/对象混排；固定 ID 的独立 Apply/OK/Cancel 属性窗；检查器固定 |
-| M4 | 分页、搜索、过滤、统计、属性单元格、处理算法/取消；多图层 Tab、原子字段计算、字段管理、面合并/分割、列显示/排序 | 列宽管理、Table 控件迁移及完整空间运算验收 |
+| M4 | 分页、搜索、过滤、统计、属性单元格、处理算法/取消；多图层 Tab、原子字段计算、字段管理、面合并/分割、列显示/排序/宽度和 antd Table | 完整空间运算验收及处理工具控件迁移 |
 | M5 | point/polyline/polygon Graphic、几何编辑、对象独立样式 | 共享 Graphic 渲染池、连续 POI、Billboard/Label/rectangle/ellipse 等及 500 对象验收 |
 | M6 | 本地二维文件、WMS/WMTS/WFS、三维资源加载、失败重试 | 二三维添加数据壳、基于项目路径的资源引用/另存重算、父目录重定位 |
 | M7 | 项目保存/另存/脏状态保护 | 原子保存、保存期间编辑/换项目竞态、恢复草稿缓存和恢复/舍弃流程 |
@@ -175,6 +175,18 @@ rtk pnpm --filter @desktop-webgis/desktop test:e2e docking.e2e.ts --project=desk
 
 当前全仓构建/单测通过，Desktop 227 通过、5 个原有环境项跳过；gis-core 74 项通过。最终源码 Desktop 构建追加通过，桌面全量 E2E 46 项通过，字段管理专项三种尺寸共 3 项通过。截图：[Ant Design 重命名事务](../design/desktop-productization/evidence/laptop-field-rename.png)、[保存重开后的字段与文本值](../design/desktop-productization/evidence/laptop-field-schema-roundtrip.png)。面合并/分割与 Table 控件迁移仍在后续范围，未将 M4 整体标为完成。
 
+## M4 属性表组件与一致 UI 批次（2026-10-14）
+
+用户明确原型是初版方向，产品优先遵循一致 UI 规则。补充细则记录统一的密度、字号、控件与窗口圆角、分区、主次按钮和状态，不要求逐像素复制。
+
+- 属性表正文使用 antd Table；搜索/单元格输入、选择框、过滤/统计字段选择、选择菜单均使用 antd。AttributeTable.tsx 已不包含手写 input/select/button/table/details 通用控件。
+- 表头、记录行、边框、悬停、选择、数值排版与编辑控件由共享主题和 workbench 样式提供。保留真实 Feature ID、点击选择、Ctrl 多选、双击/Enter 编辑或定位，以及 100 行分页的业务范围。
+- 表格仍使用现有外部滚动容器，保持各图层横纵滚动的会话恢复；列宽明确限制在 80–600px，可拖动、方向键微调、Home/End 设置边界、双击重置。Esc 回滚当前拖动，不污染项目历史。
+- 宽度与列显示/顺序、排序和草稿一起按图层会话隔离；字段重命名同步迁移宽度，Undo 恢复字段与宽度，删除字段保留宽度 tombstone 以支持 Undo。重置列显示同时清空宽度。
+- 选择菜单回归保留匹配范围、关闭和 Esc 返回入口的断言。过滤测试因 Select 迁移改用可见下拉选项与具名控件，保留原过滤值、草稿、schema 和保存数据断言。
+
+验证：最终 Desktop 生产构建通过，233 个单元测试通过、5 个原有环境项跳过；1366×768 全量 E2E 51 项通过。列宽专项在 1440×900、1366×768、1920×1080 共 3 项通过，包括实际列矩形变宽、键盘/取消、跨表隔离、无项目/历史修改和字段重命名/Undo。最新源码追加 1440×900、1920×1080 的 Tab/字段管理/列宽专项 6 项全部通过。全量浏览器复跑包含真实 GLB 像素/资源重试，原生及物理 GPU 仍未签收。[统一属性表运行截图](../design/desktop-productization/evidence/laptop-consistent-attribute-table.png)。
+
 ## 20 项验收矩阵的当前证据
 
 “部分”表示已有自动化覆盖部分行为，不等于该条完整签收。
@@ -184,7 +196,7 @@ rtk pnpm --filter @desktop-webgis/desktop test:e2e docking.e2e.ts --project=desk
 | E01 | 部分 | 真实 GeoJSON、CSV、SHP、DXF 导入 E2E 通过；本方案完整多图层配置闭环待签收 |
 | E02 | 部分 | 绘制、取消、Undo/Redo E2E 通过；多要素顶点编辑完整矩阵待补 |
 | E03 | 浏览器通过 | 原图层面合并、显式属性策略、一条命令 Undo/Redo、有效几何与保存重开；见拓扑批次 |
-| E04 | 部分 | 表格选择/定位/键盘/单元格编辑及多 Tab 会话已有回归；新增字段管理、共享引用迁移；Table 控件与列宽仍待迁移/补齐 |
+| E04 | 浏览器通过 | 点击选中、双击定位/编辑、IME/输入历史与焦点隔离；antd Table、多 Tab、列宽/显示/排序、字段管理与共享引用迁移回归通过 |
 | E05 | 浏览器通过 | 表内字段计算原子写入原数据；逐行错误、类型、空值约束提前校验；一个 Undo/Redo 恢复字段定义与记录 |
 | E06 | 部分 | 真实缓冲结果层及处理算法单测通过；四组空间处理专项矩阵待补 |
 | E07 | 部分 | 国内地图投影、导出 CRS、历史一致性通过；源 CRS 赋值工作流待接入 |

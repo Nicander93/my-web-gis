@@ -1,8 +1,9 @@
 import { Button as AntButton, type ButtonProps as AntButtonProps } from 'antd'
+import type { ComponentPropsWithRef } from 'react'
 
 type ButtonVariant = 'default' | 'primary' | 'ghost' | 'icon' | 'tab'
 
-interface ButtonProps extends Omit<AntButtonProps, 'type' | 'variant'> {
+interface ButtonProps extends Omit<ComponentPropsWithRef<typeof AntButton>, 'type' | 'variant'> {
   variant?: ButtonVariant
   type?: AntButtonProps['htmlType']
 }

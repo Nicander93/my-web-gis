@@ -24,6 +24,7 @@ interface AttributeTableState {
   statsField: string | null
   hiddenFields: string[]
   fieldOrder: string[]
+  columnWidths: Record<string, number>
 }
 
 /** 样式草稿：改草稿不改项目，应用后才写入图层配置 */
@@ -137,6 +138,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
                 : current?.filterDraft ? { filterDraft: current.filterDraft } : {}),
               hiddenFields: updates.hiddenFields ?? current?.hiddenFields ?? [],
               fieldOrder: updates.fieldOrder ?? current?.fieldOrder ?? [],
+              columnWidths: updates.columnWidths ?? current?.columnWidths ?? {},
               filterOpen: updates.filterOpen ?? current?.filterOpen ?? false,
               statisticsOpen:
                 updates.statisticsOpen ?? current?.statisticsOpen ?? false,

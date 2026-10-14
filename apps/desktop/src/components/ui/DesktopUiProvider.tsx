@@ -17,6 +17,9 @@ const desktopTheme: ThemeConfig = {
     Button: { paddingInlineSM: 10, defaultColor: '#44624d', defaultShadow: 'none', primaryShadow: 'none' },
     Form: { itemMarginBottom: 14, verticalLabelPadding: '0 0 6px', labelColor: '#67786d' },
     Tabs: { horizontalItemPaddingSM: '5px 8px', cardHeightSM: 28 },
+    Table: { headerBg: '#f8faf8', headerColor: '#596c5b', rowHoverBg: '#f1f7f0',
+      rowSelectedBg: '#e6f0e5', rowSelectedHoverBg: '#dfeedd', borderColor: '#e4ebe5',
+      cellFontSizeSM: 12, cellPaddingBlockSM: 6, cellPaddingInlineSM: 10 },
     Modal: { titleFontSize: 12, headerBg: '#fdfefc' }
   }
 }

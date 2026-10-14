@@ -1,12 +1,13 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Checkbox } from 'antd'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react'
+import { Checkbox, Dropdown, Input, Select, Table, type TableColumnsType } from 'antd'
 import { ChevronLeft, ChevronRight, PanelBottomClose, LocateFixed } from 'lucide-react'
 import {
   applyFieldFilter,
   computeFieldStats,
   sortFeatures,
   type FieldFilterCondition,
-  type FieldFilterOp
+  type FieldFilterOp,
+  type GisFeature
 } from '@desktop-webgis/gis-core'
 import { useProjectStore } from '@/stores/project.store'
 import { useWorkbenchStore } from '@/stores/workbench.store'
@@ -17,6 +18,7 @@ import { zoomMapToFeature, zoomMapToSelected } from '@/features/map/map-runtime-
 import { FieldCalculator } from './FieldCalculator'
 import { parseCellValue, resolveDatasetFields } from './field-edits'
 import { FieldSchemaDialog } from './FieldSchemaDialog'
+import { ColumnResizeHandle } from './ColumnResizeHandle'
 
 const PAGE_SIZE = 100
 
@@ -101,6 +103,8 @@ export function AttributeTable({
   const [cellError, setCellError] = useState('')
   const [calculatorOpen, setCalculatorOpen] = useState(false)
   const [columnsOpen, setColumnsOpen] = useState(false)
+  const [selectionMenuOpen, setSelectionMenuOpen] = useState(false)
+  const selectionMenuTrigger = useRef<ComponentRef<typeof Button>>(null)
   const [fieldEdit, setFieldEdit] = useState<{ mode: 'add' | 'rename' | 'remove'; name?: string } | null>(null)
 
   const selectedLayer = selectedLayerId
@@ -266,6 +270,68 @@ export function AttributeTable({
     setEditing(null)
   }
 
+  function columnWidth(field: string): number {
+    const saved = tableState?.columnWidths
+    const width = saved && Object.hasOwn(saved, field) ? saved[field] : undefined
+    return typeof width === 'number' && Number.isFinite(width) ? Math.max(80, Math.min(600, width)) : 160
+  }
+
+  const columns: TableColumnsType<GisFeature> = [
+    { key: 'selection', title: '', width: 36, render: (_, feature) => <Checkbox
+      checked={selectionIds.has(feature.id)} aria-label={`选择 ${feature.id}`}
+      onClick={(event) => event.stopPropagation()}
+      onChange={() => selectedLayerId && toggleFeatureSelection(selectedLayerId, feature.id, true)} /> },
+    { key: 'index', title: '#', width: 44, render: (_, __, index) => (safePage - 1) * PAGE_SIZE + index + 1 },
+    { key: 'id', title: 'ID', width: 220, onHeaderCell: () => ({ tabIndex: 0, className: 'sortable',
+      title: '按稳定 Feature ID 排序（清除字段排序）',
+      onClick: () => patchTable({ sortField: null, sortDirection: 'asc', currentPage: 1 }),
+      onKeyDown: (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault(); patchTable({ sortField: null, sortDirection: 'asc', currentPage: 1 })
+        }
+      } }), render: (_, feature) => <><Button variant="icon" className="attribute-locate"
+        title={`定位 ${feature.id}`} aria-label={`定位 ${feature.id}`}
+        onClick={(event) => { event.stopPropagation(); if (selectedLayerId) zoomMapToFeature(selectedLayerId, feature.id, null) }}>
+        <LocateFixed size={12} />
+      </Button><span className="attr-cell-value">{feature.id}</span></> },
+    ...visibleFields.map((field): TableColumnsType<GisFeature>[number] => ({
+      key: `field:${field}`, width: columnWidth(field),
+      title: <><span>{field}{sortField === field ? sortDirection === 'asc' ? ' ↑' : ' ↓' : ''}</span>
+        <ColumnResizeHandle field={field} width={columnWidth(field)} onChange={(width) =>
+          patchTable({ columnWidths: { ...tableState?.columnWidths, [field]: width } })} /></>,
+      onHeaderCell: () => ({ tabIndex: 0, className: 'sortable', 'aria-label': field,
+        'aria-sort': sortField === field ? sortDirection === 'asc' ? 'ascending' : 'descending' : 'none',
+        onClick: () => toggleSort(field), onKeyDown: (event) => {
+          if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault(); toggleSort(field)
+          }
+        } }),
+      onCell: (feature) => ({ tabIndex: 0, title: canEditCells ? '双击或按 Enter 编辑' : '双击或按 Enter 定位',
+        onKeyDown: (event) => {
+          if (editing?.featureId === feature.id && editing.field === field || event.key !== 'Enter') return
+          event.preventDefault(); event.stopPropagation()
+          if (canEditCells) startEdit(feature.id, field, feature.properties[field])
+          else if (selectedLayerId) zoomMapToFeature(selectedLayerId, feature.id, null)
+        },
+        onDoubleClick: (event) => {
+          event.stopPropagation()
+          if (canEditCells) startEdit(feature.id, field, feature.properties[field])
+          else if (selectedLayerId) zoomMapToFeature(selectedLayerId, feature.id, null)
+        } }),
+      render: (_, feature) => editing?.featureId === feature.id && editing.field === field ? <Input
+        className="cell-editor" value={editValue} autoFocus
+        onClick={(event) => event.stopPropagation()} onChange={(event) => setEditValue(event.target.value)} onBlur={commitEdit}
+        onKeyDown={(event) => {
+          if (event.nativeEvent.isComposing) return
+          if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); commitEdit() }
+          if (event.key === 'Escape') { event.stopPropagation(); cancelledEdit.current = true; setEditing(null) }
+        }} /> : <span className={`attr-cell-value${typeof feature.properties[field] === 'number' ? ' attr-cell-number' : ''}`}>
+        {feature.properties[field] == null || feature.properties[field] === '' ? '—' : typeof feature.properties[field] === 'object'
+          ? JSON.stringify(feature.properties[field]) : String(feature.properties[field])}
+      </span>
+    }))
+  ]
+  const tableWidth = 300 + visibleFields.reduce((sum, field) => sum + columnWidth(field), 0)
   const emptySelectedOnly = selectedOnly && selectionIds.size === 0
   const recordStatus = `全部 ${allFeatures.length} · 过滤后 ${filteredFeatures.length} · 显示 ${viewFeatures.length}${selectionIds.size > 0 || selectedOnly ? ` · 选中 ${selectionIds.size}` : ''}`
 
@@ -275,7 +341,7 @@ export function AttributeTable({
         {targetPicker}
         {selectedLayer && <>
           <label className="attr-search">
-            <input
+            <Input
               type="search"
               aria-label="表内搜索"
               value={searchQuery}
@@ -287,9 +353,7 @@ export function AttributeTable({
             />
           </label>
 
-          <label className="attr-check">
-            <input
-              type="checkbox"
+          <Checkbox className="attr-check"
               checked={selectedOnly}
               onChange={(event) =>
                 patchTable({
@@ -297,56 +361,22 @@ export function AttributeTable({
                   currentPage: 1
                 })
               }
-            />
-            仅选中
-          </label>
+            >仅选中</Checkbox>
 
-          <details
-            className="attr-selection-actions"
-            onBlur={(event) => {
-              if (!event.currentTarget.contains(event.relatedTarget)) {
-                event.currentTarget.open = false
-              }
-            }}
-            onClick={(event) => {
-              if (event.target instanceof HTMLElement && event.target.closest('button')) {
-                event.currentTarget.open = false
-              }
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') {
-                event.preventDefault()
-                event.stopPropagation()
-                event.currentTarget.open = false
-                event.currentTarget.querySelector('summary')?.focus()
-              }
-            }}
-          >
-            <summary>选择</summary>
-            <div>
-              <Button
-                variant="ghost"
-                title="选择图层过滤结果；表内搜索不改变此范围"
-                onClick={() => selectedLayerId && selectMatching(selectedLayerId)}
-              >
-                选择匹配记录
-              </Button>
-              <Button variant="ghost" onClick={() => zoomMapToSelected()}
-                disabled={selection.layerId !== selectedLayerId || selection.featureIds.length === 0}>
-                定位选中要素
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => clearSelection()}
-                disabled={
-                  selection.layerId !== selectedLayerId ||
-                  selection.featureIds.length === 0
-                }
-              >
-                清除选择
-              </Button>
-            </div>
-          </details>
+          <Dropdown trigger={['click']} autoFocus open={selectionMenuOpen} onOpenChange={(open) => {
+            setSelectionMenuOpen(open)
+            if (!open) queueMicrotask(() => selectionMenuTrigger.current?.focus())
+          }} menu={{ onClick: () => { setSelectionMenuOpen(false); selectionMenuTrigger.current?.focus() }, items: [
+            { key: 'matching', label: '选择匹配记录', title: '选择图层过滤结果；表内搜索不改变此范围',
+              onClick: () => selectedLayerId && selectMatching(selectedLayerId) },
+            { key: 'locate', label: '定位选中要素', disabled: selection.layerId !== selectedLayerId || !selection.featureIds.length,
+              onClick: () => zoomMapToSelected() },
+            { key: 'clear', label: '清除选择', disabled: selection.layerId !== selectedLayerId || !selection.featureIds.length,
+              onClick: () => clearSelection() }
+          ] }}>
+            <Button ref={selectionMenuTrigger} variant="ghost" className="attr-selection-actions"
+              aria-label="选择" aria-haspopup="menu" aria-expanded={selectionMenuOpen}>选择 ▾</Button>
+          </Dropdown>
           <Button
             variant="ghost"
             aria-expanded={filterOpen}
@@ -411,7 +441,7 @@ export function AttributeTable({
           <Button variant="ghost" aria-label={`删除字段 ${name}`} disabled={!canEditCells}
             onClick={() => setFieldEdit({ mode: 'remove', name })}>删除</Button>
         </div>)}
-        <Button variant="ghost" onClick={() => patchTable({ hiddenFields: [], fieldOrder: [] })}>重置列显示</Button>
+        <Button variant="ghost" onClick={() => patchTable({ hiddenFields: [], fieldOrder: [], columnWidths: {} })}>重置列显示</Button>
       </section>}
       {selectedLayerId && fieldEdit && <FieldSchemaDialog layerId={selectedLayerId} {...fieldEdit}
         onClose={() => setFieldEdit(null)} />}
@@ -421,29 +451,11 @@ export function AttributeTable({
           <span className="attr-filter-label" title="应用后同时影响地图与此表">
             图层过滤 · 影响地图和表格
           </span>
-          <select
-            value={draftField}
-            onChange={(e) => setDraftField(e.target.value)}
-          >
-            <option value="">字段…</option>
-            {fieldNames.map((field) => (
-              <option key={field} value={field}>
-                {field}
-              </option>
-            ))}
-          </select>
-          <select
-            value={draftOp}
-            onChange={(e) => setDraftOp(e.target.value as FieldFilterOp)}
-          >
-            {FILTER_OPS.map((op) => (
-              <option key={op.value} value={op.value}>
-                {op.label}
-              </option>
-            ))}
-          </select>
+          <Select aria-label="过滤字段" placeholder="字段…" value={draftField || undefined}
+            onChange={setDraftField} options={fieldNames.map((field) => ({ value: field, label: field }))} />
+          <Select aria-label="过滤操作" value={draftOp} onChange={setDraftOp} options={FILTER_OPS} />
           {needsValue(draftOp) && (
-            <input
+            <Input aria-label="过滤值"
               value={draftValue}
               onChange={(e) => setDraftValue(e.target.value)}
               placeholder="值"
@@ -495,13 +507,13 @@ export function AttributeTable({
                     ? ` ${String(condition.value ?? '')}`
                     : ''}
                 </code>
-                <button
+                <Button variant="icon"
                   type="button"
                   onClick={() => removeFilterCondition(index)}
                   aria-label="移除条件"
                 >
                   ×
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -512,16 +524,8 @@ export function AttributeTable({
         <div className="attr-stats" aria-label="字段统计">
           <label>
             统计字段
-            <select
-              value={statsTargetField}
-              onChange={(e) => patchTable({ statsField: e.target.value })}
-            >
-              {fieldNames.map((field) => (
-                <option key={field} value={field}>
-                  {field}
-                </option>
-              ))}
-            </select>
+            <Select aria-label="统计字段" value={statsTargetField} onChange={(value) => patchTable({ statsField: value })}
+              options={fieldNames.map((field) => ({ value: field, label: field }))} />
           </label>
           <span>
             范围：图层过滤结果 · 非空 {stats.nonNull} / 空{' '}
@@ -540,214 +544,32 @@ export function AttributeTable({
           setAttributeTableState(selectedLayerId, { scrollTop, scrollLeft })
         }
       }}>
-        {selectedLayer && !emptySelectedOnly && pageRows.length > 0 ? (
-          <table>
-            <thead>
-              <tr>
-                <th style={{ width: 36 }} />
-                <th style={{ width: 48 }}>#</th>
-                <th
-                  className="sortable"
-                  tabIndex={0}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      patchTable({
-                        sortField: null,
-                        sortDirection: 'asc',
-                        currentPage: 1
-                      })
-                    }
-                  }}
-                  title="按稳定 Feature ID 排序（清除字段排序）"
-                  onClick={() =>
-                    patchTable({
-                      sortField: null,
-                      sortDirection: 'asc',
-                      currentPage: 1
-                    })
-                  }
-                >
-                  ID
-                </th>
-                {visibleFields.map((field) => (
-                  <th
-                    key={field}
-                    className="sortable"
-                    tabIndex={0}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault()
-                        toggleSort(field)
-                      }
-                    }}
-                    onClick={() => toggleSort(field)}
-                    aria-sort={
-                      sortField === field
-                        ? sortDirection === 'asc'
-                          ? 'ascending'
-                          : 'descending'
-                        : 'none'
-                    }
-                  >
-                    {field}
-                    {sortField === field
-                      ? sortDirection === 'asc'
-                        ? ' ↑'
-                        : ' ↓'
-                      : ''}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {pageRows.map((feature, index) => {
-                const selected = selectionIds.has(feature.id)
-                return (
-                  <tr
-                    key={feature.id}
-                    data-feature-id={feature.id}
-                    className={selected ? 'row-selected' : undefined}
-                    tabIndex={0}
-                    title="双击行或按 Enter 定位"
-                    onDoubleClick={(event) => {
-                      if ((event.target as HTMLElement).closest('input,button')) return
-                      if (selectedLayerId) zoomMapToFeature(selectedLayerId, feature.id, null)
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.target !== event.currentTarget || event.key !== 'Enter') return
-                      event.preventDefault()
-                      if (selectedLayerId) zoomMapToFeature(selectedLayerId, feature.id, null)
-                    }}
-                    onClick={(event) => {
-                      if (!selectedLayerId) return
-                      if (event.metaKey || event.ctrlKey) toggleFeatureSelection(selectedLayerId, feature.id, true)
-                      else if (!selected) useProjectStore.getState().setSelection({ layerId: selectedLayerId, featureIds: [feature.id] })
-                    }}
-                  >
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selected}
-                        onClick={(event) => event.stopPropagation()}
-                        onChange={() =>
-                          selectedLayerId &&
-                          toggleFeatureSelection(
-                            selectedLayerId,
-                            feature.id,
-                            true
-                          )
-                        }
-                        aria-label={`选择 ${feature.id}`}
-                      />
-                    </td>
-                    <td>{(safePage - 1) * PAGE_SIZE + index + 1}</td>
-                    <td>
-                      <button className="attribute-locate" title={`定位 ${feature.id}`} aria-label={`定位 ${feature.id}`}
-                        onClick={(event) => { event.stopPropagation(); if (selectedLayerId) zoomMapToFeature(selectedLayerId, feature.id, null) }}>
-                        <LocateFixed size={12} />
-                      </button>{feature.id}
-                    </td>
-                    {visibleFields.map((field) => {
-                      const value = feature.properties[field]
-                      const isEditing =
-                        editing?.featureId === feature.id &&
-                        editing.field === field
-                      return (
-                        <td
-                          key={field}
-                          tabIndex={0}
-                          title={
-                            canEditCells
-                              ? '双击或按 Enter 编辑'
-                              : '双击或按 Enter 定位'
-                          }
-                          onKeyDown={(event) => {
-                            if (!isEditing && event.key === 'Enter') {
-                              event.preventDefault()
-                              event.stopPropagation()
-                              if (canEditCells) startEdit(feature.id, field, value)
-                              else if (selectedLayerId) zoomMapToFeature(selectedLayerId, feature.id, null)
-                            }
-                          }}
-                          onDoubleClick={(event) => {
-                            event.stopPropagation()
-                            if (canEditCells) startEdit(feature.id, field, value)
-                            else if (selectedLayerId) zoomMapToFeature(selectedLayerId, feature.id, null)
-                          }}
-                        >
-                          {isEditing ? (
-                            <input
-                              className="cell-editor"
-                              value={editValue}
-                              autoFocus
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) => setEditValue(e.target.value)}
-                              onBlur={commitEdit}
-                              onKeyDown={(e) => {
-                                if (e.nativeEvent.isComposing) return
-                                if (e.key === 'Enter') {
-                                  e.preventDefault()
-                                  e.stopPropagation()
-                                  commitEdit()
-                                }
-                                if (e.key === 'Escape') {
-                                  e.stopPropagation()
-                                  cancelledEdit.current = true
-                                  setEditing(null)
-                                }
-                              }}
-                            />
-                          ) : value != null && value !== '' ? (
-                            String(value)
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                      )
-                    })}
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>名称</th>
-                <th>类型</th>
-                <th>状态</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td colSpan={4} className="empty-table-cell">
-                  {!selectedLayer ? (
-                    '请选择一个图层'
-                  ) : emptySelectedOnly ? (
-                    <div className="empty-selected-only">
-                      <p>当前无选中要素（仅选中模式）</p>
-                      <Button
-                        variant="ghost"
-                        onClick={() =>
-                          patchTable({ selectedOnly: false, currentPage: 1 })
-                        }
-                      >
-                        清除“仅选中”查看模式
-                      </Button>
-                    </div>
-                  ) : allFeatures.length === 0 ? (
-                    '该图层暂无属性数据'
-                  ) : (
-                    '无匹配记录'
-                  )}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        )}
+        <Table<GisFeature> className="attribute-data-table" size="small" bordered tableLayout="fixed"
+          rowKey="id" pagination={false} columns={columns}
+          dataSource={selectedLayer && !emptySelectedOnly ? pageRows : []}
+          style={{ width: tableWidth, minWidth: '100%' }}
+          rowClassName={(feature) => selectionIds.has(feature.id) ? 'row-selected' : ''}
+          onRow={(feature) => ({
+            'data-feature-id': feature.id, tabIndex: 0, title: '双击行或按 Enter 定位',
+            onDoubleClick: (event) => {
+              if ((event.target as HTMLElement).closest('input,button')) return
+              if (selectedLayerId) zoomMapToFeature(selectedLayerId, feature.id, null)
+            },
+            onKeyDown: (event) => {
+              if (event.target !== event.currentTarget || event.key !== 'Enter') return
+              event.preventDefault()
+              if (selectedLayerId) zoomMapToFeature(selectedLayerId, feature.id, null)
+            },
+            onClick: (event) => {
+              if (!selectedLayerId) return
+              if (event.metaKey || event.ctrlKey) toggleFeatureSelection(selectedLayerId, feature.id, true)
+              else if (!selectionIds.has(feature.id)) useProjectStore.getState().setSelection({ layerId: selectedLayerId, featureIds: [feature.id] })
+            }
+          })}
+          locale={{ emptyText: !selectedLayer ? '请选择一个图层' : emptySelectedOnly ? <div className="empty-selected-only">
+            <p>当前无选中要素（仅选中模式）</p>
+            <Button variant="ghost" onClick={() => patchTable({ selectedOnly: false, currentPage: 1 })}>清除“仅选中”查看模式</Button>
+          </div> : allFeatures.length === 0 ? '该图层暂无属性数据' : '无匹配记录' }} />
       </div>
 
       {selectedLayer && (
