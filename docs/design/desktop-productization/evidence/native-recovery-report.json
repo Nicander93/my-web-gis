@@ -1,0 +1,28 @@
+{
+  "identifier": "com.desktop-webgis.recovery-acceptance-1791971406313",
+  "output": "D:\\my-code-repo\\my-web-gis\\apps\\desktop\\test-results\\native-recovery-1791971406313",
+  "scenarios": [
+    {
+      "name": "2D native process termination, startup restore and native save",
+      "passed": true
+    },
+    {
+      "name": "3D real GLB transform, native process termination and restore",
+      "passed": true
+    }
+  ],
+  "nativeFileChooser": "Not automated: fixture working paths are assigned; Save uses the real native bridge.",
+  "windowsScale125": "Not verified",
+  "appData": "C:\\Users\\PC\\AppData\\Local\\com.desktop-webgis.recovery-acceptance-1791971406313",
+  "viewport": {
+    "width": 1037,
+    "height": 648,
+    "devicePixelRatio": 1.3899999856948853
+  },
+  "modelVisibilityPixels": {
+    "visible": 51355,
+    "hidden": 14806,
+    "restored": 51348
+  },
+  "recoveredModelPixels": 51346
+}

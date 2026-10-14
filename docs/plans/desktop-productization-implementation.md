@@ -87,11 +87,11 @@ rtk pnpm --filter @desktop-webgis/desktop test:e2e folders.e2e.ts --project=desk
 | M4 | 分页、搜索、过滤、统计、属性单元格、处理算法/取消；多图层 Tab、原子字段计算、字段管理、面合并/分割、列显示/排序/宽度和 antd Table | 完整空间运算验收及处理工具控件迁移 |
 | M5 | point/polyline/polygon Graphic、几何编辑、对象独立样式 | 共享 Graphic 渲染池、连续 POI、Billboard/Label/rectangle/ellipse 等及 500 对象验收 |
 | M6 | 本地二维文件、多 GeoJSON 批次、原子导入/Undo/Redo、读取取消与工程归属保护；WMS/WMTS/WFS、三维资源加载、失败重试 | 混合格式配置队列、服务导入历史、大文件 Worker；二三维添加数据壳、基于项目路径的资源引用/另存重算、父目录重定位 |
-| M7 | 原生原子替换、串行保存/版本与工程会话保护、格式校验及草稿保护 | 恢复草稿缓存/恢复舍弃、异常退出组合、Tauri 窗口及 125% 原生验收 |
+| M7 | 原生原子替换、串行保存/版本与工程会话保护、格式校验及草稿保护；独立恢复缓存、启动恢复/舍弃、容量/保留期与保存清理；Tauri 二维属性/三维 GLB 强制退出恢复 | 系统文件选择窗口、原生完整本地资源组合与 Windows 125% 缩放验收 |
 | M8 | 独立 cesium-tileset-edit Gizmo 与可用样例模型 | Tileset 独立裁剪、坐标正确的局部压平、多变换/LOD/GPU 清理；基础测量 |
 | M9 | 本阶段窗口 E2E 与已有真实 GIS E2E | 真实指标诊断、任务日志、全量 20 项矩阵、原生和 GPU 综合验收 |
 
-本记录不表示 M0–M9 全量完成，也不表示压平/恢复草稿已经实现。M8 未实施前不得给它标记“GPU 验收通过”。现有样例 `examples/city-3d/city-sample` 可用，但不能代替两套空间变换不同、含 LOD 的完整效果测试。
+本记录不表示 M0–M9 全量完成。恢复草稿已实现，Windows 文件层、浏览器与 Tauri 二维属性/三维 GLB 恢复证据见后文 M7 批次；系统文件选择及原生完整组合仍待专项签收。M8 裁剪/压平尚未实施，不得标记“GPU 验收通过”。现有样例 `examples/city-3d/city-sample` 可用，但不能代替两套空间变换不同、含 LOD 的完整效果测试。
 
 ## 验证记录
 
@@ -230,6 +230,12 @@ Desktop build 通过；`attribute-tabs.e2e.ts`、`field-schema.e2e.ts` 在 1366�
 
 最终 Desktop build、261 项单测（5 项既有环境跳过）、15 项 Rust 测试通过。Rust 父测试实际运行两个默认 ignored 的退出探针，分别验证临时写入中退出不损坏旧文件、缓存提交后退出仍可重读。1366×768 完整浏览器回归 60 项通过；1440×900 与 1920×1080 恢复专项再通过 6 项，三个尺寸合计 9 项恢复交互。新交互先确认最新属性/光照修改进入真实缓存，再关闭页面和恢复，比较完整图层/数据与三维分组、光照、效果、节点/资源，最后保存并检查缓存清理。[恢复启动截图](../design/desktop-productization/evidence/laptop-recovery-startup.png)。原生 Tauri 界面、125% 缩放与完整资源组合仍待专项签收，E18 保持“部分”。
 
+## M7 Tauri 原生恢复专项（2026-10-14）
+
+通过 `native-recovery-acceptance.mjs` 启动独立标识的真实 Tauri/WebView2，检查原生桥/应用标识/应用数据目录，对二维属性计算与三维真实 GLB 缩放分别执行强制结束进程树、重启、启动恢复、原生保存和草稿清理。完整数据及 ID 保持，旧正式文件字节不变；GLB 显隐对照像素由 51,355 降至 14,806，再恢复至 51,348。测试实际 viewport 1037×648、DPR 约 1.39；保存工作路径预先绑定，系统文件选择与 Windows 125% 未覆盖。
+
+最终脚本运行退出码 0；隔离及普通 debug 原生构建均通过，仅有现有 linker 信息警告；正常 debug 配置已恢复，测试应用/服务均结束。代码范围为验收脚本和证据文档，不修改生产功能或无关 Cargo.toml。[原生报告](../design/desktop-productization/evidence/native-recovery-report.json)、[启动截图](../design/desktop-productization/evidence/native-recovery-startup.png)、[GLB 恢复截图](../design/desktop-productization/evidence/native-city-recovery.png)。E18 增加原生核心流程证据，完整组合继续保持部分签收。
+
 ## 20 项验收矩阵的当前证据
 
 “部分”表示已有自动化覆盖部分行为，不等于该条完整签收。
@@ -253,6 +259,6 @@ Desktop build 通过；`attribute-tabs.e2e.ts`、`field-schema.e2e.ts` 在 1366�
 | E15 | 部分 | 新建/打开/场景导入草稿保护、文件选择期间新编辑保护、三维相机与保存重开浏览器回归通过；完整原生组合待补 |
 | E16 | 部分 | GLB URL 失效、保留节点和修改地址重试通过；本地路径重定位未签收 |
 | E17 | 浏览器通过 | 浮动位置、可见性、重启与重置的本机布局回归 |
-| E18 | 部分 | 独立持久缓存、恢复/舍弃、格式/容量/保留期、保存清理、二维属性与三维分组/光照浏览器恢复通过；Windows 文件层两种异常退出通过，Tauri 界面强制退出/原生完整组合未签收 |
+| E18 | 部分 | 恢复/舍弃与缓存保护浏览器/文件层通过；真实 Tauri 二维属性/三维 GLB 强制退出、重启恢复、原生保存清理通过；系统文件选择、125% 与完整本地资源组合待补 |
 | E19 | 部分 | IME/表内输入/地图 Esc/窗口手势取消通过；所有三维工具完整焦点矩阵待补 |
 | E20 | 待实现 | 引擎实际指标诊断与空闲状态 |
