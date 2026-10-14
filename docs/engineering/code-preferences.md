@@ -17,6 +17,12 @@
 - UI 不直接散落操作 OpenLayers API；通过 runtime/service 或 command 连接外部能力。
 - 面板容器负责开关、尺寸、恢复入口和布局；具体 Feature 通过 `children` 注入，不让容器反向 import Feature。
 
+## Desktop 通用组件
+
+- 按用户 2026-10-13 补充要求，通用控件统一使用 Ant Design React（antd），主题与密度服从已确认的二维/三维 HTML 原型。
+- 新增 Button/Input/Select/Checkbox/Form/Dropdown/Tabs/Modal/Table 等不再手写原生控件；既有控件按功能批次迁移。业务包装保持轻薄，不伪造 DOM 事件适配库组件。
+- Docking、地图画布、GIS 控制柄及系统文件对话框保留真实业务边界。详细迁移顺序和验收见 [实施补充细则](../design/desktop-productization/implementation-addendum.md)。
+
 ## 注释与命名
 
 - 类、公开函数和非显然的关键逻辑添加简短注释，说明职责或原因。

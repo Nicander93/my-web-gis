@@ -5,6 +5,8 @@
 **参考仓库**：<https://github.com/Nicander93/cesium-demo>  
 **状态**：用户已确认沿用本交付包内两个 HTML 作为最终原型，接下来由 Agent 完成二、三维产品化重构。
 
+后续用户要求见 [实施补充细则](../implementation-addendum.md)：通用组件明确使用 Ant Design，原型直接实施，不再安排评审。
+
 ## 文件目录
 
 ```text

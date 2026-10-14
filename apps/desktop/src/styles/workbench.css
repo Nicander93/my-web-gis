@@ -241,6 +241,12 @@
   overflow: hidden;
 }
 .attribute-table-tab-panel[hidden] { display: none; }
+.attribute-table-ant-tabs { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.attribute-table-ant-tabs > .ant-tabs-nav, .attribute-table-ant-tabs > .ant-tabs-header { margin: 0; flex-shrink: 0; }
+.attribute-table-ant-tabs > .ant-tabs-body-holder { flex: 1; min-height: 0; overflow: hidden; position: relative; }
+.attribute-table-ant-tabs .ant-tabs-body { position: absolute; inset: 0; }
+.attribute-table-ant-tabs .ant-tabs-content { height: 100%; }
+.attribute-table-ant-tabs .attribute-table-tab-panel { height: 100%; }
 .attribute-table-tab-bar { display: flex; flex-shrink: 0; min-width: 0; align-items: center; border-bottom: 1px solid var(--color-border); }
 .attribute-table-tab-bar .table-target-picker { max-width: 160px; min-width: 80px; height: 28px; }
 .attribute-table-tabs { display: flex; flex-shrink: 0; overflow-x: auto; border-bottom: 1px solid var(--color-border); }
@@ -268,7 +274,7 @@
 .attribute-table-content .table-scroll {
   height: auto;
   flex: 1;
-  min-height: 60px;
+  min-height: 0;
 }
 /* 统一产品表面：使用明确边界与状态，不依赖漂浮卡片。 */
 :root {

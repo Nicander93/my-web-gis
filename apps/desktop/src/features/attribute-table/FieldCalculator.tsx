@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { AutoComplete, Button, Checkbox, Input, Select } from 'antd'
 import { createId, SetDatasetContentCommand, type DatasetField, type GisFeature } from '@desktop-webgis/gis-core'
 import { useProjectStore } from '@/stores/project.store'
 import { useWorkbenchStore } from '@/stores/workbench.store'
@@ -45,23 +46,22 @@ export function FieldCalculator({ layerId, filteredFeatures, selectedIds, onClos
     }
   }
   return <section className="attr-field-calculator" aria-label="字段计算器">
-    <label>字段<input aria-label="计算字段名" value={name} list={`fields-${layerId}`}
-      onChange={(event) => setName(event.target.value)} /></label>
-    <datalist id={`fields-${layerId}`}>{fields.map((field) => <option key={field.name} value={field.name} />)}</datalist>
-    <label>类型<select aria-label="计算字段类型" value={existing?.type ?? type} disabled={!!existing}
-      onChange={(event) => setType(event.target.value as DatasetField['type'])}>
-      <option value="number">数值</option><option value="string">文本</option>
-      <option value="boolean">布尔</option><option value="json">JSON</option>
-    </select></label>
-    <label><input type="checkbox" checked={existing?.nullable ?? nullable} disabled={!!existing}
-      onChange={(event) => setNullable(event.target.checked)} />允许空值</label>
-    <label>范围<select aria-label="计算范围" value={scope} onChange={(event) => setScope(event.target.value as CalculationScope)}>
-      <option value="all">全部记录</option><option value="filtered">图层过滤后</option><option value="selected">选中记录</option>
-    </select></label><span>{targets.length} 条</span>
-    <label className="attr-expression">表达式<input aria-label="字段计算表达式" value={expression}
+    <label>字段<AutoComplete value={name} onChange={setName} style={{ width: 150 }}
+      options={fields.map((field) => ({ value: field.name }))}>
+      <Input aria-label="计算字段名" />
+    </AutoComplete></label>
+    <label>类型<Select aria-label="计算字段类型" style={{ width: 80 }} value={existing?.type ?? type} disabled={!!existing}
+      onChange={setType} options={[{ value: 'number', label: '数值' }, { value: 'string', label: '文本' },
+        { value: 'boolean', label: '布尔' }, { value: 'json', label: 'JSON' }]} /></label>
+    <Checkbox checked={existing?.nullable ?? nullable} disabled={!!existing}
+      onChange={(event) => setNullable(event.target.checked)}>允许空值</Checkbox>
+    <label>范围<Select aria-label="计算范围" style={{ width: 115 }} value={scope} onChange={setScope}
+      options={[{ value: 'all', label: '全部记录' }, { value: 'filtered', label: '图层过滤后' },
+        { value: 'selected', label: '选中记录' }]} /></label><span>{targets.length} 条</span>
+    <label className="attr-expression">表达式<Input aria-label="字段计算表达式" value={expression}
       placeholder={'例如 field("人口") * 2'} onChange={(event) => setExpression(event.target.value)} /></label>
-    <button type="button" onClick={apply} disabled={!canEdit}>应用计算</button>
-    <button type="button" onClick={onClose}>关闭计算器</button>
+    <Button type="primary" onClick={apply} disabled={!canEdit}>应用计算</Button>
+    <Button onClick={onClose}>关闭计算器</Button>
     <small>支持 field、coalesce、round、concat 和算术运算；表内搜索不改变计算范围。覆盖已有字段保留原类型。</small>
     {!canEdit && <span>只读：请设置当前图层为编辑目标</span>}
     {message && <span role={failed ? 'alert' : 'status'}>{message}</span>}

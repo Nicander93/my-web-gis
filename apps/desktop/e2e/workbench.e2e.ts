@@ -49,13 +49,17 @@ test('CSV configuration keeps one modal and restores keyboard access after cance
   })
   const dialog = page.getByRole('dialog', { name: 'CSV 坐标', exact: true })
   await expect(dialog).toBeVisible()
-  await expect(page.locator('.dialog-overlay')).toHaveCount(1)
+  await expect(page.getByRole('dialog')).toHaveCount(1)
   await expect(dialog.getByLabel('经度 (X)', { exact: true })).toBeFocused()
   await dialog.getByLabel('坐标系', { exact: true }).selectOption('EPSG:3857')
   await expect(dialog.getByLabel('X (米)', { exact: true })).toBeVisible()
   await expect(dialog.getByLabel('Y (米)', { exact: true })).toBeVisible()
   for (let index = 0; index < 12; index++) {
     await page.keyboard.press('Tab')
+    expect(await dialog.evaluate(element => element.contains(document.activeElement))).toBe(true)
+  }
+  for (let index = 0; index < 12; index++) {
+    await page.keyboard.press('Shift+Tab')
     expect(await dialog.evaluate(element => element.contains(document.activeElement))).toBe(true)
   }
   await page.screenshot({ path: testInfo.outputPath('csv.png') })
@@ -156,9 +160,9 @@ test('table binding survives browsing; filters apply explicitly and scope stays 
   await importLayer(page, 'lines')
   await page.locator('.layer-name-button').filter({ hasText: 'points' }).click()
   await page.getByRole('button', { name: '属性表', exact: true }).click()
-  const selected = await page.getByLabel('属性表图层').inputValue()
+  await expect(page.locator('.table-target-picker')).toContainText('points')
   await page.locator('.layer-name-button').filter({ hasText: 'lines' }).click()
-  await expect(page.getByLabel('属性表图层')).toHaveValue(selected)
+  await expect(page.locator('.table-target-picker')).toContainText('points')
   await expect(page.getByLabel('图层字段过滤')).toBeHidden()
   await expect(page.getByLabel('字段统计', { exact: true })).toBeHidden()
   const toolbar = page.getByLabel('属性表工具')

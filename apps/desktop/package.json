@@ -28,6 +28,7 @@
     "@desktop-webgis/vector-io": "workspace:*",
     "@tauri-apps/api": "^2.7.0",
     "@tauri-apps/plugin-dialog": "^2.3.3",
+    "antd": "6.6.6",
     "cesium": "^1.145.0",
     "lucide-react": "^1.38.0",
     "nanoid": "^5.1.5",

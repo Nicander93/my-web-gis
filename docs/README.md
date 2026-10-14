@@ -22,6 +22,7 @@
 ### 阶段计划与验收
 
 - [2026-10-13 Desktop 产品化实施记录](plans/desktop-productization-implementation.md)：采用用户交付包的 M0–M9 方案，首批 Shell/Docking 改动、回归基线及尚未实施的范围。
+- [实施补充细则](design/desktop-productization/implementation-addendum.md)：已确认原型直接实施、明确采用 Ant Design、组件迁移顺序与最终 PR 验收要求。
 
 位于 [\plans/\](plans/)：
 

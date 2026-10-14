@@ -1,12 +1,15 @@
-import type { ButtonHTMLAttributes } from 'react'
+import { Button as AntButton, type ButtonProps as AntButtonProps } from 'antd'
 
 type ButtonVariant = 'default' | 'primary' | 'ghost' | 'icon' | 'tab'
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps extends Omit<AntButtonProps, 'type' | 'variant'> {
   variant?: ButtonVariant
+  type?: AntButtonProps['htmlType']
 }
 
-/** 提供 Desktop Shell 使用的轻量按钮基元。 */
-export function Button({ variant = 'default', className = '', ...props }: ButtonProps) {
-  return <button className={`ui-button ui-button-${variant} ${className}`.trim()} {...props} />
+/** Keeps domain button variants while Ant Design owns control behavior. */
+export function Button({ variant = 'default', className = '', type = 'button', ...props }: ButtonProps) {
+  return <AntButton htmlType={type}
+    type={variant === 'primary' ? 'primary' : variant === 'ghost' || variant === 'icon' || variant === 'tab' ? 'text' : 'default'}
+    className={`ui-button ui-button-${variant} ${className}`.trim()} {...props} />
 }

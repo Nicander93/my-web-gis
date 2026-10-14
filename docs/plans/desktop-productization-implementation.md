@@ -2,6 +2,8 @@
 
 执行依据：[2026-10-13 交付包](../design/desktop-productization/webgis-agent-delivery/README.md)。包内 HTML 和截图是交互参考，不能作为 GIS 或 GPU 算法验收证据。
 
+2026-10-13 追加要求：[实施补充细则](../design/desktop-productization/implementation-addendum.md)。明确采用 Ant Design 通用组件，保持既定原型，组件迁移与 M0–M9 功能开发一起推进。
+
 ## 基线与边界
 
 - 2026-10-13 fetch 后，`origin/main` 为 `015774120577546514baadd30cc22b1c79d9dbe4`。
@@ -126,6 +128,17 @@ rtk pnpm --filter @desktop-webgis/desktop test:e2e docking.e2e.ts --project=desk
 - 过滤、统计、计算器和字段列表互斥展开，保留草稿但给表格数据行留下空间。字段新增/重命名/删除管理与面合并策略尚待下一批，未将 M4 整体标为完成。
 
 验证：全仓 `rtk pnpm build` 与 `rtk pnpm test` 通过，Desktop 221 通过、5 个原有环境项跳过。新增计算/Tab 回归与专注模式会话恢复在 1440×900、1366×768、1920×1080 三个尺寸共 6 项通过。旧会话 E2E 的选择器更新为当前可见 Tab，保留原来的数据、滚动和草稿断言。最终源码的全量 Desktop 主尺寸回归 45 项全部通过。[1366×768 字段显示与计算结果](../design/desktop-productization/evidence/laptop-table-fields.png)。
+
+## Ant Design 组件迁移 A 批次（2026-10-14）
+
+- 用户明确要求统一采用 Ant Design；补充细则和工程约定已更新。`antd 6.6.6` 已加入 Desktop，lockfile 保留精确依赖。
+- 全局 `DesktopUiProvider` 提供中文、small 尺寸、原型对应的绿色/浅灰 token，关闭双汉字按钮自动空格。库的中文排版行为不会改变既定操作名称。
+- 共享 Button 与 EditorDialog 改用 antd Button/Modal；属性表的多 Tab、图层选择和字段计算器使用 Tabs、Select、AutoComplete、Input、Checkbox 与 Button。
+- Modal 保留 Busy/Esc/遮罩边界，并处理条件卸载时触发控件的焦点恢复；补充边界 Tab/Shift+Tab 循环，避免浏览器把焦点移到 body。实际 CSV 回归保留首字段聚焦、前后向循环、关闭返回入口的断言。
+- antd 6 的 Tabs 使用实际 body-holder/body/content 容器约束高度；表格仍在窗口内双向滚动，切换 Tab/专注模式保留搜索、滚动和草稿。
+- 既有 Ribbon、菜单、导入/导出表单、属性表数据区、检查器及三维表单仍有手写控件，继续按 B/C/D 迁移；本批不表示全库控件已经统一，也不表示 M0–M9 完成。
+
+当前证据：Desktop 单测 221 通过、5 个原有环境项跳过；最终源码构建通过，Desktop 主尺寸全量 E2E 45 项通过，1366×768 与 1920×1080 的样式/计算/CSV 焦点/会话专项 8 项通过。Tab/Shift+Tab 循环、触发控件焦点恢复、分页栏留在窗口内、表格滚动/草稿恢复的断言全部保留。[1366×768 Ant Design 字段计算器](../design/desktop-productization/evidence/laptop-antd-field-calculator.png)。
 
 ## 20 项验收矩阵的当前证据
 
