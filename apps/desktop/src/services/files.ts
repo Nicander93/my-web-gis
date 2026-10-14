@@ -17,6 +17,11 @@ export async function pickFile(filters?: { name: string; extensions: string[] }[
   return selected
 }
 
+export async function pickFiles(filters?: { name: string; extensions: string[] }[]): Promise<string[]> {
+  const selected = await open({ multiple: true, directory: false, filters })
+  return selected == null ? [] : Array.isArray(selected) ? selected : [selected]
+}
+
 export async function pickSaveFile(options?: {
   title?: string
   defaultPath?: string

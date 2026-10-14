@@ -15,7 +15,7 @@ import {
 import { useProjectStore } from '@/stores/project.store'
 import { useWorkbenchStore } from '@/stores/workbench.store'
 import { useWorkspaceStore } from '@/stores/workspace.store'
-import { createId } from '@desktop-webgis/gis-core'
+import { commitLocalImport } from '@/features/add-data/local-import-command'
 import type { ImportResult } from '@/services/import'
 import type { ServiceLayerAddRequest } from '@/features/add-data/ServiceConnectPanel'
 import { startWfsBoundedLoad } from '@/services/wfs-commands'
@@ -64,7 +64,6 @@ export default function App() {
     useWorkbenchStore.getState().setRightTask('inspector')
   const [exportLayerId, setExportLayerId] = useState<string | null>(null)
   const [exportMode, setExportMode] = useState<ExportDialogMode>('export')
-  const addLayer = useProjectStore((state) => state.addLayer)
   const addServiceLayer = useProjectStore((state) => state.addServiceLayer)
 
   useEffect(() => {
@@ -163,20 +162,10 @@ export default function App() {
   }, [])
 
   function handleImport(result: ImportResult): void {
-    for (const layer of result.layers) {
-      const datasetId = createId('dataset')
-      addLayer(datasetId, layer.name, layer.features, layer.styleKind)
-
-      if (layer.warnings.length > 0) {
-        emitCommandStatus(
-          `已导入 ${layer.name}，有 ${layer.warnings.length} 个警告`
-        )
-      } else {
-        emitCommandStatus(
-          `已成功导入 ${layer.name}，共 ${layer.features.length} 个要素`
-        )
-      }
-    }
+    commitLocalImport(result)
+    const total = result.layers.reduce((sum, layer) => sum + layer.features.length, 0)
+    const warnings = result.layers.reduce((sum, layer) => sum + layer.warnings.length, 0)
+    emitCommandStatus(`已导入 ${result.layers.length} 个图层，共 ${total} 个要素${warnings ? `，有 ${warnings} 个警告` : ''}；可一步撤销`)
   }
 
   function handleAddServiceLayers(layers: ServiceLayerAddRequest[]): void {

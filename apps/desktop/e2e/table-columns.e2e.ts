@@ -43,7 +43,7 @@ test('column drag, keyboard, cancellation and rename retain per-table widths wit
   await page.keyboard.press('Shift+ArrowRight')
   await expect(handle()).toHaveAttribute('aria-valuenow', '232')
   expect(await page.evaluate(async () => (await import('/src/stores/project.store.ts')).useProjectStore.getState().getSnapshot())).toEqual(before)
-  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled()
   await page.screenshot({ path: info.outputPath('consistent-attribute-table.png') })
 
   await importTable(page, 'second')
@@ -63,4 +63,10 @@ test('column drag, keyboard, cancellation and rename retain per-table widths wit
   await expect(handle()).toHaveAttribute('aria-valuenow', '232')
   await panel().getByRole('button', { name: '重置列显示', exact: true }).click()
   await expect(handle()).toHaveAttribute('aria-valuenow', '160')
+  // Only the two imports remain after undoing the rename; layout edits add no history.
+  await page.getByRole('button', { name: '撤销', exact: true }).click()
+  await expect(page.locator('.layer-name-button')).toHaveCount(1)
+  await page.getByRole('button', { name: '撤销', exact: true }).click()
+  await expect(page.locator('.layer-name-button')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled()
 })

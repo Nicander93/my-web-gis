@@ -212,6 +212,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         }
       },
       applySnapshotEdit: (snapshot) => {
+        const project = normalizeLayerTree(cloneValue(snapshot.project)), featuresByDataset = cloneValue(snapshot.featuresByDataset)
         const state = get(), changes = getProjectSnapshotChanges(state.getSnapshot(), snapshot)
         const session = useSessionStore.getState(), workbench = useWorkbenchStore.getState()
         const stale = new Set([...changes.removedLayers, ...changes.dataChangedLayers])
@@ -227,7 +228,6 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         if (workbench.editLayerId && stale.has(workbench.editLayerId)) { workbench.setEditLayer(null); workbench.setActiveTool('none') }
         for (const id of changes.removedLayers) workbench.clearLayer(id)
         useSessionStore.setState({ sessions })
-        const project = normalizeLayerTree(cloneValue(snapshot.project)), featuresByDataset = cloneValue(snapshot.featuresByDataset)
         const selectedLayerId = project.layers.some(layer => layer.id === state.selectedLayerId) ? state.selectedLayerId : null
         const selected = project.layers.find(layer => layer.id === state.selection.layerId)
         const selection = selected ? { layerId: selected.id, featureIds: intersectSelectionIds(state.selection.featureIds,

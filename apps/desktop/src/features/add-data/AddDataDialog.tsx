@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { EditorDialog } from '@/components/ui/EditorDialog'
 import { isTauri } from '@tauri-apps/api/core'
 import { FileText, Upload, CheckCircle2, AlertCircle } from 'lucide-react'
-import { pickFile, readFile } from '@/services/files'
+import { pickFiles, readFile } from '@/services/files'
 import {
   importGeoJson,
   importShapefileZip,
@@ -15,6 +15,7 @@ import type { ImportResult } from '@/services/import'
 import type { CrsInfo } from '@desktop-webgis/vector-io'
 import { CRS_PRESETS } from '@desktop-webgis/vector-io'
 import { CsvConfigDialog } from './CsvConfigDialog'
+import { useProjectStore } from '@/stores/project.store'
 import type { CsvConfig } from './CsvConfigDialog'
 import {
   ServiceConnectPanel,
@@ -74,10 +75,20 @@ export function AddDataDialog({
   const [selectedDxfLayers, setSelectedDxfLayers] = useState<Set<string>>(
     new Set()
   )
+  const parseGeneration = useRef(0)
+  const openedProjectId = useRef<string | null>(null)
+  const openRef = useRef(open)
+  openRef.current = open
+  useEffect(() => {
+    if (open) openedProjectId.current = useProjectStore.getState().project.id
+    return () => { parseGeneration.current++ }
+  }, [open])
 
   if (!open) return null
 
   function handleClose() {
+    parseGeneration.current++
+    setLoading(false)
     setStep('select')
     setParseResult(null)
     setPendingDxf(null)
@@ -92,6 +103,8 @@ export function AddDataDialog({
   }
 
   function handleCancel() {
+    parseGeneration.current++
+    setLoading(false)
     setStep('select')
     setParseResult(null)
     setPendingDxf(null)
@@ -104,10 +117,21 @@ export function AddDataDialog({
   }
 
   function handleConfirm() {
-    if (parseResult) {
+    if (loading || !parseResult) return
+    try {
+      if (useProjectStore.getState().project.id !== openedProjectId.current) throw new Error('工程已改变，请关闭窗口并重新导入')
       onImport(parseResult)
       handleClose()
+    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+  }
+
+  function isCurrentRead(generation: number): boolean {
+    if (parseGeneration.current !== generation || !openRef.current) return false
+    if (useProjectStore.getState().project.id !== openedProjectId.current) {
+      setError('读取期间工程已改变，结果未导入；请重新打开添加数据窗口')
+      return false
     }
+    return true
   }
 
   async function parseFile(
@@ -118,6 +142,9 @@ export function AddDataDialog({
     shapefileOptions?: { selectedLayers?: string[] },
     csvConfig?: CsvConfig
   ) {
+    const generation = ++parseGeneration.current
+    if (!isCurrentRead(generation)) return
+    setParseResult(null)
     setError(null)
     setLoading(true)
 
@@ -128,6 +155,7 @@ export function AddDataDialog({
             ? ((await readFile(source, false)) as string)
             : await source.text()
 
+        if (!isCurrentRead(generation)) return
         setPendingCsv({ source, fileName, content })
         setStep('select-csv-config')
         setLoading(false)
@@ -145,6 +173,7 @@ export function AddDataDialog({
           break
         case 'shapefile': {
           const preResult = await importShapefileZip(source, shapefileOptions)
+          if (!isCurrentRead(generation)) return
 
           if (preResult.errors.length > 0) {
             setError(preResult.errors.join('; '))
@@ -182,6 +211,7 @@ export function AddDataDialog({
               content = await source.text()
             }
 
+            if (!isCurrentRead(generation)) return
             const layersResult = importDxfLayers(content, {})
             const availableLayers = layersResult.layers.map((l) => l.name)
 
@@ -214,6 +244,7 @@ export function AddDataDialog({
           return
       }
 
+      if (!isCurrentRead(generation)) return
       if (result.errors.length > 0) {
         setError(result.errors.join('; '))
         setLoading(false)
@@ -223,9 +254,9 @@ export function AddDataDialog({
       setParseResult(result)
       setStep('confirm')
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      if (isCurrentRead(generation)) setError(err instanceof Error ? err.message : String(err))
     } finally {
-      setLoading(false)
+      if (parseGeneration.current === generation) setLoading(false)
     }
   }
 
@@ -239,11 +270,12 @@ export function AddDataDialog({
     }
 
     const crs: CrsInfo = { code: selectedCrs }
+    const generation = parseGeneration.current + 1
     await parseFile(pendingDxf.source, 'dxf', pendingDxf.fileName, {
       crs,
       selectedLayers
     })
-    setPendingDxf(null)
+    if (parseGeneration.current === generation) setPendingDxf(null)
   }
 
   async function handleShapefileLayersConfirm() {
@@ -255,6 +287,7 @@ export function AddDataDialog({
       return
     }
 
+    const generation = parseGeneration.current + 1
     await parseFile(
       pendingShapefile.source,
       'shapefile',
@@ -262,7 +295,7 @@ export function AddDataDialog({
       undefined,
       { selectedLayers }
     )
-    setPendingShapefile(null)
+    if (parseGeneration.current === generation) setPendingShapefile(null)
   }
 
   function toggleShapefileLayer(layerName: string) {
@@ -309,7 +342,7 @@ export function AddDataDialog({
 
   async function handleCsvConfigConfirm(config: CsvConfig) {
     if (!pendingCsv) return
-
+    const generation = parseGeneration.current + 1
     await parseFile(
       pendingCsv.source,
       'csv',
@@ -318,7 +351,7 @@ export function AddDataDialog({
       undefined,
       config
     )
-    setPendingCsv(null)
+    if (parseGeneration.current === generation) setPendingCsv(null)
   }
 
   function handleCsvConfigCancel() {
@@ -332,7 +365,8 @@ export function AddDataDialog({
       return
     }
     try {
-      const path = await pickFile([
+      const generation = parseGeneration.current
+      const paths = await pickFiles([
         { name: 'GeoJSON', extensions: ['geojson', 'json'] },
         { name: 'Shapefile', extensions: ['zip'] },
         { name: 'DXF', extensions: ['dxf'] },
@@ -340,15 +374,44 @@ export function AddDataDialog({
         { name: 'All Files', extensions: ['*'] }
       ])
 
-      if (!path) return
-
-      const fileType = detectFileType(path)
-      await parseFile(path, fileType, path)
+      if (!paths.length || !isCurrentRead(generation)) return
+      await parseSources(paths)
     } catch (reason) {
       setError(
         reason instanceof Error ? reason.message : '无法打开文件选择窗口。'
       )
     }
+  }
+
+  async function parseSources(sources: Array<string | File>): Promise<void> {
+    if (!sources.length) return
+    const name = (source: string | File) => typeof source === 'string' ? source.replaceAll('\\', '/').split('/').pop() || 'imported' : source.name
+    if (sources.length === 1) {
+      await parseFile(sources[0], detectFileType(name(sources[0])), name(sources[0]))
+      return
+    }
+    const generation = ++parseGeneration.current
+    setParseResult(null); setStep('select'); setError(null)
+    if (!sources.every((source) => detectFileType(name(source)) === 'geojson')) {
+      setLoading(false)
+      setError('多文件批次目前支持 GeoJSON；SHP ZIP、DXF 和 CSV 请分别完成各自配置后导入。')
+      return
+    }
+    setLoading(true)
+    const result: ImportResult = { layers: [], errors: [] }
+    try {
+      for (const source of sources) {
+        if (!isCurrentRead(generation)) return
+        const parsed = await importGeoJson(source, geoJsonCrs === 'auto' ? {} : { sourceCrs: { code: geoJsonCrs } })
+        if (!isCurrentRead(generation)) return
+        result.layers.push(...parsed.layers)
+        result.errors.push(...parsed.errors.map((error) => `${name(source)}：${error}`))
+      }
+      if (result.errors.length) { setError(result.errors.join('；')); return }
+      setParseResult(result); setStep('confirm')
+    } catch (reason) {
+      if (isCurrentRead(generation)) setError(reason instanceof Error ? reason.message : String(reason))
+    } finally { if (parseGeneration.current === generation) setLoading(false) }
   }
 
   async function handleDrop(event: React.DragEvent) {
@@ -357,9 +420,7 @@ export function AddDataDialog({
     const files = Array.from(event.dataTransfer.files)
     if (files.length === 0) return
 
-    const file = files[0]
-    const fileType = detectFileType(file.name)
-    await parseFile(file, fileType, file.name)
+    await parseSources(files)
   }
 
   function handleDragOver(event: React.DragEvent) {
@@ -384,12 +445,13 @@ export function AddDataDialog({
       <input
         ref={browserFileInput}
         type="file"
+        multiple
         hidden
         accept=".geojson,.json,.zip,.dxf,.csv"
         onChange={(event) => {
-          const file = event.currentTarget.files?.[0]
+          const files = Array.from(event.currentTarget.files ?? [])
           event.currentTarget.value = ''
-          if (file) void parseFile(file, detectFileType(file.name), file.name)
+          if (files.length) void parseSources(files)
         }}
       />
       <div className="import-progress" aria-label="导入步骤">
@@ -407,6 +469,9 @@ export function AddDataDialog({
           3 确认导入
         </span>
       </div>
+
+      {loading && <div className="import-cancel-read"><Button onClick={handleCancel}>取消读取</Button>
+        <span>读取完成后仍需确认；取消不会写入项目。</span></div>}
 
       {step === 'select' && (
         <div className="data-source-layout">
@@ -697,7 +762,7 @@ export function AddDataDialog({
             <Button className="button-secondary" onClick={handleCancel}>
               取消
             </Button>
-            <Button variant="primary" className="button-primary" onClick={handleConfirm}>
+            <Button variant="primary" className="button-primary" disabled={loading} onClick={handleConfirm}>
               确认导入
             </Button>
           </div>

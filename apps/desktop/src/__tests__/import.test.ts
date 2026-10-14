@@ -1,7 +1,20 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { importGeoJson } from '../services/import'
+import { readFile } from '../services/files'
+
+vi.mock('../services/files', () => ({ readFile: vi.fn(), readBinaryFile: vi.fn() }))
 
 describe('Import GeoJSON', () => {
+  it('uses the native Windows source basename without altering the path passed to file IO', async () => {
+    const path = 'D:\\地图数据\\roads.geojson'
+    vi.mocked(readFile).mockResolvedValueOnce(JSON.stringify({ type: 'Feature', id: 'road-1',
+      geometry: { type: 'LineString', coordinates: [[116, 39], [117, 40]] }, properties: { code: '0007' } }))
+    const result = await importGeoJson(path)
+    expect(readFile).toHaveBeenCalledWith(path, false)
+    expect(result.errors).toEqual([])
+    expect(result.layers[0].name).toBe('roads')
+    expect(result.layers[0].features[0].properties.code).toBe('0007')
+  })
   it('应该成功导入有效的 GeoJSON', async () => {
     const geojson = JSON.stringify({
       type: 'FeatureCollection',

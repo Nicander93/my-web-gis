@@ -10,6 +10,7 @@ test.beforeEach(async ({ page }) => {
 })
 
 test('projected Chinese shapefile ZIP imports only the two chosen source layers', async ({ page }, info) => {
+  const before = await page.evaluate(async () => (await import('/src/stores/project.store.ts')).useProjectStore.getState().getSnapshot())
   const fixture = fileURLToPath(new URL('../../../examples/phase-1/projected-chinese-multi.zip', import.meta.url))
   await page.locator('input[type=file]').setInputFiles(fixture)
   const dialog = page.getByRole('dialog', { name: '添加数据', exact: true })
@@ -34,6 +35,12 @@ test('projected Chinese shapefile ZIP imports only the two chosen source layers'
   expect(first.properties).toMatchObject({ 编号: '01', 名称: '北京站' })
   expect(first.geometry).toMatchObject({ coordinates: [expect.closeTo(116.4, 6), expect.closeTo(39.9, 6)] })
   expect(first.metadata?.sourceCrs).toBe('EPSG:3857')
+  const imported = await page.evaluate(async () => (await import('/src/stores/project.store.ts')).useProjectStore.getState().getSnapshot())
+  await page.getByRole('button', { name: '撤销', exact: true }).click()
+  expect(await page.evaluate(async () => (await import('/src/stores/project.store.ts')).useProjectStore.getState().getSnapshot())).toEqual(before)
+  await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled()
+  await page.getByRole('button', { name: '重做', exact: true }).click()
+  expect(await page.evaluate(async () => (await import('/src/stores/project.store.ts')).useProjectStore.getState().getSnapshot())).toEqual(imported)
   await page.locator('.layer-name-button').filter({ hasText: /^stations$/ }).click()
   await page.getByRole('tab', { name: '地图', exact: true }).click()
   await page.getByRole('button', { name: '属性表', exact: true }).click()

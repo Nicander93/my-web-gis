@@ -6,6 +6,10 @@ import { readFile, readBinaryFile } from './files'
 
 const STORE_CRS = 'EPSG:4326'
 
+function sourceFileName(path: string): string {
+  return path.replaceAll('\\', '/').split('/').pop() || 'imported'
+}
+
 export interface ImportLayerResult {
   name: string
   features: GisFeature[]
@@ -25,7 +29,7 @@ export async function importGeoJson(source: string | File, options: { sourceCrs?
 
     if (typeof source === 'string') {
       content = await readFile(source, false) as string
-      fileName = source.split('/').pop() || source.split('\\').pop() || 'imported'
+      fileName = sourceFileName(source)
     } else {
       content = await source.text()
       fileName = source.name
@@ -84,7 +88,7 @@ export async function importShapefileZip(
 
     if (typeof source === 'string') {
       buffer = await readBinaryFile(source)
-      fileName = source.split('/').pop() || source.split('\\').pop() || 'imported'
+      fileName = sourceFileName(source)
     } else {
       buffer = await source.arrayBuffer()
       fileName = source.name
@@ -160,7 +164,7 @@ export async function importDxfFile(
 
     if (typeof source === 'string') {
       content = await readFile(source, false) as string
-      fileName = source.split('/').pop() || source.split('\\').pop() || 'imported'
+      fileName = sourceFileName(source)
     } else {
       content = await source.text()
       fileName = source.name
@@ -264,7 +268,7 @@ export async function importCsvFile(
 
     if (typeof source === 'string') {
       content = await readFile(source, false) as string
-      fileName = source.split('/').pop() || source.split('\\').pop() || 'imported'
+      fileName = sourceFileName(source)
     } else {
       content = await source.text()
       fileName = source.name
