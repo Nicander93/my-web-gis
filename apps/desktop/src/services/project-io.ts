@@ -12,6 +12,8 @@ import {
 } from '@desktop-webgis/gis-core'
 import { pickFile, pickSaveFile, readTextFile, writeTextFile } from '@/services/files'
 import { getLiveMapState } from '@/features/map/map-runtime-host'
+import { getLiveCityCamera } from '@/features/city/city-runtime-host'
+import { useProjectStore } from '@/stores/project.store'
 import { isTauri } from '@tauri-apps/api/core'
 import { downloadProject, pickBrowserProject } from './browser-project-files'
 
@@ -21,13 +23,15 @@ export const PROJECT_FILE_FILTER = {
 }
 
 let currentProjectPath: string | null = null
+let pathEpoch: number | null = null
 
 export function getCurrentProjectPath(): string | null {
-  return currentProjectPath
+  return pathEpoch === useProjectStore.getState().projectEpoch ? currentProjectPath : null
 }
 
 export function setCurrentProjectPath(path: string | null): void {
   currentProjectPath = path
+  pathEpoch = useProjectStore.getState().projectEpoch
 }
 
 export function createSnapshotFromState(
@@ -38,7 +42,9 @@ export function createSnapshotFromState(
   const projectWithView = liveMapState
     ? { ...project, mapState: liveMapState }
     : project
-  const snapshot = buildPersistedSnapshot(projectWithView, featuresByDataset)
+  const camera = getLiveCityCamera()
+  const snapshot = buildPersistedSnapshot(projectWithView.city && camera
+    ? { ...projectWithView, city: { ...projectWithView.city, camera } } : projectWithView, featuresByDataset)
   assertNoSecretValues(snapshot)
   return snapshot
 }
@@ -46,7 +52,6 @@ export function createSnapshotFromState(
 export async function saveSnapshotToPath(path: string, snapshot: ProjectSnapshot): Promise<void> {
   assertNoSecretValues(snapshot)
   await writeTextFile(path, serializeProjectSnapshot(snapshot))
-  currentProjectPath = path
 }
 
 export async function pickAndSaveSnapshot(snapshot: ProjectSnapshot, suggestedName?: string): Promise<string | null> {
@@ -54,7 +59,6 @@ export async function pickAndSaveSnapshot(snapshot: ProjectSnapshot, suggestedNa
     assertNoSecretValues(snapshot)
     const name = suggestedName ?? 'project.webgis.json'
     downloadProject(serializeProjectSnapshot(snapshot), name)
-    currentProjectPath = null
     return name
   }
   const path = await pickSaveFile({
@@ -73,7 +77,6 @@ export async function openSnapshotFromDisk(): Promise<{ path: string; snapshot: 
     if (!file) return null
     const snapshot = parseProjectSnapshot(await file.text())
     assertNoSecretValues(snapshot)
-    currentProjectPath = null
     return { path: file.name, snapshot }
   }
   const path = await pickFile([PROJECT_FILE_FILTER])
@@ -81,6 +84,5 @@ export async function openSnapshotFromDisk(): Promise<{ path: string; snapshot: 
   const text = await readTextFile(path)
   const snapshot = parseProjectSnapshot(text)
   assertNoSecretValues(snapshot)
-  currentProjectPath = path
   return { path, snapshot }
 }

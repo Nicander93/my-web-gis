@@ -77,10 +77,14 @@ export function AddDataDialog({
   )
   const parseGeneration = useRef(0)
   const openedProjectId = useRef<string | null>(null)
+  const openedProjectEpoch = useRef<number | null>(null)
   const openRef = useRef(open)
   openRef.current = open
   useEffect(() => {
-    if (open) openedProjectId.current = useProjectStore.getState().project.id
+    if (open) {
+      openedProjectId.current = useProjectStore.getState().project.id
+      openedProjectEpoch.current = useProjectStore.getState().projectEpoch
+    }
     return () => { parseGeneration.current++ }
   }, [open])
 
@@ -119,7 +123,7 @@ export function AddDataDialog({
   function handleConfirm() {
     if (loading || !parseResult) return
     try {
-      if (useProjectStore.getState().project.id !== openedProjectId.current) throw new Error('工程已改变，请关闭窗口并重新导入')
+      if (useProjectStore.getState().project.id !== openedProjectId.current || useProjectStore.getState().projectEpoch !== openedProjectEpoch.current) throw new Error('工程已改变，请关闭窗口并重新导入')
       onImport(parseResult)
       handleClose()
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
@@ -127,7 +131,7 @@ export function AddDataDialog({
 
   function isCurrentRead(generation: number): boolean {
     if (parseGeneration.current !== generation || !openRef.current) return false
-    if (useProjectStore.getState().project.id !== openedProjectId.current) {
+    if (useProjectStore.getState().project.id !== openedProjectId.current || useProjectStore.getState().projectEpoch !== openedProjectEpoch.current) {
       setError('读取期间工程已改变，结果未导入；请重新打开添加数据窗口')
       return false
     }

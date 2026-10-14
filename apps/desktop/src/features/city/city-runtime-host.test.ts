@@ -16,3 +16,13 @@ it('captures detached live cameras and keeps a newer viewport registered during 
   removeSecond()
   expect(getLiveCityCamera()).toBeNull()
 })
+
+it('ignores a live camera while its owning project or preset is no longer current', () => {
+  let current = true
+  const camera = createCityScene().camera
+  const remove = registerCityCameraReader(() => camera, () => current)
+  expect(getLiveCityCamera()).toEqual(camera)
+  current = false
+  expect(getLiveCityCamera()).toBeNull()
+  remove()
+})

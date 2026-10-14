@@ -9,13 +9,11 @@ import { getLiveCityCamera } from '@/features/city/city-runtime-host'
 import { resolveSceneDrafts } from '@/features/inspector/scene-draft-guard'
 import { emitCommandStatus } from './status'
 import { useSessionStore } from '@/stores/session.store'
-import { useProjectStore } from '@/stores/project.store'
+import { useProjectStore, getProjectContentVersion } from '@/stores/project.store'
+import { requestProjectSave } from '@/services/project-save'
 import {
   createSnapshotFromState,
-  getCurrentProjectPath,
   openSnapshotFromDisk,
-  pickAndSaveSnapshot,
-  saveSnapshotToPath,
   setCurrentProjectPath
 } from '@/services/project-io'
 import {
@@ -79,10 +77,11 @@ export const projectCommands = {
       operation.signal.throwIfAborted()
       if (Object.values(useSessionStore.getState().sessions).some(session => session.styleDraft?.dirty)) throw new Error('请先应用或放弃样式草稿，再导入场景')
       const before = JSON.stringify(useProjectStore.getState().getSnapshot())
+      const epoch = useProjectStore.getState().projectEpoch
       const opened = await openSceneDocument(operation.signal)
       operation.signal.throwIfAborted()
       if (!opened) { emitCommandStatus('已取消导入场景'); return }
-      if (JSON.stringify(useProjectStore.getState().getSnapshot()) !== before) throw new Error('选择文件期间项目已改变，请重新导入')
+      if (useProjectStore.getState().projectEpoch !== epoch || JSON.stringify(useProjectStore.getState().getSnapshot()) !== before) throw new Error('选择文件期间项目已改变，请重新导入')
       replaceSceneDocumentAsEdit(opened.document)
       emitCommandStatus(`已导入完整场景：${opened.path}，可撤销恢复`)
     } catch (error) {
@@ -127,62 +126,37 @@ export const projectCommands = {
 
   async openProject(): Promise<void> {
     try {
+      const epoch = useProjectStore.getState().projectEpoch
+      if (!await resolveSceneDrafts()) return
       if (useProjectStore.getState().dirty && replacementGuard && !await replacementGuard()) return
+      if (epoch !== useProjectStore.getState().projectEpoch) throw new Error('工程已切换，请重新打开文件')
+      const version = getProjectContentVersion()
       const opened = await openSnapshotFromDisk()
       if (!opened) {
         emitCommandStatus('已取消打开')
         return
       }
+      if (epoch !== useProjectStore.getState().projectEpoch || version !== getProjectContentVersion()) throw new Error('选择或读取文件期间工程已改变，原内容保留')
+      if (Object.values(useSessionStore.getState().sessions).some((session) => session.styleDraft?.dirty)) throw new Error('选择或读取文件期间出现新样式草稿，原内容保留；请处理草稿后重试')
       bumpProjectGeneration()
       // credentialRef keys only in file — hydrate secrets from OS secure store when available.
       useProjectStore.getState().loadSnapshot(opened.snapshot)
+      setCurrentProjectPath(isTauri() ? opened.path : null)
+      const installedEpoch = useProjectStore.getState().projectEpoch
       await hydrateCredentialsFromRefs(
         collectCredentialRefKeys(opened.snapshot.project.datasets.filter(dataset => dataset.kind !== 'vector'))
       )
-      emitCommandStatus(`已打开项目：${opened.path}`)
+      if (installedEpoch === useProjectStore.getState().projectEpoch) emitCommandStatus(`已打开项目：${opened.path}`)
     } catch (error) {
       emitCommandStatus(error instanceof Error ? `打开失败：${error.message}` : '打开失败')
     }
   },
 
-  async saveProject(): Promise<void> {
-    try {
-      const state = useProjectStore.getState()
-      const snapshot = createSnapshotFromState(state.project, state.featuresByDataset)
-      const existing = getCurrentProjectPath()
-      if (existing) {
-        await saveSnapshotToPath(existing, snapshot)
-        state.setDirty(false)
-        emitCommandStatus(`已保存：${existing}`)
-        return
-      }
-      const path = await pickAndSaveSnapshot(snapshot, `${state.project.name || 'project'}.webgis.json`)
-      if (!path) {
-        emitCommandStatus('已取消保存')
-        return
-      }
-      state.setDirty(false)
-      emitCommandStatus(isTauri() ? `已保存：${path}` : `项目下载已发起：${path}`)
-    } catch (error) {
-      emitCommandStatus(error instanceof Error ? `保存失败：${error.message}` : '保存失败')
-    }
-  },
+  async saveProject(): Promise<void> { await requestProjectSave() },
 
-  async saveProjectAs(): Promise<void> {
-    try {
-      const state = useProjectStore.getState()
-      const snapshot = createSnapshotFromState(state.project, state.featuresByDataset)
-      const path = await pickAndSaveSnapshot(snapshot, `${state.project.name || 'project'}.webgis.json`)
-      if (!path) {
-        emitCommandStatus('已取消另存')
-        return
-      }
-      state.setDirty(false)
-      emitCommandStatus(isTauri() ? `已另存：${path}` : `项目下载已发起：${path}`)
-    } catch (error) {
-      emitCommandStatus(error instanceof Error ? `另存失败：${error.message}` : '另存失败')
-    }
-  },
+  saveProjectAndConfirm(): Promise<boolean> { return requestProjectSave() },
+
+  async saveProjectAs(): Promise<void> { await requestProjectSave(true) },
 
   /** Test/helper: clear session credentials (never written to project). */
   clearCredentialsForTests(): void {

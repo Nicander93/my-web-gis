@@ -37,6 +37,7 @@ let storeUnsub: (() => void) | null = null
 let snappingUnsub: (() => void) | null = null
 /** Avoid echoing map?store?map selection sync loops. */
 let applyingStoreSelection = false
+let viewOwner: { epoch: number; id: string; preset: string } | null = null
 
 export function getMapRuntime(): OlMapRuntime | null {
   return runtime
@@ -75,6 +76,8 @@ export function cancelMapOperation(): boolean {
 
 export function getLiveMapState(): MapState | null {
   if (!isMapRuntimeMounted() || !runtime) return null
+  const state = useProjectStore.getState()
+  if (!viewOwner || viewOwner.epoch !== state.projectEpoch || viewOwner.id !== state.project.id || viewOwner.preset !== JSON.stringify(state.project.mapState)) return null
   return runtime.getMapState()
 }
 
@@ -88,6 +91,8 @@ export function mountMapRuntime(
 
   runtime = new OlMapRuntime()
   runtime.mount(target, mapState)
+  const owner = useProjectStore.getState()
+  viewOwner = { epoch: owner.projectEpoch, id: owner.project.id, preset: JSON.stringify(mapState) }
   selectionRuntime = new OlSelectionRuntime(runtime)
   toolRuntime = new OlToolRuntime(runtime)
   toolRuntime.setSnapping(useSnappingStore.getState().options, (snapped) =>
@@ -146,6 +151,7 @@ export function mountMapRuntime(
 }
 
 export function unmountMapRuntime(): void {
+  viewOwner = null
   snappingUnsub?.()
   snappingUnsub = null
   storeUnsub?.()
@@ -185,6 +191,7 @@ export function syncMapFromProject(): void {
     credentials: collectBasemapCredentials(project.basemap), configureServiceLayer: (layer, resource) => configureMapServiceLayer(layer, resource)
   }).then(applied => {
     if (!applied || runtime !== current) return
+    viewOwner = { epoch: state.projectEpoch, id: state.project.id, preset: JSON.stringify(state.project.mapState) }
     const nextSource = target ? current.registry.getVector(target)?.getSource() : undefined
     if (previousSource !== nextSource && activeTool !== 'select') setActiveEditTool(activeTool)
     toolRuntime?.refreshSnapping()

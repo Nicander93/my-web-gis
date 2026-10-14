@@ -15,6 +15,14 @@ async function roundTrip(page: Page, info: TestInfo) {
   const path = info.outputPath('nested.webgis.json')
   await (await download).saveAs(path)
   const saved = JSON.parse(readFileSync(path, 'utf8'))
+  const current = await page.evaluate(async () => {
+    const { useProjectStore, getProjectContentVersion } = await import('/src/stores/project.store.ts')
+    const { createSnapshotFromState } = await import('/src/services/project-io.ts')
+    const state = useProjectStore.getState()
+    return { dirty: state.dirty, version: getProjectContentVersion(), snapshot: createSnapshotFromState(state.project, state.featuresByDataset) }
+  })
+  await info.attach('saved-version-comparison', { body: JSON.stringify({ saved, current }), contentType: 'application/json' })
+  expect(current.dirty).toBe(false)
   await page.getByRole('button', { name: '文件', exact: true }).click()
   const chooser = page.waitForEvent('filechooser')
   await page.getByRole('menuitem', { name: /^打开/ }).click()

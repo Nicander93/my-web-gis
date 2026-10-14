@@ -113,11 +113,17 @@ export function CityWorkspace() {
           if (!active) return
           if (state.runtime && runtime.current !== state.runtime) {
             runtime.current = state.runtime; state.runtime.layers.popupsEnabled = false
-            unregisterCamera?.(); unregisterCamera = registerCityCameraReader(() => state.runtime!.getCamera())
           }
           setReady(!!state.runtime); setStates(state.states)
           if (state.status === 'error') { report(state.error); return }
           if (state.status === 'ready') {
+            const owner = useProjectStore.getState(), epoch = owner.projectEpoch, projectId = owner.project.id
+            const preset = JSON.stringify(owner.project.city?.camera)
+            unregisterCamera?.()
+            if (state.runtime) unregisterCamera = registerCityCameraReader(() => state.runtime!.getCamera(), () => {
+              const current = useProjectStore.getState()
+              return current.projectEpoch === epoch && current.project.id === projectId && JSON.stringify(current.project.city?.camera) === preset
+            })
             const id = pendingFocus.current
             if (id && state.states[id]?.state === 'ready') { pendingFocus.current = undefined; locate(id); notify('资源已加载') }
             else setStatus('就绪')

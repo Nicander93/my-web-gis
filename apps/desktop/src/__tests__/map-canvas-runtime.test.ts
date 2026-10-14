@@ -149,7 +149,7 @@ describe('MapCanvas OlMapRuntime selection tool wiring', () => {
     expect(isToolRuntimeMounted()).toBe(true)
   })
 
-  it('host reports mounted and syncs the complete document through the public runtime', () => {
+  it('host reports mounted and syncs the complete document through the public runtime', async () => {
     const runtime = createMockRuntime(4)
     _setMapRuntimeForTests(runtime, true)
     expect(isMapRuntimeMounted()).toBe(true)
@@ -175,7 +175,21 @@ describe('MapCanvas OlMapRuntime selection tool wiring', () => {
     expect(document.nodes.filter((node: { type: string }) => node.type === 'vector')).toHaveLength(1)
     expect(Object.keys(featuresByDataset)).toContain('ds-1')
     expect(document.resources['ds-1'].type).toBe('geojson')
-    expect(getLiveMapState()?.zoom).toBe(useProjectStore.getState().project.mapState.zoom)
+    await vi.waitFor(() => expect(getLiveMapState()?.zoom).toBe(useProjectStore.getState().project.mapState.zoom))
+  })
+
+  it('does not expose the previous viewport after a same-ID project reload during sync', async () => {
+    const runtime = createMockRuntime()
+    _setMapRuntimeForTests(runtime, true)
+    let finish!: (applied: boolean) => void
+    ;(runtime.syncDocument as ReturnType<typeof vi.fn>).mockImplementationOnce(() => new Promise<boolean>((resolve) => { finish = resolve }))
+    syncMapFromProject()
+    const reopened = useProjectStore.getState().getSnapshot()
+    useProjectStore.getState().loadSnapshot(reopened)
+    finish(true); await Promise.resolve()
+    expect(getLiveMapState()).toBeNull()
+    syncMapFromProject()
+    await vi.waitFor(() => expect(getLiveMapState()?.zoom).toBe(reopened.project.mapState.zoom))
   })
 
   it('geometry callbacks stay on the explicit target while browsing another layer', () => {

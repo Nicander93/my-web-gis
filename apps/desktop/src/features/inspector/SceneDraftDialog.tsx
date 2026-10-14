@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { EditorDialog } from '@/components/ui/EditorDialog'
+import { Button } from '@/components/ui/Button'
 import { useSessionStore } from '@/stores/session.store'
 import { useProjectStore } from '@/stores/project.store'
 import { layerCommands } from '@/app/commands/layer.commands'
@@ -38,9 +39,9 @@ export function SceneDraftDialog() {
       {error && <p role="alert">{error}</p>}
     </div>
     <footer className="dialog-footer">
-      <button className="button-secondary" onClick={() => close()}>取消导入</button>
-      <button className="button-secondary" onClick={() => decide(false)}>放弃草稿并继续</button>
-      <button className="button-primary" onClick={() => decide(true)}>应用草稿并继续</button>
+      <Button onClick={() => close()}>取消操作</Button>
+      <Button onClick={() => decide(false)}>放弃草稿并继续</Button>
+      <Button variant="primary" onClick={() => decide(true)}>应用草稿并继续</Button>
     </footer>
   </EditorDialog>
 }

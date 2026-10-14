@@ -7,6 +7,7 @@ vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => probe.native }))
 vi.mock('./browser-project-files', () => ({ downloadProject: probe.download, pickBrowserProject: probe.pick }))
 vi.mock('@/services/files', () => ({ pickSaveFile: probe.nativePick, writeTextFile: probe.write, pickFile: vi.fn(), readTextFile: vi.fn() }))
 vi.mock('@/features/map/map-runtime-host', () => ({ getLiveMapState: () => null }))
+vi.mock('@/features/city/city-runtime-host', () => ({ getLiveCityCamera: () => null }))
 beforeEach(() => { vi.clearAllMocks(); probe.native = false; setCurrentProjectPath(null) })
 
 describe('project IO adapters', () => {
@@ -15,7 +16,7 @@ describe('project IO adapters', () => {
     setCurrentProjectPath('old.webgis.json')
     await expect(pickAndSaveSnapshot(snapshot, 'city.webgis.json')).resolves.toBe('city.webgis.json')
     expect(probe.download).toHaveBeenCalledWith(serializeProjectSnapshot(snapshot), 'city.webgis.json')
-    expect(getCurrentProjectPath()).toBeNull(); expect(probe.nativePick).not.toHaveBeenCalled()
+    expect(getCurrentProjectPath()).toBe('old.webgis.json'); expect(probe.nativePick).not.toHaveBeenCalled()
   })
   it('opens and validates the selected file, handles cancellation, and rejects malformed projects', async () => {
     const snapshot = { project: createProject(), featuresByDataset: {} }
@@ -31,7 +32,7 @@ describe('project IO adapters', () => {
     const snapshot = { project: createProject(), featuresByDataset: {} }
     expect(await pickAndSaveSnapshot(snapshot)).toBe('D:/city.webgis.json')
     expect(probe.write).toHaveBeenCalledWith('D:/city.webgis.json', serializeProjectSnapshot(snapshot))
-    expect(getCurrentProjectPath()).toBe('D:/city.webgis.json')
+    expect(getCurrentProjectPath()).toBeNull()
     expect(probe.download).not.toHaveBeenCalled()
   })
 })

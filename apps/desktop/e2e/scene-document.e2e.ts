@@ -79,7 +79,7 @@ for (const decision of ['放弃草稿并继续', '应用草稿并继续']) {
     await page.getByRole('menuitem', { name: '导入场景', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: '处理未应用样式', exact: true })
     await expect(dialog).toBeVisible()
-    await dialog.getByRole('button', { name: '取消导入', exact: true }).click()
+    await dialog.getByRole('button', { name: '取消操作', exact: true }).click()
     await expect(page.getByLabel('符号颜色', { exact: true })).toHaveValue('#ff0000')
     await page.getByRole('button', { name: '文件', exact: true }).click()
     await page.getByRole('menuitem', { name: '导入场景', exact: true }).click()

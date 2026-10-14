@@ -6,6 +6,7 @@ interface ToolbarButtonProps {
   label: string
   disabled?: boolean
   active?: boolean
+  loading?: boolean
   onClick(): void
 }
 
@@ -14,6 +15,7 @@ export function ToolbarButton({
   label,
   disabled,
   active,
+  loading,
   onClick
 }: ToolbarButtonProps) {
   return (
@@ -21,6 +23,7 @@ export function ToolbarButton({
       className="toolbar-button"
       type="text" htmlType="button"
       disabled={disabled}
+      loading={loading} aria-busy={loading}
       title={label}
       aria-label={label}
       aria-pressed={active}

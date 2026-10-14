@@ -35,6 +35,7 @@ import { processingCommands } from '@/app/commands/processing.commands'
 import { useProjectStore } from '@/stores/project.store'
 import { useWorkbenchStore } from '@/stores/workbench.store'
 import { useSessionStore } from '@/stores/session.store'
+import { useSaveStore } from '@/stores/save.store'
 
 const tabs = [
   ['map', '地图'],
@@ -53,6 +54,7 @@ function Group({ label, children }: { label: string; children: ReactNode }) {
 
 /** 两行任务功能区；低频命令由菜单与图层上下文菜单提供。 */
 export function Toolbar() {
+  const saving = useSaveStore((state) => state.pending > 0)
   const [tab, setTab] = useState<Tab>('map')
   const project = useProjectStore((state) => state.project)
   const browsedId = useProjectStore((state) => state.selectedLayerId)
@@ -146,6 +148,7 @@ export function Toolbar() {
           <ToolbarButton
             icon={Save}
             label="保存项目"
+            disabled={saving} loading={saving}
             onClick={projectCommands.saveProject}
           />
         </div>

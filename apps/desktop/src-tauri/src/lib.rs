@@ -1,3 +1,5 @@
+mod atomic_file;
+
 #[tauri::command]
 fn read_text_path(path: String) -> Result<String, String> {
     std::fs::read_to_string(path).map_err(|error| error.to_string())
@@ -5,7 +7,7 @@ fn read_text_path(path: String) -> Result<String, String> {
 
 #[tauri::command]
 fn write_text_path(path: String, content: String) -> Result<(), String> {
-    std::fs::write(path, content).map_err(|error| error.to_string())
+    atomic_file::write_atomic(std::path::Path::new(&path), content.as_bytes()).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -15,7 +17,7 @@ fn read_binary_path(path: String) -> Result<Vec<u8>, String> {
 
 #[tauri::command]
 fn write_binary_path(path: String, content: Vec<u8>) -> Result<(), String> {
-    std::fs::write(path, content).map_err(|error| error.to_string())
+    atomic_file::write_atomic(std::path::Path::new(&path), &content).map_err(|error| error.to_string())
 }
 
 /// Resolve resources under a user-selected directory, including symlink containment.

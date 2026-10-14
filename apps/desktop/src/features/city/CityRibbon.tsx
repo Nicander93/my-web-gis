@@ -4,6 +4,8 @@ import { WorkbenchRibbon } from '@/app/header/WorkbenchRibbon'
 import { MenuItem } from '@/app/header/menus/MenuItem'
 import { useWorkspaceStore } from '@/stores/workspace.store'
 import { helpCommands } from '@/app/commands/help.commands'
+import { Button } from '@/components/ui/Button'
+import { useSaveStore } from '@/stores/save.store'
 
 export interface CityRibbonCommand { id: string; label: string; icon: LucideIcon; disabled?: string; active?: boolean; execute(): void }
 interface CityRibbonProps {
@@ -20,6 +22,7 @@ interface CityRibbonProps {
 
 /** Scene capabilities stay independent while desktop chrome is shared. */
 export function CityRibbon({ commands: all, target, preview, onPreview, onUndo, onRedo, onSave, canUndo, canRedo }: CityRibbonProps) {
+  const saving = useSaveStore((state) => state.pending > 0)
   function commands(ids: string[]): CityRibbonCommand[] { return ids.flatMap(id => all.filter(item => item.id === id)) }
   const category = useWorkspaceStore(state => state.ribbonCategory)
   const add = all.find(item => item.id === 'add')
@@ -30,7 +33,7 @@ export function CityRibbon({ commands: all, target, preview, onPreview, onUndo, 
     { id:'tiles', label:'瓦片', commands:commands(['quality']) },
     { id:'analysis', label:'分析', commands:[] }
   ]} target={category === 'scene' ? undefined : `编辑目标：${target}`} onAdd={() => add?.execute()} preview={preview}
-    quickActions={<><button aria-label="撤销" disabled={!canUndo} onClick={onUndo}><Undo2 size={16} /></button><button aria-label="重做" disabled={!canRedo} onClick={onRedo}><Redo2 size={16} /></button><button aria-label="保存项目" onClick={onSave}><Save size={16} /></button></>}
+    quickActions={<><Button variant="icon" aria-label="撤销" disabled={!canUndo} onClick={onUndo}><Undo2 size={16} /></Button><Button variant="icon" aria-label="重做" disabled={!canRedo} onClick={onRedo}><Redo2 size={16} /></Button><Button variant="icon" aria-label="保存项目" disabled={saving} loading={saving} aria-busy={saving} onClick={onSave}><Save size={16} /></Button></>}
     previewAction={<button className="ribbon-command" aria-pressed={preview} onClick={onPreview}><Play size={14} />{preview ? '退出预览' : '预览'}</button>}
     more={<>{commands(['left','right','reset','new-group']).map(item => <MenuItem key={item.id} icon={item.icon} label={item.label} disabled={!!item.disabled} onClick={item.execute} />)}<MenuItem icon={HelpCircle} label="操作帮助" onClick={helpCommands.openHelp} /><MenuItem icon={HelpCircle} label="关于" onClick={helpCommands.openAbout} /></>} />
 }

@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Box, Map } from 'lucide-react'
 import { EditorDialog } from '@/components/ui/EditorDialog'
+import { Button } from '@/components/ui/Button'
 import { projectCommands } from '@/app/commands/project.commands'
 import { useProjectStore } from '@/stores/project.store'
 import type { ProjectType } from '@/services/project-type'
+import { resolveSceneDrafts } from '@/features/inspector/scene-draft-guard'
 
 interface NewProjectDialogProps { onClose(): void }
 
@@ -13,17 +15,24 @@ export function NewProjectDialog({ onClose }: NewProjectDialogProps) {
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [ownerEpoch] = useState(useProjectStore.getState().projectEpoch)
 
-  async function create(save: boolean): Promise<void> {
+  async function create(save: boolean, discard = false): Promise<void> {
     setError('')
-    if (save) {
-      setBusy(true)
-      await projectCommands.saveProject()
-      setBusy(false)
-      if (useProjectStore.getState().dirty) { setError('当前项目尚未保存，已保留修改。可以重试保存或取消新建。'); return }
-    }
-    projectCommands.createWorkspace(type, name)
-    onClose()
+    setBusy(true)
+    try {
+      if (ownerEpoch !== useProjectStore.getState().projectEpoch) throw new Error('工程已切换，请重新打开新建窗口')
+      if (!discard && !await resolveSceneDrafts()) return
+      if (ownerEpoch !== useProjectStore.getState().projectEpoch) throw new Error('工程已切换，请重新打开新建窗口')
+      if (!discard && (save || useProjectStore.getState().dirty)) {
+        const saved = await projectCommands.saveProjectAndConfirm()
+        if (!saved || useProjectStore.getState().dirty) throw new Error('当前项目尚未保存，已保留修改。可以重试保存或取消新建。')
+      }
+      if (ownerEpoch !== useProjectStore.getState().projectEpoch) throw new Error('工程已切换，请重新打开新建窗口')
+      projectCommands.createWorkspace(type, name)
+      onClose()
+    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+    finally { setBusy(false) }
   }
 
   return <EditorDialog title="新建项目" onClose={onClose} busy={busy} className="new-project-dialog">
@@ -38,7 +47,7 @@ export function NewProjectDialog({ onClose }: NewProjectDialogProps) {
         {dirty && <p className="editor-warning">当前项目有未保存的修改。创建新项目前，请保存或明确放弃这些修改。</p>}
         {error && <p className="editor-error" role="alert">{error}</p>}
       </div>
-      <footer className="dialog-footer"><button type="button" className="button-secondary" disabled={busy} onClick={onClose}>取消</button>{dirty && <button type="button" className="button-secondary" disabled={busy} onClick={() => void create(false)}>放弃修改并创建</button>}<button type="submit" className="button-primary" disabled={busy}>{busy ? '保存中…' : dirty ? '保存并创建' : '创建项目'}</button></footer>
+      <footer className="dialog-footer"><Button disabled={busy} onClick={onClose}>取消</Button>{dirty && <Button disabled={busy} onClick={() => void create(false, true)}>放弃修改并创建</Button>}<Button type="submit" variant="primary" disabled={busy}>{busy ? '保存中…' : dirty ? '保存并创建' : '创建项目'}</Button></footer>
     </form>
   </EditorDialog>
 }

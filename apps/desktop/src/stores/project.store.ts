@@ -54,6 +54,7 @@ import { useSessionStore } from '@/stores/session.store'
 import type { LayerStyle } from '@desktop-webgis/ol-style'
 
 interface ProjectState {
+  projectEpoch: number
   project: Project
   featuresByDataset: Record<string, GisFeature[]>
   dirty: boolean
@@ -236,11 +237,12 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       },
       replaceSnapshot: (snapshot) => {
         const project = normalizeLayerTree(cloneValue(snapshot.project))
+        const featuresByDataset = cloneValue(snapshot.featuresByDataset)
         useSessionStore.getState().bumpWfsLoadGeneration()
         useWorkbenchStore.getState().reset()
         // Layer IDs can be reused by another scene; cached inspectors belong to the old content.
         useSessionStore.setState({ sessions: {}, inspectorTab: 'layer' })
-        set({ project, featuresByDataset: cloneValue(snapshot.featuresByDataset), dirty: true, selectedLayerId: null,
+        set({ project, featuresByDataset, dirty: true, selectedLayerId: null,
           selection: { layerId: null, featureIds: [] }, lastSelectionCountAfterFilter: null })
       }
     }
@@ -263,6 +265,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   }
 
   return {
+  projectEpoch: 0,
   project: createProject(),
   featuresByDataset: {},
   dirty: false,
@@ -409,15 +412,16 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   setDirty: (dirty) => set({ dirty }),
 
   loadSnapshot: (snapshot) => {
+    const project = normalizeLayerTree(cloneValue(snapshot.project))
+    const featuresByDataset = cloneValue(snapshot.featuresByDataset ?? {})
     useSessionStore.setState({ inspectorTab: 'layer' })
     useWorkbenchStore.getState().reset()
     editHistory.clear()
-    const project = normalizeLayerTree(cloneValue(snapshot.project))
-    const featuresByDataset = cloneValue(snapshot.featuresByDataset ?? {})
     syncStoreFromState(featuresByDataset)
     useSessionStore.setState({ sessions: {} })
     set({
       project,
+      projectEpoch: get().projectEpoch + 1,
       featuresByDataset,
       dirty: false,
       selectedLayerId: null,
@@ -819,3 +823,11 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   }
 
 }})
+
+let contentVersion = 0
+useProjectStore.subscribe((state, previous) => {
+  if (state.project !== previous.project || state.featuresByDataset !== previous.featuresByDataset) contentVersion++
+})
+
+/** In-memory revision only; selection, layout and dirty acknowledgements do not change document content. */
+export function getProjectContentVersion(): number { return contentVersion }
