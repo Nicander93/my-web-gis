@@ -33,6 +33,18 @@ function snapshot(): ProjectSnapshot {
 }
 
 describe('full project scene content', () => {
+  it('keeps local three-dimensional GeoJSON references and unused assets outside map datasets', () => {
+    const project = createProject(); project.city = createCityScene()
+    project.city.assets.points = { type: 'geojson', reference: { kind: 'relative', path: '数据/points.geojson' } }
+    project.city.assets.unused = { type: 'glb', reference: { kind: 'absolute', path: 'D:/模型/model.glb' } }
+    project.city.nodes.push({ type: 'geojson', id: 'points', name: 'Points', visible: true, asset: 'points' })
+    const document = createProjectSceneDocument({ project, featuresByDataset: {} })
+    const restored = createProjectFromSceneDocument(document)
+    expect(restored.project.city!.assets).toEqual(project.city.assets)
+    expect(restored.project.city!.nodes).toEqual(project.city.nodes)
+    expect(restored.project.datasets).toEqual([])
+    expect(createProjectSceneDocument(restored).resources).toEqual(document.resources)
+  })
   it('round trips nested 2D and 3D folders with colliding host IDs without flattening hierarchy', () => {
     const input = snapshot()
     input.project.groups.push({ id: 'child', name: 'Map child', parentId: 'group', visible: true, locked: true, layerIds: ['a'] })

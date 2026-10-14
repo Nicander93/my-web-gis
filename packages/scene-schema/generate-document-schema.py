@@ -7,6 +7,8 @@ root = Path(__file__).parent
 legacy = json.loads((root / 'scene.schema.json').read_text(encoding='utf-8'))
 defs = copy.deepcopy(legacy['$defs'])
 defs['cityAsset']['properties']['type'] = {'enum': ['3dtiles', 'glb']}
+defs['geoJsonSource']['properties']['reference'] = {'$ref': '#/$defs/resourceReference'}
+defs['geoJsonSource']['oneOf'].append({'required': ['reference'], 'not': {'anyOf': [{'required': ['url']}, {'required': ['data']}]}})
 
 def ref(name):
     return {'$ref': '#/$defs/' + name}

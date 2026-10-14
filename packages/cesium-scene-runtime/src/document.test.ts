@@ -11,6 +11,15 @@ function document() {
 }
 
 describe('v3 Cesium projection', () => {
+  it('preserves local GeoJSON references until the host resolves them without creating page-relative URLs', () => {
+    const city = createCityScene()
+    city.assets.points = { type: 'geojson', reference: { kind: 'relative', path: '数据/points.geojson' } }
+    city.nodes.push({ type: 'geojson', id: 'points', name: 'Points', visible: true, asset: 'points' })
+    const input = migrateSceneDocument(city)
+    const before = JSON.stringify(input)
+    expect(projectCesiumDocument(input).scene.assets.points).toEqual(city.assets.points)
+    expect(JSON.stringify(input)).toBe(before)
+  })
   it('retains original local states while deriving nested group state for the renderer', () => {
     const input = document()
     input.nodes.unshift({ type: 'group', id: 'outer', name: 'Outer', visible: false, locked: true, scope: '3d' }, { type: 'group', id: 'inner', name: 'Inner', visible: true, parentId: 'outer', scope: '3d' })

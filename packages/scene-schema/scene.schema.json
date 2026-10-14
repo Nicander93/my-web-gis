@@ -1201,11 +1201,25 @@
         "url": {
           "type": "string",
           "minLength": 1
+        },
+        "reference": {
+          "$ref": "#/$defs/resourceReference"
         }
       },
       "required": [
-        "type",
-        "url"
+        "type"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "url"
+          ]
+        },
+        {
+          "required": [
+            "reference"
+          ]
+        }
       ]
     },
     "cityTileset": {
@@ -1756,6 +1770,66 @@
         "name",
         "visible"
       ]
+    },
+    "resourceReference": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "relative"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "kind",
+            "path"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "absolute"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "kind",
+            "path"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "url"
+            },
+            "url": {
+              "type": "string",
+              "pattern": "^https?://"
+            },
+            "credentialRef": {
+              "type": "string",
+              "pattern": "\\S"
+            }
+          },
+          "required": [
+            "kind",
+            "url"
+          ]
+        }
+      ],
+      "$comment": "Structural shape only. validateResourceReference enforces path kind, protocols and credential exclusion."
     }
   },
   "allOf": [

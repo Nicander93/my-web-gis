@@ -368,9 +368,11 @@ export class CitySceneRuntime {
       })
     }
     const asset = scene.assets[node.asset]
-    if (node.type === '3dtiles') return new TilesetLayer({ ...base, url: this.resource(asset.url!), transform: node.transform, maximumScreenSpaceError: node.maximumScreenSpaceError, cacheBytes: node.cacheBytes })
-    if (node.type === 'model') return new ModelLayer({ ...base, url: this.resource(asset.url!), position: node.position, transform: node.transform })
-    return new GeoJsonLayer({ ...base, data: asset.data ?? this.resource(asset.url!), color: node.color })
+    const resourceUrl = asset.url ?? (asset.reference?.kind === 'url' ? asset.reference.url : undefined)
+    if (!resourceUrl && !asset.data) throw new Error(`资源 ${node.asset} 的本地引用尚未由宿主解析`)
+    if (node.type === '3dtiles') return new TilesetLayer({ ...base, url: this.resource(resourceUrl!), transform: node.transform, maximumScreenSpaceError: node.maximumScreenSpaceError, cacheBytes: node.cacheBytes })
+    if (node.type === 'model') return new ModelLayer({ ...base, url: this.resource(resourceUrl!), position: node.position, transform: node.transform })
+    return new GeoJsonLayer({ ...base, data: asset.data ?? this.resource(resourceUrl!), color: node.color })
   }
 
   private async updateEnvironment(scene: CityScene): Promise<void> {

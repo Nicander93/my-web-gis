@@ -40,11 +40,12 @@ export function projectCesiumDocument(input: unknown, viewId?: string): CesiumDo
     // Map-only resources remain in the document, not in the native scene or its update comparisons.
     if (!document.nodes.some(node => node.type !== 'vector' && node.type !== 'tile' && 'resource' in node && node.resource === id)) continue
     if (resource.type === '3dtiles' || resource.type === 'glb') {
-      scene.assets[id] = { type: resource.type, url: resource.url }
-    } else if (resource.type === 'geojson' && resource.url) {
-      scene.assets[id] = { type: 'geojson', url: resource.url }
-    } else if (resource.type === 'geojson' && resource.data) {
-      scene.assets[id] = { type: 'geojson', data: structuredClone(resource.data) }
+      scene.assets[id] = { type: resource.type, ...(resource.url === undefined ? {} : { url: resource.url }), ...(resource.reference ? { reference: resource.reference } : {}) }
+    } else if (resource.type === 'geojson') {
+      scene.assets[id] = { type: 'geojson',
+        ...(resource.url === undefined ? {} : { url: resource.url }),
+        ...(resource.reference ? { reference: structuredClone(resource.reference) } : {}),
+        ...(resource.data ? { data: structuredClone(resource.data) } : {}) }
     }
   }
 

@@ -1,4 +1,6 @@
 /** Serializable city scenes. Coordinates use WGS84 degrees and ellipsoid metres. */
+import { validateResourceReference, type ResourceReference } from './resource-reference.js'
+export { isRuntimeResourceUrl, validateResourceReference, type ResourceReference } from './resource-reference.js'
 export type GeoPosition = [longitude: number, latitude: number, height: number]
 export type Triple = [number, number, number]
 
@@ -25,8 +27,9 @@ export interface PopupDefinition {
 
 export interface CityAsset {
   type: '3dtiles' | 'glb' | 'geojson'
-  /** HTTP(S) or a relative URL. Credentials are supplied by the host. Required for 3dtiles/glb; optional for geojson when data is inline. */
+  /** Legacy HTTP(S) or relative URL. Local references are resolved separately by the host. */
   url?: string
+  reference?: ResourceReference
   /** Inline GeoJSON used by document-projected vector resources that have no portable URL. */
   data?: object
 }
@@ -195,11 +198,13 @@ export function validateCityScene(input: unknown, root = '$'): CityValidationIss
     if (asset.type === 'geojson') {
       const hasUrl = asset.url !== undefined && isCityResourceUrl(asset.url)
       const hasData = asset.data !== undefined && record(asset.data)
-      check(hasUrl || hasData, `assets.${id}`, 'GeoJSON 资源需要有效 URL 或内联 data')
+      check(hasUrl || hasData || validateResourceReference(asset.reference), `assets.${id}`, 'GeoJSON 资源需要有效 URL、引用或内联 data')
       if (asset.url !== undefined) check(isCityResourceUrl(asset.url), `assets.${id}.url`, '资源 URL 无效')
     } else {
-      check(isCityResourceUrl(asset.url), `assets.${id}`, '资源类型或 URL 无效')
+      check(asset.url !== undefined && isCityResourceUrl(asset.url) || asset.reference !== undefined && validateResourceReference(asset.reference), `assets.${id}`, '资源需要有效 URL 或引用')
     }
+    if (asset.url !== undefined) check(isCityResourceUrl(asset.url), `assets.${id}.url`, '资源 URL 无效')
+    if (asset.reference !== undefined) check(validateResourceReference(asset.reference), `assets.${id}.reference`, '资源引用无效')
   }
   const groupIds = new Set<string>()
   if (input.groups !== undefined) {

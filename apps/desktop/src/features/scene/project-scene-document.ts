@@ -223,7 +223,7 @@ export function createProjectFromSceneDocument(input: unknown): ProjectSnapshot 
   for (const [id, resource] of Object.entries(document.resources)) {
     if (basemapResources.has(id) && !mapNodes.some(node => node.resource === id && !(node.type === 'tile' && node.role === 'basemap')) || resource.type === '3dtiles' || resource.type === 'glb') continue
     const isMapResource = mapNodes.some(node => node.resource === id)
-    if (!isMapResource && resource.type === 'geojson' && resource.url) continue
+    if (!isMapResource && resource.type === 'geojson' && (resource.url || resource.reference) && !resource.data) continue
     const name = resource.title ?? id
     let dataset: Dataset
     if (resource.type === 'geojson') { dataset = { id, name, kind: 'vector', source: { type: 'memory', label: name } }; featuresByDataset[id] = restoreFeatures(resource) }
@@ -268,7 +268,7 @@ export function createProjectFromSceneDocument(input: unknown): ProjectSnapshot 
     if (groups.some(group => group.id === node.id) && !node.parentId) project.rootOrder.push({ type: 'group', id: node.id })
     else if (project.layers.some(layer => layer.id === node.id) && !grouped.has(node.id)) project.rootOrder.push({ type: 'layer', id: node.id })
   }
-  const hasCityResources = Object.entries(document.resources).some(([id, resource]) => resource.type === '3dtiles' || resource.type === 'glb' || resource.type === 'geojson' && resource.url && !mapNodes.some(node => node.resource === id))
+  const hasCityResources = Object.entries(document.resources).some(([id, resource]) => resource.type === '3dtiles' || resource.type === 'glb' || resource.type === 'geojson' && (resource.url || resource.reference) && !mapNodes.some(node => node.resource === id))
   if (cityViews.length || hasCityResources || document.nodes.some(node => !['tile', 'vector'].includes(node.type) && (node.type !== 'group' || node.scope === '3d'))) {
     const city = createCityScene(), mapGroups = new Set(groups.map(group => group.id))
     if (cityViews[0]) city.camera = cityViews[0].camera
@@ -281,13 +281,13 @@ export function createProjectFromSceneDocument(input: unknown): ProjectSnapshot 
       const { parentId, ...definition } = node
       if ('resource' in definition) {
         const { resource: id, ...rest } = definition, resource = document.resources[id]
-        if (resource.type !== '3dtiles' && resource.type !== 'glb' && (resource.type !== 'geojson' || !resource.url)) throw new Error('三维对象资源类型不受支持')
-        city.assets[id] = { type: resource.type, url: resource.url! }
+        if (resource.type !== '3dtiles' && resource.type !== 'glb' && resource.type !== 'geojson') throw new Error('三维对象资源类型不受支持')
+        city.assets[id] = { type: resource.type, ...(resource.url === undefined ? {} : { url: resource.url }), ...(resource.reference ? { reference: structuredClone(resource.reference) } : {}), ...(resource.type === 'geojson' && resource.data ? { data: structuredClone(resource.data) } : {}) }
         return { ...rest, asset: id, ...(parentId ? { groupId: parentId } : {}) } as CityNode
       }
       return { ...definition, ...(parentId ? { groupId: parentId } : {}) } as CityNode
     })
-    for (const [id, resource] of Object.entries(document.resources)) if (resource.type === '3dtiles' || resource.type === 'glb' || resource.type === 'geojson' && resource.url && !mapNodes.some(node => node.resource === id)) city.assets[id] = { type: resource.type, url: resource.url! }
+    for (const [id, resource] of Object.entries(document.resources)) if (resource.type === '3dtiles' || resource.type === 'glb' || resource.type === 'geojson' && (resource.url || resource.reference) && !mapNodes.some(node => node.resource === id)) city.assets[id] = { type: resource.type, ...(resource.url === undefined ? {} : { url: resource.url }), ...(resource.reference ? { reference: structuredClone(resource.reference) } : {}), ...(resource.type === 'geojson' && resource.data ? { data: structuredClone(resource.data) } : {}) }
     project.city = parseCityScene(city)
   }
   return { project, featuresByDataset }

@@ -1,4 +1,4 @@
-import { createCityScene, parseCityScene, validateCityScene, type CityCamera, type CityNode, type CityScene } from '@desktop-webgis/cesium-scene-schema'
+import { createCityScene, parseCityScene, validateCityScene, validateResourceReference, type ResourceReference, type CityCamera, type CityNode, type CityScene } from '@desktop-webgis/cesium-scene-schema'
 import { parseScene, SceneValidationError } from './parse.js'
 import { validateScene } from './validate.js'
 import type { GeoJsonFeatureCollection, JsonValue, SceneManifest, SceneSource, SceneView, TileLayer, VectorLayer, ValidationIssue, ValidationResult } from './types.js'
@@ -29,6 +29,7 @@ export interface WfsSceneResource {
 }
 
 export interface SceneResourceMetadata {
+  reference?: ResourceReference
   title?: string
   fields?: Array<{ name: string; type: 'string' | 'number' | 'boolean' | 'json'; nullable: boolean }>
   /** Keys use `${typeof feature.id}:${feature.id}` so numeric and string IDs stay distinct. */
@@ -36,7 +37,7 @@ export interface SceneResourceMetadata {
   authentication?: { mode: 'query-token' | 'bearer'; credential?: string; tokenParam?: string }
 }
 
-export type SceneResource = (SceneSource | WfsSceneResource | { type: '3dtiles' | 'glb'; url: string }) & SceneResourceMetadata
+export type SceneResource = (SceneSource | WfsSceneResource | { type: '3dtiles' | 'glb'; url?: string }) & SceneResourceMetadata
 
 export interface SceneFilterCondition {
   field: string
@@ -163,6 +164,7 @@ export function validateSceneDocument(input: unknown): ValidationResult {
     check(Boolean(id.trim()), `$.resources.${id}`, 'resource.id', '资源 ID 不得为空')
     if (!record(resource)) { check(false, `$.resources.${id}`, 'type.object', '资源必须是对象'); continue }
     const path = `$.resources.${id}`
+    if (resource.reference !== undefined) check(['3dtiles', 'glb', 'geojson'].includes(String(resource.type)) && validateResourceReference(resource.reference), `${path}.reference`, 'resource.reference', '本地/在线引用无效或资源不支持该引用')
     check(resource.title === undefined || typeof resource.title === 'string', `${path}.title`, 'type.string', '资源名称必须是字符串')
     if (resource.featureMetadata !== undefined) check(record(resource.featureMetadata) && Object.entries(resource.featureMetadata).every(([key, metadata]) => /^(string|number):/.test(key) && record(metadata)
       && Object.keys(metadata).every(name => ['sourceId', 'overlaySourceId', 'sourceCrs', 'importId'].includes(name))
@@ -198,8 +200,14 @@ export function validateSceneDocument(input: unknown): ValidationResult {
       issues.push(...urlIssues.map(issue => ({ ...issue, path: `${path}.url` })))
     }
     else {
-      mapSources[id] = resource
-      if (resource.type === 'geojson' && resource.url !== undefined) assets[id] = { type: 'geojson', url: resource.url }
+      const referenceOnly = resource.type === 'geojson' && resource.reference !== undefined && resource.url === undefined && resource.data === undefined
+      if (referenceOnly) {
+        check(!mapLayers.some(layer => layer.source === id), path, 'resource.unresolved', '二维引用资源需先由宿主准备完整数据')
+      } else mapSources[id] = resource
+      if (resource.type === 'geojson') assets[id] = { type: 'geojson',
+        ...(resource.url === undefined ? {} : { url: resource.url }),
+        ...(resource.reference === undefined ? {} : { reference: resource.reference }),
+        ...(resource.data === undefined ? {} : { data: resource.data }) }
     }
   }
   const mapView = { projection: 'EPSG:3857', center: [0, 0], zoom: 2 }
@@ -261,10 +269,11 @@ export function migrateSceneDocument(input: unknown, identity = { id: 'city-scen
         resources[next] = {
           type: 'geojson',
           ...(asset.url ? { url: asset.url } : {}),
+          ...(asset.reference ? { reference: structuredClone(asset.reference) } : {}),
           ...(asset.data ? { data: structuredClone(asset.data) as import('./types.js').GeoJsonFeatureCollection } : {})
         }
       } else {
-        resources[next] = { type: asset.type, url: asset.url! }
+        resources[next] = { type: asset.type, ...(asset.url === undefined ? {} : { url: asset.url }), ...(asset.reference ? { reference: structuredClone(asset.reference) } : {}) }
       }
     }
     for (const group of city.groups ?? []) {

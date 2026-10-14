@@ -16,6 +16,7 @@ import { getLiveCityCamera } from '@/features/city/city-runtime-host'
 import { useProjectStore } from '@/stores/project.store'
 import { isTauri } from '@tauri-apps/api/core'
 import { downloadProject, pickBrowserProject } from './browser-project-files'
+import { prepareProjectResourceReferences, resolveProjectResourceReferences } from './project-resource-references'
 
 export const PROJECT_FILE_FILTER = {
   name: 'Web GIS 项目',
@@ -49,12 +50,13 @@ export function createSnapshotFromState(
   return snapshot
 }
 
-export async function saveSnapshotToPath(path: string, snapshot: ProjectSnapshot): Promise<void> {
+export async function saveSnapshotToPath(path: string, snapshot: ProjectSnapshot, sourcePath: string | null = getCurrentProjectPath()): Promise<void> {
   assertNoSecretValues(snapshot)
-  await writeTextFile(path, serializeProjectSnapshot(snapshot))
+  await writeTextFile(path, serializeProjectSnapshot(prepareProjectResourceReferences(snapshot, sourcePath, path)))
 }
 
 export async function pickAndSaveSnapshot(snapshot: ProjectSnapshot, suggestedName?: string): Promise<string | null> {
+  const sourcePath = getCurrentProjectPath()
   if (!isTauri()) {
     assertNoSecretValues(snapshot)
     const name = suggestedName ?? 'project.webgis.json'
@@ -67,7 +69,7 @@ export async function pickAndSaveSnapshot(snapshot: ProjectSnapshot, suggestedNa
     filters: [PROJECT_FILE_FILTER]
   })
   if (!path) return null
-  await saveSnapshotToPath(path, snapshot)
+  await saveSnapshotToPath(path, snapshot, sourcePath)
   return path
 }
 
@@ -84,5 +86,5 @@ export async function openSnapshotFromDisk(): Promise<{ path: string; snapshot: 
   const text = await readTextFile(path)
   const snapshot = parseProjectSnapshot(text)
   assertNoSecretValues(snapshot)
-  return { path, snapshot }
+  return { path, snapshot: resolveProjectResourceReferences(snapshot, path) }
 }

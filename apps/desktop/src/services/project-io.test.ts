@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createProject, serializeProjectSnapshot } from '@desktop-webgis/gis-core'
+import { createCityScene } from '@desktop-webgis/cesium-scene-schema'
 import { getCurrentProjectPath, openSnapshotFromDisk, pickAndSaveSnapshot, setCurrentProjectPath } from './project-io'
 
 const probe = vi.hoisted(() => ({ native: false, download: vi.fn(), pick: vi.fn(), nativePick: vi.fn(), write: vi.fn() }))
@@ -11,6 +12,21 @@ vi.mock('@/features/city/city-runtime-host', () => ({ getLiveCityCamera: () => n
 beforeEach(() => { vi.clearAllMocks(); probe.native = false; setCurrentProjectPath(null) })
 
 describe('project IO adapters', () => {
+  it('captures the old project anchor before waiting for a Save As dialog', async () => {
+    probe.native = true
+    setCurrentProjectPath('D:/original/main.webgis.json')
+    const project = createProject(); project.city = createCityScene()
+    project.city.assets.model = { type: 'glb', reference: { kind: 'relative', path: '模型/tower.glb' } }
+    probe.nativePick.mockImplementation(async () => {
+      setCurrentProjectPath('E:/other/main.webgis.json')
+      return 'F:/copy/main.webgis.json'
+    })
+    await pickAndSaveSnapshot({ project, featuresByDataset: {} })
+    const written = JSON.parse(probe.write.mock.calls[0][1])
+    expect(written.project.city.assets.model.reference).toEqual({ kind: 'absolute', path: 'D:/original/模型/tower.glb' })
+    expect(project.city.assets.model.reference).toEqual({ kind: 'relative', path: '模型/tower.glb' })
+    expect(getCurrentProjectPath()).toBe('E:/other/main.webgis.json')
+  })
   it('downloads a serialized browser project without storing a fake disk path', async () => {
     const snapshot = { project: createProject(), featuresByDataset: {} }
     setCurrentProjectPath('old.webgis.json')
