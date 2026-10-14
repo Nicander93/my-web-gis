@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { Button } from '@/components/ui/Button'
 import { EditorDialog } from '@/components/ui/EditorDialog'
 import { isTauri } from '@tauri-apps/api/core'
 import { FileText, Upload, CheckCircle2, AlertCircle } from 'lucide-react'
@@ -410,20 +411,20 @@ export function AddDataDialog({
       {step === 'select' && (
         <div className="data-source-layout">
           <div className="dialog-tabs">
-            <button
+            <Button variant="ghost"
               className={`dialog-tab ${activeTab === 'file' ? 'active' : ''}`}
               onClick={() => setActiveTab('file')}
             >
               <FileText size={14} />
               本地文件
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost"
               className={`dialog-tab ${activeTab === 'service' ? 'active' : ''}`}
               onClick={() => setActiveTab('service')}
             >
               <Upload size={14} />
               地图服务
-            </button>
+            </Button>
           </div>
 
           <div className="dialog-body">
@@ -460,13 +461,13 @@ export function AddDataDialog({
                 <FileText size={32} />
                 <p>将文件拖放到此处</p>
                 <p className="file-drop-hint">或</p>
-                <button
-                  className="button-primary"
+                <Button
+                  variant="primary" className="button-primary"
                   onClick={handlePickFile}
                   disabled={loading}
                 >
                   {loading ? '解析中...' : '选择文件'}
-                </button>
+                </Button>
                 <p className="file-drop-formats">
                   支持格式: GeoJSON (.geojson, .json), Shapefile (.zip), DXF
                   (.dxf), CSV (.csv)
@@ -530,15 +531,15 @@ export function AddDataDialog({
                 </p>
 
                 <div className="selector-actions">
-                  <button className="button-link" onClick={selectAllDxfLayers}>
+                  <Button variant="ghost" className="button-link" onClick={selectAllDxfLayers}>
                     全选
-                  </button>
-                  <button
-                    className="button-link"
+                  </Button>
+                  <Button
+                    variant="ghost" className="button-link"
                     onClick={deselectAllDxfLayers}
                   >
                     取消全选
-                  </button>
+                  </Button>
                 </div>
 
                 <div className="layer-list">
@@ -557,16 +558,16 @@ export function AddDataDialog({
             </div>
           </div>
           <div className="dialog-footer">
-            <button className="button-secondary" onClick={handleCancel}>
+            <Button className="button-secondary" onClick={handleCancel}>
               取消
-            </button>
-            <button
-              className="button-primary"
+            </Button>
+            <Button
+              variant="primary" className="button-primary"
               onClick={handleDxfConfigConfirm}
               disabled={loading || selectedDxfLayers.size === 0}
             >
               {loading ? '导入中...' : `导入 ${selectedDxfLayers.size} 个图层`}
-            </button>
+            </Button>
           </div>
         </>
       )}
@@ -585,18 +586,18 @@ export function AddDataDialog({
               </p>
 
               <div className="selector-actions">
-                <button
-                  className="button-link"
+                <Button
+                  variant="ghost" className="button-link"
                   onClick={selectAllShapefileLayers}
                 >
                   全选
-                </button>
-                <button
-                  className="button-link"
+                </Button>
+                <Button
+                  variant="ghost" className="button-link"
                   onClick={deselectAllShapefileLayers}
                 >
                   取消全选
-                </button>
+                </Button>
               </div>
 
               <div className="layer-list">
@@ -614,18 +615,18 @@ export function AddDataDialog({
             </div>
           </div>
           <div className="dialog-footer">
-            <button className="button-secondary" onClick={handleCancel}>
+            <Button className="button-secondary" onClick={handleCancel}>
               取消
-            </button>
-            <button
-              className="button-primary"
+            </Button>
+            <Button
+              variant="primary" className="button-primary"
               onClick={handleShapefileLayersConfirm}
               disabled={loading || selectedShapefileLayers.size === 0}
             >
               {loading
                 ? '导入中...'
                 : `导入 ${selectedShapefileLayers.size} 个图层`}
-            </button>
+            </Button>
           </div>
         </>
       )}
@@ -693,12 +694,12 @@ export function AddDataDialog({
           </div>
 
           <div className="dialog-footer">
-            <button className="button-secondary" onClick={handleCancel}>
+            <Button className="button-secondary" onClick={handleCancel}>
               取消
-            </button>
-            <button className="button-primary" onClick={handleConfirm}>
+            </Button>
+            <Button variant="primary" className="button-primary" onClick={handleConfirm}>
               确认导入
-            </button>
+            </Button>
           </div>
         </>
       )}

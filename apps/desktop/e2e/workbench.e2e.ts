@@ -44,6 +44,7 @@ test('CSV configuration keeps one modal and restores keyboard access after cance
   await page.getByRole('tab', { name: '数据', exact: true }).click()
   const add = page.getByRole('region', { name: '二维功能区' }).getByRole('button', { name: '添加数据', exact: true })
   await add.click()
+  await page.screenshot({ path: testInfo.outputPath('prototype-aligned-add-data.png') })
   await page.locator('input[type=file]').setInputFiles({
     name: 'coordinates.csv', mimeType: 'text/csv', buffer: Buffer.from('id,x,y\n1,116.4,39.9\n2,116.5,40.0')
   })

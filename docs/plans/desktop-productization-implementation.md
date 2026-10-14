@@ -117,6 +117,19 @@ rtk pnpm --filter @desktop-webgis/desktop test:e2e docking.e2e.ts --project=desk
 
 原生 Tauri 文件选择/保存、Windows 125% 缩放及物理 GPU 压平不由浏览器矩形测试签收。未建立最终 PR，因为全量 M0–M9 Gate 尚未满足。
 
+## 原型视觉校准（2026-10-14）
+
+用户指出运行截图的弹窗、按钮细节弱于确认原型。本批直接以原型 CSS 为依据校准，保留 Ant Design 的交互能力：
+
+- 浅色主题恢复原型的绿色文字、边框、选中状态与浅绿遮罩，清理旧 Button CSS 与 antd 默认主题的冲突。
+- 共享 Modal 使用 620px 宽度、7px 圆角、41px 独立标题栏、原型的边框和阴影；字段与拓扑表单操作区具有独立分隔线、8px 操作间距，弹窗按钮高度 31px。
+- 添加数据恢复顶部来源页签与浅绿虚线拖放区域，现有按钮全部迁移为共享 antd Button；导入步骤、坐标配置与真实文件读取继续保留。
+- 尚未将所有旧窗口和三维控件的视觉一致性签收。后续功能批次继续迁移，并以原型对照截图校验。
+
+验证：全仓构建与测试通过，Desktop 231 通过、5 个环境项跳过。1366×768 全量浏览器回归 48 项通过，覆盖 CSV 首字段聚焦、Tab/Shift+Tab 边界、关闭返回入口、真实导入、编辑和保存。合并/分割与取消专项在 1366×768 和 1920×1080 共 4 项通过；取消后重新聚焦可用的提交按钮。原生窗口和物理 GPU 不由这些浏览器检查签收。
+
+运行截图：[添加数据](../design/desktop-productization/evidence/laptop-prototype-aligned-add-data.png)、[合并面弹窗](../design/desktop-productization/evidence/laptop-prototype-aligned-merge-dialog.png)。合并/分割属于正在开发的下一功能批次，本节仅记录其共享 UI 校准与已运行测试。
+
 ## M4 属性表与字段计算批次
 
 - 一个属性表窗口可打开多个图层 Tab。关闭当前 Tab 自动选择相邻项；删除图层会清理对应项。Tab 按图层 ID 绑定，浏览场景树不改变表格目标。

@@ -20,7 +20,7 @@ export function EditorDialog({ title, children, onClose, busy = false, className
       if (!body.current?.isConnected && trigger.current?.isConnected) trigger.current.focus()
     })
   }, [])
-  return <Modal open title={title} footer={null} centered width={560}
+  return <Modal open title={title} footer={null} centered width={620}
     className={`desktop-editor-modal ${className}`}
     closable={{ disabled: busy, 'aria-label': `关闭${title}` }}
     keyboard={!busy} mask={{ closable: !busy }} onCancel={onClose} destroyOnHidden
@@ -46,7 +46,11 @@ export function EditorDialog({ title, children, onClose, busy = false, className
       first?.focus()
     }}
     styles={{ wrapper: { position: 'fixed', inset: 0 },
-      body: { maxHeight: 'calc(100dvh - 150px)', overflow: 'auto' } }}>
+      container: { padding: 0, border: '1px solid #cfdcd2', borderRadius: 7,
+        overflow: 'hidden', boxShadow: '0 22px 55px #0c221e35' },
+      header: { height: 41, padding: '0 42px 0 13px', display: 'flex', alignItems: 'center',
+        marginBottom: 0, borderBottom: '1px solid #dfe6e0' },
+      body: { maxHeight: 'calc(100dvh - 110px)', overflow: 'auto' } }}>
     <div ref={body}>{children}</div>
   </Modal>
 }

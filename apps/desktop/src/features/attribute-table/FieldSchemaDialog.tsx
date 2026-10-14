@@ -86,7 +86,7 @@ export function FieldSchemaDialog({ layerId, mode, name, onClose }: {
       {!canEdit && <Alert type="warning" title={locked ? `共享数据集的图层 ${locked.name} 已锁定，请先解除锁定`
         : '只读：请先将当前本地矢量图层设为编辑目标'} />}
       {error && <Alert role="alert" type="error" showIcon title={error} />}
-      <Space className="field-schema-actions">
+      <Space className="desktop-dialog-actions">
         <Button onClick={onClose}>取消</Button>
         <Button type="primary" danger={mode === 'remove'} htmlType="submit" disabled={!canEdit}>
           {mode === 'remove' ? '删除字段及数据' : '应用字段修改'}

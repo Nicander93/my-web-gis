@@ -5,15 +5,19 @@ import zhCN from 'antd/locale/zh_CN'
 /** Ant Design controls share the approved workbench palette and desktop density. */
 const desktopTheme: ThemeConfig = {
   token: {
-    colorPrimary: '#2f695b', colorBgLayout: '#f7f9f6', colorBgContainer: '#fafbf9',
-    colorBorder: '#dfe4e2', colorText: '#252522', colorTextSecondary: '#74736d', colorError: '#a64c47',
+    colorPrimary: '#38745a', colorInfo: '#38745a', colorBgLayout: '#f7f9f6', colorBgContainer: '#ffffff',
+    colorBorder: '#d3dfd5', colorBorderSecondary: '#ebefeb', colorText: '#26352d', colorTextSecondary: '#77877c', colorError: '#a64c47',
+    colorBgMask: '#13251d29',
+    colorInfoBg: '#f1f7f0', colorInfoBorder: '#d7e5d9',
     fontFamily: "'Segoe UI', 'Microsoft YaHei UI', system-ui, 'Noto Sans SC', sans-serif",
-    fontSize: 12, borderRadius: 4, controlHeight: 30, controlHeightSM: 26, motion: false
+    fontSize: 12, borderRadius: 4, borderRadiusSM: 3, borderRadiusLG: 7,
+    controlHeight: 30, controlHeightSM: 29, motion: false
   },
   components: {
-    Button: { paddingInlineSM: 8 },
+    Button: { paddingInlineSM: 10, defaultColor: '#44624d', defaultShadow: 'none', primaryShadow: 'none' },
+    Form: { itemMarginBottom: 14, verticalLabelPadding: '0 0 6px', labelColor: '#67786d' },
     Tabs: { horizontalItemPaddingSM: '5px 8px', cardHeightSM: 28 },
-    Modal: { titleFontSize: 14 }
+    Modal: { titleFontSize: 12, headerBg: '#fdfefc' }
   }
 }
 
