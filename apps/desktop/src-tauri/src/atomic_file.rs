@@ -82,6 +82,33 @@ fn write_with(path: &Path, writer: impl FnOnce(&mut File) -> io::Result<()>) -> 
 mod tests {
     use super::*;
 
+    #[test]
+    #[ignore = "only executed by the abrupt-exit parent test"]
+    fn abrupt_exit_child() {
+        let root = PathBuf::from(std::env::var("WEBGIS_ATOMIC_TEST_ROOT").unwrap()).canonicalize().unwrap();
+        let base = std::env::current_dir().unwrap().canonicalize().unwrap();
+        assert_eq!(root.parent(), Some(base.as_path()));
+        assert!(root.file_name().unwrap().to_string_lossy().starts_with(".atomic-write-test-"));
+        write_with(&root.join("project.webgis.json"), |file| {
+            file.write_all(b"partial replacement")?;
+            file.sync_all()?;
+            std::process::exit(71);
+        }).unwrap();
+    }
+
+    #[test]
+    fn abrupt_exit_during_staging_keeps_the_old_destination_intact() {
+        let directory = TestDirectory::new();
+        let target = directory.root.join("project.webgis.json");
+        fs::write(&target, "complete previous project").unwrap();
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--ignored", "--exact", "atomic_file::tests::abrupt_exit_child"])
+            .env("WEBGIS_ATOMIC_TEST_ROOT", &directory.root).output().unwrap();
+        assert_eq!(output.status.code(), Some(71), "{}", String::from_utf8_lossy(&output.stderr));
+        assert_eq!(fs::read_to_string(target).unwrap(), "complete previous project");
+        assert_eq!(fs::read_dir(&directory.root).unwrap().count(), 2);
+    }
+
     struct TestDirectory {
         root: PathBuf,
         base: PathBuf,

@@ -92,3 +92,6 @@
 .attribute-table-content .attr-stats .ant-select { width: 140px; margin-left: 6px; }
 .import-cancel-read { display: flex; align-items: center; gap: 10px; padding: 10px 18px; border-bottom: 1px solid var(--color-border); }
 .import-cancel-read span { font-size: 11px; color: var(--color-text-secondary); }
+.recovery-draft { padding: 12px 0; border-top: 1px solid var(--color-border); }
+.recovery-draft p { margin: 6px 0; font-size: 11px; line-height: 1.6; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.recovery-draft-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }

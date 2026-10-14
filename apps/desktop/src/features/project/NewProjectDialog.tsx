@@ -6,6 +6,7 @@ import { projectCommands } from '@/app/commands/project.commands'
 import { useProjectStore } from '@/stores/project.store'
 import type { ProjectType } from '@/services/project-type'
 import { resolveSceneDrafts } from '@/features/inspector/scene-draft-guard'
+import { discardRecoveryOnReplacement } from '@/services/recovery-tracking'
 
 interface NewProjectDialogProps { onClose(): void }
 
@@ -29,6 +30,7 @@ export function NewProjectDialog({ onClose }: NewProjectDialogProps) {
         if (!saved || useProjectStore.getState().dirty) throw new Error('当前项目尚未保存，已保留修改。可以重试保存或取消新建。')
       }
       if (ownerEpoch !== useProjectStore.getState().projectEpoch) throw new Error('工程已切换，请重新打开新建窗口')
+      if (discard) discardRecoveryOnReplacement()
       projectCommands.createWorkspace(type, name)
       onClose()
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }

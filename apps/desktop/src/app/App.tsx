@@ -34,6 +34,7 @@ import { SceneDraftDialog } from '@/features/inspector/SceneDraftDialog'
 import { HelpDialog } from '@/features/help/HelpDialog'
 import { registerHelpDialog, type HelpDialogPage } from './commands/help.commands'
 import { viewCommands } from './commands/view.commands'
+import { RecoveryDraftHost } from '@/features/project/RecoveryDraftHost'
 
 const CityWorkspace = lazy(() =>
   import('@/features/city/CityWorkspace').then((module) => ({
@@ -245,6 +246,7 @@ export default function App() {
         />
       )}
       <StyleDraftDialog />
+      <RecoveryDraftHost />
       <SceneDraftDialog />
       {helpPage && <HelpDialog page={helpPage} onClose={() => setHelpPage(null)} />}
       <AddDataDialog

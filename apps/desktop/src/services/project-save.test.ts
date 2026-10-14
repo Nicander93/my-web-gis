@@ -7,12 +7,13 @@ import { useSaveStore } from '@/stores/save.store'
 import { getCurrentProjectPath, setCurrentProjectPath } from './project-io'
 import { requestProjectSave } from './project-save'
 
-const probe = vi.hoisted(() => ({ write: vi.fn(), pick: vi.fn(), status: vi.fn(), camera: null as CityCamera | null }))
+const probe = vi.hoisted(() => ({ write: vi.fn(), pick: vi.fn(), status: vi.fn(), cleanup: vi.fn(), camera: null as CityCamera | null }))
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
 vi.mock('@/services/files', () => ({ pickSaveFile: probe.pick, writeTextFile: probe.write }))
 vi.mock('@/features/map/map-runtime-host', () => ({ getLiveMapState: () => null }))
 vi.mock('@/features/city/city-runtime-host', () => ({ getLiveCityCamera: () => probe.camera }))
 vi.mock('@/app/commands/status', () => ({ emitCommandStatus: probe.status }))
+vi.mock('./project-recovery', () => ({ projectRecovery: { clearSaved: probe.cleanup }, recoveryOwner: (epoch: number) => `test:${epoch}` }))
 
 function deferred() {
   let resolve!: () => void
@@ -22,6 +23,7 @@ function deferred() {
 
 beforeEach(() => {
   vi.clearAllMocks(); probe.camera = null; probe.write.mockResolvedValue(undefined); probe.pick.mockResolvedValue('D:/new.webgis.json')
+  probe.cleanup.mockResolvedValue(undefined)
   const project = createProject('Saved')
   project.datasets = [{ id: 'd', name: 'Data', kind: 'vector', source: { type: 'memory', label: 'Data' } }]
   project.layers = [{ id: 'l', datasetId: 'd', name: 'Data', visible: true, opacity: 1, editable: false, style: createDefaultLayerStyle('point') }]
@@ -49,6 +51,25 @@ it('keeps new edits dirty and does not let an older completion overwrite current
   expect(JSON.parse(probe.write.mock.calls[0][1]).featuresByDataset.d[0].properties.value).toBe(2)
   expect(useProjectStore.getState().featuresByDataset.d[0].properties.value).toBe(99)
   expect(useProjectStore.getState().dirty).toBe(true)
+  expect(probe.cleanup).not.toHaveBeenCalled()
+})
+
+it('keeps edits made during recovery cleanup dirty and does not acknowledge an older saved revision', async () => {
+  const gate = deferred(); probe.cleanup.mockImplementationOnce(() => gate.promise)
+  const saving = requestProjectSave()
+  await vi.waitFor(() => expect(probe.cleanup).toHaveBeenCalledTimes(1))
+  useProjectStore.getState().updateFeatureProperties('l', 'f', { value: 88 })
+  gate.resolve()
+  expect(await saving).toBe(false)
+  expect(useProjectStore.getState().dirty).toBe(true)
+  expect(useProjectStore.getState().featuresByDataset.d[0].properties.value).toBe(88)
+})
+
+it('reports recovery cleanup failure while preserving the successful formal save', async () => {
+  probe.cleanup.mockRejectedValueOnce(new Error('cache locked'))
+  expect(await requestProjectSave()).toBe(true)
+  expect(useProjectStore.getState().dirty).toBe(false)
+  expect(probe.status).toHaveBeenLastCalledWith(expect.stringContaining('恢复草稿清理失败'))
 })
 
 it('does not clear a re-opened same-ID project or adopt the old save path', async () => {

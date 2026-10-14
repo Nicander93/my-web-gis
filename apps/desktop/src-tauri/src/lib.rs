@@ -1,4 +1,25 @@
 mod atomic_file;
+mod recovery_cache;
+
+fn recovery_root(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    use tauri::Manager;
+    Ok(app.path().app_local_data_dir().map_err(|error| error.to_string())?.join("project-recovery"))
+}
+
+#[tauri::command]
+fn list_recovery_cache(app: tauri::AppHandle) -> Result<Vec<recovery_cache::Entry>, String> {
+    recovery_cache::list(&recovery_root(&app)?).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn write_recovery_cache(app: tauri::AppHandle, key: String, content: String, expected_content: Option<String>) -> Result<(), String> {
+    recovery_cache::write(&recovery_root(&app)?, &key, &content, expected_content.as_deref()).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn remove_recovery_cache(app: tauri::AppHandle, key: String, expected_content: Option<String>, expected_stamp: Option<String>) -> Result<bool, String> {
+    recovery_cache::remove(&recovery_root(&app)?, &key, expected_content.as_deref(), expected_stamp.as_deref()).map_err(|error| error.to_string())
+}
 
 #[tauri::command]
 fn read_text_path(path: String) -> Result<String, String> {
@@ -218,6 +239,9 @@ pub fn run() {
             write_text_path,
             read_binary_path,
             write_binary_path,
+            list_recovery_cache,
+            write_recovery_cache,
+            remove_recovery_cache,
             read_scene_resource,
             persist_scene_archive,
             read_cached_scene_resource,

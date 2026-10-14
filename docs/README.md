@@ -43,6 +43,7 @@
 ### 工程约定
 
 - [代码偏好与维护约定](engineering/code-preferences.md)
+- [项目恢复草稿](engineering/project-recovery.md)：缓存规则、恢复/舍弃操作、自动化入口与原生验收边界。
 
 ### 设计参考图
 

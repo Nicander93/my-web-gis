@@ -4,6 +4,7 @@ import { useProjectStore, getProjectContentVersion } from '@/stores/project.stor
 import { useSaveStore } from '@/stores/save.store'
 import { emitCommandStatus } from '@/app/commands/status'
 import { createSnapshotFromState, getCurrentProjectPath, pickAndSaveSnapshot, saveSnapshotToPath, setCurrentProjectPath } from './project-io'
+import { projectRecovery, recoveryOwner } from './project-recovery'
 
 let queue: Promise<unknown> = Promise.resolve()
 const waiting = new Map<string, Promise<boolean>>()
@@ -51,8 +52,17 @@ export function requestProjectSave(saveAs = false): Promise<boolean> {
       const current = useProjectStore.getState()
       const unchanged = version === getProjectContentVersion() && sameSavedContent(snapshot, createSnapshotFromState(current.project, current.featuresByDataset))
       current.setDirty(!unchanged)
-      emitCommandStatus(`${isTauri() ? '已保存' : '项目下载已发起'}：${path}${unchanged ? '' : '；期间有新修改，仍需保存'}`)
-      return unchanged
+      let cleanupError = ''
+      if (unchanged) {
+        try { await projectRecovery.clearSaved(snapshot, recoveryOwner(epoch)) }
+        catch (error) { cleanupError = `；恢复草稿清理失败：${error instanceof Error ? error.message : String(error)}` }
+      }
+      if (!ownsProject()) { emitCommandStatus('原工程已保存；清理期间当前工程已切换'); return false }
+      const latest = useProjectStore.getState()
+      const acknowledged = unchanged && version === getProjectContentVersion() && sameSavedContent(snapshot, createSnapshotFromState(latest.project, latest.featuresByDataset))
+      if (!acknowledged) latest.setDirty(true)
+      emitCommandStatus(`${isTauri() ? '已保存' : '项目下载已发起'}：${path}${acknowledged ? '' : '；期间有新修改，仍需保存'}${cleanupError}`)
+      return acknowledged
     } catch (error) {
       emitCommandStatus(`${saveAs ? '另存' : '保存'}失败：${error instanceof Error ? error.message : String(error)}`)
       return false
