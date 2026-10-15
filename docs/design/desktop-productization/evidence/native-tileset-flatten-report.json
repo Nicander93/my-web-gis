@@ -1,0 +1,86 @@
+{
+  "identifier": "com.desktop-webgis.recovery-acceptance-1792045133645",
+  "output": "D:\\my-code-repo\\my-web-gis\\apps\\desktop\\test-results\\native-recovery-1792045133645",
+  "scenarios": [
+    {
+      "name": "Native directory protocol, external GLTF mesh/texture, ranges and revocation",
+      "passed": true
+    },
+    {
+      "name": "2D native process termination, startup restore and native save",
+      "passed": true
+    },
+    {
+      "name": "3D real GLB transform, native process termination and restore",
+      "passed": true
+    },
+    {
+      "name": "3D Tiles local flatten on native physical GPU, camera movement, LOD change and restore",
+      "passed": true
+    }
+  ],
+  "nativeFileChooser": "Not automated: fixture working paths are assigned; Save uses the real native bridge.",
+  "windowsScale125": "Not verified",
+  "appData": "C:\\Users\\PC\\AppData\\Local\\com.desktop-webgis.recovery-acceptance-1792045133645",
+  "viewport": {
+    "width": 1037,
+    "height": 648,
+    "devicePixelRatio": 1.3899999856948853
+  },
+  "localProtocol": {
+    "matched": true,
+    "imageSize": [
+      1,
+      1
+    ],
+    "externalBuffers": 2,
+    "statuses": {
+      "model": 200,
+      "mesh": 200,
+      "image": 200,
+      "part": 206,
+      "suffix": 206,
+      "head": 200,
+      "missing": 404,
+      "traversal": 403
+    },
+    "revoked": 403,
+    "partBytes": [
+      0,
+      63,
+      0,
+      0,
+      0,
+      0
+    ],
+    "suffixBytes": [
+      22,
+      0,
+      23,
+      0
+    ],
+    "modelType": "model/gltf+json",
+    "imageType": "image/png",
+    "partRange": "bytes 2-7/648",
+    "headLength": "648"
+  },
+  "localModelReference": {
+    "kind": "relative",
+    "path": "本地模型/塔楼 #%.glb"
+  },
+  "modelVisibilityPixels": {
+    "visible": 51326,
+    "hidden": 14801,
+    "restored": 51319
+  },
+  "recoveredModelPixels": 51317,
+  "nativeTilesetFlatten": {
+    "renderer": {
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5070 (0x00002F04) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "vendor": "Google Inc. (NVIDIA)"
+    },
+    "initialDifference": 169984,
+    "restoredDifference": 5071,
+    "maximumScreenSpaceError": 4
+  }
+}

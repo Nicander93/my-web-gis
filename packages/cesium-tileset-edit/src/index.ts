@@ -4,7 +4,7 @@ import type { TransformLayer } from '@desktop-webgis/cesium-layer'
 import type { Transform } from '@desktop-webgis/cesium-scene-schema'
 
 export type EditMode = 'translate' | 'rotate' | 'scale'
-type Axis = 'X' | 'Y' | 'Z' | 'XY' | 'S'
+type Axis = 'X' | 'Y' | 'Z' | 'XY' | 'XZ' | 'YZ' | 'S'
 export interface TransformEditEvent { id: string; before: Transform; after: Transform }
 export interface TilesetEditorOptions {
   mode?: EditMode
@@ -132,6 +132,8 @@ export class TilesetEditor {
     }
     if (this.mode === 'translate') {
       ;(['X', 'Y', 'Z'] as const).forEach((axis, i) => add(axis, () => [point(0,0,0), point(i === 0 ? 1 : 0, i === 1 ? 1 : 0, i === 2 ? 1 : 0)], colors[i], true))
+      add('XZ', () => [point(.2,0,.2), point(.45,0,.2), point(.45,0,.45), point(.2,0,.45), point(.2,0,.2)], colors[1])
+      add('YZ', () => [point(0,.2,.2), point(0,.45,.2), point(0,.45,.45), point(0,.2,.45), point(0,.2,.2)], colors[0])
       add('XY', () => [point(.2,.2,0), point(.45,.2,0), point(.45,.45,0), point(.2,.45,0), point(.2,.2,0)], Color.YELLOW)
     } else if (this.mode === 'rotate') {
       ;(['X', 'Y', 'Z'] as const).forEach((axis, i) => {
@@ -157,8 +159,8 @@ export class TilesetEditor {
     if (!axis || !frame) return
     const { origin, basis } = frame
     const index = axis === 'X' ? 0 : axis === 'Y' ? 1 : 2
-    let normal = basis[2]
-    if (axis !== 'XY' && axis !== 'S') {
+    let normal = axis === 'XY' ? basis[2] : axis === 'XZ' ? basis[1] : axis === 'YZ' ? basis[0] : basis[2]
+    if (!['XY', 'XZ', 'YZ', 'S'].includes(axis)) {
       normal = this.mode === 'rotate' ? basis[index] : Cartesian3.subtract(this.viewer.camera.directionWC, Cartesian3.multiplyByScalar(basis[index], Cartesian3.dot(this.viewer.camera.directionWC, basis[index]), new Cartesian3()), new Cartesian3())
       if (Cartesian3.magnitudeSquared(normal) < 1e-8) return
       Cartesian3.normalize(normal, normal)
@@ -187,7 +189,7 @@ export class TilesetEditor {
     if (this.mode === 'translate' && hit) {
       const delta = Cartesian3.subtract(hit, drag.start, new Cartesian3())
       for (let i = 0; i < 3; i++) {
-        if (drag.axis === 'XY' ? i === 2 : i !== axisIndex) continue
+        if (drag.axis.length === 2 ? !drag.axis.includes(['X', 'Y', 'Z'][i]) : i !== axisIndex) continue
         const distance = snap(Cartesian3.dot(delta, drag.basis[i]), this.options.translationSnap)
         next.translation[i] += distance
       }

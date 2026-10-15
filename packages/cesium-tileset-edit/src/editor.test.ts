@@ -84,13 +84,21 @@ describe('transform gesture transactions',() => {
     s.editor.destroy()
   })
   it('previews an ENU translation and commits once even with two release events',() => {
-    const s=setup();s.begin();s.move();s.move()
+    const s=setup(); expect(s.entities).toHaveLength(6); s.begin();s.move();s.move()
     expect(s.layer.getTransform().translation).toEqual([25,15,0])
     expect(s.onCommit).not.toHaveBeenCalled()
     handlers.get(ScreenSpaceEventType.LEFT_UP)?.()
     window.dispatchEvent(new Event('pointerup'))
     expect(s.onCommit).toHaveBeenCalledOnce()
     expect(s.viewer.scene.screenSpaceCameraController.enableInputs).toBe(false)
+    s.editor.destroy()
+  })
+  it('translates on the additional YZ plane without changing east', () => {
+    const s = setup()
+    s.viewer.scene.pick = () => ({ id: s.entities[4] })
+    s.viewer.camera.getPickRay = (pixel: Cartesian2) => new Ray(new Cartesian3(s.layer.pivot!.x + pixel.y, 100, pixel.x), new Cartesian3(0, -1, 0))
+    s.begin(); s.move()
+    expect(s.layer.getTransform().translation).toEqual([0, 25, 15])
     s.editor.destroy()
   })
   it('Escape restores the original transform and host camera setting',() => {

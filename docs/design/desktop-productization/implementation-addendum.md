@@ -78,7 +78,9 @@ A 完成不代表全部界面迁移完成。逐批记录剩余文件，不将 an
 - 已实现局部 ENU 遮罩压平：每个范围可配置 WGS84 椭球目标高程，Shader 将世界坐标经 Tileset 模型变换正确换算到局部空间；支持多范围和重叠优先级。范围跨度限制为 5 km，遮罩限制为 2048 像素并同时遵守 GPU 最大纹理尺寸，超限时返回明确诊断。
 - 压平纹理、`CustomShader` 和宿主状态按 Tileset 隔离并由管理器确定性释放；调用方已有自定义 Shader 时显式拒绝覆盖。单元测试覆盖双实例隔离、不同高度、超限、冲突和销毁恢复。
 - 浏览器 GPU 路径使用真实示例 Tileset 验收压平、关闭恢复、项目保存重开，以及两个分别平移 -180 m / +180 m 的 Tileset 独立启停。12 项（3 场景 × 4 视口）全部通过，像素差异断言证明运行时几何发生改变而非只更新 UI。证据见 `evidence/browser-tileset-flatten-report.json`、`browser-tileset-flattened.png`、`browser-tileset-flatten-restored.png` 和 `browser-tileset-flatten-reopened.png`。
-- M8 仍未最终签收：当前浏览器由 Playwright/SwiftShader 执行，尚需 Windows Tauri 物理 GPU 下验证相机运动、LOD 切换及资源释放指标；不得把浏览器证据表述成物理 GPU 验收。
+- Windows Tauri/WebView2 原生验收在 `ANGLE (NVIDIA GeForce RTX 5070, Direct3D 11)` 上通过，明确排除了 SwiftShader。真实 Tileset 在压平期间完成相机缩放、屏幕误差 16→4、关闭恢复和原生保存；压平前后变化 169984 像素，关闭效果变化 5071 像素。Shader 销毁及宿主状态恢复另有单元测试覆盖。证据见 `evidence/native-tileset-flatten-report.json` 和 `native-tileset-flattened.png`。
+- 已对照 `cesium-demo` 的 `draw-util` 和 `model-editor`：裁剪/压平绘制采用其“优先深度拾取、失败回退地表”的有效思路；Gizmo 补齐 XY、XZ、YZ 三个平面拖动。生产实现继续保留独立会话所有权、Esc 回滚、相机输入恢复、ENU 射线平面约束、项目历史和完整销毁，不复制 demo 中全局 `removeAll`、私有字段访问或固定相机比例算法。
+- Tileset 裁剪/压平子项已完成浏览器与物理 GPU 验收。M8 整体仍需完成基础三维测量后再关闭。
 
 ## 7. 每批验证与最终 PR
 

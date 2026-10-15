@@ -19,7 +19,11 @@ export function useSceneDrawing(runtime: CesiumSceneRuntime | undefined, onCompl
     if (!runtime) return
     cancel()
     try {
-      const drawing = runtime.startDraw({ type: next === 'water' || next === 'clip' || next === 'flatten' ? 'polygon' : next, onChange: setCount })
+      const drawing = runtime.startDraw({
+        type: next === 'water' || next === 'clip' || next === 'flatten' ? 'polygon' : next,
+        heightMode: next === 'clip' || next === 'flatten' ? 'absolute' : 'ground',
+        onChange: setCount
+      })
       session.current = drawing; setKind(next)
       void drawing.result.then(result => {
         if (session.current !== drawing) return

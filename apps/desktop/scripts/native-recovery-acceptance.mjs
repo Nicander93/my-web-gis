@@ -138,6 +138,36 @@ async function modelPixels() {
     return count
   }, [...png])
 }
+async function canvasPixels() {
+  return [...await page.locator('.scene3d-canvas__viewport canvas').screenshot()]
+}
+async function changedPixels(before, after) {
+  return page.evaluate(async ({ before, after }) => {
+    async function pixels(bytes) {
+      const bitmap = await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/png' }))
+      const canvas = document.createElement('canvas'); canvas.width = bitmap.width; canvas.height = bitmap.height
+      const context = canvas.getContext('2d'); context.drawImage(bitmap, 0, 0); bitmap.close()
+      return context.getImageData(0, 0, canvas.width, canvas.height).data
+    }
+    const first = await pixels(before), second = await pixels(after)
+    let changed = 0
+    for (let index = 0; index < first.length; index += 4) {
+      if (Math.abs(first[index] - second[index]) + Math.abs(first[index + 1] - second[index + 1]) + Math.abs(first[index + 2] - second[index + 2]) > 30) changed++
+    }
+    return changed
+  }, { before, after })
+}
+async function webglRenderer() {
+  return page.locator('.scene3d-canvas__viewport canvas').evaluate((canvas) => {
+    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl')
+    if (!gl) return { renderer: null, vendor: null }
+    const extension = gl.getExtension('WEBGL_debug_renderer_info')
+    return {
+      renderer: extension ? gl.getParameter(extension.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
+      vendor: extension ? gl.getParameter(extension.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR)
+    }
+  })
+}
 async function restore() {
   const dialog = page.getByRole('dialog', { name: '发现恢复草稿', exact: true })
   await expect(dialog).toBeVisible()
@@ -285,7 +315,7 @@ try {
   await page.getByRole('menuitem', { name: /^新建/ }).click()
   const creating = page.getByRole('dialog', { name: '新建项目', exact: true })
   await creating.getByRole('radio', { name: /三维场景/ }).check()
-  await creating.getByPlaceholder('例如：中心城区场景').fill('Native city recovery')
+  await creating.getByPlaceholder('例如：园区三维场景').fill('Native scene recovery')
   await creating.getByRole('button', { name: '创建项目', exact: true }).click()
   await expect(page.locator('.scene3d-footer__state')).toHaveText('就绪', { timeout: 60_000 })
   await page.getByRole('button', { name: '添加数据', exact: true }).click()
@@ -358,6 +388,61 @@ try {
   report.scenarios.push({ name: '3D real GLB transform, native process termination and restore', passed: true })
   report.recoveredModelPixels = await modelPixels()
   console.log('[native-recovery] 3D native recovery passed')
+
+  await page.getByRole('button', { name: '文件', exact: true }).click()
+  await page.getByRole('menuitem', { name: /^新建/ }).click()
+  const flattenProject = page.getByRole('dialog', { name: '新建项目', exact: true })
+  await flattenProject.getByRole('radio', { name: /三维场景/ }).check()
+  await flattenProject.getByPlaceholder('例如：园区三维场景').fill('Native Tileset flatten')
+  await flattenProject.getByRole('button', { name: '创建项目', exact: true }).click()
+  await expect(page.locator('.scene3d-footer__state')).toHaveText('就绪', { timeout: 60_000 })
+  await page.getByRole('button', { name: '使用三维示例', exact: true }).click()
+  const tilesetRow = page.locator('.scene3d-layer-row').filter({ hasText: '建筑场景' })
+  await expect(tilesetRow.locator('small')).toHaveText('3D Tiles', { timeout: 60_000 })
+  const renderer = await webglRenderer()
+  assert.ok(renderer.renderer, 'Native WebView must expose a WebGL renderer')
+  assert.equal(/swiftshader/i.test(renderer.renderer), false, `Physical GPU required; received ${renderer.renderer}`)
+  await tilesetRow.locator('.scene3d-layer-row__select').click()
+  const inspector = page.getByRole('complementary', { name: '检查器面板' })
+  if (!await inspector.isVisible()) {
+    await page.getByRole('button', { name: '窗口', exact: true }).click()
+    await page.getByRole('menuitemcheckbox', { name: '检查器', exact: true }).click()
+  }
+  await page.getByRole('tab', { name: '瓦片', exact: true }).click()
+  const canvas = page.locator('.scene3d-canvas__viewport canvas'), before = await canvasPixels()
+  await page.getByRole('button', { name: '局部压平', exact: true }).click()
+  const bounds = await canvas.boundingBox(); assert.ok(bounds)
+  for (const [x, y] of [[.43,.38],[.57,.38],[.58,.62],[.42,.62]]) await page.mouse.click(bounds.x + bounds.width * x, bounds.y + bounds.height * y)
+  await page.keyboard.press('Enter')
+  const height = page.getByRole('spinbutton', { name: '压平目标高程 1' })
+  await expect(height).toBeVisible(); await height.fill('0'); await height.press('Enter')
+  await expect(page.locator('.scene3d-footer__state')).not.toHaveClass(/scene3d-footer__state--error/)
+  await page.waitForTimeout(500)
+  const flattened = await canvasPixels(), initialDifference = await changedPixels(before, flattened)
+  assert.ok(initialDifference > 200, `Native flattening changed only ${initialDifference} pixels`)
+  await page.screenshot({ path: join(output, 'native-tileset-flattened.png') })
+  const cameraBefore = await page.evaluate(async () => (await import('/src/features/scene3d/scene3d-runtime-host.ts')).getLiveSceneCamera())
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
+  await page.mouse.wheel(0, -500)
+  await poll(async () => {
+    const current = await page.evaluate(async () => (await import('/src/features/scene3d/scene3d-runtime-host.ts')).getLiveSceneCamera())
+    return current && cameraBefore && Math.abs(current.position[2] - cameraBefore.position[2]) > 1
+  }, 'Native camera did not move while flattening was active')
+  const quality = inspector.locator('.scene3d-property-group').filter({ hasText: '瓦片质量' }).getByRole('combobox').first()
+  await quality.selectOption('4'); await expect(quality).toHaveValue('4')
+  await page.waitForTimeout(500)
+  const enabledAfterCamera = await canvasPixels()
+  await page.getByRole('switch', { name: '启用压平范围 1' }).click()
+  await page.waitForTimeout(500)
+  const restoredAfterCamera = await canvasPixels(), restoredDifference = await changedPixels(enabledAfterCamera, restoredAfterCamera)
+  assert.ok(restoredDifference > 200, `Disabling native flattening changed only ${restoredDifference} pixels`)
+  await page.getByRole('switch', { name: '启用压平范围 1' }).click()
+  const nativeFlatten = await saveTo(join(output, 'native-tileset-flatten.webgis.json'))
+  const savedTileset = nativeFlatten.project.city.nodes.find((node) => node.type === '3dtiles')
+  assert.deepEqual(savedTileset.effects.map(({ kind, enabled, height }) => ({ kind, enabled, height })), [{ kind: 'flatten-polygon', enabled: true, height: 0 }])
+  report.nativeTilesetFlatten = { renderer, initialDifference, restoredDifference, maximumScreenSpaceError: savedTileset.maximumScreenSpaceError }
+  report.scenarios.push({ name: '3D Tiles local flatten on native physical GPU, camera movement, LOD change and restore', passed: true })
+  console.log(`[native-recovery] physical GPU Tileset flatten passed on ${renderer.renderer}`)
 } catch (error) {
   report.error = error.stack ?? String(error)
   await page?.screenshot({ path: join(output, 'native-failure.png') }).catch(() => undefined)
