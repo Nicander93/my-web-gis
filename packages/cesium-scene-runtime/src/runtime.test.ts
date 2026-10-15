@@ -45,6 +45,30 @@ function setup() {
   return { scene, viewer, runtime: new CesiumSceneRuntime(viewer, { target: 'map', scene }) }
 }
 describe('v3 document updates', () => {
+  it('previews native transforms without changing the applied scene and restores the latest update', async () => {
+    const s = setup()
+    await s.runtime.updateScene(s.scene)
+    const layer = s.runtime.layers.getLayer('blocks')! as import('@desktop-webgis/cesium-layer').TilesetLayer
+    const base = structuredClone(s.scene.nodes[0])
+    if (base.type !== '3dtiles') throw new Error('Expected Tileset')
+    const draft = { ...base, visible: false, transform: { ...base.transform, translation: [20, 0, 0] as [number, number, number] } }
+    expect(s.runtime.previewNode(base.id, draft)).toBe(true)
+    expect(layer.show).toBe(false)
+    expect(layer.getTransform().translation).toEqual([20, 0, 0])
+    expect(s.runtime.previewNode(base.id, null)).toBe(true)
+    expect(layer.show).toBe(true)
+    expect(layer.getTransform().translation).toEqual([0, 0, 0])
+    const next = structuredClone(s.scene)
+    if (next.nodes[0].type !== '3dtiles') throw new Error('Expected Tileset')
+    next.nodes[0].transform.translation = [7, 0, 0]
+    expect(s.runtime.updatePresentation(next)).toBe(true)
+    s.runtime.previewNode(base.id, draft)
+    s.runtime.previewNode(base.id, null)
+    expect(layer.getTransform().translation).toEqual([7, 0, 0])
+    expect(s.runtime.previewNode('removed', draft)).toBe(false)
+    s.runtime.destroy()
+    expect(s.runtime.previewNode(base.id, draft)).toBe(false)
+  })
   it('retains native interaction when content outside the city projection changes', async () => {
     const s = setup(), input = migrateSceneDocument(s.scene)
     const loaded = await createCesiumDocumentRuntime({ viewer: s.viewer, document: input })

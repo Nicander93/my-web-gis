@@ -37,6 +37,8 @@ Cesium 为 peer dependency。首版 0.1.0，MIT；尚未发布 npm。
 
 `setSelected(ids)` 设置图形、GeoJSON、3D Tiles 和模型的临时高亮，不写入场景协议。取消选择恢复原样式；GeoJSON 更新场景颜色后取消选择恢复最新配置。`onSelect(id, properties, selection)` 透传 Ctrl/Shift 修饰信息，宿主自行决定多选语义。图形 `style.labelField` 和属性在编辑器、只读 Viewer 共用渲染逻辑，属性更新后标签同步更新且无需重新挂载资源。
 
+`previewNode(id, draft)` 临时更新已安装对象的位置、变换、显隐、样式、水面参数与瓦片效果，不修改权威场景、文档或历史，也不加载替换资源。`previewNode(id, null)` 恢复运行时最近成功应用的定义；宿主负责在关闭、取消、对象冲突和工程切换时释放预览。锁定对象拒绝预览，缺失或已销毁对象返回 false。`getDiagnostics(id?)` 可附带该对象的原生显隐、模型矩阵换算位置、变换和水面运行时参数，返回隔离数据而非可写原生对象。
+
 运行时按 `groups` / `groupId` 计算成员的实际显隐和锁定；隐藏组不覆盖对象自身的 `visible`，锁定组会禁止成员几何与模型编辑。重命名、排序和分组移动复用原生资源；持久化、批量命令和历史由宿主负责。
 # v3 文档适配（实施中的 API）
 

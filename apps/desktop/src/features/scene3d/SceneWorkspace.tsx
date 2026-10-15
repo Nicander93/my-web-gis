@@ -65,6 +65,7 @@ interface MeasurementDraft { graphic: GraphicNode; result: SceneMeasurement }
 export function SceneWorkspace() {
   const target = useRef<HTMLDivElement>(null)
   const runtime = useRef<CesiumSceneRuntime | undefined>(undefined)
+  const propertyPreview = useRef<{ runtime: CesiumSceneRuntime; id: string } | null>(null)
   const documentSession = useRef<ReturnType<typeof createSceneDocumentSession> | undefined>(undefined)
   const resourceSession = useRef<ReturnType<typeof createLocalResourceSession> | undefined>(undefined)
   const pendingFocus = useRef<string | undefined>(undefined)
@@ -156,7 +157,7 @@ export function SceneWorkspace() {
             unregisterDiagnostics?.()
             if (state.runtime) {
               const currentRuntime = state.runtime
-              unregisterDiagnostics = registerSceneDiagnosticsReader(() => currentRuntime.getDiagnostics())
+              unregisterDiagnostics = registerSceneDiagnosticsReader(id => currentRuntime.getDiagnostics(id ? documentSession.current?.getRuntimeNodeId(id) ?? '' : undefined), () => useProjectStore.getState().projectEpoch === epoch)
               unregisterCamera = registerSceneCameraReader(() => currentRuntime.getCamera(), () => {
               const current = useProjectStore.getState()
               return current.projectEpoch === epoch && current.project.id === projectId && JSON.stringify(current.project.city?.camera) === preset
@@ -351,6 +352,20 @@ export function SceneWorkspace() {
     updateScene(label, current => ({ ...current, nodes: current.nodes.map(item => item.id === inspectorNode.id ? { ...item, ...patch } as CesiumSceneNode : item) }))
     notify('对象属性已应用')
   }
+  function previewPropertyNode(draft: CesiumSceneNode | null): void {
+    if (!draft) {
+      const owner = propertyPreview.current
+      propertyPreview.current = null
+      owner?.runtime.previewNode(owner.id, null)
+      return
+    }
+    if (!propertyTarget || propertyTarget.epoch !== useProjectStore.getState().projectEpoch) return
+    const id = documentSession.current?.getRuntimeNodeId(propertyTarget.node.id)
+    if (!id || !runtime.current) return
+    drawing.cancel(); stopEditing()
+    propertyPreview.current = { runtime: runtime.current, id }
+    runtime.current.previewNode(id, draft)
+  }
   function pickGround(x: number, y: number): GeoPosition | undefined {
     const viewer = runtime.current?.viewer
     if (!viewer) return
@@ -521,7 +536,7 @@ export function SceneWorkspace() {
       {!!liveIds.length && <><MenuItem icon={Copy} label="复制" onClick={() => { copyNode(); setContext(null) }} /><MenuItem icon={LockKeyhole} label={allLocked ? '解锁' : '锁定'} disabled={allLocked && !!inheritedLock} onClick={() => { toggleLock(); setContext(null) }} /><MenuItem icon={Download} label="导出对象" onClick={() => { void exportObjects(); setContext(null) }} /><MenuItem icon={Trash2} label="删除" disabled={hasLocked} onClick={() => { setDeleting(true); setContext(null) }} /></>}
     </LayerPopupMenu>}
     {folderPropertyTarget && folderPropertyTarget.epoch === projectEpoch && <FolderPropertyWindow key={`${folderPropertyTarget.epoch}:${folderPropertyTarget.id}`} scene3d id={folderPropertyTarget.id} onClose={() => setFolderPropertyTarget(null)} />}
-    {propertyTarget && propertyTarget.epoch === projectEpoch && <ScenePropertyWindow key={`${propertyTarget.epoch}:${propertyTarget.node.id}`} initial={propertyTarget.node} scene={scene} onClose={() => setPropertyTarget(null)} onApply={(base, draft) => {
+    {propertyTarget && propertyTarget.epoch === projectEpoch && <ScenePropertyWindow key={`${propertyTarget.epoch}:${propertyTarget.node.id}`} initial={propertyTarget.node} scene={scene} previewReady={syncStatus === 'ready'} onPreview={previewPropertyNode} onClose={() => setPropertyTarget(null)} onApply={(base, draft) => {
       if (useProjectStore.getState().projectEpoch !== propertyTarget.epoch) throw new Error('项目已切换，请重新打开属性窗口。')
       drawing.cancel(); stopEditing()
       updateScene('应用完整对象属性', current => applyScenePropertyDraft(current, base, draft))

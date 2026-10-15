@@ -11,6 +11,7 @@ import { PropertyWindow } from '@/components/ui/PropertyWindow'
 import { propertyWindowEvent } from './property-window-request'
 import type { PropertyWindowRequest } from './property-window-request'
 import { FolderPropertyWindow } from './FolderPropertyWindow'
+import { createMapPropertyPreview } from '@/features/map/map-runtime-host'
 
 /** Host captures a target and epoch at the explicit open action, never at selection changes. */
 export function LayerPropertyWindowHost() {
@@ -34,6 +35,13 @@ function LayerPropertyWindow({ id, onClose }: { id: string; onClose(): void }) {
   const [base, setBase] = useState(() => structuredClone(current))
   const [draft, setDraft] = useState(() => structuredClone(current))
   const [section, setSection] = useState('general'), [query, setQuery] = useState(''), [error, setError] = useState('')
+  const [preview, setPreview] = useState(false)
+  useEffect(() => {
+    if (!preview || !base || !draft || JSON.stringify(current) !== JSON.stringify(base)) return
+    const session = createMapPropertyPreview(base, epoch)
+    try { session.update(draft) } catch { session.dispose() }
+    return () => session.dispose()
+  }, [preview, base, draft, current, epoch])
   if (!base || !draft) return null
   const dataset = project.datasets.find(dataset => dataset.id === draft.datasetId)
   const vector = dataset?.kind === 'vector' || dataset?.kind === 'wfs'
@@ -65,7 +73,7 @@ function LayerPropertyWindow({ id, onClose }: { id: string; onClose(): void }) {
   }
   const symbol = style.mode === 'single' ? style.symbol : style.fallback
   const setSymbol = (symbol: Symbol) => setStyle(style.mode === 'single' ? { ...style, symbol } : { ...style, fallback: symbol })
-  return <PropertyWindow title={`完整属性：${title}`} subtitle={`图层 · ${id}`} dirty={dirty} categories={[{ key: 'general', label: '常规与显示' }, { key: 'style', label: '样式' }, { key: 'label', label: '标注' }, { key: 'source', label: '数据源' }]} section={section} onSection={setSection} query={query} onQuery={setQuery} onClose={onClose} footer={<><Button disabled={!current} onClick={() => { setBase(structuredClone(current)); setDraft(structuredClone(current)); setError('') }}>重新载入</Button><span /><Button onClick={onClose}>取消</Button><Button disabled={!current || !dirty} onClick={() => apply()}>应用</Button><Button type="primary" disabled={!current} onClick={() => apply(true)}>确定</Button></>}>
+  return <PropertyWindow title={`完整属性：${title}`} subtitle={`图层 · ${id}`} dirty={dirty} categories={[{ key: 'general', label: '常规与显示' }, { key: 'style', label: '样式' }, { key: 'label', label: '标注' }, { key: 'source', label: '数据源' }]} section={section} onSection={setSection} query={query} onQuery={setQuery} onClose={onClose} footer={<><label><Switch aria-label="实时预览" checked={preview} onChange={setPreview} /> 实时预览</label><Button disabled={!current} onClick={() => { setBase(structuredClone(current)); setDraft(structuredClone(current)); setError('') }}>重新载入</Button><span /><Button onClick={onClose}>取消</Button><Button disabled={!current || !dirty} onClick={() => apply()}>应用</Button><Button type="primary" disabled={!current} onClick={() => apply(true)}>确定</Button></>}>
     {(!current || error) && <Alert type="error" title={error || '图层已删除，无法应用。'} />}
     {section === 'general' && <>
       {field('图层名称', 'name', <Input aria-label="图层名称" value={draft.name} onChange={event => patch({ name: event.target.value })} />)}

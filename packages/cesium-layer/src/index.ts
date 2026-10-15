@@ -114,6 +114,14 @@ export class ModelLayer extends AssetLayer {
   constructor(private readonly options: ModelLayerOptions) { super(options); this.transform = structuredClone(options.transform ?? createTransform()) }
   get native(): Model | undefined { return this.model }
   get boundingSphere(): BoundingSphere | undefined { return this.model?.ready ? this.model.boundingSphere : undefined }
+  /** Reposition an installed model using its public modelMatrix, retaining its transform. */
+  setPosition(position: GeoPosition): void {
+    if (!position.every(Number.isFinite) || Math.abs(position[0]) > 180 || Math.abs(position[1]) > 90) throw new Error('模型地理位置无效')
+    this.options.position = [...position]
+    this.pivot = Cartesian3.fromDegrees(...position)
+    this.originalMatrix = Transforms.eastNorthUpToFixedFrame(this.pivot)
+    this.setTransform(this.transform)
+  }
   contains(picked: unknown): boolean { return isPick(picked) && (picked.primitive === this.model || picked.id === this.id) }
   protected async createNative(viewer: Viewer, signal: AbortSignal): Promise<() => void> {
     const pivot = Cartesian3.fromDegrees(...this.options.position)

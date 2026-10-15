@@ -3,9 +3,10 @@ import type {
   EditCommand,
   EditTool,
   MapState,
+  Layer,
   SelectionState
 } from '@desktop-webgis/gis-core'
-import { capabilitiesForDataset, getEffectiveLocked, isLegacyStyle } from '@desktop-webgis/gis-core'
+import { capabilitiesForDataset, getEffectiveLocked, getEffectiveVisible, isLegacyStyle } from '@desktop-webgis/gis-core'
 import {
   OlMapRuntime,
   OlSelectionRuntime,
@@ -38,6 +39,41 @@ let snappingUnsub: (() => void) | null = null
 /** Avoid echoing map?store?map selection sync loops. */
 let applyingStoreSelection = false
 let viewOwner: { epoch: number; id: string; preset: string } | null = null
+const propertyPreviews = new Map<string, { owner: object; epoch: number; base: string; draft: Layer }>()
+
+function refreshPropertyPreviews(): void {
+  const state = useProjectStore.getState()
+  for (const [id, preview] of propertyPreviews) {
+    const current = state.project.layers.find(layer => layer.id === id)
+    const valid = preview.epoch === state.projectEpoch && current && JSON.stringify(current) === preview.base && !getEffectiveLocked(state.project, id)
+    if (!valid) propertyPreviews.delete(id)
+    const layer = valid ? preview.draft : current
+    if (!layer) continue
+    const project = { ...state.project, layers: state.project.layers.map(item => item.id === id ? layer : item) }
+    runtime?.previewLayer({ ...layer, visible: getEffectiveVisible(project, id) })
+  }
+}
+
+/** A disposable overlay owned by one property window and one project revision. */
+export function createMapPropertyPreview(base: Layer, epoch: number) {
+  const owner = {}, id = base.id
+  return {
+    update(draft: Layer): boolean {
+      const state = useProjectStore.getState(), current = state.project.layers.find(layer => layer.id === id)
+      if (!mounted || !runtime || epoch !== state.projectEpoch || !current || JSON.stringify(current) !== JSON.stringify(base) || getEffectiveLocked(state.project, id)) return false
+      if (draft.id !== id || draft.datasetId !== base.datasetId || !Number.isFinite(draft.opacity) || draft.opacity < 0 || draft.opacity > 1 || (draft.minZoom ?? -Infinity) > (draft.maxZoom ?? Infinity)) return false
+      propertyPreviews.set(id, { owner, epoch, base: JSON.stringify(base), draft: structuredClone(draft) })
+      refreshPropertyPreviews()
+      return true
+    },
+    dispose(): void {
+      if (propertyPreviews.get(id)?.owner !== owner) return
+      propertyPreviews.delete(id)
+      const state = useProjectStore.getState(), current = state.project.layers.find(layer => layer.id === id)
+      if (mounted && epoch === state.projectEpoch && current) runtime?.previewLayer({ ...current, visible: getEffectiveVisible(state.project, id) })
+    }
+  }
+}
 
 export function getMapRuntime(): OlMapRuntime | null {
   return runtime
@@ -151,6 +187,7 @@ export function mountMapRuntime(
 }
 
 export function unmountMapRuntime(): void {
+  propertyPreviews.clear()
   viewOwner = null
   snappingUnsub?.()
   snappingUnsub = null
@@ -191,6 +228,7 @@ export function syncMapFromProject(): void {
     credentials: collectBasemapCredentials(project.basemap), configureServiceLayer: (layer, resource) => configureMapServiceLayer(layer, resource)
   }).then(applied => {
     if (!applied || runtime !== current) return
+    refreshPropertyPreviews()
     viewOwner = { epoch: state.projectEpoch, id: state.project.id, preset: JSON.stringify(state.project.mapState) }
     const nextSource = target ? current.registry.getVector(target)?.getSource() : undefined
     if (previousSource !== nextSource && activeTool !== 'select') setActiveEditTool(activeTool)

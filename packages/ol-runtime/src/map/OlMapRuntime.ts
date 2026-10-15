@@ -236,6 +236,19 @@ export class OlMapRuntime {
    * Sync project layers to OpenLayers.
    * Vector datasets use VectorLayer; WMS uses TileWMS (P16); WMTS uses ol/source/WMTS (P17).
    */
+  /** Update presentation only; property drafts never replace features or the document. */
+  previewLayer(layer: Layer): boolean {
+    const native = this.registry.get(layer.id)
+    if (!native) return false
+    const style = createLayerStyle(layer)
+    native.setOpacity(layer.opacity)
+    native.setVisible(layer.visible)
+    native.setMinZoom(layer.minZoom ?? -Infinity)
+    native.setMaxZoom(layer.maxZoom ?? Infinity)
+    this.registry.getVector(layer.id)?.setStyle(style)
+    return true
+  }
+
   syncLayers(
     layers: Layer[],
     featuresByDataset: Record<string, GisFeature[]>,

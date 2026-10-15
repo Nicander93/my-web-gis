@@ -1,4 +1,4 @@
-import { Cartesian3, CesiumTerrainProvider, EllipsoidTerrainProvider, ImageryLayer, JulianDate, Math as CesiumMath, Resource, TileMapServiceImageryProvider, UrlTemplateImageryProvider, Viewer, buildModuleUrl } from 'cesium'
+import { Cartesian3, Cartographic, Matrix4, CesiumTerrainProvider, EllipsoidTerrainProvider, ImageryLayer, JulianDate, Math as CesiumMath, Resource, TileMapServiceImageryProvider, UrlTemplateImageryProvider, Viewer, buildModuleUrl } from 'cesium'
 import { BaseLayer, DrawSession, GeoJsonLayer, GraphicLayer, ImageryTemplateLayer, LayerCollection, ModelLayer, TilesetLayer } from '@desktop-webgis/cesium-layer'
 import type { DrawOptions, EditSession, GraphicEditOptions } from '@desktop-webgis/cesium-layer'
 import { TilesetEditor } from '@desktop-webgis/cesium-tileset-edit'
@@ -6,7 +6,7 @@ import type { EditMode, TransformEditEvent } from '@desktop-webgis/cesium-tilese
 import { assertTilesetEffectsSupported, TilesetEffectManager } from '@desktop-webgis/cesium-tileset-effects'
 import { SceneEffects, WaterLayer } from '@desktop-webgis/cesium-effects'
 import { getCesiumSceneNodeState, parseCesiumScene } from '@desktop-webgis/cesium-scene-schema'
-import type { CesiumSceneCamera, CesiumSceneNode, CesiumScene, GraphicNode } from '@desktop-webgis/cesium-scene-schema'
+import type { CesiumSceneCamera, CesiumSceneNode, CesiumScene, GraphicNode, GeoPosition, Transform } from '@desktop-webgis/cesium-scene-schema'
 import { applyRenderQuality, defaultRenderQuality } from './render-quality.js'
 import type { RenderQuality } from './render-quality.js'
 import { projectCesiumDocument, type CesiumDocumentIssue } from './document.js'
@@ -46,6 +46,7 @@ export interface SceneRuntimeDiagnostics {
   managedLayers: number
   dataSources: number
   primitives: number
+  presentation?: { id: string; visible: boolean; transform?: Transform; position?: GeoPosition; water?: { height: number; amplitude: number; frequency: number; speed: number } }
 }
 
 interface PreparedEnvironment { key: string; imagery: ImageryProvider; terrain: TerrainProvider }
@@ -308,6 +309,36 @@ export class CesiumSceneRuntime {
     return true
   }
 
+  /** Preview an installed object's presentation without changing its authoritative definition. */
+  previewNode(id: string, draft: CesiumSceneNode | null): boolean {
+    if (this.destroyed) return false
+    const current = this.scene.nodes.find(node => node.id === id), layer = this.layers.getLayer(id)
+    if (!current || !layer?.isMountedOn(this.viewer)) return false
+    if (draft && getCesiumSceneNodeState(this.scene, current).locked) throw new Error('对象或所属文件夹已锁定，无法预览')
+    if (draft && draft.type !== current.type) throw new Error('预览对象类型不匹配')
+    // Resource identity remains authoritative; previews never fetch replacement assets.
+    const properties = draft ? Object.fromEntries(Object.entries(draft).filter(([key]) => ['name', 'visible', 'position', 'height', 'amplitude', 'frequency', 'speed', 'transform', 'style', 'color', 'effects', 'popup', 'maximumScreenSpaceError', 'cacheBytes', 'opacity'].includes(key))) : {}
+    const candidate = { ...current, ...properties, id } as CesiumSceneNode
+    const scene = parseCesiumScene({ ...this.scene, nodes: this.scene.nodes.map(node => node.id === id ? candidate : node) })
+    this.assertTilesetEffects(scene)
+    const node = { ...candidate, ...getCesiumSceneNodeState(scene, candidate) }
+    layer.name = node.name; layer.show = node.visible
+    if (layer instanceof ModelLayer && node.type === 'model') layer.setPosition(node.position)
+    if ((layer instanceof TilesetLayer || layer instanceof ModelLayer) && (node.type === '3dtiles' || node.type === 'model')) layer.setTransform(node.transform)
+    if (layer instanceof TilesetLayer && node.type === '3dtiles') {
+      layer.setQuality(node.maximumScreenSpaceError, node.cacheBytes)
+      if (layer.tileset) this.tilesetEffects.setEffects(id, layer.tileset, node.effects ?? [], this.viewer.scene)
+    }
+    if (layer instanceof GraphicLayer && node.type === 'graphic') layer.getGraphic(id)?.setOptions(node)
+    if (layer instanceof GeoJsonLayer && node.type === 'geojson') layer.setColor(node.color ?? '#55a6ff')
+    if (layer instanceof WaterLayer && node.type === 'water') layer.setOptions({ height: node.height, color: node.color, amplitude: node.amplitude, frequency: node.frequency, speed: node.speed })
+    if (layer instanceof ImageryTemplateLayer && node.type === 'imagery') layer.setOpacity(node.opacity ?? 1)
+    if (node.popup) layer.bindPopup(node.popup); else layer.unbindPopup()
+    this.applySelection(layer)
+    this.viewer.scene.requestRender()
+    return true
+  }
+
   cancelPreparation(): void { this.preparation?.abort(); this.preparation = null }
 
   startEditing(id: string, mode: EditMode = 'translate'): void {
@@ -377,13 +408,20 @@ export class CesiumSceneRuntime {
     return { position: [CesiumMath.toDegrees(p.longitude), CesiumMath.toDegrees(p.latitude), p.height], heading: CesiumMath.toDegrees(camera.heading), pitch: CesiumMath.toDegrees(camera.pitch), roll: CesiumMath.toDegrees(camera.roll) }
   }
   /** Reports engine-owned counts for diagnostics and performance acceptance. */
-  getDiagnostics(): SceneRuntimeDiagnostics {
+  getDiagnostics(id?: string): SceneRuntimeDiagnostics {
+    const layer = id ? this.layers.getLayer(id) : undefined
+    const modelPosition = layer instanceof ModelLayer && layer.model ? Cartographic.fromCartesian(Matrix4.getTranslation(layer.model.modelMatrix, new Cartesian3())) : undefined
     return {
       sceneObjects: this.nodes.size,
       graphicObjects: [...this.nodes.values()].filter(node => node.type === 'graphic').length,
       managedLayers: this.currentLayers.size,
       dataSources: this.viewer.dataSources.length,
-      primitives: this.viewer.scene.primitives.length
+      primitives: this.viewer.scene.primitives.length,
+      ...(layer ? { presentation: { id: layer.id, visible: layer.show,
+        ...(layer instanceof ModelLayer || layer instanceof TilesetLayer ? { transform: layer.getTransform() } : {}),
+        ...(modelPosition ? { position: [CesiumMath.toDegrees(modelPosition.longitude), CesiumMath.toDegrees(modelPosition.latitude), modelPosition.height] as GeoPosition } : {}),
+        ...(layer instanceof WaterLayer ? { water: layer.getParameters() } : {})
+      } } : {})
     }
   }
   getNativeViewer(): Viewer { return this.viewer }

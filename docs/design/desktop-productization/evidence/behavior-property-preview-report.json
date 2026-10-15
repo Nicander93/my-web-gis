@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-15",
+  "validationPolicy": "User owns visual review. Unit tests and behavioral E2E only; no screenshot acceptance or per-pixel comparison.",
+  "command": "pnpm --filter @desktop-webgis/desktop exec playwright test e2e/property-preview.e2e.ts --project=desktop --project=laptop",
+  "viewports": ["1440x900", "1366x768"],
+  "result": "6 passed",
+  "checks": [
+    "2D native opacity previews without changing Project content or its version",
+    "Disabling preview restores applied opacity; Apply followed by another preview and Cancel keeps the applied value",
+    "One Undo restores the pre-Apply value",
+    "External same-layer changes invalidate the stale preview; Cancel retains the external value",
+    "3D native visibility previews without changing Project content or version",
+    "3D Apply followed by another preview and Cancel restores the latest applied visibility; one Undo restores the original",
+    "Actual GLB matrix position changes to 100 m and restores to its applied anchor on Cancel",
+    "Water runtime height changes to 40 m and restores on Cancel",
+    "GLB is requested once during preview and rollback"
+  ],
+  "build": "Desktop and affected packages passed",
+  "coverageBoundary": "Behavior and runtime-state evidence; visual review is delegated to the user. Native desktop and Windows scaling acceptance remain separate.",
+  "remaining": "Full specialized field coverage and native acceptance; resource replacement remains an Apply-time operation."
+}

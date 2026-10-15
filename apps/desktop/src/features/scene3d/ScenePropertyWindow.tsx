@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent, ReactNode } from 'react'
 import { Alert, Button, Input, InputNumber, Menu, Select, Switch } from 'antd'
 import { X } from 'lucide-react'
@@ -13,10 +13,12 @@ interface Props {
   scene: CesiumScene
   onApply(base: CesiumSceneNode, draft: CesiumSceneNode): void
   onClose(): void
+  onPreview?(draft: CesiumSceneNode | null): void
+  previewReady?: boolean
 }
 
 /** A modeless, object-bound draft; browsing the scene never retargets it. */
-export function ScenePropertyWindow({ initial, scene, onApply, onClose }: Props) {
+export function ScenePropertyWindow({ initial, scene, onApply, onClose, onPreview, previewReady = true }: Props) {
   const [base, setBase] = useState(() => structuredClone(initial))
   const [draft, setDraft] = useState(() => structuredClone(initial))
   const [section, setSection] = useState('object')
@@ -24,10 +26,20 @@ export function ScenePropertyWindow({ initial, scene, onApply, onClose }: Props)
   const [error, setError] = useState('')
   const [invalid, setInvalid] = useState<Record<string, boolean>>({})
   const [revision, setRevision] = useState(0)
+  const [preview, setPreview] = useState(false)
+  const [previewError, setPreviewError] = useState('')
+  const previewHandler = useRef(onPreview)
+  previewHandler.current = onPreview
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null)
   const dirty = JSON.stringify(base) !== JSON.stringify(draft)
   const current = scene.nodes.find(node => node.id === initial.id)
+  useEffect(() => {
+    if (!preview || !previewReady || !current || JSON.stringify(current) !== JSON.stringify(base)) return
+    try { previewHandler.current?.(draft); setPreviewError('') }
+    catch (reason) { setPreviewError(reason instanceof Error ? reason.message : '预览失败') }
+    return () => { previewHandler.current?.(null) }
+  }, [preview, previewReady, draft, current, base])
   function patch(value: Partial<CesiumSceneNode>): void { setDraft(node => ({ ...node, ...value } as CesiumSceneNode)) }
   function apply(close = false): void {
     if (Object.values(invalid).some(Boolean)) { setError('请先修正无效的字段。'); return }
@@ -65,6 +77,8 @@ export function ScenePropertyWindow({ initial, scene, onApply, onClose }: Props)
       <Menu selectedKeys={[section]} items={categories} onClick={({ key }) => setSection(key)} />
       <div className="scene-property-window__fields">
         {(!current || error) && <Alert type="error" showIcon title={error || '对象已删除，无法应用草稿。'} />}
+        {previewError && <Alert type="warning" title={previewError} />}
+        {preview && <p className="editor-help">位置、样式、变换、水面参数和瓦片效果正在预览；取消恢复已应用值。资源替换在应用后加载。</p>}
         {section === 'object' && <>
           {field('对象名称', 'name', <Input aria-label="对象名称" value={draft.name} onChange={event => patch({ name: event.target.value })} />)}
           {field('显示对象', 'visible', <Switch aria-label="显示对象" checked={draft.visible} onChange={visible => patch({ visible })} />)}
@@ -103,7 +117,7 @@ export function ScenePropertyWindow({ initial, scene, onApply, onClose }: Props)
         {section === 'effects' && draft.type === '3dtiles' && <TilesetEffectsDraft node={draft} onChange={effects => patch({ effects })} />}
       </div>
     </div>
-    <footer><Button disabled={!current} onClick={() => { if (current) { setBase(structuredClone(current)); setDraft(structuredClone(current)); setError(''); setInvalid({}); setRevision(value => value + 1) } }}>重新载入</Button><span /><Button onClick={onClose}>取消</Button><Button disabled={!current || !dirty || Object.values(invalid).some(Boolean)} onClick={() => apply()}>应用</Button><Button type="primary" disabled={!current || Object.values(invalid).some(Boolean)} onClick={() => dirty ? apply(true) : onClose()}>确定</Button></footer>
+    <footer>{onPreview && <label><Switch aria-label="实时预览" checked={preview} onChange={setPreview} /> 实时预览</label>}<Button disabled={!current} onClick={() => { if (current) { setBase(structuredClone(current)); setDraft(structuredClone(current)); setError(''); setInvalid({}); setRevision(value => value + 1) } }}>重新载入</Button><span /><Button onClick={onClose}>取消</Button><Button disabled={!current || !dirty || Object.values(invalid).some(Boolean)} onClick={() => apply()}>应用</Button><Button type="primary" disabled={!current || Object.values(invalid).some(Boolean)} onClick={() => dirty ? apply(true) : onClose()}>确定</Button></footer>
   </section>
 }
 

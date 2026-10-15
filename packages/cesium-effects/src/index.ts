@@ -18,7 +18,28 @@ export class WaterLayer extends BaseLayer {
   primitive?: Primitive
   private material?: Material
   private removeTick?: () => void
-  constructor(private readonly options: WaterLayerOptions) { super(options) }
+  constructor(private options: WaterLayerOptions) { super(options) }
+  /** Detached live parameters for inspectors and diagnostics. */
+  getParameters(): { height: number; amplitude: number; frequency: number; speed: number } {
+    return { height: this.options.height, amplitude: this.material?.uniforms.amplitude ?? this.options.amplitude ?? 4, frequency: this.material?.uniforms.frequency ?? this.options.frequency ?? 1000, speed: this.material?.uniforms.animationSpeed ?? this.options.speed ?? .02 }
+  }
+  /** Update uniforms in place; rebuild only geometry when the boundary or height changes. */
+  setOptions(patch: Partial<Pick<WaterLayerOptions, 'boundary' | 'height' | 'color' | 'amplitude' | 'frequency' | 'speed'>>): void {
+    const next = { ...this.options, ...patch }
+    const color = Color.fromCssColorString(next.color ?? '#238bafcc')
+    if (!color || !Number.isFinite(next.height) || !Number.isFinite(next.amplitude ?? 4) || (next.amplitude ?? 4) < 0 || !Number.isFinite(next.frequency ?? 1000) || (next.frequency ?? 1000) <= 0 || !Number.isFinite(next.speed ?? .02) || (next.speed ?? .02) < 0 || next.boundary.length < 3 || !next.boundary.every(point => point.every(Number.isFinite) && Math.abs(point[0]) <= 180 && Math.abs(point[1]) <= 90)) throw new Error('水面参数无效')
+    const geometryChanged = JSON.stringify([next.boundary, next.height]) !== JSON.stringify([this.options.boundary, this.options.height])
+    if (this.viewer && this.material && geometryChanged) {
+      const replacement = this.createPrimitive(this.material, next)
+      this.viewer.scene.primitives.add(replacement)
+      if (this.primitive && !this.primitive.isDestroyed()) this.viewer.scene.primitives.remove(this.primitive)
+      this.primitive = replacement
+    }
+    this.options = { ...next, boundary: next.boundary.map(point => [...point] as GeoPosition) }
+    if (this.material) Object.assign(this.material.uniforms, { baseWaterColor: color, frequency: next.frequency ?? 1000, animationSpeed: next.speed ?? .02, amplitude: next.amplitude ?? 4 })
+    this.setNativeVisible(this.show)
+    this.viewer?.scene.requestRender()
+  }
   contains(picked: unknown): boolean { return Boolean(picked && typeof picked === 'object' && 'primitive' in picked && picked.primitive === this.primitive) }
   async flyTo(): Promise<void> { if (this.viewer) this.viewer.camera.flyTo({ destination: Cartesian3.fromDegrees(this.options.boundary[0][0], this.options.boundary[0][1], this.options.height + 600) }) }
   protected setNativeVisible(value: boolean): void {
@@ -35,20 +56,23 @@ export class WaterLayer extends BaseLayer {
       amplitude: this.options.amplitude ?? 4,
       specularIntensity: .5
     })
-    const primitive = new Primitive({
-      geometryInstances: new GeometryInstance({ id: this.id, geometry: new PolygonGeometry({ polygonHierarchy: new PolygonHierarchy(this.options.boundary.map(p => Cartesian3.fromDegrees(p[0], p[1], this.options.height))), height: this.options.height, vertexFormat: MaterialAppearance.MaterialSupport.TEXTURED.vertexFormat }) }),
-      appearance: new MaterialAppearance({ material, faceForward: true, translucent: true }),
-      asynchronous: false,
-      show: this.show
-    })
+    const primitive = this.createPrimitive(material, this.options)
     this.material = material; this.primitive = primitive
     viewer.scene.primitives.add(primitive)
     return () => {
-      this.removeTick?.(); this.removeTick = undefined
-      if (!viewer.isDestroyed() && !primitive.isDestroyed()) viewer.scene.primitives.remove(primitive)
+      const ownsCurrent = this.material === material
+      if (ownsCurrent) { this.removeTick?.(); this.removeTick = undefined }
+      const owned = ownsCurrent ? this.primitive : primitive
+      if (owned && !owned.isDestroyed()) { if (!viewer.isDestroyed()) viewer.scene.primitives.remove(owned); else owned.destroy() }
       if (!material.isDestroyed()) material.destroy()
-      this.primitive = undefined; this.material = undefined
+      if (ownsCurrent) { this.primitive = undefined; this.material = undefined }
     }
+  }
+  private createPrimitive(material: Material, options: WaterLayerOptions): Primitive {
+    return new Primitive({
+      geometryInstances: new GeometryInstance({ id: this.id, geometry: new PolygonGeometry({ polygonHierarchy: new PolygonHierarchy(options.boundary.map(p => Cartesian3.fromDegrees(p[0], p[1], options.height))), height: options.height, vertexFormat: MaterialAppearance.MaterialSupport.TEXTURED.vertexFormat }) }),
+      appearance: new MaterialAppearance({ material, faceForward: true, translucent: true }), asynchronous: false, show: this.show
+    })
   }
 }
 
