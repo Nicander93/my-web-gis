@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CesiumSceneRuntime } from '@desktop-webgis/cesium-scene-runtime'
 import type { GraphicNode, GraphicType } from '@desktop-webgis/cesium-scene-schema'
+import type { SceneMeasurementKind } from '@desktop-webgis/cesium-measure'
 
-export type SceneDrawKind = GraphicType | 'water' | 'clip' | 'flatten'
+export type SceneDrawKind = GraphicType | 'water' | 'clip' | 'flatten' | SceneMeasurementKind
 
 /** The core owns Cesium input; React only subscribes and commits completion. */
 export function useSceneDrawing(runtime: CesiumSceneRuntime | undefined, onComplete: (graphic: GraphicNode, kind: SceneDrawKind, id?: string) => void, onError: (reason: unknown) => void, onCancel: () => void) {
@@ -19,9 +20,12 @@ export function useSceneDrawing(runtime: CesiumSceneRuntime | undefined, onCompl
     if (!runtime) return
     cancel()
     try {
+      const polygon = next === 'water' || next === 'clip' || next === 'flatten' || next === 'area'
+      const measurement = ['spatial-distance', 'ground-distance', 'area', 'height-difference'].includes(next)
+      const type: GraphicType = polygon ? 'polygon' : measurement ? 'polyline' : next as GraphicType
       const drawing = runtime.startDraw({
-        type: next === 'water' || next === 'clip' || next === 'flatten' ? 'polygon' : next,
-        heightMode: next === 'clip' || next === 'flatten' ? 'absolute' : 'ground',
+        type,
+        heightMode: next === 'clip' || next === 'flatten' || measurement ? 'absolute' : 'ground',
         onChange: setCount
       })
       session.current = drawing; setKind(next)
@@ -35,5 +39,6 @@ export function useSceneDrawing(runtime: CesiumSceneRuntime | undefined, onCompl
   }
   function finish(): void { session.current?.finish() }
   useEffect(() => () => { session.current?.cancel(); session.current = undefined }, [runtime])
-  return { kind, count, drawing: kind !== null, minimum: kind === 'point' ? 1 : kind === 'polyline' ? 2 : 3, start, finish, cancel }
+  const minimum = kind === 'point' ? 1 : kind === 'polyline' || kind === 'spatial-distance' || kind === 'ground-distance' || kind === 'height-difference' ? 2 : 3
+  return { kind, count, drawing: kind !== null, minimum, start, finish, cancel }
 }

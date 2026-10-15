@@ -1,0 +1,32 @@
+{
+  "name": "@desktop-webgis/cesium-measure",
+  "version": "0.1.0",
+  "description": "Three-dimensional spatial, ground, area and height measurements for Cesium scenes",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@desktop-webgis/cesium-scene-schema": "workspace:*"
+  },
+  "devDependencies": {
+    "cesium": "^1.145.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "peerDependencies": {
+    "cesium": "^1.145.0"
+  }
+}

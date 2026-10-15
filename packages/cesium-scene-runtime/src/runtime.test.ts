@@ -301,6 +301,24 @@ describe('incremental scene reconciliation', () => {
     s.runtime.destroy()
     expect(s.viewer.dataSources.remove).toHaveBeenCalledOnce()
   })
+  it('keeps transient measurements outside the authoritative scene and replaces them deterministically', async () => {
+    const s = setup()
+    s.viewer.dataSources = { add: vi.fn(async source => source), remove: vi.fn() } as unknown as Viewer['dataSources']
+    const graphic = { id: 'measurement', name: '空间距离', type: 'graphic' as const, visible: true,
+      geometry: { type: 'polyline' as const, heightMode: 'absolute' as const, positions: [[116,39,0],[116.001,39,10]] as [number,number,number][] },
+      style: { color: '#d18b47', width: 4, pointSize: 9 }, properties: { measurementKind: 'spatial-distance' } }
+    const before = structuredClone(s.scene)
+    await s.runtime.setTransientGraphic(graphic)
+    expect(s.viewer.dataSources.add).toHaveBeenCalledOnce()
+    expect(s.scene).toEqual(before)
+    await s.runtime.setTransientGraphic({ ...graphic, id: 'replacement' })
+    expect(s.viewer.dataSources.remove).toHaveBeenCalledOnce()
+    expect(s.viewer.dataSources.add).toHaveBeenCalledTimes(2)
+    await s.runtime.setTransientGraphic()
+    expect(s.viewer.dataSources.remove).toHaveBeenCalledTimes(2)
+    expect(s.scene).toEqual(before)
+    s.runtime.destroy()
+  })
   it('reuses the loaded tileset for transforms and cancels gestures on authoritative updates', async () => {
     const s = setup(); await s.runtime.updateScene(s.scene)
     const original = s.runtime.layers.getLayer('blocks')

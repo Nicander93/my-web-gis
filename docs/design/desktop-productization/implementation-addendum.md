@@ -80,7 +80,10 @@ A 完成不代表全部界面迁移完成。逐批记录剩余文件，不将 an
 - 浏览器 GPU 路径使用真实示例 Tileset 验收压平、关闭恢复、项目保存重开，以及两个分别平移 -180 m / +180 m 的 Tileset 独立启停。12 项（3 场景 × 4 视口）全部通过，像素差异断言证明运行时几何发生改变而非只更新 UI。证据见 `evidence/browser-tileset-flatten-report.json`、`browser-tileset-flattened.png`、`browser-tileset-flatten-restored.png` 和 `browser-tileset-flatten-reopened.png`。
 - Windows Tauri/WebView2 原生验收在 `ANGLE (NVIDIA GeForce RTX 5070, Direct3D 11)` 上通过，明确排除了 SwiftShader。真实 Tileset 在压平期间完成相机缩放、屏幕误差 16→4、关闭恢复和原生保存；压平前后变化 169984 像素，关闭效果变化 5071 像素。Shader 销毁及宿主状态恢复另有单元测试覆盖。证据见 `evidence/native-tileset-flatten-report.json` 和 `native-tileset-flattened.png`。
 - 已对照 `cesium-demo` 的 `draw-util` 和 `model-editor`：裁剪/压平绘制采用其“优先深度拾取、失败回退地表”的有效思路；Gizmo 补齐 XY、XZ、YZ 三个平面拖动。生产实现继续保留独立会话所有权、Esc 回滚、相机输入恢复、ENU 射线平面约束、项目历史和完整销毁，不复制 demo 中全局 `removeAll`、私有字段访问或固定相机比例算法。
-- Tileset 裁剪/压平子项已完成浏览器与物理 GPU 验收。M8 整体仍需完成基础三维测量后再关闭。
+- 已新增独立 `@desktop-webgis/cesium-measure` 包，完成空间距离、贴地距离、水平面积和带正负号高度差。贴地距离沿 WGS84 测地线按 30 m 加密，有地形可用性时采样真实地形，交互采样总数限制为 4096；面积在局部 ENU 平面计算，避免直接使用经纬度面积。
+- 测量完成后先挂载运行时专用临时 `GraphicLayer`，不修改 Project、Dirty 或历史；用户通过 Ant Design 结果卡选择“保留测量”后，结果才作为含测量元数据和 Popup 的独立 Graphic 写入项目。临时层在替换、清除、项目切换和 Runtime 销毁时确定性释放。
+- 四种测量在 1440×900、1024×680、1366×768、1920×1080 共 4 项浏览器 E2E 全部通过，覆盖临时隔离、清除、保留、Undo/Redo 和保存文件断言。证据见 `evidence/browser-scene3d-measurement-report.json`、`browser-scene3d-measurement-transient.png` 和 `browser-scene3d-measurement-retained.png`。
+- M8 计划内功能实现已闭环；验收矩阵 E08 仍因 Gizmo 真实指针拖动 E2E 保持“部分”，不由测量子项替代。
 
 ## 7. 每批验证与最终 PR
 

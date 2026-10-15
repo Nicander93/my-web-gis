@@ -20,6 +20,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@desktop-webgis/cesium-measure':
+        specifier: workspace:*
+        version: link:../../packages/cesium-measure
       '@desktop-webgis/cesium-scene-runtime':
         specifier: workspace:*
         version: link:../../packages/cesium-scene-runtime
@@ -210,6 +213,22 @@ importers:
       '@desktop-webgis/cesium-popup':
         specifier: workspace:*
         version: link:../cesium-popup
+      '@desktop-webgis/cesium-scene-schema':
+        specifier: workspace:*
+        version: link:../cesium-scene-schema
+    devDependencies:
+      cesium:
+        specifier: ^1.145.0
+        version: 1.145.0
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)
+
+  packages/cesium-measure:
+    dependencies:
       '@desktop-webgis/cesium-scene-schema':
         specifier: workspace:*
         version: link:../cesium-scene-schema

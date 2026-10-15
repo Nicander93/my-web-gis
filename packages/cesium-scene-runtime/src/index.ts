@@ -6,7 +6,7 @@ import type { EditMode, TransformEditEvent } from '@desktop-webgis/cesium-tilese
 import { assertTilesetEffectsSupported, TilesetEffectManager } from '@desktop-webgis/cesium-tileset-effects'
 import { SceneEffects, WaterLayer } from '@desktop-webgis/cesium-effects'
 import { getCesiumSceneNodeState, parseCesiumScene } from '@desktop-webgis/cesium-scene-schema'
-import type { CesiumSceneCamera, CesiumSceneNode, CesiumScene } from '@desktop-webgis/cesium-scene-schema'
+import type { CesiumSceneCamera, CesiumSceneNode, CesiumScene, GraphicNode } from '@desktop-webgis/cesium-scene-schema'
 import { applyRenderQuality, defaultRenderQuality } from './render-quality.js'
 import type { RenderQuality } from './render-quality.js'
 import { projectCesiumDocument, type CesiumDocumentIssue } from './document.js'
@@ -60,6 +60,8 @@ export class CesiumSceneRuntime {
   private sceneRevision = 0
   private readonly layerReady = new Map<BaseLayer, Promise<unknown>>()
   private readonly currentLayers = new Map<string, BaseLayer>()
+  private transientGraphic?: GraphicLayer
+  private transientRevision = 0
   private baseLayer?: ImageryLayer
   private environmentRevision = 0
   private environmentKey = ''
@@ -343,6 +345,18 @@ export class CesiumSceneRuntime {
     return drawing
   }
   cancelDraw(): void { const drawing = this.drawing; this.drawing = undefined; drawing?.cancel(); this.layers.pickingEnabled = true }
+  async setTransientGraphic(graphic?: GraphicNode): Promise<void> {
+    if (this.destroyed) throw new Error('CesiumSceneRuntime 已销毁')
+    const revision = ++this.transientRevision
+    this.transientGraphic?.destroy(); this.transientGraphic = undefined
+    if (!graphic) { this.viewer.scene.requestRender(); return }
+    const layer = new GraphicLayer({ id: '__transient-measurement__', name: '临时测量', graphics: [graphic] })
+    this.transientGraphic = layer
+    try { await layer.mount(this.viewer) }
+    catch (error) { if (this.transientGraphic === layer) this.transientGraphic = undefined; layer.destroy(); throw error }
+    if (revision !== this.transientRevision || this.destroyed) { layer.destroy(); return }
+    this.viewer.scene.requestRender()
+  }
   setPreview(enabled: boolean): void { this.stopEditing(); this.cancelDraw(); this.layers.popupsEnabled = enabled; this.layers.layers.forEach(layer => layer.closePopup()) }
   setEditMode(mode: EditMode): void { this.editor.setMode(mode) }
   setRenderQuality(quality: RenderQuality): void { applyRenderQuality(this.viewer, quality) }
@@ -358,7 +372,8 @@ export class CesiumSceneRuntime {
   destroy(): void {
     if (this.destroyed) return
     this.destroyed = true; this.cancelPreparation(); this.environmentRevision++; this.sceneRevision++; this.layerReady.clear(); this.currentLayers.clear()
-    this.cancelDraw(); this.cancelGraphicEditing(); this.editor.destroy(); this.tilesetEffects.destroy(); this.layers.destroy(); this.effects.destroy()
+    this.cancelDraw(); this.cancelGraphicEditing(); this.transientRevision++; this.transientGraphic?.destroy(); this.transientGraphic = undefined
+    this.editor.destroy(); this.tilesetEffects.destroy(); this.layers.destroy(); this.effects.destroy()
     if (this.baseLayer) this.viewer.imageryLayers.remove(this.baseLayer, true)
     if (this.options.ownsViewer !== false) this.viewer.destroy()
     else {

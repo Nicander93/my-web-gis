@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-15",
+  "scope": "M8 basic 3D measurement browser acceptance",
+  "command": "pnpm --filter @desktop-webgis/desktop exec playwright test e2e/scene3d-measurement.e2e.ts",
+  "result": {
+    "passed": 4,
+    "failed": 0,
+    "viewports": {
+      "desktop": "1440x900",
+      "compact": "1024x680",
+      "laptop": "1366x768",
+      "wide": "1920x1080"
+    }
+  },
+  "assertions": [
+    "spatial distance, terrain-following distance, horizontal area and signed height difference produce finite formatted results",
+    "measurement results remain outside the project document until the user chooses Keep measurement",
+    "clearing a transient result removes its runtime GraphicLayer",
+    "retained measurement is a standalone Graphic node with measurement metadata",
+    "retained measurement supports undo, redo and project save"
+  ],
+  "screenshots": [
+    "browser-scene3d-measurement-transient.png",
+    "browser-scene3d-measurement-retained.png"
+  ]
+}

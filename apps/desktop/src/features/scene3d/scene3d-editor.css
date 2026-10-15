@@ -134,6 +134,12 @@
 .scene3d-drawing-bar { position: absolute; left: 50%; bottom: 32px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; width: max-content; max-width: calc(100% - 24px); white-space: normal; padding: 8px 10px; background: var(--color-panel); border: 1px solid var(--color-border); border-radius: 5px; box-shadow: 0 3px 12px rgb(0 0 0 / .12); }
 .scene3d-drawing-bar > span { min-width: 0; font-size: 12px; line-height: 1.5; }
 .scene3d-drawing-bar > button, .scene3d-drawing-bar > svg { flex-shrink: 0; }
+.scene3d-measurement-card { position: absolute; right: 18px; bottom: 32px; z-index: 2; width: min(300px, calc(100% - 36px)); padding: 13px 14px 12px; background: color-mix(in srgb, var(--color-panel) 96%, transparent); border: 1px solid var(--color-border-strong); border-top: 3px solid #2f7655; border-radius: 5px; box-shadow: 0 8px 24px rgb(14 35 25 / .2); backdrop-filter: blur(8px); }
+.scene3d-measurement-card > div { display: grid; gap: 3px; }
+.scene3d-measurement-card span { color: var(--color-text-secondary); font-size: 11px; }
+.scene3d-measurement-card output { color: var(--color-text-primary); font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.scene3d-measurement-card small { color: var(--color-text-secondary); font-size: 10px; }
+.scene3d-measurement-card footer { display: flex; justify-content: flex-end; gap: 7px; margin-top: 12px; }
 .scene3d-footer { display: flex; align-items: center; gap: 18px; flex: 0 0 auto; height: 26px; padding: 0 12px; border-top: 1px solid var(--color-border); background: var(--color-panel); color: var(--color-text-secondary); font-size: 10px; }
 .scene3d-footer > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .scene3d-footer__state { flex: 1; color: var(--color-text-primary); }

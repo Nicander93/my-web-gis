@@ -88,10 +88,10 @@ rtk pnpm --filter @desktop-webgis/desktop test:e2e folders.e2e.ts --project=desk
 | M5 | point/polyline/polygon Graphic、几何编辑、对象独立样式 | 共享 Graphic 渲染池、连续 POI、Billboard/Label/rectangle/ellipse 等及 500 对象验收 |
 | M6 | 本地二维文件、多 GeoJSON 批次、原子导入/Undo/Redo、读取取消与工程归属保护；WMS/WMTS/WFS、三维资源加载、失败重试 | 混合格式配置队列、服务导入历史、大文件 Worker；二三维添加数据壳、基于项目路径的资源引用/另存重算、父目录重定位 |
 | M7 | 原生原子替换、串行保存/版本与工程会话保护、格式校验及草稿保护；独立恢复缓存、启动恢复/舍弃、容量/保留期与保存清理；Tauri 二维属性/三维 GLB 强制退出恢复 | 系统文件选择窗口、原生完整本地资源组合与 Windows 125% 缩放验收 |
-| M8 | 独立 Gizmo（轴向与 XY/XZ/YZ 平面）、Tileset 原生裁剪、局部 ENU 压平、多变换隔离、项目保存重开与物理 GPU/LOD 验收 | 基础三维测量 |
+| M8 | 独立 Gizmo（轴向与 XY/XZ/YZ 平面）、Tileset 原生裁剪、局部 ENU 压平、多变换隔离、项目保存重开与物理 GPU/LOD 验收；空间距离、贴地距离、面积和高度差，临时结果与保留 Graphic 分离 | 功能实现已闭环；E08 仍需 Gizmo 真实指针拖动 E2E |
 | M9 | 本阶段窗口 E2E 与已有真实 GIS E2E | 真实指标诊断、任务日志、全量 20 项矩阵、原生和 GPU 综合验收 |
 
-本记录不表示 M0–M9 全量完成。恢复草稿已实现，Windows 文件层、浏览器与 Tauri 二维属性/三维 GLB 恢复证据见后文 M7 批次；系统文件选择仍待专项签收。M8 的 Tileset 裁剪/压平已完成两套不同变换实例、保存重开、LOD 和 NVIDIA 物理 GPU 验收，基础三维测量仍待实现。
+本记录不表示 M0–M9 全量完成。恢复草稿已实现，Windows 文件层、浏览器与 Tauri 二维属性/三维 GLB 恢复证据见后文 M7 批次；系统文件选择仍待专项签收。M8 的 Tileset 裁剪/压平已完成两套不同变换实例、保存重开、LOD 和 NVIDIA 物理 GPU 验收，四类基础三维测量已完成四视口浏览器验收；E08 的 Gizmo 真实指针拖动 E2E 仍待补齐。
 
 ## 验证记录
 
@@ -278,7 +278,9 @@ Desktop build 通过；`attribute-tabs.e2e.ts`、`field-schema.e2e.ts` 在 1366�
 - 真实示例 Tileset 的三项场景在 1440×900、1024×680、1366×768、1920×1080 共 12 项 E2E 通过，包含两个分别平移 -180 m / +180 m 的实例隔离。
 - Tauri/WebView2 在 `ANGLE (NVIDIA GeForce RTX 5070, Direct3D 11)` 物理 GPU 上通过压平、相机缩放、LOD 16→4、关闭恢复和原生保存。报告及截图：`native-tileset-flatten-report.json`、`native-tileset-flattened.png`。
 - 对照 `cesium-demo` 后，裁剪/压平绘制改为优先深度拾取并回退地表，Gizmo 补齐 XY/XZ/YZ 平面。沿用独立会话、Esc 回滚、相机输入恢复、项目历史和销毁生命周期，不复制 demo 的全局清理及私有字段访问。
-- M8 还剩空间距离、贴地距离、面积和高度差四类基础三维测量；临时结果与“保留测量”持久对象需要分开实现。
+- 新增 `@desktop-webgis/cesium-measure`，实现空间距离、贴地距离、局部 ENU 水平面积及带正负号高度差；贴地路径有地形时使用 Cesium 真实地形采样，并以 30 m 加密、4096 点上限控制交互成本。
+- 测量结果先进入运行时临时 GraphicLayer，不写项目；“保留测量”后才作为独立 Graphic 进入历史与持久化。四种测量在 1440×900、1024×680、1366×768、1920×1080 四视口 E2E 全部通过，包含清除、保留、Undo/Redo 和保存断言。报告及截图：`browser-scene3d-measurement-report.json`、`browser-scene3d-measurement-transient.png`、`browser-scene3d-measurement-retained.png`。
+- M8 功能实现已闭环；E08 继续保留 Gizmo 真实指针拖动 E2E 的未签收边界。
 
 ## M6 批次：持久资源引用与项目路径（2026-10-14）
 

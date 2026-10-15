@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, Copy, Download, Eye, FolderPlus, Globe, Layers2, LocateFixed, LockKeyhole, Maximize2, MessageSquare, MousePointer2, Move, MoveDown, Palette, PanelLeftClose, PanelRightClose, Plus, RefreshCw, RotateCw, Scissors, Search, Shapes, SlidersHorizontal, Sun, Table2, Trash2, Waves } from 'lucide-react'
+import { ArrowUpDown, Check, Copy, Download, Eye, FolderPlus, Globe, Layers2, LocateFixed, LockKeyhole, Maximize2, MessageSquare, MousePointer2, Move, MoveDown, Palette, PanelLeftClose, PanelRightClose, Plus, RefreshCw, RotateCw, Route, Ruler, Scissors, Search, Shapes, SlidersHorizontal, SquareDashed, Sun, Table2, Trash2, Waves } from 'lucide-react'
 import type { CesiumSceneRuntime, EditMode } from '@desktop-webgis/cesium-scene-runtime'
 import { createCesiumScene, getCesiumSceneNodeState, getCesiumSceneGroupState, getCesiumSceneDescendantIds } from '@desktop-webgis/cesium-scene-schema'
-import type { CesiumSceneNode, GeoPosition } from '@desktop-webgis/cesium-scene-schema'
+import type { CesiumSceneNode, GeoPosition, GraphicNode } from '@desktop-webgis/cesium-scene-schema'
+import { measureArea, measureGroundDistance, measureHeightDifference, measureSpatialDistance } from '@desktop-webgis/cesium-measure'
+import type { SceneMeasurement, SceneMeasurementKind } from '@desktop-webgis/cesium-measure'
 import { serializeScene } from '@desktop-webgis/scene-core'
 import { registerSceneCameraReader } from './scene3d-runtime-host'
 import { createSceneDocumentSession } from './scene3d-document-session'
@@ -39,6 +41,7 @@ import { compileSceneObjectExport } from './scene3d-object-export'
 import type { SceneInspectorSection } from './SceneInspector'
 import { useSceneRenderPreferences } from './SceneRenderSettings'
 import { SceneInfo } from './ScenePropertyGroup'
+import { Button } from '@/components/ui/Button'
 import 'cesium/Build/Cesium/Widgets/widgets.css'
 import './scene3d-editor.css'
 import { createLocalResourceSession } from '@/services/local-resource-session'
@@ -49,7 +52,11 @@ import { isTauri } from '@tauri-apps/api/core'
 import type { ResourceReference } from '@desktop-webgis/cesium-scene-schema'
 
 interface LayerState { state: 'loading' | 'ready' | 'error'; error?: string }
-const drawLabels = { point: '点', polyline: '线', polygon: '面', water: '水面边界', clip: '裁剪范围', flatten: '压平范围' }
+const drawLabels = { point: '点', polyline: '线', polygon: '面', water: '水面边界', clip: '裁剪范围', flatten: '压平范围', 'spatial-distance': '空间距离', 'ground-distance': '贴地距离', area: '面积', 'height-difference': '高度差' }
+const measurementKinds: SceneMeasurementKind[] = ['spatial-distance', 'ground-distance', 'area', 'height-difference']
+const isMeasurementKind = (kind: SceneDrawKind): kind is SceneMeasurementKind => measurementKinds.includes(kind as SceneMeasurementKind)
+
+interface MeasurementDraft { graphic: GraphicNode; result: SceneMeasurement }
 
 /** General 3D scene editor shell; rendering extensions remain independent of product UI. */
 export function SceneWorkspace() {
@@ -60,8 +67,10 @@ export function SceneWorkspace() {
   const pendingFocus = useRef<string | undefined>(undefined)
   const pendingClip = useRef<{ nodeId: string; effectId?: string } | undefined>(undefined)
   const pendingFlatten = useRef<{ nodeId: string; effectId?: string } | undefined>(undefined)
+  const measurementRevision = useRef(0)
   const defaultScene = useRef(createCesiumScene())
   const project = useProjectStore(state => state.project)
+  const projectEpoch = useProjectStore(state => state.projectEpoch)
   const scene = project.city ?? defaultScene.current
   const left = useWorkspaceStore(state => state.left)
   const right = useWorkspaceStore(state => state.right)
@@ -87,6 +96,7 @@ export function SceneWorkspace() {
   const [deleting, setDeleting] = useState(false)
   const [preview, setPreview] = useState(false)
   const [inspectorSection, setInspectorSection] = useState<SceneInspectorSection>('object')
+  const [measurement, setMeasurement] = useState<MeasurementDraft | null>(null)
 
   const selectedNodes = scene.nodes.filter(candidate => selectedIds.includes(candidate.id))
   const liveIds = selectedNodes.map(node => node.id)
@@ -150,10 +160,15 @@ export function SceneWorkspace() {
 
   useEffect(() => { setEditing(null) }, [project.id, scene.camera])
   useEffect(() => { runtime.current?.setSelected(preview ? [] : (JSON.parse(highlightKey) as string[]).flatMap(id => documentSession.current?.getRuntimeNodeId(id) ?? [])) }, [highlightKey, preview, ready, states])
-  useEffect(() => { setSelectedIds([]); setSelectedGroup(null); anchor.current = null }, [project.id])
+  useEffect(() => {
+    setSelectedIds([]); setSelectedGroup(null); anchor.current = null
+    measurementRevision.current++; setMeasurement(null)
+    void runtime.current?.setTransientGraphic().catch(report)
+  }, [project.id, projectEpoch])
 
   const drawing = useSceneDrawing(runtime.current, (graphic, kind, id) => {
     try {
+      if (isMeasurementKind(kind)) { void completeMeasurement(graphic, kind); return }
       if (kind === 'clip') {
         const pending = pendingClip.current
         pendingClip.current = undefined
@@ -202,6 +217,46 @@ export function SceneWorkspace() {
       select(nextId); notify(id ? '水面边界已更新' : '水面已创建，可在属性面板调整材质')
     } catch (reason) { report(reason) }
   }, report, () => notify('已取消绘制'))
+
+  async function completeMeasurement(graphic: GraphicNode, kind: SceneMeasurementKind): Promise<void> {
+    const currentRuntime = runtime.current
+    if (!currentRuntime) return
+    const revision = ++measurementRevision.current
+    try {
+      const positions = graphic.geometry.positions
+      const result = kind === 'spatial-distance' ? measureSpatialDistance(positions)
+        : kind === 'ground-distance' ? await measureGroundDistance(positions, currentRuntime.viewer.scene)
+        : kind === 'area' ? measureArea(positions)
+        : measureHeightDifference(positions)
+      if (revision !== measurementRevision.current || currentRuntime !== runtime.current) return
+      const name = `${drawLabels[kind]} ${scene.nodes.filter(item => item.type === 'graphic' && item.properties.measurementKind === kind).length + 1}`
+      const measured: GraphicNode = {
+        ...graphic,
+        id: `measurement-${crypto.randomUUID()}`,
+        name,
+        style: { ...graphic.style, color: '#d18b47', width: 4, pointSize: 9 },
+        properties: { ...graphic.properties, name, measurementKind: kind, measurementValue: result.value, measurementUnit: result.unit, measurementLabel: result.label },
+        popup: { title: name, fields: [{ field: 'measurementLabel', label: '测量结果' }, { field: 'name', label: '名称' }] }
+      }
+      await currentRuntime.setTransientGraphic(measured)
+      if (revision !== measurementRevision.current || currentRuntime !== runtime.current) return
+      setMeasurement({ graphic: measured, result }); notify(`${drawLabels[kind]}完成；当前为临时结果`)
+    } catch (reason) { if (revision === measurementRevision.current) report(reason) }
+  }
+
+  function clearMeasurement(message?: string): void {
+    measurementRevision.current++; setMeasurement(null)
+    void runtime.current?.setTransientGraphic().catch(report)
+    if (message) notify(message)
+  }
+
+  function retainMeasurement(): void {
+    if (!measurement) return
+    const graphic = structuredClone(measurement.graphic)
+    clearMeasurement()
+    updateScene('保留三维测量', scene => { scene.nodes.push(graphic); return scene })
+    select(graphic.id); notify('测量结果已保留到项目，可撤销或保存')
+  }
 
   function stopEditing(): void { graphicEditing.cancel(); runtime.current?.stopEditing(); setEditing(null) }
   function locate(id: string): void {
@@ -253,6 +308,7 @@ export function SceneWorkspace() {
   }
   function startDraw(kind: SceneDrawKind, id?: string): void {
     if (!ready) return
+    if (measurement) clearMeasurement()
     stopEditing(); drawing.start(kind, id)
     notify(`绘制${drawLabels[kind]}：单击添加顶点，右键或 Enter 完成，Esc 取消`)
   }
@@ -315,7 +371,7 @@ export function SceneWorkspace() {
   }
   function showProperties(section: SceneInspectorSection): void { drawing.cancel(); stopEditing(); setInspectorSection(section); setInspectorTab('object'); useWorkspaceStore.getState().setRightOpen(true) }
   function showScene(): void { drawing.cancel(); stopEditing(); setInspectorTab('scene'); useWorkspaceStore.getState().setRightOpen(true) }
-  function togglePreview(): void { setContext(null); drawing.cancel(); stopEditing(); runtime.current?.setPreview(!preview); setPreview(!preview); notify(preview ? '已返回编辑模式' : '预览模式：单击对象查看属性弹窗') }
+  function togglePreview(): void { setContext(null); drawing.cancel(); stopEditing(); if (measurement) clearMeasurement(); runtime.current?.setPreview(!preview); setPreview(!preview); notify(preview ? '已返回编辑模式' : '预览模式：单击对象查看属性弹窗') }
   function copyNode(): void {
     organize(() => { const ids = copySceneNodes(liveIds); setSelectedIds(ids); setSelectedGroup(null); setPickedProperties({}) }, '所选对象已复制，可撤销恢复')
   }
@@ -345,6 +401,10 @@ export function SceneWorkspace() {
     command('flatten', '局部压平', MoveDown, () => startFlatten(), selectionReason ?? (node?.type !== '3dtiles' ? '请选择 3D Tiles 对象' : undefined), drawing.kind === 'flatten'),
     command('camera', '保存初始视角', Eye, saveCamera, ready ? undefined : '场景尚未就绪'),
     command('water', '水面', Waves, () => startWater(), ready ? undefined : '场景尚未就绪', drawing.kind === 'water'),
+    command('measure-space', '空间距离', Ruler, () => startDraw('spatial-distance'), ready ? undefined : '场景尚未就绪', drawing.kind === 'spatial-distance'),
+    command('measure-ground', '贴地距离', Route, () => startDraw('ground-distance'), ready ? undefined : '场景尚未就绪', drawing.kind === 'ground-distance'),
+    command('measure-area', '面积', SquareDashed, () => startDraw('area'), ready ? undefined : '场景尚未就绪', drawing.kind === 'area'),
+    command('measure-height', '高度差', ArrowUpDown, () => startDraw('height-difference'), ready ? undefined : '场景尚未就绪', drawing.kind === 'height-difference'),
     command('new-group', '新建分组', FolderPlus, () => setCreatingGroup(true)),
     command('left', '场景树', Layers2, () => useWorkspaceStore.getState().setLeftOpen(!left.open), undefined, left.open),
     command('right', '属性面板', PanelRightClose, () => useWorkspaceStore.getState().setRightOpen(!right.open), undefined, right.open),
@@ -383,7 +443,7 @@ export function SceneWorkspace() {
     return () => { window.removeEventListener('desktop-webgis:scene3d-action', onAction); window.removeEventListener('keydown', onHistory); window.removeEventListener('resize', onResize); window.removeEventListener('desktop-webgis:command-status', onStatus) }
   }, [preview])
 
-  const DrawingIcon = drawing.kind === 'water' ? Waves : drawing.kind === 'clip' ? Scissors : drawing.kind === 'flatten' ? MoveDown : Shapes
+  const DrawingIcon = drawing.kind === 'water' ? Waves : drawing.kind === 'clip' ? Scissors : drawing.kind === 'flatten' ? MoveDown : drawing.kind && isMeasurementKind(drawing.kind) ? Ruler : Shapes
   return <main className="scene3d-workspace" aria-label="三维场景编辑器">
     <SceneRibbon target={group?.name ?? (liveIds.length > 1 ? `${liveIds.length} 个对象` : node?.name ?? '未设置')} commands={commands} preview={preview} onPreview={togglePreview} onUndo={() => history()} onRedo={() => history(true)} onSave={() => { void projectCommands.saveProject() }} canUndo={canUndo} canRedo={canRedo} />
     <div className="scene3d-workspace__body">
@@ -406,6 +466,10 @@ export function SceneWorkspace() {
         {editing && !preview && <div className="scene3d-drawing-bar"><Move size={16} aria-hidden="true" /><span>{editing === 'translate' ? '移动' : editing === 'rotate' ? '旋转' : '等比缩放'}</span><SceneInfo label="变换工具">{`${editing === 'translate' ? '红：东向，绿：北向，蓝：高度；黄色框：水平移动。' : editing === 'rotate' ? '拖动对象局部轴环。' : '拖动白色箭头等比缩放。'}松开应用，Esc 取消本次拖动。`}</SceneInfo><button className="button-secondary" onClick={() => { stopEditing(); notify('已退出模型编辑') }}>结束编辑</button></div>}
         {graphicEditing.state && <div className="scene3d-drawing-bar"><Shapes size={16} aria-hidden="true" /><span>编辑几何 · {graphicEditing.state.geometry.positions.length} 个顶点</span><button className="button-primary" onClick={graphicEditing.finish}><Check size={14} aria-hidden="true" />应用修改</button><button className="button-secondary" onClick={() => { stopEditing(); notify('已取消几何编辑，原几何已恢复') }}>取消编辑</button></div>}
         {drawing.drawing && <div className="scene3d-drawing-bar"><DrawingIcon size={16} aria-hidden="true" /><span>{drawing.kind ? drawLabels[drawing.kind] : "绘制"} · {drawing.count} 个顶点</span><button className="button-primary" disabled={drawing.count < drawing.minimum} onClick={drawing.finish}><Check size={14} aria-hidden="true" />完成</button><button className="button-secondary" onClick={() => { drawing.cancel(); notify('已取消绘制') }}>取消</button></div>}
+        {measurement && !drawing.drawing && <section className="scene3d-measurement-card" aria-label="三维测量结果">
+          <div><span>{drawLabels[measurement.result.kind]}</span><output>{measurement.result.label}</output><small>临时结果，尚未写入项目</small></div>
+          <footer><Button variant="primary" size="small" onClick={retainMeasurement}>保留测量</Button><Button size="small" onClick={() => clearMeasurement('已清除临时测量')}>清除</Button></footer>
+        </section>}
       </section>
       {!preview && <RightPanel showHeader={false}>
         <header className="scene3d-inspector-header"><span>属性</span><div className="scene3d-inspector-tabs" role="tablist" aria-label="属性范围"><button role="tab" aria-selected={inspectorTab === 'object'} onClick={() => setInspectorTab('object')}>对象</button><button role="tab" aria-selected={inspectorTab === 'scene'} onClick={() => setInspectorTab('scene')}>场景</button></div><button className="scene3d-inspector-close" aria-label="收起检查器" onClick={() => useWorkspaceStore.getState().setRightOpen(false)}><PanelRightClose size={14} aria-hidden="true" /></button></header>
