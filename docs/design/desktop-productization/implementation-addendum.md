@@ -65,7 +65,7 @@ A 完成不代表全部界面迁移完成。逐批记录剩余文件，不将 an
 - 2026-10-14 已完成主 API 与 Desktop/Viewer 主流程迁移：公开能力采用 `CesiumScene*`、`Scene*`、`SceneWorkspace` 和 `scene3d` 路径；旧 `City*` 符号只从独立 `compat-city` 模块以 `@deprecated` 别名导出。旧 `project.city`、`activeView: 'city'` 与 CityScene v1/v2 文件继续作为持久化兼容边界，不再扩散到产品组件和新 API。
 - 本轮验证覆盖兼容别名真实调用、22 个 workspace 项目的完整单测和生产构建、Desktop 四种视口的浏览器交互，以及 Windows Tauri 本地资源保存恢复。原生报告与截图保存在 `evidence/native-scene-api-report.json` 和 `evidence/native-scene-api-restored.png`。
 
-- Graphic 是独立对象，共享池只复用运行时资源，不向用户暴露人工 GraphicLayer。连续放置/Esc、500 对象和批量编辑均实测。
+- Graphic 是独立对象，共享池只复用运行时资源，不向用户暴露人工 GraphicLayer。连续 POI 每次单击独立提交并保持工具，Esc 或“结束放置”释放输入；500 个独立 Graphic 实测只使用一个 Cesium `CustomDataSource`。搜索、10 对象多选/批量显隐、Undo/Redo、保存重开均有 E2E 断言，证据见 `evidence/browser-scene3d-graphic-scale-report.json`、`browser-scene3d-continuous-points.png` 和 `browser-scene3d-500-poi.png`。
 - 裁剪/基础压平绑定目标 Tileset，明确局部坐标与高度语义，处理空间变换和 LOD。参考 cesium-demo 算法思路，不将实验效果或 UI 模拟当作生产能力。
 - 至少两套不同空间变换、含 LOD 的真实 Tileset 验证效果、恢复/撤销、GPU 资源清理。诊断使用引擎实际指标，不显示编造性能值。
 

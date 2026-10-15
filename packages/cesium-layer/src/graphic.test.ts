@@ -71,7 +71,7 @@ describe('independent GraphicLayer', () => {
     const item = layer.getGraphic('p')!
     item.setOptions({ name: 'Layer name', properties: { name: 'Attribute name' } })
     const source = v.sources[0] as CustomDataSource
-    expect(source.entities.getById('p')?.properties?.getValue(JulianDate.now()).name).toBe('Attribute name')
+    expect(source.entities.values[0]?.properties?.getValue(JulianDate.now()).name).toBe('Attribute name')
     item.setOptions({ style: { ...item.toJSON().style, color: '#ff0000' } })
     expect(v.host.dataSources.add).toHaveBeenCalledOnce()
     expect(layer.toJSON()[0].style.color).toBe('#ff0000')
@@ -79,6 +79,21 @@ describe('independent GraphicLayer', () => {
     await expect(session.result).resolves.toEqual({ status: 'cancelled' })
     expect(v.host.entities.values).toHaveLength(0)
     layer.destroy(); layer.destroy(); expect(v.host.dataSources.remove).toHaveBeenCalledOnce()
+  })
+  it('shares one native data source across independent graphic layers without cross-removal', async () => {
+    const v = viewer(), first = new GraphicLayer({ id: 'first', graphics: [graphic()] })
+    const secondGraphic = { ...graphic(), id: 'second', name: 'Second' }
+    const second = new GraphicLayer({ id: 'second', graphics: [secondGraphic] })
+    await Promise.all([first.mount(v.value), second.mount(v.value)])
+    expect(v.host.dataSources.add).toHaveBeenCalledOnce()
+    const source = v.sources[0] as CustomDataSource
+    expect(source.entities.values).toHaveLength(2)
+    const replacement = new GraphicLayer({ id: 'first', graphics: [graphic()] }); await replacement.mount(v.value)
+    expect(source.entities.values).toHaveLength(3)
+    replacement.destroy(); expect(source.entities.values).toHaveLength(2)
+    first.destroy(); expect(v.host.dataSources.remove).not.toHaveBeenCalled(); expect(source.entities.values).toHaveLength(1)
+    expect(second.contains({ id: source.entities.values[0] })).toBe(true)
+    second.destroy(); expect(v.host.dataSources.remove).toHaveBeenCalledOnce()
   })
   it('detaches serialized values and validates changes atomically', () => {
     const layer = new GraphicLayer({ id: 'graphics' }), original = graphic(), item = layer.addGraphic(original)
@@ -179,9 +194,9 @@ describe('attribute-driven labels', () => {
     const v = viewer(), node = graphic(); node.style.labelField = 'count'; node.properties.count = 0
     const layer = new GraphicLayer({ id: 'labels', graphics: [node] }); await layer.mount(v.value)
     const source = v.sources[0] as CustomDataSource
-    expect(source.entities.getById('p')?.label?.text?.getValue(JulianDate.now())).toBe('0')
+    expect(source.entities.values[0]?.label?.text?.getValue(JulianDate.now())).toBe('0')
     layer.getGraphic('p')!.setOptions({ properties: { count: 12 } })
-    expect(source.entities.getById('p')?.label?.text?.getValue(JulianDate.now())).toBe('12')
+    expect(source.entities.values[0]?.label?.text?.getValue(JulianDate.now())).toBe('12')
     expect(v.host.dataSources.add).toHaveBeenCalledOnce(); layer.destroy()
   })
 })

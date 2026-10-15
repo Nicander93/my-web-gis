@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { createCesiumScene } from '@desktop-webgis/cesium-scene-schema'
-import { getLiveSceneCamera, registerSceneCameraReader } from './scene3d-runtime-host'
+import { getLiveSceneCamera, getLiveSceneDiagnostics, registerSceneCameraReader, registerSceneDiagnosticsReader } from './scene3d-runtime-host'
 
 it('captures detached live cameras and keeps a newer viewport registered during old cleanup', () => {
   const first = createCesiumScene().camera
@@ -15,6 +15,14 @@ it('captures detached live cameras and keeps a newer viewport registered during 
   expect(getLiveSceneCamera()).toEqual(second)
   removeSecond()
   expect(getLiveSceneCamera()).toBeNull()
+})
+
+it('exposes detached diagnostics only while their runtime owner is registered', () => {
+  const diagnostics = { sceneObjects: 500, graphicObjects: 500, managedLayers: 500, dataSources: 1, primitives: 0 }
+  const remove = registerSceneDiagnosticsReader(() => diagnostics)
+  const read = getLiveSceneDiagnostics()!
+  expect(read).toEqual(diagnostics); read.dataSources = 20; expect(getLiveSceneDiagnostics()?.dataSources).toBe(1)
+  remove(); expect(getLiveSceneDiagnostics()).toBeNull()
 })
 
 it('ignores a live camera while its owning project or preset is no longer current', () => {

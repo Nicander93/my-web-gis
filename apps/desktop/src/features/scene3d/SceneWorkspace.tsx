@@ -6,7 +6,7 @@ import type { CesiumSceneNode, GeoPosition, GraphicNode } from '@desktop-webgis/
 import { measureArea, measureGroundDistance, measureHeightDifference, measureSpatialDistance } from '@desktop-webgis/cesium-measure'
 import type { SceneMeasurement, SceneMeasurementKind } from '@desktop-webgis/cesium-measure'
 import { serializeScene } from '@desktop-webgis/scene-core'
-import { registerSceneCameraReader } from './scene3d-runtime-host'
+import { registerSceneCameraReader, registerSceneDiagnosticsReader } from './scene3d-runtime-host'
 import { createSceneDocumentSession } from './scene3d-document-session'
 import { createProjectSceneController } from '../scene/project-scene-controller'
 import { Cartesian2, Cartographic, Math as CesiumMath } from 'cesium'
@@ -89,6 +89,7 @@ export function SceneWorkspace() {
   const [error, setError] = useState('')
   const [states, setStates] = useState<Record<string, LayerState>>({})
   const [ready, setReady] = useState(false)
+  const [syncStatus, setSyncStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [adding, setAdding] = useState(false)
   const [inspectorTab, setInspectorTab] = useState<'object' | 'scene'>('object')
   const [search, setSearch] = useState('')
@@ -123,6 +124,7 @@ export function SceneWorkspace() {
     if (!target.current) return
     let active = true
     let unregisterCamera: (() => void) | undefined
+    let unregisterDiagnostics: (() => void) | undefined
     const controller = createProjectSceneController()
     const localResources = createLocalResourceSession({ projectPath: getProjectResourceBasePath })
     resourceSession.current = localResources
@@ -132,6 +134,7 @@ export function SceneWorkspace() {
         onEdit: event => { updateScene('变换三维模型', current => ({ ...current, nodes: current.nodes.map(n => n.id === event.id && (n.type === '3dtiles' || n.type === 'model') ? { ...n, transform: event.after } : n) })); notify('模型变换已应用，可撤销恢复') },
         onState: state => {
           if (!active) return
+          setSyncStatus(state.status)
           if (state.runtime && runtime.current !== state.runtime) {
             runtime.current = state.runtime; state.runtime.layers.popupsEnabled = false
           }
@@ -141,10 +144,15 @@ export function SceneWorkspace() {
             const owner = useProjectStore.getState(), epoch = owner.projectEpoch, projectId = owner.project.id
             const preset = JSON.stringify(owner.project.city?.camera)
             unregisterCamera?.()
-            if (state.runtime) unregisterCamera = registerSceneCameraReader(() => state.runtime!.getCamera(), () => {
+            unregisterDiagnostics?.()
+            if (state.runtime) {
+              const currentRuntime = state.runtime
+              unregisterDiagnostics = registerSceneDiagnosticsReader(() => currentRuntime.getDiagnostics())
+              unregisterCamera = registerSceneCameraReader(() => currentRuntime.getCamera(), () => {
               const current = useProjectStore.getState()
               return current.projectEpoch === epoch && current.project.id === projectId && JSON.stringify(current.project.city?.camera) === preset
-            })
+              })
+            }
             const id = pendingFocus.current
             if (id && state.states[id]?.state === 'ready') { pendingFocus.current = undefined; locate(id); notify('资源已加载') }
             else setStatus('就绪')
@@ -153,7 +161,7 @@ export function SceneWorkspace() {
         }
       })
     } catch (reason) { report(reason) }
-    return () => { active = false; unregisterCamera?.(); documentSession.current?.destroy(); documentSession.current = undefined; controller.dispose(); runtime.current = undefined; resourceSession.current = undefined; void localResources.destroy().catch(reason => console.error('释放本地资源授权失败', reason)) }
+    return () => { active = false; unregisterCamera?.(); unregisterDiagnostics?.(); documentSession.current?.destroy(); documentSession.current = undefined; controller.dispose(); runtime.current = undefined; resourceSession.current = undefined; void localResources.destroy().catch(reason => console.error('释放本地资源授权失败', reason)) }
   }, [])
 
   useEffect(() => { if (runtime.current) { try { runtime.current.setRenderQuality(renderQuality) } catch (reason) { report(reason) } } }, [renderQuality, ready])
@@ -205,7 +213,8 @@ export function SceneWorkspace() {
         graphic.properties.name = graphic.name
         graphic.popup = { fields: [{ field: 'name', label: '名称' }] }
         updateScene('绘制图形', scene => { scene.nodes.push(graphic); return scene })
-        select(graphic.id); notify('图形已创建，可配置样式和属性弹窗'); return
+        if (kind !== 'point') select(graphic.id)
+        notify(kind === 'point' ? '点已创建；继续单击放置，Esc 退出' : '图形已创建，可配置样式和属性弹窗'); return
       }
       const boundary = graphic.geometry.positions
       const nextId = id ?? `water-${crypto.randomUUID()}`
@@ -217,6 +226,8 @@ export function SceneWorkspace() {
       select(nextId); notify(id ? '水面边界已更新' : '水面已创建，可在属性面板调整材质')
     } catch (reason) { report(reason) }
   }, report, () => notify('已取消绘制'))
+
+  useEffect(() => { if (syncStatus === 'ready' && drawing.kind === 'point') drawing.resume() }, [syncStatus, scene.nodes.length])
 
   async function completeMeasurement(graphic: GraphicNode, kind: SceneMeasurementKind): Promise<void> {
     const currentRuntime = runtime.current
@@ -310,7 +321,7 @@ export function SceneWorkspace() {
     if (!ready) return
     if (measurement) clearMeasurement()
     stopEditing(); drawing.start(kind, id)
-    notify(`绘制${drawLabels[kind]}：单击添加顶点，右键或 Enter 完成，Esc 取消`)
+    notify(kind === 'point' ? '连续放置点：单击创建，Esc 退出' : `绘制${drawLabels[kind]}：单击添加顶点，右键或 Enter 完成，Esc 取消`)
   }
   function history(redo = false): void {
     drawing.cancel(); stopEditing()
@@ -465,7 +476,7 @@ export function SceneWorkspace() {
         <div className="scene3d-canvas__viewport" ref={target} />
         {editing && !preview && <div className="scene3d-drawing-bar"><Move size={16} aria-hidden="true" /><span>{editing === 'translate' ? '移动' : editing === 'rotate' ? '旋转' : '等比缩放'}</span><SceneInfo label="变换工具">{`${editing === 'translate' ? '红：东向，绿：北向，蓝：高度；黄色框：水平移动。' : editing === 'rotate' ? '拖动对象局部轴环。' : '拖动白色箭头等比缩放。'}松开应用，Esc 取消本次拖动。`}</SceneInfo><button className="button-secondary" onClick={() => { stopEditing(); notify('已退出模型编辑') }}>结束编辑</button></div>}
         {graphicEditing.state && <div className="scene3d-drawing-bar"><Shapes size={16} aria-hidden="true" /><span>编辑几何 · {graphicEditing.state.geometry.positions.length} 个顶点</span><button className="button-primary" onClick={graphicEditing.finish}><Check size={14} aria-hidden="true" />应用修改</button><button className="button-secondary" onClick={() => { stopEditing(); notify('已取消几何编辑，原几何已恢复') }}>取消编辑</button></div>}
-        {drawing.drawing && <div className="scene3d-drawing-bar"><DrawingIcon size={16} aria-hidden="true" /><span>{drawing.kind ? drawLabels[drawing.kind] : "绘制"} · {drawing.count} 个顶点</span><button className="button-primary" disabled={drawing.count < drawing.minimum} onClick={drawing.finish}><Check size={14} aria-hidden="true" />完成</button><button className="button-secondary" onClick={() => { drawing.cancel(); notify('已取消绘制') }}>取消</button></div>}
+        {drawing.drawing && <div className="scene3d-drawing-bar"><DrawingIcon size={16} aria-hidden="true" /><span>{drawing.kind === 'point' ? '连续放置点 · 单击创建，Esc 退出' : `${drawing.kind ? drawLabels[drawing.kind] : '绘制'} · ${drawing.count} 个顶点`}</span>{drawing.kind !== 'point' && <Button variant="primary" size="small" disabled={drawing.count < drawing.minimum} onClick={drawing.finish}><Check size={14} aria-hidden="true" />完成</Button>}<Button size="small" onClick={() => { drawing.cancel(); notify(drawing.kind === 'point' ? '已退出连续放置' : '已取消绘制') }}>{drawing.kind === 'point' ? '结束放置' : '取消'}</Button></div>}
         {measurement && !drawing.drawing && <section className="scene3d-measurement-card" aria-label="三维测量结果">
           <div><span>{drawLabels[measurement.result.kind]}</span><output>{measurement.result.label}</output><small>临时结果，尚未写入项目</small></div>
           <footer><Button variant="primary" size="small" onClick={retainMeasurement}>保留测量</Button><Button size="small" onClick={() => clearMeasurement('已清除临时测量')}>清除</Button></footer>
@@ -478,7 +489,7 @@ export function SceneWorkspace() {
         </div>
       </RightPanel>}
     </div>
-    <footer className="status-bar scene3d-footer"><span className={`scene3d-footer__state${error ? ' scene3d-footer__state--error' : ''}`} role="status">{error || (drawing.drawing ? `绘制${drawing.kind ? drawLabels[drawing.kind] : '图形'}：单击添加顶点 · Enter 完成 · Esc 取消` : status)}</span><span>{group ? group.name : liveIds.length > 1 ? `已选 ${liveIds.length} 个对象` : node?.name ?? '未选择对象'}</span><span>WGS84 · 椭球高度</span></footer>
+    <footer className="status-bar scene3d-footer"><span className={`scene3d-footer__state${error ? ' scene3d-footer__state--error' : ''}`} role="status">{error || (drawing.kind === 'point' ? '连续放置点：单击创建 · Esc 退出' : drawing.drawing ? `绘制${drawing.kind ? drawLabels[drawing.kind] : '图形'}：单击添加顶点 · Enter 完成 · Esc 取消` : status)}</span><span>{group ? group.name : liveIds.length > 1 ? `已选 ${liveIds.length} 个对象` : node?.name ?? '未选择对象'}</span><span>WGS84 · 椭球高度</span></footer>
     {context && <LayerPopupMenu x={context.x} y={context.y} label="对象菜单" onClose={() => setContext(null)}>
       <div className="scene3d-context-title">{group?.name ?? (liveIds.length > 1 ? `${liveIds.length} 个对象` : node?.name)}</div>
       <MenuItem icon={Table2} label="对象属性" onClick={() => { showProperties('object'); setContext(null) }} />

@@ -40,6 +40,14 @@ export interface CesiumSceneRuntimeOptions {
   onLayerState?: (id: string, state: BaseLayer['state'], error?: Error) => void
 }
 
+export interface SceneRuntimeDiagnostics {
+  sceneObjects: number
+  graphicObjects: number
+  managedLayers: number
+  dataSources: number
+  primitives: number
+}
+
 interface PreparedEnvironment { key: string; imagery: ImageryProvider; terrain: TerrainProvider }
 
 /** Composes independent packages; editing and read-only viewers share this renderer. */
@@ -367,6 +375,16 @@ export class CesiumSceneRuntime {
   getCamera(): CesiumSceneCamera {
     const camera = this.viewer.camera, p = camera.positionCartographic
     return { position: [CesiumMath.toDegrees(p.longitude), CesiumMath.toDegrees(p.latitude), p.height], heading: CesiumMath.toDegrees(camera.heading), pitch: CesiumMath.toDegrees(camera.pitch), roll: CesiumMath.toDegrees(camera.roll) }
+  }
+  /** Reports engine-owned counts for diagnostics and performance acceptance. */
+  getDiagnostics(): SceneRuntimeDiagnostics {
+    return {
+      sceneObjects: this.nodes.size,
+      graphicObjects: [...this.nodes.values()].filter(node => node.type === 'graphic').length,
+      managedLayers: this.currentLayers.size,
+      dataSources: this.viewer.dataSources.length,
+      primitives: this.viewer.scene.primitives.length
+    }
   }
   getNativeViewer(): Viewer { return this.viewer }
   destroy(): void {

@@ -85,7 +85,7 @@ rtk pnpm --filter @desktop-webgis/desktop test:e2e folders.e2e.ts --project=desk
 | M2 | 点线面编辑、捕捉、选择、CRS/导出；已接入嵌套 Folder 与原子树命令 | 明确 CRS 赋值工作流及复杂拓扑编辑、专业选择能力 |
 | M3 | 模型/Tileset 选择、整体 Gizmo、专业 Inspector、旧 CityScene 兼容；已接入嵌套 Folder | 文件夹/对象混排；固定 ID 的独立 Apply/OK/Cancel 属性窗；检查器固定 |
 | M4 | 分页、搜索、过滤、统计、属性单元格、处理算法/取消；多图层 Tab、原子字段计算、字段管理、面合并/分割、列显示/排序/宽度和 antd Table | 完整空间运算验收及处理工具控件迁移 |
-| M5 | point/polyline/polygon Graphic、几何编辑、对象独立样式 | 共享 Graphic 渲染池、连续 POI、Billboard/Label/rectangle/ellipse 等及 500 对象验收 |
+| M5 | point/polyline/polygon Graphic、几何编辑、对象独立样式、共享原生渲染池、连续 POI 与 Esc、500 对象搜索/多选/批量显隐/保存重开 | Billboard、rectangle、ellipse 等扩展标绘类型 |
 | M6 | 本地二维文件、多 GeoJSON 批次、原子导入/Undo/Redo、读取取消与工程归属保护；WMS/WMTS/WFS、三维资源加载、失败重试 | 混合格式配置队列、服务导入历史、大文件 Worker；二三维添加数据壳、基于项目路径的资源引用/另存重算、父目录重定位 |
 | M7 | 原生原子替换、串行保存/版本与工程会话保护、格式校验及草稿保护；独立恢复缓存、启动恢复/舍弃、容量/保留期与保存清理；Tauri 二维属性/三维 GLB 强制退出恢复 | 系统文件选择窗口、原生完整本地资源组合与 Windows 125% 缩放验收 |
 | M8 | 独立 Gizmo（轴向与 XY/XZ/YZ 平面）、Tileset 原生裁剪、局部 ENU 压平、多变换隔离、项目保存重开与物理 GPU/LOD 验收；空间距离、贴地距离、面积和高度差，临时结果与保留 Graphic 分离 | 功能实现已闭环；E08 仍需 Gizmo 真实指针拖动 E2E |
@@ -258,8 +258,8 @@ Desktop build 通过；`attribute-tabs.e2e.ts`、`field-schema.e2e.ts` 在 1366�
 | E06 | 部分 | 真实缓冲结果层及处理算法单测通过；四组空间处理专项矩阵待补 |
 | E07 | 部分 | 国内地图投影、导出 CRS、历史一致性通过；源 CRS 赋值工作流待接入 |
 | E08 | 部分 | 实际 GLB 像素、属性变换、撤销、导出、资源重试通过；Gizmo 的轴向与 XY/XZ/YZ 射线约束、取消及提交有单测，仍需真实指针拖动 E2E |
-| E09 | 待实现 | 连续 POI 放置与 Esc |
-| E10 | 待实现 | 500 Graphic 共享渲染池及批量编辑 |
+| E09 | 浏览器通过 | 连续单击创建 3 个独立 Graphic，每次独立进入历史；Esc 后点击不再创建，Undo/Redo 通过 |
+| E10 | 浏览器通过 | 500 Graphic 仅使用 1 个原生 CustomDataSource；搜索、10 对象多选与批量显隐范围、保存重开 ID/样式/位置通过 |
 | E11 | 通过 | 目标 Tileset 原生裁剪、多范围、撤销/恢复、保存重开及双变换实例隔离通过 |
 | E12 | 通过 | 局部 ENU、动态椭球高程、多高度遮罩、模型变换、LOD、关闭恢复和 Shader 销毁通过；Tauri 在 NVIDIA D3D11 物理 GPU 上验收 |
 | E13 | 浏览器通过 | `docking.e2e.ts` 验证画布不变、整宽属性表 |

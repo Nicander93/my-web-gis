@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-15",
+  "scope": "M5 continuous POI and 500 Graphic acceptance",
+  "commands": [
+    "pnpm --filter @desktop-webgis/desktop exec playwright test e2e/scene3d-continuous-point.e2e.ts --project=desktop",
+    "pnpm --filter @desktop-webgis/desktop exec playwright test e2e/scene3d-graphic-scale.e2e.ts --project=desktop"
+  ],
+  "result": { "passed": 2, "failed": 0, "viewport": "1440x900" },
+  "engineCountsFor500Graphics": {
+    "sceneObjects": 500,
+    "graphicObjects": 500,
+    "managedLayers": 500,
+    "customDataSources": 1
+  },
+  "assertions": [
+    "three consecutive clicks create three independent point Graphics and three history entries",
+    "Escape releases the continuous point handler and later clicks do not create objects",
+    "500 independent Graphics share one native CustomDataSource",
+    "search finds a single named POI",
+    "multi-select batch visibility changes only ten selected Graphics",
+    "all 500 IDs, styles and positions survive project save and reopen"
+  ],
+  "screenshots": ["browser-scene3d-continuous-points.png", "browser-scene3d-500-poi.png"]
+}

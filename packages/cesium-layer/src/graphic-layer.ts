@@ -11,6 +11,37 @@ import { EditSession } from './graphic-edit.js'
 import type { GraphicEditOptions } from './graphic-edit.js'
 import { resolveGraphicLabel } from './graphic-label.js'
 
+interface SharedGraphicSource {
+  source: CustomDataSource
+  references: number
+  ready: Promise<void>
+}
+
+const graphicSources = new WeakMap<Viewer, SharedGraphicSource>()
+let graphicLayerSequence = 0
+
+async function acquireGraphicSource(viewer: Viewer): Promise<{ source: CustomDataSource; release(): void }> {
+  let shared = graphicSources.get(viewer)
+  if (!shared) {
+    const source = new CustomDataSource('三维标绘')
+    shared = { source, references: 0, ready: Promise.resolve(viewer.dataSources.add(source)).then(() => {}) }
+    graphicSources.set(viewer, shared)
+    void shared.ready.catch(() => { if (graphicSources.get(viewer) === shared) graphicSources.delete(viewer) })
+  }
+  shared.references++
+  try { await shared.ready }
+  catch (error) { shared.references--; throw error }
+  let released = false
+  return { source: shared.source, release() {
+    if (released) return
+    released = true; shared.references--
+    if (shared.references === 0 && graphicSources.get(viewer) === shared) {
+      graphicSources.delete(viewer)
+      if (!viewer.isDestroyed()) viewer.dataSources.remove(shared.source, true)
+    }
+  } }
+}
+
 /** Serializable spatial object; native rendering is owned by its GraphicLayer. */
 export class Graphic {
   private definition: GraphicNode
@@ -30,6 +61,8 @@ export class Graphic {
 /** Shares the resource lifecycle and pick routing of other Cesium layers. */
 export class GraphicLayer extends BaseLayer {
   private readonly graphics = new Map<string, Graphic>()
+  private readonly nativePrefix = `graphic-layer-${++graphicLayerSequence}:`
+  private readonly nativeIds = new Map<string, string>()
   private source?: CustomDataSource
   private drawing?: DrawSession
   private editing?: EditSession
@@ -42,7 +75,7 @@ export class GraphicLayer extends BaseLayer {
     const graphic = new Graphic(definition, () => this.renderGraphic(graphic))
     this.graphics.set(graphic.id, graphic); this.renderGraphic(graphic); return graphic
   }
-  removeGraphic(id: string): void { if (this.editing?.id === id) this.editing.cancel(); this.graphics.delete(id); this.selected.delete(id); this.source?.entities.removeById(id); this.viewer?.scene.requestRender() }
+  removeGraphic(id: string): void { if (this.editing?.id === id) this.editing.cancel(); this.graphics.delete(id); this.selected.delete(id); const nativeId = this.nativeIds.get(id); if (nativeId) this.source?.entities.removeById(nativeId); this.nativeIds.delete(id); this.viewer?.scene.requestRender() }
   setSelected(ids: readonly string[]): void {
     this.selected.clear(); ids.forEach(id => this.selected.add(id))
     this.allGraphics.forEach(graphic => this.renderGraphic(graphic))
@@ -61,30 +94,40 @@ export class GraphicLayer extends BaseLayer {
     void editing.result.then(() => { if (this.editing === editing) this.editing = undefined })
     return editing
   }
-  contains(picked: unknown): boolean { return Boolean(picked && typeof picked === 'object' && 'id' in picked && picked.id instanceof Entity && this.source?.entities.contains(picked.id)) }
-  async flyTo(): Promise<void> { if (this.viewer && this.source && this.graphics.size) await this.viewer.flyTo(this.source) }
+  contains(picked: unknown): boolean { return Boolean(picked && typeof picked === 'object' && 'id' in picked && picked.id instanceof Entity && [...this.nativeIds.values()].includes(picked.id.id)) }
+  async flyTo(): Promise<void> {
+    if (!this.viewer || !this.source || !this.graphics.size) return
+    const entities = [...this.nativeIds.values()].flatMap(id => this.source?.entities.getById(id) ?? [])
+    if (entities.length) await this.viewer.flyTo(entities.length === 1 ? entities[0] : entities)
+  }
   protected getPopupContent(event: LayerClickEvent): PopupContent | undefined {
     const picked = event.picked
-    const graphic = picked && typeof picked === 'object' && 'id' in picked && picked.id instanceof Entity ? this.graphics.get(picked.id.id) : undefined
+    const entity = picked && typeof picked === 'object' && 'id' in picked && picked.id instanceof Entity ? picked.id : undefined
+    const id = entity ? [...this.nativeIds].find(([, nativeId]) => nativeId === entity.id)?.[0] : undefined
+    const graphic = id ? this.graphics.get(id) : undefined
     return graphic?.toJSON().popup ?? super.getPopupContent(event)
   }
-  protected setNativeVisible(show: boolean): void { if (this.source) this.source.show = show; if (!show) { this.drawing?.cancel(); this.editing?.cancel() } }
+  protected setNativeVisible(show: boolean): void { this.allGraphics.forEach(graphic => this.renderGraphic(graphic)); if (!show) { this.drawing?.cancel(); this.editing?.cancel() } }
   protected async createNative(viewer: Viewer, signal: AbortSignal): Promise<() => void> {
-    const source = new CustomDataSource(this.name)
-    source.show = this.show
-    await viewer.dataSources.add(source)
-    if (signal.aborted || viewer.isDestroyed()) { if (!viewer.isDestroyed()) viewer.dataSources.remove(source, true); return () => {} }
+    const shared = await acquireGraphicSource(viewer), source = shared.source
+    if (signal.aborted || viewer.isDestroyed()) { shared.release(); return () => {} }
     this.source = source; this.allGraphics.forEach(graphic => this.renderGraphic(graphic))
-    return () => { this.drawing?.cancel(); this.editing?.cancel(); if (!viewer.isDestroyed()) viewer.dataSources.remove(source, true); if (this.source === source) this.source = undefined }
+    return () => {
+      this.drawing?.cancel(); this.editing?.cancel()
+      this.nativeIds.forEach(id => source.entities.removeById(id)); this.nativeIds.clear()
+      if (this.source === source) this.source = undefined
+      shared.release()
+    }
   }
   private renderGraphic(graphic: Graphic): void {
     if (!this.source) return
     const node = graphic.toJSON(), positions = node.geometry.positions.map(position => Cartesian3.fromDegrees(...position)), color = Color.fromCssColorString(node.style.color), ground = node.geometry.heightMode === 'ground'
     const selected = this.selected.has(node.id), stroke = selected ? Color.fromCssColorString('#3984d7') : color
     const label = resolveGraphicLabel(node)
-    this.source.entities.removeById(node.id)
+    const nativeId = this.nativeIds.get(node.id) ?? `${this.nativePrefix}${node.id}`
+    this.nativeIds.set(node.id, nativeId); this.source.entities.removeById(nativeId)
     this.source.entities.add({
-      id: node.id, name: node.name, show: node.visible, properties: { name: node.name, ...node.properties }, position: positions[0],
+      id: nativeId, name: node.name, show: this.show && node.visible, properties: { name: node.name, ...node.properties }, position: positions[0],
       point: node.geometry.type === 'point' ? { pixelSize: node.style.pointSize, color, outlineColor: stroke, outlineWidth: selected ? 3 : 0, heightReference: ground ? HeightReference.CLAMP_TO_GROUND : HeightReference.NONE, disableDepthTestDistance: Number.POSITIVE_INFINITY } : undefined,
       polyline: node.geometry.type !== 'point' ? { positions: node.geometry.type === 'polygon' ? [...positions,positions[0]] : positions, width: selected ? Math.max(node.style.width, 4) : node.style.width, material: stroke, clampToGround: ground } : undefined,
       polygon: node.geometry.type === 'polygon' ? { hierarchy: new PolygonHierarchy(positions), material: color.withAlpha(color.alpha * .35), perPositionHeight: !ground } : undefined,
