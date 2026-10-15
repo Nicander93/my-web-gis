@@ -29,6 +29,7 @@ interface Drag {
 /** Ray/plane-constrained transform handles for both tilesets and glTF models. */
 export class TilesetEditor {
   private layer?: TransformLayer
+  private handleOffset = new Cartesian3()
   private handles: Entity[] = []
   private readonly axes = new Map<Entity, Axis>()
   private readonly handler: ScreenSpaceEventHandler
@@ -56,6 +57,9 @@ export class TilesetEditor {
     this.stopEditing()
     if (!layer.pivot || !layer.boundingSphere) throw new Error('请等待模型加载完成后再编辑')
     this.layer = layer
+    const frame = Transforms.eastNorthUpToFixedFrame(layer.pivot)
+    const anchor = Matrix4.multiplyByPoint(frame, Cartesian3.fromArray(layer.getTransform().translation), new Cartesian3())
+    this.handleOffset = Cartesian3.subtract(layer.boundingSphere.center, anchor, new Cartesian3())
     this.drawHandles()
   }
   setMode(mode: EditMode): void { this.cancel(); this.mode = mode; this.drawHandles() }
@@ -101,7 +105,10 @@ export class TilesetEditor {
   private getFrame(): { origin: Cartesian3; basis: Cartesian3[] } | undefined {
     if (!this.layer?.pivot) return
     const frame = Transforms.eastNorthUpToFixedFrame(this.layer.pivot)
+    // Imported models commonly anchor at ground level. Put translation handles at
+    // their visible center so the model or globe cannot bury the entire control.
     const origin = Matrix4.multiplyByPoint(frame, Cartesian3.fromArray(this.layer.getTransform().translation), new Cartesian3())
+    if (this.mode === 'translate') Cartesian3.add(origin, this.handleOffset, origin)
     const rotation = Matrix3.fromQuaternion(Quaternion.fromHeadingPitchRoll(new HeadingPitchRoll(...this.layer.getTransform().rotation.map(CesiumMath.toRadians))))
     const basis = [Cartesian3.UNIT_X, Cartesian3.UNIT_Y, Cartesian3.UNIT_Z].map(axis => Matrix4.multiplyByPointAsVector(frame, this.mode === 'translate' ? axis : Matrix3.multiplyByVector(rotation, axis, new Cartesian3()), new Cartesian3()))
     return { origin, basis }
@@ -119,7 +126,7 @@ export class TilesetEditor {
       const pixelSize = canvas.clientWidth && canvas.clientHeight
         ? this.viewer.camera.getPixelSize(new BoundingSphere(origin, 1), canvas.clientWidth, canvas.clientHeight)
         : 0
-      const radius = pixelSize > 0 ? pixelSize * 100 : Math.max(10, this.layer?.boundingSphere?.radius ?? 30)
+      const radius = Math.max(pixelSize > 0 ? pixelSize * 100 : 10, (this.layer?.boundingSphere?.radius ?? 30) * 1.2)
       const result = Cartesian3.clone(origin)
       ;[x, y, z].forEach((value, i) => Cartesian3.add(result, Cartesian3.multiplyByScalar(basis[i], value * radius, new Cartesian3()), result))
       return result

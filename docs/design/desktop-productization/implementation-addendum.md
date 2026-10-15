@@ -83,7 +83,7 @@ A 完成不代表全部界面迁移完成。逐批记录剩余文件，不将 an
 - 已新增独立 `@desktop-webgis/cesium-measure` 包，完成空间距离、贴地距离、水平面积和带正负号高度差。贴地距离沿 WGS84 测地线按 30 m 加密，有地形可用性时采样真实地形，交互采样总数限制为 4096；面积在局部 ENU 平面计算，避免直接使用经纬度面积。
 - 测量完成后先挂载运行时专用临时 `GraphicLayer`，不修改 Project、Dirty 或历史；用户通过 Ant Design 结果卡选择“保留测量”后，结果才作为含测量元数据和 Popup 的独立 Graphic 写入项目。临时层在替换、清除、项目切换和 Runtime 销毁时确定性释放。
 - 四种测量在 1440×900、1024×680、1366×768、1920×1080 共 4 项浏览器 E2E 全部通过，覆盖临时隔离、清除、保留、Undo/Redo 和保存文件断言。证据见 `evidence/browser-scene3d-measurement-report.json`、`browser-scene3d-measurement-transient.png` 和 `browser-scene3d-measurement-retained.png`。
-- M8 计划内功能实现已闭环；验收矩阵 E08 仍因 Gizmo 真实指针拖动 E2E 保持“部分”，不由测量子项替代。
+- M8 计划内功能实现已闭环；验收矩阵 E08 已补齐 GLB 与 Tileset 的真实指针拖动浏览器验收，包含撤销、重做与 Esc 回滚。证据见 `evidence/browser-scene3d-gizmo-pointer-report.json`；原生控件和综合验收仍按各自矩阵签收。
 
 ## 7. 每批验证与最终 PR
 

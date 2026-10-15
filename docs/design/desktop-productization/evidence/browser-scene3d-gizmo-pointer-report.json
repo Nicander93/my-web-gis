@@ -1,0 +1,16 @@
+{
+  "date": "2026-10-15",
+  "scope": "E08 browser pointer editing",
+  "command": "pnpm --filter @desktop-webgis/desktop exec playwright test e2e/scene3d-gizmo-pointer.e2e.ts --project=desktop",
+  "result": "2 passed",
+  "checks": [
+    "Real sample 3D Tiles: mouse down/move/up commits translation",
+    "One undo restores original transform; redo restores committed transform",
+    "Escape during a second active pointer gesture restores original transform",
+    "Real GLB tower anchored at ground level: pointer drag commits translation and undo restores original transform"
+  ],
+  "implementation": "Translation handles use a stable offset from the geographic anchor to the bounding center; arrows extend beyond the object radius and follow live translation.",
+  "unitTests": "cesium-tileset-edit: 8 passed",
+  "build": "cesium-tileset-edit and Desktop passed",
+  "limitations": "Browser evidence; this run does not certify native desktop input, Windows scaling, or physical GPU behavior. Rotation, scale and plane constraints are covered by unit tests rather than this pointer suite."
+}
