@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-15",
+  "scope": "E14 first 3D object-window batch; E14 remains partial",
+  "viewports": ["1440x900", "1366x768"],
+  "command": "pnpm --filter @desktop-webgis/desktop exec playwright test e2e/scene3d-property-window.e2e.ts --project=desktop --project=laptop",
+  "result": "2 passed",
+  "checks": [
+    "Unapplied name stays outside Project",
+    "Selecting Beta leaves the Alpha property window bound to Alpha",
+    "Apply changes only Alpha; Cancel discards the next draft while retaining applied values",
+    "One Undo restores Alpha",
+    "Pinned inspector edits Alpha while Beta is selected, preserves unapplied style inputs, and unpin follows Beta",
+    "Concurrent quick-inspector edit rejects a stale window draft",
+    "Reload refreshes the draft to the current object revision",
+    "Structured attribute rows reject an empty field name",
+    "Data attributes and popup definitions commit with OK; OK closes the window"
+  ],
+  "unitTests": "Desktop: 274 passed, 5 skipped; includes object revision, deletion and inherited locking checks",
+  "build": "Desktop passed",
+  "remaining": [
+    "2D layer and folder property windows",
+    "Full specialized field coverage, resource edits and clipping/flattening category",
+    "Runtime preview and rollback",
+    "Native desktop, compact/wide viewports and Windows scaling acceptance"
+  ]
+}
