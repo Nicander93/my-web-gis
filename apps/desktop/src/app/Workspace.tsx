@@ -12,6 +12,7 @@ import { layerCommands } from './commands/layer.commands'
 import { useProjectStore } from '@/stores/project.store'
 import { AttributeTableHost } from '@/features/attribute-table/AttributeTableHost'
 import { Inspector } from '@/features/inspector/Inspector'
+import { LayerPropertyWindowHost } from '@/features/inspector/LayerPropertyWindow'
 import { LayerPanel } from '@/features/layers/LayerPanel'
 import { MapCanvas } from '@/features/map/MapCanvas'
 import { useWorkspaceStore } from '@/stores/workspace.store'
@@ -168,6 +169,7 @@ export function Workspace({
       <BottomPanel>
         <AttributeTableHost />
       </BottomPanel>
+      <LayerPropertyWindowHost />
     </main>
   )
 }

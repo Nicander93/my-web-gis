@@ -43,6 +43,7 @@ import { useSceneRenderPreferences } from './SceneRenderSettings'
 import { SceneInfo } from './ScenePropertyGroup'
 import { ScenePropertyWindow } from './ScenePropertyWindow'
 import { applyScenePropertyDraft } from './scene-property-session'
+import { FolderPropertyWindow } from '@/features/inspector/FolderPropertyWindow'
 import { Button } from '@/components/ui/Button'
 import 'cesium/Build/Cesium/Widgets/widgets.css'
 import './scene3d-editor.css'
@@ -101,6 +102,7 @@ export function SceneWorkspace() {
   const [inspectorSection, setInspectorSection] = useState<SceneInspectorSection>('object')
   const [measurement, setMeasurement] = useState<MeasurementDraft | null>(null)
   const [propertyTarget, setPropertyTarget] = useState<{ node: CesiumSceneNode; epoch: number } | null>(null)
+  const [folderPropertyTarget, setFolderPropertyTarget] = useState<{ id: string; epoch: number } | null>(null)
   const [pinnedTarget, setPinnedTarget] = useState<{ id: string; epoch: number; properties: Record<string, unknown> } | null>(null)
 
   const selectedNodes = scene.nodes.filter(candidate => selectedIds.includes(candidate.id))
@@ -507,6 +509,7 @@ export function SceneWorkspace() {
       <div className="scene3d-context-title">{group?.name ?? (liveIds.length > 1 ? `${liveIds.length} 个对象` : node?.name)}</div>
       <MenuItem icon={Table2} label="对象属性" onClick={() => { showProperties('object'); setContext(null) }} />
       {definition && <MenuItem icon={Maximize2} label="完整属性" onClick={() => { drawing.cancel(); stopEditing(); setPropertyTarget({ node: structuredClone(definition), epoch: projectEpoch }); setContext(null) }} />}
+      {group && <MenuItem icon={Maximize2} label="完整属性" onClick={() => { drawing.cancel(); stopEditing(); setFolderPropertyTarget({ id: group.id, epoch: projectEpoch }); setContext(null) }} />}
       {node && <>
         <MenuItem icon={LocateFixed} label="定位" disabled={states[node.id]?.state !== 'ready'} onClick={() => { locate(node.id); setContext(null) }} />
         {(node.type === 'graphic' || node.type === 'geojson') && <MenuItem icon={Palette} label="样式与标注" onClick={() => { showProperties('style'); setContext(null) }} />}
@@ -517,6 +520,7 @@ export function SceneWorkspace() {
       {(node || group) && <MenuItem icon={SlidersHorizontal} label="重命名" disabled={!!group?.locked || hasLocked} onClick={() => { setRenameDraft(node?.name ?? group?.name ?? ''); setRenaming(true); setContext(null) }} />}
       {!!liveIds.length && <><MenuItem icon={Copy} label="复制" onClick={() => { copyNode(); setContext(null) }} /><MenuItem icon={LockKeyhole} label={allLocked ? '解锁' : '锁定'} disabled={allLocked && !!inheritedLock} onClick={() => { toggleLock(); setContext(null) }} /><MenuItem icon={Download} label="导出对象" onClick={() => { void exportObjects(); setContext(null) }} /><MenuItem icon={Trash2} label="删除" disabled={hasLocked} onClick={() => { setDeleting(true); setContext(null) }} /></>}
     </LayerPopupMenu>}
+    {folderPropertyTarget && folderPropertyTarget.epoch === projectEpoch && <FolderPropertyWindow key={`${folderPropertyTarget.epoch}:${folderPropertyTarget.id}`} scene3d id={folderPropertyTarget.id} onClose={() => setFolderPropertyTarget(null)} />}
     {propertyTarget && propertyTarget.epoch === projectEpoch && <ScenePropertyWindow key={`${propertyTarget.epoch}:${propertyTarget.node.id}`} initial={propertyTarget.node} scene={scene} onClose={() => setPropertyTarget(null)} onApply={(base, draft) => {
       if (useProjectStore.getState().projectEpoch !== propertyTarget.epoch) throw new Error('项目已切换，请重新打开属性窗口。')
       drawing.cancel(); stopEditing()

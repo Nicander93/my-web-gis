@@ -4,8 +4,9 @@ import { Alert, Button, Input, InputNumber, Menu, Select, Switch } from 'antd'
 import { X } from 'lucide-react'
 import { attributeRows, parseAttributeRows } from './graphic-attributes'
 import type { AttributeRow, AttributeType } from './graphic-attributes'
+import { TilesetEffectsDraft } from './TilesetEffectsDraft'
 import type { CesiumScene, CesiumSceneNode, GeoPosition } from '@desktop-webgis/cesium-scene-schema'
-import './scene-property-window.css'
+import '@/components/ui/property-window.css'
 
 interface Props {
   initial: CesiumSceneNode
@@ -38,7 +39,7 @@ export function ScenePropertyWindow({ initial, scene, onApply, onClose }: Props)
     const height = event.currentTarget.parentElement?.getBoundingClientRect().height ?? 560
     setOffset({ x: Math.max(-window.innerWidth / 2 + 180, Math.min(window.innerWidth / 2 - 180, drag.current.left + event.clientX - drag.current.x)), y: Math.max(0, Math.min(Math.max(0, window.innerHeight - height - 161), drag.current.top + event.clientY - drag.current.y)) })
   }
-  const categories = [{ key: 'object', label: '常规与位置' }, { key: 'style', label: '样式与参数' }, { key: 'properties', label: '数据属性' }, { key: 'popup', label: '属性弹窗' }, { key: 'source', label: '数据源' }]
+  const categories = [{ key: 'object', label: '常规与位置' }, { key: 'style', label: '样式与参数' }, ...(draft.type === '3dtiles' ? [{ key: 'effects', label: '裁剪与压平' }] : []), { key: 'properties', label: '数据属性' }, { key: 'popup', label: '属性弹窗' }, { key: 'source', label: '数据源' }]
   function field(label: string, alias: string, control: ReactNode) {
     if (query && !`${label} ${alias}`.toLowerCase().includes(query.toLowerCase())) return null
     return <label className="scene-property-window__field"><span>{label}<small>{alias}</small></span>{control}</label>
@@ -99,6 +100,7 @@ export function ScenePropertyWindow({ initial, scene, onApply, onClose }: Props)
           <Button onClick={() => patch({ popup: { ...draft.popup, fields: [...(draft.popup?.fields ?? []), { field: 'name', label: '名称' }] } })}>添加弹窗字段</Button>
         </>}
         {section === 'source' && <p>{'asset' in draft ? scene.assets[draft.asset]?.url ?? JSON.stringify(scene.assets[draft.asset]?.reference) : '独立标绘对象，不依赖外部资源。'}</p>}
+        {section === 'effects' && draft.type === '3dtiles' && <TilesetEffectsDraft node={draft} onChange={effects => patch({ effects })} />}
       </div>
     </div>
     <footer><Button disabled={!current} onClick={() => { if (current) { setBase(structuredClone(current)); setDraft(structuredClone(current)); setError(''); setInvalid({}); setRevision(value => value + 1) } }}>重新载入</Button><span /><Button onClick={onClose}>取消</Button><Button disabled={!current || !dirty || Object.values(invalid).some(Boolean)} onClick={() => apply()}>应用</Button><Button type="primary" disabled={!current || Object.values(invalid).some(Boolean)} onClick={() => dirty ? apply(true) : onClose()}>确定</Button></footer>

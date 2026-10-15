@@ -16,6 +16,7 @@ import {
 import { LayerPopupMenu } from './LayerPopupMenu'
 import { MenuItem } from '@/app/header/menus/MenuItem'
 import { MenuSeparator } from '@/app/header/menus/MenuSeparator'
+import { openPropertyWindow } from '@/features/inspector/property-window-request'
 import {
   getLayerCapabilities,
   layerCommands
@@ -64,6 +65,7 @@ export function LayerContextMenu({
         label="图层属性"
         onClick={() => run(() => layerCommands.properties(layerId))}
       />
+      <MenuItem icon={SlidersHorizontal} label="完整属性" onClick={() => run(() => openPropertyWindow({ kind: 'layer', id: layerId }))} />
       <MenuItem
         icon={Pencil}
         label="样式"

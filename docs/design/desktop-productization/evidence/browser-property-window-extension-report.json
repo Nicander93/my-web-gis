@@ -1,0 +1,23 @@
+{
+  "date": "2026-10-15",
+  "scope": "Ordered implementation item 1: 2D layer/folder windows and Tileset effects category",
+  "viewports": ["1440x900", "1366x768"],
+  "command": "pnpm --filter @desktop-webgis/desktop exec playwright test e2e/property-window-2d-folder.e2e.ts e2e/scene3d-property-window.e2e.ts --project=desktop --project=laptop",
+  "result": "8 passed",
+  "checks": [
+    "2D layer window remains bound while browsing a different layer",
+    "Unapplied name/opacity stay outside Project; Apply updates both in one history operation",
+    "Categorized style is retained exactly when general properties change",
+    "Cancel retains applied values and discards subsequent edits; one Undo restores prior values",
+    "2D folder edit retains member IDs and feature datasets; Undo restores folder settings",
+    "3D folder edit retains nodes; Apply/Cancel/Undo remain bound to its original ID",
+    "Real sample Tileset flatten range is drawn through the canvas before opening its effects category",
+    "Height and enable state stay in a draft until Apply, commit together and undo together",
+    "Previous object window, inspector pinning, dirty style preservation and concurrent-change rejection still pass"
+  ],
+  "desktopUnitTests": "274 passed; 5 skipped",
+  "desktopBuild": "passed",
+  "evidence": ["browser-property-layer-2d.png", "browser-property-folder-2d.png", "browser-property-folder-3d.png", "browser-property-tileset-effects.png"],
+  "remaining": ["Runtime previews and cancellation rollback", "Full specialized parameter coverage", "Native desktop and Windows scaling acceptance"],
+  "status": "E14 remains partial; browser evidence does not certify native desktop"
+}

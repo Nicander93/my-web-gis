@@ -19,6 +19,7 @@ import {
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/Button'
 import { useProjectStore } from '@/stores/project.store'
+import { openPropertyWindow } from '@/features/inspector/property-window-request'
 import { useSessionStore } from '@/stores/session.store'
 import {
   isLegacyStyle,
@@ -522,6 +523,7 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
           label="组菜单"
           onClose={() => setGroupMenu(null)}
         >
+          <MenuItem label="完整属性" onClick={() => { openPropertyWindow({ kind: 'folder', id: groupMenu.group.id }); setGroupMenu(null) }} />
           <MenuItem icon={FolderPlus} label="新建子文件夹" disabled={getLayerGroupState(tree, groupMenu.group.id).locked} onClick={() => { useProjectStore.getState().createGroup('新建文件夹', [], groupMenu.group.id); setGroupMenu(null) }} />
           <MenuItem icon={Pencil} label="重命名文件夹" disabled={getLayerGroupState(tree, groupMenu.group.id).locked} onClick={() => { setRenamingGroup(groupMenu.group); setRenameValue(groupMenu.group.name); setGroupMenu(null) }} />
           <MenuItem icon={LockKeyhole} label={groupMenu.group.locked ? '解锁文件夹' : '锁定文件夹'} disabled={getLayerGroupState(tree, groupMenu.group.parentId).locked} onClick={() => { useProjectStore.getState().setGroupLocked(groupMenu.group.id, !groupMenu.group.locked); setGroupMenu(null) }} />
