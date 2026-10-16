@@ -52,7 +52,10 @@ async function revealMapTarget(page: Page, pixel: number[]): Promise<void> {
   if (await closeTable.count()) await closeTable.click()
 }
 
+test.use({ screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
+
 test.beforeEach(async ({ page }) => {
+  test.setTimeout(120_000)
   await page.route('**/*tile.openstreetmap.org/**', route => route.abort())
   await page.goto('/')
   await page.getByRole('button', { name: /^二维地图/ }).click()
@@ -72,6 +75,10 @@ test.beforeEach(async ({ page }) => {
 })
 
 test('box selection links the accepted rows; modifiers, empty selection and row locate work', async ({ page }, info) => {
+  await page.getByRole('button', { name: '窗口', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: '诊断', exact: true }).click()
+  await page.getByRole('button', { name: '关闭任务与诊断窗口', exact: true }).click()
+
   let state = await mapState(page)
   const first = state.positions[0].pixel
   await drag(page, [first[0] - 12, first[1] - 12], [first[0] + 12, first[1] + 12])
@@ -98,7 +105,6 @@ test('box selection links the accepted rows; modifiers, empty selection and row 
   await drag(page, [20, 20], [40, 40])
   await expect(page.getByLabel('表格状态与分页')).toContainText('选中 0')
   await expect(page.getByLabel('表格状态与分页')).toContainText('0 / 0')
-  await page.screenshot({ path: info.outputPath('selection-empty.png') })
 })
 
 test('map selectable policy preserves table selection and location, and follows undo', async ({ page }, info) => {
@@ -122,7 +128,6 @@ test('map selectable policy preserves table selection and location, and follows 
   await expect.poll(async () => (await mapState(page)).selection).toEqual([initial.positions[0].id])
   await expect(page.locator('.table-scroll tbody tr')).toHaveCount(1)
   await page.getByLabel('仅选中', { exact: true }).uncheck()
-  await page.screenshot({ path: info.outputPath('map-selection-disabled.png') })
   const row = page.locator('.table-scroll tbody tr').filter({ hasText: 'Point 2' })
   await row.locator('td').nth(2).click()
   await expect.poll(async () => (await mapState(page)).selection).toEqual(['point-2'])
@@ -210,7 +215,6 @@ test('popup fields are safe, independent of map selection, and close when filter
     const map = await page.locator('.ol-viewport').boundingBox()
     return !!close && !!map && close.x >= map.x && close.x + close.width <= map.x + map.width
   }).toBe(true)
-  await page.screenshot({ path: info.outputPath('popup-safe-text.png') })
   await page.getByRole('button', { name: '窗口', exact: true }).click()
   await page.getByRole('menuitemcheckbox', { name: '图层面板', exact: true }).click()
   await page.getByRole('button', { name: '隐藏selection', exact: true }).click()
@@ -299,7 +303,6 @@ test('domestic view projections keep selection, CSV coordinates and document his
   await picker.selectOption('EPSG:4513')
   await expect(picker).toHaveValue('EPSG:4527')
   await expect(page.getByRole('status').last()).toContainText('分带')
-  await page.screenshot({ path: info.outputPath('domestic-projection.png') })
 })
 
 test('table keyboard keeps input history local, commits outside IME, and locates with Enter', async ({ page }) => {

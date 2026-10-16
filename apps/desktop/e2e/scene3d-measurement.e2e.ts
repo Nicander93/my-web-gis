@@ -21,6 +21,8 @@ async function projectDirty(page: Page): Promise<boolean> {
   return page.evaluate(async () => (await import('/src/stores/project.store.ts')).useProjectStore.getState().dirty)
 }
 
+test.use({ screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
+
 test.beforeEach(async ({ page }) => {
   await page.route('**/*tile.openstreetmap.org/**', route => route.abort())
   await page.goto('/')
@@ -53,7 +55,6 @@ test('four measurement tools stay transient until retained and then support hist
   await expect(card.locator('output')).toHaveText(/m|km/)
   expect(await measurementCount(page)).toBe(0)
   expect(await projectDirty(page)).toBe(false)
-  await page.screenshot({ path: testInfo.outputPath('scene3d-measurement-transient.png') })
   await card.getByRole('button', { name: '保留测量', exact: true }).click()
   await expect(card).toHaveCount(0)
   expect(await measurementCount(page)).toBe(1)
@@ -73,5 +74,4 @@ test('four measurement tools stay transient until retained and then support hist
   expect(saved.project.city.nodes).toContainEqual(expect.objectContaining({
     type: 'graphic', name: '空间距离 1', properties: expect.objectContaining({ measurementKind: 'spatial-distance', measurementUnit: 'm' })
   }))
-  await page.screenshot({ path: testInfo.outputPath('scene3d-measurement-retained.png') })
 })

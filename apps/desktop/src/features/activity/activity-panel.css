@@ -4,8 +4,9 @@
 .activity-panel__detail pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; user-select: text; margin: 8px 0; }
 .activity-panel .ant-descriptions { margin-bottom: 8px; }
 .activity-panel .ant-btn-link { padding-inline: 0; }
-.activity-panel-tabs { height: 100%; min-height: 0; }
-.activity-panel-tabs > .ant-tabs-nav { margin-bottom: 0; padding-inline: 12px; }
-.activity-panel-tabs > .ant-tabs-content-holder { min-height: 0; overflow: hidden; }
-.activity-panel-tabs .ant-tabs-content, .activity-panel-tabs .ant-tabs-tabpane { height: 100%; }
-.activity-panel-tabs .ant-tabs-tabpane { overflow: auto; }
+.activity-panel-tabs { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.activity-panel-tabs > .ant-tabs-nav { margin-bottom: 0; padding-inline: 12px; flex-shrink: 0; }
+.activity-panel-tabs > .ant-tabs-body-holder { flex: 1; min-height: 0; overflow: hidden; position: relative; }
+.activity-panel-tabs > .ant-tabs-body-holder > .ant-tabs-body { position: absolute; inset: 0; }
+.activity-panel-tabs > .ant-tabs-body-holder > .ant-tabs-body > .ant-tabs-content { height: 100%; overflow: auto; }
+.activity-panel-tabs > .ant-tabs-body-holder > .ant-tabs-body > .ant-tabs-content:not(.ant-tabs-content-hidden) { display: flex; flex-direction: column; }

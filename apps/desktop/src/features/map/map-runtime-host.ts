@@ -1,3 +1,4 @@
+import { openActivityPanel } from '@/stores/activity-panel.store'
 import type {
   BasemapConfig,
   EditCommand,
@@ -386,7 +387,7 @@ export function setActiveEditTool(tool: EditTool): boolean {
         useSessionStore.getState().setAttributeTableState(state.layerId, {
           selectedOnly: true, searchQuery: '', currentPage: 1
         })
-        useWorkspaceStore.getState().setBottomOpen(true)
+        openActivityPanel('attributes')
       }
     })
     syncSelectionHighlight(useProjectStore.getState().selection)

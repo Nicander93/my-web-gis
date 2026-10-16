@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { BottomPanel } from '@/app/BottomPanel'
 import { useSceneTaskLog } from './useSceneTaskLog'
+import { applyGraphicGeometryEdit } from './graphic-edit-commit'
 import { ResourceRelocationDialog } from './ResourceRelocationDialog'
 import { applyResourceRelocation } from '@/services/resource-relocation'
 import { ArrowUpDown, Check, Copy, Download, Eye, FolderPlus, Globe, Layers2, LocateFixed, LockKeyhole, Maximize2, MessageSquare, MousePointer2, Move, MoveDown, Palette, PanelLeftClose, PanelRightClose, Plus, RefreshCw, RotateCw, Route, Ruler, Scissors, Search, Shapes, SlidersHorizontal, SquareDashed, Sun, Table2, Trash2, Waves } from 'lucide-react'
@@ -77,6 +78,7 @@ export function SceneWorkspace() {
   const propertyPreview = useRef<{ runtime: CesiumSceneRuntime; id: string } | null>(null)
   const documentSession = useRef<ReturnType<typeof createSceneDocumentSession> | undefined>(undefined)
   const resourceSession = useRef<ReturnType<typeof createLocalResourceSession> | undefined>(undefined)
+  const activeEditId = useRef<string | undefined>(undefined)
   const pendingFocus = useRef<string | undefined>(undefined)
   const pendingClip = useRef<{ nodeId: string; effectId?: string } | undefined>(undefined)
   const pendingFlatten = useRef<{ nodeId: string; effectId?: string } | undefined>(undefined)
@@ -139,9 +141,13 @@ export function SceneWorkspace() {
   function notify(text: string): void { setError(''); setStatus(text) }
   const graphicEditing = useSceneGraphicEditing(runtime.current, result => {
     const id = documentSession.current?.getHostNodeId(result.id)
-    if (result.changed && id) updateScene('编辑图形几何', scene => ({ ...scene, nodes: scene.nodes.map(item => item.id === id && item.type === 'graphic' ? { ...item, geometry: result.after } : item) }))
+    activeEditId.current = undefined
+    if (result.changed && id) {
+      try { updateScene('编辑图形几何', scene => applyGraphicGeometryEdit(scene, id, result.before, result.after)) }
+      catch (reason) { documentSession.current?.refresh(); throw reason }
+    }
     notify(result.changed ? '几何修改已应用，可一次撤销恢复' : '几何未发生变化')
-  }, report, () => notify('已取消几何编辑，原几何已恢复'))
+  }, report, () => notify('已取消几何编辑，原几何已恢复'), projectEpoch, () => useProjectStore.getState().projectEpoch)
 
   useEffect(() => {
     if (!target.current) return
@@ -193,8 +199,7 @@ export function SceneWorkspace() {
   useEffect(() => { runtime.current?.setSelected(preview ? [] : (JSON.parse(highlightKey) as string[]).flatMap(id => documentSession.current?.getRuntimeNodeId(id) ?? [])) }, [highlightKey, preview, ready, states])
   useEffect(() => {
     setSelectedIds([]); setSelectedGroup(null); anchor.current = null
-    measurementRevision.current++; setMeasurement(null)
-    void runtime.current?.setTransientGraphic().catch(report)
+    endToolSession()
   }, [project.id, projectEpoch])
 
   const drawing = useSceneDrawing(runtime.current, (graphic, kind, id) => {
@@ -248,7 +253,22 @@ export function SceneWorkspace() {
       })
       select(nextId); notify(id ? '水面边界已更新' : '水面已创建，可在属性面板调整材质')
     } catch (reason) { report(reason) }
-  }, report, () => notify('已取消绘制'))
+  }, report, () => notify('已取消绘制'), projectEpoch, () => useProjectStore.getState().projectEpoch)
+
+  useEffect(() => {
+    const id = activeEditId.current ?? pendingClip.current?.nodeId ?? pendingFlatten.current?.nodeId
+    if (!id) return
+    const target = scene.nodes.find(item => item.id === id)
+    const state = target && getCesiumSceneNodeState(scene, target)
+    if (!state || state.locked || !state.visible) {
+      endToolSession()
+      notify('编辑目标已删除、锁定或隐藏，已取消当前工具')
+    }
+  }, [scene.nodes, scene.groups])
+
+  useEffect(() => {
+    if (adding || renaming || deleting || creatingGroup) endToolSession()
+  }, [adding, renaming, deleting, creatingGroup])
 
   useEffect(() => { if (syncStatus === 'ready' && isContinuousDraw(drawing.kind)) drawing.resume() }, [syncStatus, scene.nodes.length])
 
@@ -256,13 +276,14 @@ export function SceneWorkspace() {
     const currentRuntime = runtime.current
     if (!currentRuntime) return
     const revision = ++measurementRevision.current
+    const isCurrent = () => revision === measurementRevision.current && currentRuntime === runtime.current && useProjectStore.getState().projectEpoch === projectEpoch
     try {
       const positions = graphic.geometry.positions
       const result = kind === 'spatial-distance' ? measureSpatialDistance(positions)
         : kind === 'ground-distance' ? await measureGroundDistance(positions, currentRuntime.viewer.scene)
         : kind === 'area' ? measureArea(positions)
         : measureHeightDifference(positions)
-      if (revision !== measurementRevision.current || currentRuntime !== runtime.current) return
+      if (!isCurrent()) return
       const name = `${drawLabels[kind]} ${scene.nodes.filter(item => item.type === 'graphic' && item.properties.measurementKind === kind).length + 1}`
       const measured: GraphicNode = {
         ...graphic,
@@ -273,14 +294,15 @@ export function SceneWorkspace() {
         popup: { title: name, fields: [{ field: 'measurementLabel', label: '测量结果' }, { field: 'name', label: '名称' }] }
       }
       await currentRuntime.setTransientGraphic(measured)
-      if (revision !== measurementRevision.current || currentRuntime !== runtime.current) return
+      if (!isCurrent()) return
       setMeasurement({ graphic: measured, result }); notify(`${drawLabels[kind]}完成；当前为临时结果`)
-    } catch (reason) { if (revision === measurementRevision.current) report(reason) }
+    } catch (reason) { if (isCurrent()) report(reason) }
   }
 
   function clearMeasurement(message?: string): void {
-    measurementRevision.current++; setMeasurement(null)
-    void runtime.current?.setTransientGraphic().catch(report)
+    const revision = ++measurementRevision.current, currentRuntime = runtime.current, epoch = useProjectStore.getState().projectEpoch
+    setMeasurement(null)
+    void currentRuntime?.setTransientGraphic().catch(reason => { if (revision === measurementRevision.current && currentRuntime === runtime.current && useProjectStore.getState().projectEpoch === epoch) report(reason) })
     if (message) notify(message)
   }
 
@@ -292,18 +314,23 @@ export function SceneWorkspace() {
     select(graphic.id); notify('测量结果已保留到项目，可撤销或保存')
   }
 
-  function stopEditing(): void { graphicEditing.cancel(); runtime.current?.stopEditing(); setEditing(null) }
+  function stopEditing(): void { activeEditId.current = undefined; graphicEditing.cancel(); runtime.current?.stopEditing(); setEditing(null) }
+  /** Switching tools discards transient results, including measurements still awaiting terrain. */
+  function endToolSession(): void {
+    drawing.cancel(); stopEditing(); clearMeasurement()
+    pendingClip.current = undefined; pendingFlatten.current = undefined
+  }
   function locate(id: string): void {
     const nativeId = documentSession.current?.getRuntimeNodeId(id)
     if (nativeId) void runtime.current?.flyTo(nativeId).catch(report)
   }
   function select(id: string, mode?: SceneSelectionMode, order = scene.nodes.map(node => node.id)): void {
-    drawing.cancel(); stopEditing(); setSelectedGroup(null)
+    endToolSession(); setSelectedGroup(null)
     setSelectedIds(selectSceneIds(liveIds, id, mode, order, anchor.current))
     if (mode !== 'range') anchor.current = id
     setPickedProperties({})
   }
-  function selectGroup(id: string): void { drawing.cancel(); stopEditing(); setSelectedIds([]); setSelectedGroup(id); setPickedProperties({}) }
+  function selectGroup(id: string): void { endToolSession(); setSelectedIds([]); setSelectedGroup(id); setPickedProperties({}) }
   handlePick.current = (id, properties, mode) => { if (id) { select(id, mode === 'range' ? 'add' : mode); setPickedProperties(properties ?? {}) } else { setSelectedIds([]); setSelectedGroup(null); setPickedProperties({}); anchor.current = null } }
   useEffect(() => {
     if ((inspectorSection === 'style' && inspectorNode?.type !== 'graphic' && inspectorNode?.type !== 'geojson') || (inspectorSection === 'source' && (!inspectorNode || inspectorNode.type === 'graphic' || inspectorNode.type === 'water'))) setInspectorSection('object')
@@ -314,40 +341,39 @@ export function SceneWorkspace() {
     setContext({ x, y })
   }
   function organize(action: () => void, message: string): void {
-    drawing.cancel(); stopEditing()
+    endToolSession()
     try { action(); notify(message) } catch (reason) { report(reason) }
   }
   function startEditing(mode: EditMode): void {
     if (!node || !canEdit || !runtime.current) return
-    drawing.cancel(); graphicEditing.cancel()
+    endToolSession()
     const id = documentSession.current?.getRuntimeNodeId(node.id)
     if (!id) return
-    try { runtime.current.startEditing(id, mode); setEditing(mode); notify('拖动彩色手柄调整模型；松手应用，Esc 取消当前拖动') } catch (reason) { report(reason) }
+    try { runtime.current.startEditing(id, mode); activeEditId.current = node.id; setEditing(mode); notify('拖动彩色手柄调整模型；松手应用，Esc 取消当前拖动') } catch (reason) { report(reason) }
   }
-  function startWater(id?: string): void { startDraw('water', id) }
+  function startWater(id?: string): void { startDraw('water', id); activeEditId.current = id }
   function startClip(effectId?: string, targetNode = node): void {
     if (!targetNode || targetNode.type !== '3dtiles' || targetNode.locked || !targetNode.visible || states[targetNode.id]?.state !== 'ready') return
-    pendingClip.current = { nodeId: targetNode.id, effectId }; startDraw('clip')
+    startDraw('clip'); pendingClip.current = { nodeId: targetNode.id, effectId }
   }
   function startFlatten(effectId?: string, targetNode = node): void {
     if (!targetNode || targetNode.type !== '3dtiles' || targetNode.locked || !targetNode.visible || states[targetNode.id]?.state !== 'ready') return
-    pendingFlatten.current = { nodeId: targetNode.id, effectId }; startDraw('flatten')
+    startDraw('flatten'); pendingFlatten.current = { nodeId: targetNode.id, effectId }
   }
   function startGraphicEditing(targetNode = node): void {
     if (!targetNode || targetNode.type !== 'graphic' || targetNode.locked || !targetNode.visible || states[targetNode.id]?.state !== 'ready') return
-    drawing.cancel(); stopEditing(); setInspectorTab('object'); useWorkspaceStore.getState().setRightOpen(true)
+    endToolSession(); setInspectorTab('object'); useWorkspaceStore.getState().setRightOpen(true)
     const id = documentSession.current?.getRuntimeNodeId(targetNode.id)
     if (!id) return
-    graphicEditing.start(id); notify('编辑顶点：拖动调整 · 白色中点插入 · Enter 应用 · Esc 取消')
+    activeEditId.current = targetNode.id; graphicEditing.start(id); notify('编辑顶点：拖动调整 · 白色中点插入 · Enter 应用 · Esc 取消')
   }
   function startDraw(kind: SceneDrawKind, id?: string): void {
     if (!ready) return
-    if (measurement) clearMeasurement()
-    stopEditing(); drawing.start(kind, id)
+    endToolSession(); drawing.start(kind, id)
     notify(drawInstruction(kind))
   }
   function history(redo = false): void {
-    drawing.cancel(); stopEditing()
+    endToolSession()
     const store = useProjectStore.getState()
     if (redo ? store.redoEdit() : store.undoEdit()) notify(redo ? '已重做' : '已撤销')
     else { const reason = store.getHistoryBlockReason(redo ? 'redo' : 'undo'); if (reason) notify(reason) }
@@ -361,7 +387,7 @@ export function SceneWorkspace() {
   }
   function patchInspectorNode(patch: Partial<CesiumSceneNode>, label = '修改三维对象'): void {
     if (!inspectorNode || inspectorNode.locked) return
-    drawing.cancel(); stopEditing()
+    endToolSession()
     updateScene(label, current => ({ ...current, nodes: current.nodes.map(item => item.id === inspectorNode.id ? { ...item, ...patch } as CesiumSceneNode : item) }))
     notify('对象属性已应用')
   }
@@ -375,7 +401,7 @@ export function SceneWorkspace() {
     if (!propertyTarget || propertyTarget.epoch !== useProjectStore.getState().projectEpoch) return
     const id = documentSession.current?.getRuntimeNodeId(propertyTarget.node.id)
     if (!id || !runtime.current) return
-    drawing.cancel(); stopEditing()
+    endToolSession()
     propertyPreview.current = { runtime: runtime.current, id }
     runtime.current.previewNode(id, draft)
   }
@@ -406,7 +432,7 @@ export function SceneWorkspace() {
   }
   function reload(targetNode = inspectorNode): void {
     if (!targetNode || !documentSession.current) return
-    drawing.cancel(); stopEditing()
+    endToolSession()
     notify('正在重新加载资源…'); documentSession.current.refresh()
   }
   function sample(): void {
@@ -423,9 +449,9 @@ export function SceneWorkspace() {
     const camera = runtime.current?.getCamera()
     if (camera) { updateScene('设置三维初始视角', scene => ({ ...scene, camera })); notify('初始视角已更新') }
   }
-  function showProperties(section: SceneInspectorSection): void { drawing.cancel(); stopEditing(); setInspectorSection(section); setInspectorTab('object'); useWorkspaceStore.getState().setRightOpen(true) }
-  function showScene(): void { drawing.cancel(); stopEditing(); setInspectorTab('scene'); useWorkspaceStore.getState().setRightOpen(true) }
-  function togglePreview(): void { setContext(null); drawing.cancel(); stopEditing(); if (measurement) clearMeasurement(); runtime.current?.setPreview(!preview); setPreview(!preview); notify(preview ? '已返回编辑模式' : '预览模式：单击对象查看属性弹窗') }
+  function showProperties(section: SceneInspectorSection): void { endToolSession(); setInspectorSection(section); setInspectorTab('object'); useWorkspaceStore.getState().setRightOpen(true) }
+  function showScene(): void { endToolSession(); setInspectorTab('scene'); useWorkspaceStore.getState().setRightOpen(true) }
+  function togglePreview(): void { setContext(null); endToolSession(); runtime.current?.setPreview(!preview); setPreview(!preview); notify(preview ? '已返回编辑模式' : '预览模式：单击对象查看属性弹窗') }
   function copyNode(): void {
     organize(() => { const ids = copySceneNodes(liveIds); setSelectedIds(ids); setSelectedGroup(null); setPickedProperties({}) }, '所选对象已复制，可撤销恢复')
   }
@@ -437,7 +463,7 @@ export function SceneWorkspace() {
   const command = (id: string, label: string, icon: LucideIcon, execute: () => void, disabled?: string, active?: boolean): SceneRibbonCommand => ({ id, label, icon, execute, disabled, active })
   const commands = [
     command('add', '添加数据', Plus, () => setAdding(true)),
-    command('select', '选择', MousePointer2, () => { drawing.cancel(); stopEditing(); notify('选择对象') }, undefined, !editing && !drawing.drawing && !graphicEditing.active),
+    command('select', '选择', MousePointer2, () => { endToolSession(); notify('选择对象') }, undefined, !editing && !drawing.drawing && !graphicEditing.active),
     command('point', '绘制点', MousePointer2, () => startDraw('point'), ready ? undefined : '场景尚未就绪', drawing.kind === 'point'),
     command('billboard', '放置图标', LocateFixed, () => startDraw('billboard'), ready ? undefined : '场景尚未就绪', drawing.kind === 'billboard'),
     command('line', '绘制线', Move, () => startDraw('polyline'), ready ? undefined : '场景尚未就绪', drawing.kind === 'polyline'),
@@ -487,7 +513,7 @@ export function SceneWorkspace() {
     function onHistory(event: KeyboardEvent): void {
       if (event.defaultPrevented || event.isComposing) return
       if (event.target instanceof HTMLElement && (event.target.closest('[role="dialog"]') || event.target.closest('input,textarea,select,[contenteditable="true"],[role="menu"]'))) return
-      if (event.key === 'Escape') { if (preview) togglePreview(); else { drawing.cancel(); stopEditing(); notify('已退出当前工具') }; return }
+      if (event.key === 'Escape') { if (preview) togglePreview(); else { endToolSession(); notify('已退出当前工具') }; return }
       if (preview) return
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') { event.preventDefault(); handleAction.current('redo') }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); handleAction.current(event.shiftKey ? 'redo' : 'undo') }
@@ -531,7 +557,7 @@ export function SceneWorkspace() {
       {!preview && <RightPanel showHeader={false}>
         <header className="scene3d-inspector-header"><span>属性</span><Button size="small" aria-pressed={!!pinned} disabled={!pinned && !node} onClick={() => setPinnedTarget(pinned ? null : node ? { id: node.id, epoch: projectEpoch, properties: structuredClone(pickedProperties) } : null)}>{pinned ? '取消固定' : '固定检查器'}</Button><div className="scene3d-inspector-tabs" role="tablist" aria-label="属性范围"><button role="tab" aria-selected={inspectorTab === 'object'} onClick={() => setInspectorTab('object')}>对象</button><button role="tab" aria-selected={inspectorTab === 'scene'} onClick={() => setInspectorTab('scene')}>场景</button></div><button className="scene3d-inspector-close" aria-label="收起检查器" onClick={() => useWorkspaceStore.getState().setRightOpen(false)}><PanelRightClose size={14} aria-hidden="true" /></button></header>
         <div key={JSON.stringify([inspectorTab, inspectorSection, pinned ?? selectedGroup, pinned ?? liveIds, !!graphicEditing.state])} className="scene3d-panel__scroll" role="tabpanel" aria-label={inspectorTab === 'object' ? '对象属性' : '场景设置'}>
-          {inspectorTab === 'scene' ? <SceneSettings scene={scene} onSaveCamera={saveCamera} onApply={patch => { stopEditing(); updateScene('设置场景环境', scene => ({ ...scene, ...patch })); notify('场景设置已应用') }} /> : graphicEditing.state ? <GraphicVertexInspector state={graphicEditing.state} onSelect={graphicEditing.selectVertex} onPosition={graphicEditing.setPosition} onInsert={graphicEditing.insertVertex} onRemove={graphicEditing.removeVertex} /> : !pinned && group ? <SceneGroupInspector key={JSON.stringify(group)} scene={scene} group={group} onPatch={patch => organize(() => patchSceneGroup(group.id, patch), '分组设置已应用')} onSelectMembers={() => { const ids = getCesiumSceneDescendantIds(scene, group.id); setSelectedGroup(null); setSelectedIds(ids); anchor.current = ids[0] ?? null }} onDissolve={() => organize(() => { dissolveSceneGroup(group.id); setSelectedGroup(null) }, '分组已解散，对象保留，可撤销恢复')} onMove={parentId => organize(() => moveSceneFolder(group.id, parentId), '父文件夹已更新')} onReorder={direction => organize(() => reorderSceneFolder(group.id, direction), '文件夹顺序已更新')} /> : !pinned && liveIds.length > 1 ? <SceneBatchInspector scene={scene} nodes={selectedNodes} onVisible={visible => organize(() => setSceneNodesVisible(liveIds, visible), '批量显隐已应用')} onLock={locked => organize(() => setSceneNodesLocked(liveIds, locked), '批量锁定已应用')} onMove={id => organize(() => moveSceneSelection(liveIds, id), '对象分组已更新')} onCopy={copyNode} onDelete={() => setDeleting(true)} /> : inspectorNode ? <SceneInspector groups={scene.groups} onMoveGroup={id => organize(() => moveSceneSelection([inspectorNode.id], id), '对象分组已更新')} pickedProperties={pinned ? pinnedTarget?.properties : pickedProperties} section={inspectorSection} node={inspectorNode} onRelocate={('asset' in inspectorNode && inspectorAsset?.reference && inspectorAsset.reference.kind !== 'url') ? () => { drawing.cancel(); stopEditing(); setRelocation({ assetId: inspectorNode.asset, scene: structuredClone(scene), epoch: projectEpoch }) } : undefined} assetUrl={inspectorSource} error={states[inspectorNode.id]?.error} onPatch={patchInspectorNode} onReload={reload} onResource={url => { if (inspectorNode.type === 'water' || inspectorNode.type === 'graphic') return; updateScene('更新三维资源地址', scene => ({ ...scene, assets: { ...scene.assets, ...('asset' in inspectorNode ? { [inspectorNode.asset]: { ...scene.assets[inspectorNode.asset], reference: undefined, url } } : {}) } })); notify('资源地址已更新，正在加载…') }} onDrawBoundary={() => startWater(inspectorNode.id)} onDrawClip={effectId => startClip(effectId, inspectorNode)} onDrawFlatten={effectId => startFlatten(effectId, inspectorNode)} onEditGeometry={() => startGraphicEditing(inspectorNode)} geometryDisabled={inspectorNode.locked || !inspectorNode.visible} onDelete={() => { setSelectedIds([inspectorNode.id]); setSelectedGroup(null); setDeleting(true) }} /> : <div className="scene3d-empty"><MousePointer2 size={24} aria-hidden="true" /><strong>选择一个对象</strong><p>在视图中单击模型，或在左侧对象列表中选择。</p><button className="scene3d-text-action" onClick={() => setInspectorTab('scene')}>编辑场景环境</button></div>}
+          {inspectorTab === 'scene' ? <SceneSettings scene={scene} onSaveCamera={saveCamera} onApply={patch => { stopEditing(); updateScene('设置场景环境', scene => ({ ...scene, ...patch })); notify('场景设置已应用') }} /> : graphicEditing.state ? <GraphicVertexInspector state={graphicEditing.state} onSelect={graphicEditing.selectVertex} onPosition={graphicEditing.setPosition} onInsert={graphicEditing.insertVertex} onRemove={graphicEditing.removeVertex} /> : !pinned && group ? <SceneGroupInspector key={JSON.stringify(group)} scene={scene} group={group} onPatch={patch => organize(() => patchSceneGroup(group.id, patch), '分组设置已应用')} onSelectMembers={() => { const ids = getCesiumSceneDescendantIds(scene, group.id); setSelectedGroup(null); setSelectedIds(ids); anchor.current = ids[0] ?? null }} onDissolve={() => organize(() => { dissolveSceneGroup(group.id); setSelectedGroup(null) }, '分组已解散，对象保留，可撤销恢复')} onMove={parentId => organize(() => moveSceneFolder(group.id, parentId), '父文件夹已更新')} onReorder={direction => organize(() => reorderSceneFolder(group.id, direction), '文件夹顺序已更新')} /> : !pinned && liveIds.length > 1 ? <SceneBatchInspector scene={scene} nodes={selectedNodes} onVisible={visible => organize(() => setSceneNodesVisible(liveIds, visible), '批量显隐已应用')} onLock={locked => organize(() => setSceneNodesLocked(liveIds, locked), '批量锁定已应用')} onMove={id => organize(() => moveSceneSelection(liveIds, id), '对象分组已更新')} onCopy={copyNode} onDelete={() => setDeleting(true)} /> : inspectorNode ? <SceneInspector groups={scene.groups} onMoveGroup={id => organize(() => moveSceneSelection([inspectorNode.id], id), '对象分组已更新')} pickedProperties={pinned ? pinnedTarget?.properties : pickedProperties} section={inspectorSection} node={inspectorNode} onRelocate={('asset' in inspectorNode && inspectorAsset?.reference && inspectorAsset.reference.kind !== 'url') ? () => { endToolSession(); setRelocation({ assetId: inspectorNode.asset, scene: structuredClone(scene), epoch: projectEpoch }) } : undefined} assetUrl={inspectorSource} error={states[inspectorNode.id]?.error} onPatch={patchInspectorNode} onReload={reload} onResource={url => { if (inspectorNode.type === 'water' || inspectorNode.type === 'graphic') return; updateScene('更新三维资源地址', scene => ({ ...scene, assets: { ...scene.assets, ...('asset' in inspectorNode ? { [inspectorNode.asset]: { ...scene.assets[inspectorNode.asset], reference: undefined, url } } : {}) } })); notify('资源地址已更新，正在加载…') }} onDrawBoundary={() => startWater(inspectorNode.id)} onDrawClip={effectId => startClip(effectId, inspectorNode)} onDrawFlatten={effectId => startFlatten(effectId, inspectorNode)} onEditGeometry={() => startGraphicEditing(inspectorNode)} geometryDisabled={inspectorNode.locked || !inspectorNode.visible} onDelete={() => { setSelectedIds([inspectorNode.id]); setSelectedGroup(null); setDeleting(true) }} /> : <div className="scene3d-empty"><MousePointer2 size={24} aria-hidden="true" /><strong>选择一个对象</strong><p>在视图中单击模型，或在左侧对象列表中选择。</p><button className="scene3d-text-action" onClick={() => setInspectorTab('scene')}>编辑场景环境</button></div>}
         </div>
       </RightPanel>}
       {!preview && <BottomPanel sceneStates={states} onSelectResource={id => { select(id); showProperties('source') }} />}
@@ -540,8 +566,8 @@ export function SceneWorkspace() {
     {context && <LayerPopupMenu x={context.x} y={context.y} label="对象菜单" onClose={() => setContext(null)}>
       <div className="scene3d-context-title">{group?.name ?? (liveIds.length > 1 ? `${liveIds.length} 个对象` : node?.name)}</div>
       <MenuItem icon={Table2} label="对象属性" onClick={() => { showProperties('object'); setContext(null) }} />
-      {definition && <MenuItem icon={Maximize2} label="完整属性" onClick={() => { drawing.cancel(); stopEditing(); setPropertyTarget({ node: structuredClone(definition), epoch: projectEpoch }); setContext(null) }} />}
-      {group && <MenuItem icon={Maximize2} label="完整属性" onClick={() => { drawing.cancel(); stopEditing(); setFolderPropertyTarget({ id: group.id, epoch: projectEpoch }); setContext(null) }} />}
+      {definition && <MenuItem icon={Maximize2} label="完整属性" onClick={() => { endToolSession(); setPropertyTarget({ node: structuredClone(definition), epoch: projectEpoch }); setContext(null) }} />}
+      {group && <MenuItem icon={Maximize2} label="完整属性" onClick={() => { endToolSession(); setFolderPropertyTarget({ id: group.id, epoch: projectEpoch }); setContext(null) }} />}
       {node && <>
         <MenuItem icon={LocateFixed} label="定位" disabled={states[node.id]?.state !== 'ready'} onClick={() => { locate(node.id); setContext(null) }} />
         {(node.type === 'graphic' || node.type === 'geojson') && <MenuItem icon={Palette} label="样式与标注" onClick={() => { showProperties('style'); setContext(null) }} />}
@@ -559,19 +585,19 @@ export function SceneWorkspace() {
       if (!current) throw new Error('场景已关闭')
       const next = applyResourceRelocation(current, changes)
       resourceSession.current?.authorizeDirectory(directory ? normalizeLocalResourcePath(target) : localProjectDirectory(target))
-      drawing.cancel(); stopEditing()
+      endToolSession()
       updateScene('重新定位本地资源', () => next)
       notify('资源引用已更新，正在重新加载；可撤销恢复')
     }} />}
     {propertyTarget && propertyTarget.epoch === projectEpoch && <ScenePropertyWindow key={`${propertyTarget.epoch}:${propertyTarget.node.id}`} initial={propertyTarget.node} scene={scene} previewReady={syncStatus === 'ready'} onPreview={previewPropertyNode} onClose={() => setPropertyTarget(null)} onApply={(base, draft) => {
       if (useProjectStore.getState().projectEpoch !== propertyTarget.epoch) throw new Error('项目已切换，请重新打开属性窗口。')
-      drawing.cancel(); stopEditing()
+      endToolSession()
       updateScene('应用完整对象属性', current => applyScenePropertyDraft(current, base, draft))
       notify('完整属性已应用，可撤销恢复')
     }} />}
     {renaming && <EditorDialog title="重命名" onClose={() => setRenaming(false)}><div className="dialog-body"><label className="editor-field">名称<input autoFocus value={renameDraft} onChange={event => setRenameDraft(event.target.value)} /></label></div><footer className="dialog-footer"><button className="button-secondary" onClick={() => setRenaming(false)}>取消</button><button className="button-primary" disabled={!renameDraft.trim()} onClick={() => { if (group) organize(() => patchSceneGroup(group.id, { name:renameDraft.trim() }), '已重命名分组'); else patchNode({ name:renameDraft.trim() }); setRenaming(false) }}>应用</button></footer></EditorDialog>}
     {adding && <SceneResourceDialog onClose={() => setAdding(false)} onAdd={add} onChooseLocal={isTauri() ? chooseLocalResource : undefined} />}
-    {creatingGroup && <SceneCreateGroupDialog count={liveIds.length} locked={hasLocked} onClose={() => setCreatingGroup(false)} onCreate={(name, include) => { drawing.cancel(); stopEditing(); const id = addSceneGroup(name, include ? liveIds : [], selectedGroup ?? undefined); selectGroup(id); notify('分组已创建，可撤销恢复') }} />}
+    {creatingGroup && <SceneCreateGroupDialog count={liveIds.length} locked={hasLocked} onClose={() => setCreatingGroup(false)} onCreate={(name, include) => { endToolSession(); const id = addSceneGroup(name, include ? liveIds : [], selectedGroup ?? undefined); selectGroup(id); notify('分组已创建，可撤销恢复') }} />}
     {deleting && liveIds.length > 0 && !hasLocked && <EditorDialog title="删除对象" onClose={() => setDeleting(false)}><div className="dialog-body"><p>{liveIds.length === 1 ? `删除「${node?.name}」？` : `删除选中的 ${liveIds.length} 个对象？`}删除后可通过一次撤销全部恢复。</p></div><footer className="dialog-footer"><button className="button-secondary" onClick={() => setDeleting(false)}>取消</button><button className="button-danger" onClick={() => organize(() => { deleteSceneNodes(liveIds); setSelectedIds([]); setDeleting(false) }, '所选对象已删除，可撤销恢复')}>删除对象</button></footer></EditorDialog>}
   </main>
 }

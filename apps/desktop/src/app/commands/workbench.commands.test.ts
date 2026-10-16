@@ -5,6 +5,7 @@ import { useWorkbenchStore } from '@/stores/workbench.store'
 import { useWorkspaceStore } from '@/stores/workspace.store'
 import { useSessionStore } from '@/stores/session.store'
 import { layerCommands } from './layer.commands'
+import { openActivityPanel, useActivityPanelStore } from '@/stores/activity-panel.store'
 
 beforeEach(() => {
   vi.stubGlobal('window', new EventTarget())
@@ -41,4 +42,17 @@ it('does not accept a tile service as an editing target and clears the target wh
   expect(useWorkbenchStore.getState().editLayerId).toBe(id)
   useProjectStore.getState().loadSnapshot(useProjectStore.getState().getSnapshot())
   expect(useWorkbenchStore.getState().editLayerId).toBeNull()
+})
+
+it('explicit table and filter commands switch away from diagnostics without changing the project', () => {
+  const id = add('本地图层'), before = useProjectStore.getState().getSnapshot()
+  openActivityPanel('diagnostics')
+  layerCommands.openAttributeTable(id)
+  expect(useActivityPanelStore.getState().tab).toBe('attributes')
+  expect(useWorkbenchStore.getState().tableLayerId).toBe(id)
+  openActivityPanel('tasks')
+  layerCommands.openFilter(id)
+  expect(useActivityPanelStore.getState().tab).toBe('attributes')
+  expect(useSessionStore.getState().getLayerSession(id).attributeTable?.filterOpen).toBe(true)
+  expect(useProjectStore.getState().getSnapshot()).toEqual(before)
 })

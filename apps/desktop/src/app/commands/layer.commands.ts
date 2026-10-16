@@ -1,3 +1,4 @@
+import { openActivityPanel } from '@/stores/activity-panel.store'
 import { emitCommandStatus } from './status'
 import { projectCommands } from './project.commands'
 import { useWorkspaceStore } from '@/stores/workspace.store'
@@ -313,7 +314,7 @@ export const layerCommands = {
       return
     }
     useProjectStore.getState().setSelectedLayer(id)
-    useWorkspaceStore.getState().setBottomOpen(true)
+    openActivityPanel('attributes')
     emitCommandStatus('属性表已打开')
     useWorkbenchStore.getState().bindTable(id)
   },
@@ -327,7 +328,7 @@ export const layerCommands = {
       return
     }
     useProjectStore.getState().setSelectedLayer(id)
-    useWorkspaceStore.getState().setBottomOpen(true)
+    openActivityPanel('attributes')
     emitCommandStatus('已打开属性表过滤')
     useWorkbenchStore.getState().bindTable(id)
     useSessionStore.getState().setAttributeTableState(id, { filterOpen: true })

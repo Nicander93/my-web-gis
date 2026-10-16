@@ -1,0 +1,31 @@
+{
+  "date": "2026-10-16",
+  "scope": "Tool-session cancellation, project ownership and attribute-tab coordination",
+  "validation": {
+    "desktopUnitTests": { "passed": 317, "skipped": 5, "files": 62 },
+    "toolSessionE2E": { "file": "tool-session.e2e.ts", "projects": ["desktop", "laptop"], "passed": 6 },
+    "sceneRegressionE2E": { "files": ["scene3d-measurement.e2e.ts", "parametric-graphics.e2e.ts", "billboard.e2e.ts", "scene3d-continuous-point.e2e.ts"], "project": "desktop", "passed": 5 },
+    "mapRegressionE2E": { "file": "selection.e2e.ts", "project": "desktop", "passed": 3, "cases": ["box selection links", "escape from a focused map", "escape cancels a live drag"] },
+    "activityLayoutRegressionE2E": { "file": "activity-panel.e2e.ts", "projects": ["desktop", "laptop"], "passed": 6 },
+    "desktopProductionBuild": "passed",
+    "screenshots": "disabled; no pixel comparison"
+  },
+  "assertions": [
+    "One scene cleanup path cancels drawing, model editing and graphic editing and invalidates completed or pending temporary measurements",
+    "Switching tools, opening resource/group/rename/delete dialogs, Esc, history and project replacement use that cleanup path",
+    "Drawing/edit callbacks require the same runtime, generation and live project epoch, including synchronous Enter during reopening of the same project ID",
+    "Continuous point placement resumes only its own intent and still commits each accepted click exactly once",
+    "Removed, hidden or effectively locked targets cancel the owning edit session",
+    "Geometry commit preflights target identity, inherited visibility/lock and the exact original geometry before replacement; rejected commits refresh authoritative content",
+    "Temporary measurement cards and native data sources return to baseline after selection or Esc, without project history changes",
+    "A fresh graphic edit after cancellation commits once and undoes back to the exact original geometry",
+    "2D box selection, explicit attribute-table commands and filters activate the attribute tab after diagnostics/tasks",
+    "Ant Design 6 outer tab body sizing is scoped to its direct containers, preserving nested attribute-table cell pointer input and real double-click location",
+    "2D Esc cancellation retains original feature data, selection and camera behavior"
+  ],
+  "boundaries": [
+    "Cesium terrain sampling has no AbortSignal contract here; invalidated results are discarded rather than claiming the network request was aborted",
+    "Browser/SwiftShader behavior does not sign off Windows focus-loss, physical pointer devices, IME or GPU acceptance",
+    "No screenshot-based handle discovery or visual comparison was used in this batch"
+  ]
+}
