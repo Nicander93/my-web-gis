@@ -392,3 +392,11 @@ Desktop build 通过；`attribute-tabs.e2e.ts`、`field-schema.e2e.ts` 在 1366�
 - 额外确认旧进程的目录授权在重启后返回 403；正式项目只保存资源引用，报告剔除临时授权 key。GLTF 状态读取真实 Cesium 模型矩阵，依赖校验来自 WebView2 实际请求及原生协议响应。
 - 文件路径由夹具提供；打开使用原生读取、引用解析与 Store 加载，跨目录写入调用保存服务。因此没有签收打开菜单、系统文件选择和另存对话框。本轮辅助功能工具未识别系统对话框；这些项继续待验收。Windows 125%、Tileset/GeoJSON 本地引用全生命周期、E01–E20 综合矩阵和独立 PR 仍未完成。
 - 证据见 [原生资源生命周期报告](../design/desktop-productization/evidence/native-resource-lifecycle-report.json)。本批只增加自动验收、执行入口与文档，未修改产品交互或视觉。
+
+## M6/M7/M9 批次：Tileset/GeoJSON 与外部目录授权（2026-10-16）
+
+- 原生夹具扩展为 GLTF、两级 JSON/GLB 的 Tileset 和 GeoJSON。7 组场景通过，覆盖三者共同加载、原生保存/退出重开、文件及父目录重定位、跨目录副本与外部路径重新授权；实际依赖响应及 Cesium 托管层/datasource 状态均有断言。
+- 修复另存副本重开后无法授权未改变目录的问题。重定位窗口在桌面环境、目录未变化时提供“授权目录并重新加载”，授权仅作用于当前项目会话，校验工程 epoch；不创建编辑命令，不修改项目快照、脏状态和历史可用性。未授权外部路径仍拒绝加载。
+- 原生夹具改存 `.artifacts/`，避免被 Playwright 清理。二维尺寸回归中的实时相机比较改为浮点容差，场景其他内容仍精确比较。
+- 验证：317 项单测通过、5 项既有环境项跳过；desktop/laptop 重定位 E2E 共 2 项通过；Desktop 生产构建与隔离/普通原生 debug 构建通过。无截图。证据见 [三类资源及授权报告](../design/desktop-productization/evidence/native-resource-authorization-report.json)。
+- 本批原生路径仍由夹具提供，不签收系统选择器、打开/另存对话框；小型嵌套 Tileset 不代签大数据 LOD/性能。Windows 125%、最终 E01–E20 综合矩阵及独立 PR 继续待完成。

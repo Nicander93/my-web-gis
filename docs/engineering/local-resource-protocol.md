@@ -68,3 +68,11 @@ Desktop 的 `createLocalResourceSession` 为挂载的三维工作区复用项目
 [本批报告](../design/desktop-productization/evidence/native-resource-lifecycle-report.json) 的四组场景通过：外部 GLTF 几何/UV/PNG 在中文和 `#%` 路径下加载；原生保存相对引用后终止进程并重开；通过重定位窗口填写新路径并实际加载新目录的依赖；跨目录原生写入副本，保留编辑状态、当前文件及原文件字节，目录外资源保持绝对引用。重启后旧目录授权 URL 返回 403，报告不保存临时授权 key。
 
 文件路径由验收夹具提供，重开使用真实文件读取与引用解析/Store 加载，跨目录写入直接调用 `saveSnapshotToPath`。这些结果不验证系统选择器、打开菜单或另存对话框；本轮系统对话框未被辅助功能工具识别，仍待验收。Tileset/GeoJSON 引用生命周期、Windows 125% 和最终全矩阵继续保留为未完成项，视觉细节交由用户验收。
+
+## 三类资源与外部目录重新授权（2026-10-16）
+
+后续验收补齐 GLTF、嵌套 Tileset 和 GeoJSON 的共同加载、原生保存/退出重开及目录重定位。Tileset 真实请求根 JSON、子 JSON 和中文路径 GLB，GeoJSON 创建独立 Cesium datasource；重定位后再次请求新目录依赖，托管层及 datasource 数量保持正确。测试夹具移入仓库 `.artifacts/`，避免并行 Playwright 清理 `test-results/` 时删除原生资源。
+
+发现并修复外部路径在另存副本重开后的授权缺口：此前路径未变化时“应用重定位”禁用，无法重新授权原目录。现在桌面应用中选择“替换所在目录”并填写资源当前父目录，会出现“授权目录并重新加载”。点击后仅授权当前项目会话、刷新资源，不修改引用、项目脏状态或撤销历史；工程代次变化则拒绝。不同目录仍执行原有重定位命令，浏览器不显示该授权操作。
+
+[原生授权报告](../design/desktop-productization/evidence/native-resource-authorization-report.json) 包含 7 组通过场景：另存副本重开时先拒绝未授权的外部路径，显式授权后加载全部三类资源，前后项目快照、脏状态和历史可用性相等。317 项单测、两个尺寸的资源重定位 E2E 和生产构建通过；没有截图。该受控小数据案例不代表大规模 Tileset LOD/性能验收；系统选择器、Windows 125% 及 E01–E20 全矩阵仍待完成。

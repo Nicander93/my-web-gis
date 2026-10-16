@@ -9,7 +9,8 @@ const desktop = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const tauri = join(desktop, 'src-tauri')
 const runId = Date.now().toString()
 const identifier = `com.desktop-webgis.resource-acceptance-${runId}`
-const output = join(desktop, 'test-results', `native-resources-${runId}`)
+// Playwright clears test-results before each run; native fixtures must live elsewhere.
+const output = resolve(desktop, '../../.artifacts', `native-resources-${runId}`)
 const serverPort = 5197, debugPort = 9229
 const url = `http://127.0.0.1:${serverPort}`
 const report = { identifier, output, scenarios: [], screenshots: false,
@@ -120,16 +121,32 @@ async function saveTo(path) {
   return JSON.parse(await readFile(path, 'utf8'))
 }
 
-async function ready(name) {
+async function ready(name, label = '模型') {
   const row = page.locator('.scene3d-layer-row').filter({ hasText: name })
-  await expect(row.locator('small')).toHaveText('模型', { timeout: 60_000 })
+  await expect(row.locator('small')).toHaveText(label, { timeout: 60_000 })
   const diagnostics = await page.evaluate(async (name) => {
     const state = (await import('/src/stores/project.store.ts')).useProjectStore.getState()
     const node = state.project.city.nodes.find(node => node.name === name)
     return (await import('/src/features/scene3d/scene3d-runtime-host.ts')).getLiveSceneDiagnostics(node.id)
   }, name)
-  assert.ok(diagnostics.presentation?.position, 'Native model must have a loaded model matrix')
+  assert.ok(diagnostics.presentation, 'Native resource must have a loaded layer')
+  if (label === '模型') assert.ok(diagnostics.presentation.position, 'Native model must have a loaded model matrix')
   return diagnostics
+}
+
+async function readyResources() {
+  await ready('Native external GLTF')
+  await ready('Native nested Tileset', '3D Tiles')
+  const diagnostics = await ready('Native GeoJSON', '矢量数据')
+  assert.equal(diagnostics.managedLayers, 3)
+  assert.equal(diagnostics.dataSources, 1, 'GeoJSON must own a real Cesium datasource')
+}
+
+async function dependencies(directory, since = 0) {
+  for (const file of ['模型.gltf', '几何.bin', '纹理.png', 'tileset.json', '子瓦片/tileset.json', '子瓦片/内容/街区.glb', '要素.geojson']) {
+    const path = directory ? `${directory}/${file}` : file
+    await poll(async () => report.resourceResponses.slice(since).some(item => item.path === path && item.status === 200), `Native dependency did not load: ${path}`)
+  }
 }
 
 try {
@@ -171,6 +188,17 @@ try {
     await writeFile(join(dirname(file), '几何.bin'), mesh)
     for (const { name, uv } of uvBuffers) await writeFile(join(dirname(file), name), uv)
     await writeFile(join(dirname(file), '纹理.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGP4DwQACfsD/fteaysAAAAASUVORK5CYII=', 'base64'))
+    const root = JSON.parse(await readFile(resolve(desktop, '../../examples/city-3d/city-sample/tileset.json'), 'utf8'))
+    const nested = structuredClone(root)
+    delete nested.root.transform
+    nested.root.content.uri = '内容/街区.glb'
+    root.root.content.uri = '子瓦片/tileset.json'
+    root.root.geometricError = 1000
+    await mkdir(join(dirname(file), '子瓦片', '内容'), { recursive: true })
+    await writeFile(join(dirname(file), 'tileset.json'), JSON.stringify(root))
+    await writeFile(join(dirname(file), '子瓦片', 'tileset.json'), JSON.stringify(nested))
+    await copyFile(resolve(desktop, '../../examples/city-3d/city-sample/city.glb'), join(dirname(file), '子瓦片', '内容', '街区.glb'))
+    await writeFile(join(dirname(file), '要素.geojson'), JSON.stringify({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: { name: '原生要素', value: 42 }, geometry: { type: 'Point', coordinates: [116.391, 39.907] } }] }))
   }
   server = start(['pnpm', 'dev', '--port', String(serverPort), '--strictPort'], desktop)
   await poll(() => available(serverPort), 'Owned Vite server did not start')
@@ -186,9 +214,20 @@ try {
   // Assigned fixture paths exercise native IPC and the production runtime, not the OS picker.
   await page.evaluate(async ({ source, projectPath }) => {
     (await import('/src/services/project-io.ts')).setCurrentProjectPath(projectPath)
-    ;(await import('/src/features/scene3d/scene3d-commands.ts')).addSceneAsset('model', { kind: 'absolute', path: source }, 'Native external GLTF')
+    const commands = await import('/src/features/scene3d/scene3d-commands.ts')
+    commands.addSceneAsset('model', { kind: 'absolute', path: source }, 'Native external GLTF')
+    const directory = source.slice(0, source.lastIndexOf('/'))
+    commands.addSceneAsset('3dtiles', { kind: 'absolute', path: `${directory}/tileset.json` }, 'Native nested Tileset')
+    commands.addSceneAsset('geojson', { kind: 'absolute', path: `${directory}/要素.geojson` }, 'Native GeoJSON')
+    commands.updateScene('设置验收视图', scene => {
+      scene.camera = { position: [116.391, 39.902, 850], heading: 0, pitch: -48, roll: 0 }
+      return scene
+    })
   }, { source: source.replaceAll('\\', '/'), projectPath: join(output, '原生项目.webgis.json') })
   report.initial = await ready('Native external GLTF')
+  await readyResources()
+  await dependencies('原始资源 #%')
+  report.scenarios.push({ name: 'Native nested Tileset JSON/GLB dependencies and GeoJSON datasource load together', passed: true })
   await poll(async () => report.resourceResponses.some(item => item.path.includes('原始资源 #%/几何.bin') && item.status === 200), 'External geometry must be requested by Cesium')
   await poll(async () => report.resourceResponses.some(item => item.path.includes('原始资源 #%/纹理.png') && item.status === 200), 'External texture must be requested by Cesium')
   report.scenarios.push({ name: 'Native GLTF external binary loading with Unicode and reserved path characters', passed: true })
@@ -199,6 +238,8 @@ try {
   const asset = Object.values(saved.project.city.assets).find(asset => asset.reference)
   assert.equal(asset.reference.kind, 'relative')
   assert.equal(asset.url, undefined)
+  assert.equal(Object.values(saved.project.city.assets).filter(asset => asset.reference?.kind === 'relative' && !asset.url).length, 3)
+  const reopenedResponses = report.resourceResponses.length
   await crash(); await launch()
   assert.ok(oldResourceUrl)
   assert.equal(await page.evaluate(async url => (await fetch(url)).status, oldResourceUrl), 403, 'A previous process directory lease must not survive restart')
@@ -209,7 +250,8 @@ try {
     ;(await import('/src/stores/project.store.ts')).useProjectStore.getState().loadSnapshot(resolved)
     ;(await import('/src/services/project-io.ts')).setCurrentProjectPath(path)
   }, projectPath)
-  await ready('Native external GLTF')
+  await readyResources()
+  await dependencies('原始资源 #%', reopenedResponses)
   report.scenarios.push({ name: 'Native save, relative reference persistence and reopen after process restart', passed: true })
   const row = page.locator('.scene3d-layer-row').filter({ hasText: 'Native external GLTF' })
   await row.locator('.scene3d-layer-row__select').click({ button: 'right' })
@@ -227,6 +269,23 @@ try {
   assert.ok(changedAsset.reference.path.includes('迁移资源 #%'))
   assert.deepEqual(changed.project.city.nodes, saved.project.city.nodes)
   report.scenarios.push({ name: 'Native relocation loads external binary from new directory and persists the new relative path', passed: true })
+  const tileRow = page.locator('.scene3d-layer-row').filter({ hasText: 'Native nested Tileset' })
+  await tileRow.locator('.scene3d-layer-row__select').click({ button: 'right' })
+  await page.getByRole('menuitem', { name: '数据源', exact: true }).click()
+  await page.getByRole('button', { name: '重新定位本地资源', exact: true }).click()
+  await relocation.getByRole('radio', { name: '替换所在目录', exact: true }).check()
+  await relocation.getByLabel('资源新位置').fill(dirname(relocated))
+  await expect(relocation.getByRole('status')).toHaveText('将更新 2 个资源引用')
+  const relocatedResponses = report.resourceResponses.length
+  await relocation.getByRole('button', { name: '应用重定位', exact: true }).click()
+  await readyResources()
+  for (const file of ['tileset.json', '子瓦片/tileset.json', '子瓦片/内容/街区.glb', '要素.geojson']) {
+    await poll(async () => report.resourceResponses.slice(relocatedResponses).some(item => item.path === `迁移资源 #%/${file}` && item.status === 200), `Relocated resource dependency missing: ${file}`)
+  }
+  const relocatedSnapshot = await saveTo(projectPath)
+  assert.deepEqual(relocatedSnapshot.project.city.nodes, saved.project.city.nodes)
+  assert.ok(Object.values(relocatedSnapshot.project.city.assets).every(asset => asset.reference?.path.startsWith('迁移资源 #%/')))
+  report.scenarios.push({ name: 'Parent directory relocation updates exactly Tileset and GeoJSON; nested content actually reloads without duplicating datasource', passed: true })
   const anotherPath = join(output, '另存目录', '副本.webgis.json')
   await mkdir(dirname(anotherPath), { recursive: true })
   const previousBytes = await readFile(projectPath)
@@ -244,7 +303,34 @@ try {
   const copyAsset = Object.values(copySnapshot.project.city.assets).find(asset => asset.reference)
   assert.equal(copyAsset.reference.kind, 'absolute', 'Files outside the new project directory remain explicit absolute references')
   assert.equal(copyAsset.reference.path, relocated.replaceAll('\\', '/'))
+  assert.equal(Object.values(copySnapshot.project.city.assets).filter(asset => asset.reference?.kind === 'absolute').length, 3)
   report.scenarios.push({ name: 'Cross-directory native snapshot save preserves working state, current file and original bytes; external reference rebased correctly', passed: true })
+  // Opening a copied project must not silently authorize paths outside its directory.
+  await page.evaluate(async ({ snapshot, path }) => {
+    (await import('/src/stores/project.store.ts')).useProjectStore.getState().loadSnapshot(snapshot)
+    ;(await import('/src/services/project-io.ts')).setCurrentProjectPath(path)
+  }, { snapshot: copySnapshot, path: anotherPath })
+  await expect(page.locator('.scene3d-footer__state')).toHaveClass(/scene3d-footer__state--error/)
+  const beforeAuthorization = await page.evaluate(async () => {
+    const state = (await import('/src/stores/project.store.ts')).useProjectStore.getState()
+    return { snapshot: state.getSnapshot(), dirty: state.dirty, canUndo: state.canUndoEdit(), canRedo: state.canRedoEdit() }
+  })
+  await page.locator('.scene3d-layer-row').filter({ hasText: 'Native nested Tileset' }).locator('.scene3d-layer-row__select').click({ button: 'right' })
+  await page.getByRole('menuitem', { name: '数据源', exact: true }).click()
+  await page.getByRole('button', { name: '重新定位本地资源', exact: true }).click()
+  await relocation.getByRole('radio', { name: '替换所在目录', exact: true }).check()
+  await relocation.getByLabel('资源新位置').fill(dirname(relocated))
+  await expect(relocation.getByRole('status')).toHaveText('将更新 0 个资源引用')
+  const authorizationResponses = report.resourceResponses.length
+  await relocation.getByRole('button', { name: '授权目录并重新加载', exact: true }).click()
+  await readyResources()
+  await dependencies('', authorizationResponses)
+  const afterAuthorization = await page.evaluate(async () => {
+    const state = (await import('/src/stores/project.store.ts')).useProjectStore.getState()
+    return { snapshot: state.getSnapshot(), dirty: state.dirty, canUndo: state.canUndoEdit(), canRedo: state.canRedoEdit() }
+  })
+  assert.deepEqual(afterAuthorization, beforeAuthorization)
+  report.scenarios.push({ name: 'Copied project rejects unauthorized external roots; explicit same-directory authorization reloads all resources without project/history changes', passed: true })
 } catch (error) {
   report.error = error.stack ?? String(error)
   console.error(error); process.exitCode = 1

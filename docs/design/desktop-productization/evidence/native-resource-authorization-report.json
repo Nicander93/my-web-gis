@@ -1,0 +1,249 @@
+{
+  "identifier": "com.desktop-webgis.resource-acceptance-1792156572225",
+  "output": "D:\\my-code-repo\\my-web-gis\\.artifacts\\native-resources-1792156572225",
+  "scenarios": [
+    {
+      "name": "Native nested Tileset JSON/GLB dependencies and GeoJSON datasource load together",
+      "passed": true
+    },
+    {
+      "name": "Native GLTF external binary loading with Unicode and reserved path characters",
+      "passed": true
+    },
+    {
+      "name": "Native save, relative reference persistence and reopen after process restart",
+      "passed": true
+    },
+    {
+      "name": "Native relocation loads external binary from new directory and persists the new relative path",
+      "passed": true
+    },
+    {
+      "name": "Parent directory relocation updates exactly Tileset and GeoJSON; nested content actually reloads without duplicating datasource",
+      "passed": true
+    },
+    {
+      "name": "Cross-directory native snapshot save preserves working state, current file and original bytes; external reference rebased correctly",
+      "passed": true
+    },
+    {
+      "name": "Copied project rejects unauthorized external roots; explicit same-directory authorization reloads all resources without project/history changes",
+      "passed": true
+    }
+  ],
+  "screenshots": false,
+  "nativeFileChooser": "Not verified: fixture working paths assigned; native filesystem and resource protocol used",
+  "windowsScale125": "Not verified",
+  "resourceResponses": [
+    {
+      "path": "原始资源 #%/tileset.json",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/模型.gltf",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/要素.geojson",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/几何.bin",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/纹理.png",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/坐标-0.bin",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/子瓦片/tileset.json",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/子瓦片/内容/街区.glb",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/tileset.json",
+      "status": 403
+    },
+    {
+      "path": "原始资源 #%/模型.gltf",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/tileset.json",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/要素.geojson",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/几何.bin",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/坐标-0.bin",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/纹理.png",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/子瓦片/tileset.json",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/子瓦片/内容/街区.glb",
+      "status": 200
+    },
+    {
+      "path": "迁移资源 #%/模型.gltf",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/tileset.json",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/要素.geojson",
+      "status": 200
+    },
+    {
+      "path": "迁移资源 #%/几何.bin",
+      "status": 200
+    },
+    {
+      "path": "迁移资源 #%/坐标-0.bin",
+      "status": 200
+    },
+    {
+      "path": "迁移资源 #%/纹理.png",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/子瓦片/tileset.json",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/子瓦片/内容/街区.glb",
+      "status": 200
+    },
+    {
+      "path": "迁移资源 #%/要素.geojson",
+      "status": 200
+    },
+    {
+      "path": "迁移资源 #%/tileset.json",
+      "status": 200
+    },
+    {
+      "path": "迁移资源 #%/子瓦片/tileset.json",
+      "status": 200
+    },
+    {
+      "path": "迁移资源 #%/子瓦片/内容/街区.glb",
+      "status": 200
+    },
+    {
+      "path": "tileset.json",
+      "status": 200
+    },
+    {
+      "path": "模型.gltf",
+      "status": 200
+    },
+    {
+      "path": "要素.geojson",
+      "status": 200
+    },
+    {
+      "path": "纹理.png",
+      "status": 200
+    },
+    {
+      "path": "几何.bin",
+      "status": 200
+    },
+    {
+      "path": "坐标-0.bin",
+      "status": 200
+    },
+    {
+      "path": "子瓦片/tileset.json",
+      "status": 200
+    },
+    {
+      "path": "子瓦片/内容/街区.glb",
+      "status": 200
+    }
+  ],
+  "appData": "C:\\Users\\PC\\AppData\\Local\\com.desktop-webgis.resource-acceptance-1792156572225",
+  "viewport": {
+    "width": 1036,
+    "height": 648,
+    "devicePixelRatio": 1.5927083492279053
+  },
+  "initial": {
+    "sceneObjects": 3,
+    "graphicObjects": 0,
+    "managedLayers": 3,
+    "dataSources": 1,
+    "primitives": 3,
+    "presentation": {
+      "id": "scene3d-mvazrqzm-3-9jwunw",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": 1
+      },
+      "position": [
+        116.39099999999999,
+        39.907,
+        -1.3969838619232178e-09
+      ]
+    }
+  },
+  "date": "2026-10-16",
+  "command": "rtk pnpm --filter @desktop-webgis/desktop test:native-resources",
+  "validation": {
+    "nativeHarnessExitCode": 0,
+    "nativeScenarios": 7,
+    "desktopUnitTests": {
+      "passed": 317,
+      "skipped": 5,
+      "files": 62
+    },
+    "resourceRelocationE2E": {
+      "passed": 2,
+      "projects": [
+        "desktop",
+        "laptop"
+      ]
+    },
+    "desktopProductionBuild": "passed",
+    "normalDebugConfigurationRestored": "passed",
+    "screenshots": "disabled"
+  },
+  "limitations": [
+    "Fixture working paths are assigned; OS file dialogs and menu-driven project opening are not validated.",
+    "Cross-directory snapshot save calls saveSnapshotToPath directly; Save As dialog is not validated.",
+    "Windows 125 percent scaling and comprehensive E01-E20 final acceptance remain pending.",
+    "Small controlled nested Tileset fixture is not large-data LOD/performance or GPU effect acceptance."
+  ]
+}

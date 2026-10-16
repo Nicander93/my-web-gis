@@ -579,7 +579,14 @@ export function SceneWorkspace() {
       {!!liveIds.length && <><MenuItem icon={Copy} label="复制" onClick={() => { copyNode(); setContext(null) }} /><MenuItem icon={LockKeyhole} label={allLocked ? '解锁' : '锁定'} disabled={allLocked && !!inheritedLock} onClick={() => { toggleLock(); setContext(null) }} /><MenuItem icon={Download} label="导出对象" onClick={() => { void exportObjects(); setContext(null) }} /><MenuItem icon={Trash2} label="删除" disabled={hasLocked} onClick={() => { setDeleting(true); setContext(null) }} /></>}
     </LayerPopupMenu>}
     {folderPropertyTarget && folderPropertyTarget.epoch === projectEpoch && <FolderPropertyWindow key={`${folderPropertyTarget.epoch}:${folderPropertyTarget.id}`} scene3d id={folderPropertyTarget.id} onClose={() => setFolderPropertyTarget(null)} />}
-    {relocation && <ResourceRelocationDialog scene={relocation.scene} assetId={relocation.assetId} projectPath={getProjectResourceBasePath()} onClose={() => setRelocation(null)} onApply={(changes, target, directory) => {
+    {relocation && <ResourceRelocationDialog scene={relocation.scene} assetId={relocation.assetId} projectPath={getProjectResourceBasePath()} onClose={() => setRelocation(null)} onAuthorize={directory => {
+      if (useProjectStore.getState().projectEpoch !== relocation.epoch) throw new Error('项目已切换，请重新打开重定位窗口')
+      if (!resourceSession.current || !documentSession.current) throw new Error('场景资源会话尚未准备好')
+      resourceSession.current.authorizeDirectory(directory)
+      endToolSession()
+      documentSession.current.refresh()
+      notify('目录已授权，正在重新加载资源')
+    }} onApply={(changes, target, directory) => {
       if (useProjectStore.getState().projectEpoch !== relocation.epoch) throw new Error('项目已切换，请重新打开重定位窗口')
       const current = useProjectStore.getState().project.city
       if (!current) throw new Error('场景已关闭')

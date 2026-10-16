@@ -46,7 +46,13 @@ test('local resource relocation previews directory changes, cancels and supports
   await (await download).saveAs(path)
   const saved = JSON.parse(readFileSync(path, 'utf8'))
   expect(saved.project.city.assets).toEqual(after.project.city!.assets)
-  expect(saved.project.city).toEqual({ ...after.project.city, camera })
+  const { camera: savedCamera, ...savedScene } = saved.project.city
+  const { camera: _storedCamera, ...expectedScene } = after.project.city!
+  expect(savedScene).toEqual(expectedScene)
+  // Cesium's live camera can differ by floating-point rounding between frames.
+  expect(camera).not.toBeNull()
+  savedCamera.position.forEach((value: number, index: number) => expect(value).toBeCloseTo(camera!.position[index], 7))
+  for (const key of ['heading', 'pitch', 'roll'] as const) expect(savedCamera[key]).toBeCloseTo(camera![key], 7)
   await page.getByRole('button', { name: '文件', exact: true }).click()
   const chooser = page.waitForEvent('filechooser')
   await page.getByRole('menuitem', { name: /^打开/ }).click()
