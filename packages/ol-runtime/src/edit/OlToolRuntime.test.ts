@@ -8,6 +8,8 @@ import View from 'ol/View'
 import Snap from 'ol/interaction/Snap'
 import Draw from 'ol/interaction/Draw'
 import Select from 'ol/interaction/Select'
+import Modify from 'ol/interaction/Modify'
+import Collection from 'ol/Collection'
 import type Interaction from 'ol/interaction/Interaction'
 import type Map from 'ol/Map'
 import type Geometry from 'ol/geom/Geometry'
@@ -86,6 +88,70 @@ function fixture() {
 }
 
 describe('editing capture', () => {
+  it('seeds multiple selected targets and submits one shared-vertex command', () => {
+    const f = fixture(), first = f.source.getFeatures()[0]
+    first.setId('a')
+    const second = new Feature(new LineString([[0, 0], [0, 100]])); second.setId('b'); f.source.addFeature(second)
+    f.callbacks.getSelectedFeatureIds = () => ['a', 'b']
+    f.callbacks.onUpdateGeometries = vi.fn()
+    f.tool.activate('modify', f.callbacks)
+    const select = f.interactions.find(item => item instanceof Select) as Select
+    const modify = f.interactions.find(item => item instanceof Modify) as Modify
+    expect(select.getFeatures().getLength()).toBe(2)
+    const features = new Collection([first, second])
+    modify.dispatchEvent({ type: 'modifystart', features } as never)
+    first.setGeometry(new LineString([[10, 10], [100, 0]])); second.setGeometry(new LineString([[10, 10], [0, 100]]))
+    modify.dispatchEvent({ type: 'modifyend', features } as never)
+    expect(f.callbacks.onUpdateGeometries).toHaveBeenCalledOnce()
+    expect(f.callbacks.onUpdateGeometry).not.toHaveBeenCalled()
+    // A no-op event must not emit another command.
+    modify.dispatchEvent({ type: 'modifystart', features } as never)
+    modify.dispatchEvent({ type: 'modifyend', features } as never)
+    expect(f.callbacks.onUpdateGeometries).toHaveBeenCalledOnce()
+    f.tool.deactivate()
+  })
+  it('restores all in-flight geometries on Escape or tool switch, ignoring the late pointer-up', () => {
+    const f = fixture(), feature = f.source.getFeatures()[0], original = feature.getGeometry()!.clone()
+    feature.setId('a'); f.callbacks.getSelectedFeatureIds = () => ['a']; f.callbacks.onUpdateGeometries = vi.fn()
+    f.tool.activate('modify', f.callbacks)
+    const modify = f.interactions.find(item => item instanceof Modify) as Modify
+    const features = new Collection([feature])
+    modify.dispatchEvent({ type: 'modifystart', features } as never)
+    feature.setGeometry(new Point([10, 10]))
+    expect(f.tool.cancelSketch()).toBe(true)
+    expect(feature.getGeometry()!.getExtent()).toEqual(original.getExtent())
+    modify.dispatchEvent({ type: 'modifyend', features } as never)
+    expect(f.callbacks.onUpdateGeometries).not.toHaveBeenCalled()
+    modify.dispatchEvent({ type: 'modifystart', features } as never)
+    feature.setGeometry(new Point([20, 20])); f.tool.deactivate()
+    expect(feature.getGeometry()!.getExtent()).toEqual(original.getExtent())
+    expect(f.callbacks.onUpdateGeometries).not.toHaveBeenCalled()
+  })
+  it('rebinds selected IDs to refreshed features and excludes filtered records', () => {
+    const f = fixture(), first = f.source.getFeatures()[0]
+    first.setId('a'); f.callbacks.getSelectedFeatureIds = () => ['a']
+    f.tool.activate('modify', f.callbacks)
+    const select = f.interactions.find(item => item instanceof Select) as Select
+    const replacement = new Feature(new Point([10, 20])); replacement.setId('a')
+    f.source.clear(); f.source.addFeature(replacement); f.tool.syncSelection(['a'])
+    expect(select.getFeatures().getArray()).toEqual([replacement])
+    vi.spyOn(f.runtime, 'isFeatureIncluded').mockReturnValue(false)
+    f.tool.syncSelection(['a'])
+    expect(select.getFeatures().getLength()).toBe(0)
+    f.tool.deactivate()
+  })
+  it('rolls back native preview when the host rejects a stale transaction', () => {
+    const f = fixture(), feature = f.source.getFeatures()[0], before = feature.getGeometry()!.clone()
+    feature.setId('a'); f.callbacks.getSelectedFeatureIds = () => ['a']; f.callbacks.onUpdateGeometries = () => false
+    f.tool.activate('modify', f.callbacks)
+    const modify = f.interactions.find(item => item instanceof Modify) as Modify
+    const features = new Collection([feature])
+    modify.dispatchEvent({ type: 'modifystart', features } as never)
+    feature.setGeometry(new Point([20, 20]))
+    modify.dispatchEvent({ type: 'modifyend', features } as never)
+    expect(feature.getGeometry()!.getExtent()).toEqual(before.getExtent())
+    f.tool.deactivate()
+  })
   it('excludes node-filtered records from capture and editing without deleting full source data', () => {
     const f = fixture(), hidden = f.source.getFeatures()[0]
     vi.spyOn(f.runtime, 'isFeatureIncluded').mockImplementation((_id, feature) => feature.get('allowed') !== false)

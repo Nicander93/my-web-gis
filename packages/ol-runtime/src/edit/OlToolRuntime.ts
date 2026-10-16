@@ -2,6 +2,7 @@ import {
   AddFeatureCommand,
   DeleteFeatureCommand,
   UpdateGeometryCommand,
+  UpdateGeometriesCommand,
   cloneValue,
   createId,
   type EditTool,
@@ -23,6 +24,9 @@ import type { OlMapRuntime } from '../map/OlMapRuntime'
 
 export interface ToolCallbacks {
   getActiveLayerId(): string | null
+  getSelectedFeatureIds?(): string[]
+  getFeatureGeometry?(datasetId: string, featureId: string): GisFeature['geometry'] | undefined
+  onUpdateGeometries?(command: UpdateGeometriesCommand): boolean | void
   onAddFeature(datasetId: string, feature: GisFeature, command: AddFeatureCommand): void
   onDeleteFeatures(datasetId: string, features: GisFeature[], commands: DeleteFeatureCommand[]): void
   onUpdateGeometry(datasetId: string, featureId: string, before: GisFeature['geometry'], after: GisFeature['geometry'], command: UpdateGeometryCommand): void
@@ -49,6 +53,8 @@ export class OlToolRuntime {
   private editSource: VectorSource | null = null
   private editLayerId: string | null = null
   private drawing = false
+  private modifySelection: Select | null = null
+  private modifyOriginals = new Map<Feature<Geometry>, Geometry>()
   private onSnapChange: (snapped: boolean) => void = () => undefined
 
   constructor(private readonly mapRuntime: OlMapRuntime) {}
@@ -123,6 +129,8 @@ export class OlToolRuntime {
   }
 
   deactivate(): void {
+    this.cancelModification()
+    this.modifySelection = null
     this.drawing = false
     this.clearSnapping()
     this.editSource = null
@@ -155,8 +163,9 @@ export class OlToolRuntime {
     this.refreshSnapping()
   }
 
-  /** 只取消未完成的绘制，不回滚已进入历史的修改。 */
+  /** Cancel only an in-flight sketch or vertex gesture, leaving committed history intact. */
   cancelSketch(): boolean {
+    if (this.cancelModification()) return true
     if (!this.drawing) return false
     const draw = this.interactions.find((interaction): interaction is Draw => interaction instanceof Draw)
     draw?.abortDrawing()
@@ -166,6 +175,8 @@ export class OlToolRuntime {
 
   private activateModify(source: VectorSource, callbacks: ToolCallbacks): void {
     const select = this.createEditSelection(callbacks)
+    this.modifySelection = select
+    this.syncSelection(callbacks.getSelectedFeatureIds?.() ?? [])
     const modify = new Modify({ features: select.getFeatures() })
     const beforeByFeature = new Map<string, GisFeature['geometry']>()
 
@@ -181,28 +192,62 @@ export class OlToolRuntime {
     })
 
     modify.on('modifystart', (event) => {
+      beforeByFeature.clear()
+      this.modifyOriginals.clear()
       event.features.forEach((feature) => {
         const domainFeature = fromOlFeature(feature as Feature<Geometry>, this.mapRuntime.getMap().getView().getProjection().getCode())
-        beforeByFeature.set(domainFeature.id, cloneValue(domainFeature.geometry))
+        const datasetId = this.getActiveDatasetId(callbacks)
+        beforeByFeature.set(domainFeature.id, cloneValue(datasetId ? callbacks.getFeatureGeometry?.(datasetId, domainFeature.id) ?? domainFeature.geometry : domainFeature.geometry))
+        const geometry = feature.getGeometry()
+        if (geometry) this.modifyOriginals.set(feature as Feature<Geometry>, geometry.clone())
       })
     })
 
     modify.on('modifyend', (event) => {
+      if (!this.modifyOriginals.size) return
       const datasetId = this.getActiveDatasetId(callbacks)
-      if (!datasetId) return
+      if (!datasetId) { this.cancelModification(); return }
+      const changes: { featureId: string; before: GisFeature['geometry']; after: GisFeature['geometry'] }[] = []
       event.features.forEach((feature) => {
         const after = fromOlFeature(feature as Feature<Geometry>, this.mapRuntime.getMap().getView().getProjection().getCode())
         const before = beforeByFeature.get(after.id)
-        if (!before) return
-        const command = new UpdateGeometryCommand(createId('cmd'), datasetId, after.id, before, after.geometry)
-        callbacks.onUpdateGeometry(datasetId, after.id, before, after.geometry, command)
+        const original = this.modifyOriginals.get(feature as Feature<Geometry>)
+        const originalDomain = original ? fromOlFeature(new Feature(original), this.mapRuntime.getMap().getView().getProjection().getCode()).geometry : undefined
+        if (!before || !originalDomain || JSON.stringify(originalDomain) === JSON.stringify(after.geometry)) return
+        changes.push({ featureId: after.id, before, after: preserveUnchangedPositions(before, originalDomain, after.geometry) })
       })
       beforeByFeature.clear()
+      try {
+        if (changes.length && callbacks.onUpdateGeometries) {
+          if (callbacks.onUpdateGeometries(new UpdateGeometriesCommand(createId('cmd'), datasetId, changes)) === false) this.cancelModification()
+        }
+        else for (const change of changes) callbacks.onUpdateGeometry(datasetId, change.featureId, change.before, change.after, new UpdateGeometryCommand(createId('cmd'), datasetId, change.featureId, change.before, change.after))
+        this.modifyOriginals.clear()
+      } catch (error) { this.cancelModification(); throw error }
     })
 
     this.addInteractions(select, modify)
     this.editSource = source
     this.refreshSnapping()
+  }
+
+  /** Rebind by stable IDs after a project refresh replaces native features. */
+  syncSelection(ids: string[]): void {
+    if (!this.modifySelection || this.modifyOriginals.size || !this.editLayerId) return
+    const layerId = this.editLayerId
+    const selected = new Set(ids)
+    const features = this.mapRuntime.registry.getVector(layerId)?.getSource()?.getFeatures().filter(feature => feature instanceof Feature && selected.has(String(feature.get('domainFeatureId') ?? feature.getId())) && this.mapRuntime.isFeatureIncluded(layerId, feature)) as Feature<Geometry>[] ?? []
+    const collection = this.modifySelection.getFeatures()
+    if (collection.getLength() === features.length && features.every((feature, index) => collection.item(index) === feature)) return
+    collection.clear(); collection.extend(features)
+  }
+
+  private cancelModification(): boolean {
+    if (!this.modifyOriginals.size) return false
+    const originals = [...this.modifyOriginals]
+    this.modifyOriginals.clear()
+    for (const [feature, geometry] of originals) feature.setGeometry(geometry.clone())
+    return true
   }
 
   private activateDelete(source: VectorSource, callbacks: ToolCallbacks): void {
@@ -241,4 +286,25 @@ export class OlToolRuntime {
     if (!layerId) return null
     return this.mapRuntime.registry.getDatasetIdForLayer(layerId) ?? null
   }
+}
+
+/** Keep untouched vertices exact instead of introducing projection round-trip noise. */
+function preserveUnchangedPositions(before: GisFeature['geometry'], projectedBefore: GisFeature['geometry'], after: GisFeature['geometry']): GisFeature['geometry'] {
+  const originals = new Map<string, number[]>()
+  function remember(projected: unknown, original: unknown): void {
+    if (!Array.isArray(projected) || !Array.isArray(original)) return
+    if (typeof projected[0] === 'number') originals.set(JSON.stringify(projected), original)
+    else projected.forEach((child, index) => remember(child, original[index]))
+  }
+  function restore(value: unknown): void {
+    if (!Array.isArray(value)) return
+    if (typeof value[0] === 'number') {
+      const original = originals.get(JSON.stringify(value))
+      if (original) value.splice(0, value.length, ...original)
+    } else value.forEach(restore)
+  }
+  remember(projectedBefore.coordinates, before.coordinates)
+  const result = cloneValue(after)
+  restore(result.coordinates)
+  return result
 }

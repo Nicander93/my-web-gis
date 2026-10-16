@@ -1,0 +1,13 @@
+{
+  "date": "2026-10-16",
+  "scope": "Multi-feature vertex gestures as atomic edits",
+  "e2e": {
+    "command": "pnpm --filter @desktop-webgis/desktop exec playwright test e2e/multi-vertex.e2e.ts --project=desktop --project=laptop",
+    "result": "6 passed",
+    "viewports": [[1440, 900], [1366, 768]],
+    "checks": ["real pointer shared vertex drag", "one-step undo/redo for all targets", "holes and unedited multi-polygon parts preserved exactly", "unselected shared vertex untouched", "native selection rebound for next gesture", "Escape restores native geometry with no history", "shared edge insertion and Alt deletion", "downloaded project reopens with edited geometry"]
+  },
+  "unitTests": { "gisCore": "77 passed", "olRuntime": "31 passed", "desktopWorkbench": "6 passed" },
+  "build": "gis-core, ol-runtime and Desktop production builds passed",
+  "validationBoundary": "Behavior and state assertions only. Native desktop and complete geometry-validity boundaries remain unverified; no screenshots or pixel comparison."
+}

@@ -69,7 +69,7 @@ export const editCommands = {
       return
     }
     if (setActiveEditTool('modify')) {
-      emitCommandStatus('修改工具已激活')
+      emitCommandStatus('顶点编辑已激活：Shift 多选，拖动公共顶点同步修改，Alt 单击删除顶点，Esc 取消当前拖动')
       return
     }
     emitCommandStatus('修改（请选择可编辑矢量图层）')

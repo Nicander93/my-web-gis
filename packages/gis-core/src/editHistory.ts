@@ -80,6 +80,37 @@ export class UpdateGeometryCommand implements EditCommand {
   }
 }
 
+export interface GeometryChange {
+  featureId: string
+  before: Geometry
+  after: Geometry
+}
+
+/** A shared-vertex gesture is one transaction, including preflight of every target. */
+export class UpdateGeometriesCommand implements EditCommand {
+  readonly label = 'Update geometries'
+  private readonly changes: GeometryChange[]
+
+  constructor(readonly id: string, private readonly datasetId: string, changes: GeometryChange[]) {
+    if (!changes.length || new Set(changes.map(change => change.featureId)).size !== changes.length) throw new Error('Geometry changes require unique targets.')
+    this.changes = cloneValue(changes)
+  }
+
+  execute(context: EditContext): void { this.replace(context, 'after', 'before') }
+  undo(context: EditContext): void { this.replace(context, 'before', 'after') }
+
+  private replace(context: EditContext, next: 'before' | 'after', expected: 'before' | 'after'): void {
+    const features = context.featureStore.getAll(this.datasetId)
+    const byId = new Map(features.map(feature => [feature.id, feature]))
+    for (const change of this.changes) {
+      const feature = byId.get(change.featureId)
+      if (!feature || JSON.stringify(feature.geometry) !== JSON.stringify(change[expected])) throw new Error('Geometry target changed; reload before editing.')
+      byId.set(feature.id, { ...feature, geometry: cloneValue(change[next]) })
+    }
+    context.featureStore.setAll(this.datasetId, features.map(feature => byId.get(feature.id)!))
+  }
+}
+
 export class UpdatePropertiesCommand implements EditCommand {
   readonly label = 'Update properties'
 

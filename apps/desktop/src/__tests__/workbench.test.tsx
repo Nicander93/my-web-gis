@@ -12,7 +12,7 @@ import {
   setActiveEditTool
 } from '@/features/map/map-runtime-host'
 
-const mocks = vi.hoisted(() => ({ activate: vi.fn(), deactivate: vi.fn() }))
+const mocks = vi.hoisted(() => ({ activate: vi.fn(), deactivate: vi.fn(), syncSelection: vi.fn() }))
 vi.mock('@desktop-webgis/ol-runtime', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@desktop-webgis/ol-runtime')>()),
   OlMapRuntime: class {
@@ -37,6 +37,7 @@ vi.mock('@desktop-webgis/ol-runtime', async (importOriginal) => ({
   },
   OlToolRuntime: class {
     setSnapping() {}
+    syncSelection = mocks.syncSelection
     activate = mocks.activate
     deactivate = mocks.deactivate
   }
@@ -98,6 +99,9 @@ describe('workbench task targets', () => {
     expect(callbacks.getActiveLayerId()).toBe(first)
     callbacks.onSelectionChange(['ds-first-feature'])
     expect(useProjectStore.getState().selection.layerId).toBe(first)
+    expect(callbacks.getSelectedFeatureIds()).toEqual(['ds-first-feature'])
+    expect(callbacks.getFeatureGeometry('ds-first', 'ds-first-feature')).toEqual({ type: 'Point', coordinates: [0, 0] })
+    expect(mocks.syncSelection).toHaveBeenLastCalledWith(['ds-first-feature'])
     editCommands.end()
     expect(useWorkbenchStore.getState().editLayerId).toBeNull()
     expect(useWorkbenchStore.getState().activeTool).toBe('select')

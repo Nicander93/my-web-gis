@@ -103,10 +103,13 @@ export function getActiveEditTool(): EditTool {
   return activeTool
 }
 
-/** Esc 优先取消绘制草稿；再次使用时切回浏览，保持编辑目标。 */
+/** Esc first cancels an in-flight sketch or vertex gesture, retaining the edit target. */
 export function cancelMapOperation(): boolean {
   if (selectionRuntime?.cancelGesture()) return true
-  if (toolRuntime?.cancelSketch()) return true
+  if (toolRuntime?.cancelSketch()) {
+    if (activeTool === 'modify') setActiveEditTool('modify')
+    return true
+  }
   return setActiveEditTool('pan')
 }
 
@@ -433,6 +436,21 @@ export function clearMapSelection(): boolean {
 function createToolCallbacks(): ToolCallbacks {
   return {
     getActiveLayerId: () => useWorkbenchStore.getState().editLayerId,
+    getSelectedFeatureIds: () => {
+      const selection = useProjectStore.getState().selection
+      return selection.layerId === useWorkbenchStore.getState().editLayerId ? selection.featureIds : []
+    },
+    getFeatureGeometry: (datasetId, featureId) => useProjectStore.getState().featuresByDataset[datasetId]?.find(feature => feature.id === featureId)?.geometry,
+    onUpdateGeometries: command => {
+      try {
+        useProjectStore.getState().executeEditCommand(command)
+        syncMapFromProject()
+        return true
+      } catch (error) {
+        window.dispatchEvent(new CustomEvent('desktop-webgis:command-status', { detail: error instanceof Error ? error.message : '顶点修改失败，已恢复几何。' }))
+        return false
+      }
+    },
     onAddFeature: (_datasetId, _feature, command) => {
       useProjectStore.getState().executeEditCommand(command)
       syncMapFromProject()
@@ -460,6 +478,7 @@ function createToolCallbacks(): ToolCallbacks {
 }
 
 function syncSelectionHighlight(selection: SelectionState): void {
+  toolRuntime?.syncSelection(selection.layerId === useWorkbenchStore.getState().editLayerId ? selection.featureIds : [])
   if (!selectionRuntime || applyingStoreSelection) return
   selectionRuntime.syncSelection(selection)
 }
