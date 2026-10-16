@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-16",
+  "scope": "Source CRS metadata assignment, independent of coordinate reprojection",
+  "e2e": {
+    "command": "pnpm --filter @desktop-webgis/desktop exec playwright test e2e/source-crs.e2e.ts --project=desktop --project=laptop",
+    "result": "2 passed",
+    "viewports": [[1440, 900], [1366, 768]],
+    "checks": ["draft and cancel leave snapshot unchanged", "Apply changes source declaration only", "coordinates and display CRS unchanged", "reload discards uncommitted declaration", "one-step undo and redo", "downloaded project file reopens with declaration and original coordinates"]
+  },
+  "unitTests": { "desktop": "21 passed", "sceneSchema": "27 passed" },
+  "build": "scene-schema, gis-core and Desktop production builds passed",
+  "validationBoundary": "Browser behavior only; native desktop not signed off. No screenshot or pixel comparison. Initial sandbox server startup did not complete; normal local execution passed.",
+  "remaining": ["complex topology editing", "multi-feature vertex editing", "native acceptance"]
+}

@@ -73,7 +73,7 @@ export function createProjectSceneProjection(snapshot: ProjectSnapshot): Project
   for (const dataset of project.datasets) {
     if (Object.hasOwn(resources, dataset.id)) throw new Error(`Dataset ID “${dataset.id}” 重复`)
     const features = snapshot.featuresByDataset[dataset.id] ?? []
-    if (dataset.kind === 'vector') resources[dataset.id] = { type: 'geojson', data: collection(features), dataProjection: 'EPSG:4326', ...resourceMetadata(dataset.name, features), ...(dataset.fields ? { fields: structuredClone(dataset.fields) } : {}) }
+    if (dataset.kind === 'vector') resources[dataset.id] = { type: 'geojson', data: collection(features), dataProjection: 'EPSG:4326', ...resourceMetadata(dataset.name, features), ...(dataset.sourceCrs ? { sourceCrs: dataset.sourceCrs } : {}), ...(dataset.fields ? { fields: structuredClone(dataset.fields) } : {}) }
     else {
       const auth = authentication(dataset.source, credentials)
       const metadata = { ...resourceMetadata(dataset.name, dataset.kind === 'wfs' ? features : undefined), ...(auth ? { authentication: auth } : {}), ...(dataset.fields ? { fields: structuredClone(dataset.fields) } : {}) }
@@ -226,7 +226,7 @@ export function createProjectFromSceneDocument(input: unknown): ProjectSnapshot 
     if (!isMapResource && resource.type === 'geojson' && (resource.url || resource.reference) && !resource.data) continue
     const name = resource.title ?? id
     let dataset: Dataset
-    if (resource.type === 'geojson') { dataset = { id, name, kind: 'vector', source: { type: 'memory', label: name } }; featuresByDataset[id] = restoreFeatures(resource) }
+    if (resource.type === 'geojson') { dataset = { id, name, kind: 'vector', source: { type: 'memory', label: name }, ...(resource.sourceCrs ? { sourceCrs: resource.sourceCrs } : {}) }; featuresByDataset[id] = restoreFeatures(resource) }
     else if (resource.type === 'wfs') {
       const { snapshot, authentication, title, fields, featureMetadata, authMode, ...source } = resource
       dataset = { id, name, kind: 'wfs', source: { ...source, ...restoreAuthentication(resource, document) } }; featuresByDataset[id] = restoreFeatures(resource)

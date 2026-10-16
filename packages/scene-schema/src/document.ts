@@ -29,6 +29,8 @@ export interface WfsSceneResource {
 }
 
 export interface SceneResourceMetadata {
+  /** Source declaration, independent of the snapshot dataProjection. */
+  sourceCrs?: string
   reference?: ResourceReference
   title?: string
   fields?: Array<{ name: string; type: 'string' | 'number' | 'boolean' | 'json'; nullable: boolean }>
@@ -164,6 +166,7 @@ export function validateSceneDocument(input: unknown): ValidationResult {
     check(Boolean(id.trim()), `$.resources.${id}`, 'resource.id', '资源 ID 不得为空')
     if (!record(resource)) { check(false, `$.resources.${id}`, 'type.object', '资源必须是对象'); continue }
     const path = `$.resources.${id}`
+    check(resource.sourceCrs === undefined || resource.type === 'geojson' && typeof resource.sourceCrs === 'string' && Boolean(resource.sourceCrs.trim()), `${path}.sourceCrs`, 'resource.sourceCrs', '源 CRS 必须是非空字符串且仅用于矢量资源')
     if (resource.reference !== undefined) check(['3dtiles', 'glb', 'geojson'].includes(String(resource.type)) && validateResourceReference(resource.reference), `${path}.reference`, 'resource.reference', '本地/在线引用无效或资源不支持该引用')
     check(resource.title === undefined || typeof resource.title === 'string', `${path}.title`, 'type.string', '资源名称必须是字符串')
     if (resource.featureMetadata !== undefined) check(record(resource.featureMetadata) && Object.entries(resource.featureMetadata).every(([key, metadata]) => /^(string|number):/.test(key) && record(metadata)

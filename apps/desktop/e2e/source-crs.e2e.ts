@@ -1,0 +1,58 @@
+import { expect, test } from '@playwright/test'
+import { readFileSync } from 'node:fs'
+
+test.use({ screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
+
+test('source CRS assignment keeps coordinates, supports cancel, undo/redo and saved project reopen', async ({ page }, info) => {
+  await page.route('**/*tile.openstreetmap.org/**', route => route.abort())
+  await page.goto('/')
+  await page.getByRole('button', { name: /^二维地图/ }).click()
+  await page.getByRole('tab', { name: '数据', exact: true }).click()
+  await page.getByRole('region', { name: '二维功能区' }).getByRole('button', { name: '添加数据', exact: true }).click()
+  await page.locator('input[type=file]').setInputFiles({ name: 'crs.geojson', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: { code: '001' }, geometry: { type: 'Point', coordinates: [116.4, 39.9, 10] } }] })) })
+  await page.getByRole('button', { name: '确认导入', exact: true }).click()
+  const snapshot = () => page.evaluate(async () => (await import('/src/stores/project.store.ts')).useProjectStore.getState().getSnapshot())
+  const before = await snapshot(), datasetId = before.project.layers[0].datasetId
+  async function open() {
+    await page.locator('.layer-item').filter({ hasText: 'crs' }).click({ button: 'right' })
+    await page.getByRole('menuitem', { name: '完整属性', exact: true }).click()
+    await page.locator('.scene-property-window').getByRole('menuitem', { name: '数据源', exact: true }).click()
+  }
+  async function choose(code: string) {
+    await page.getByRole('combobox', { name: '源 CRS 赋值', exact: true }).click()
+    await page.locator('.ant-select-dropdown .ant-select-item-option-content').filter({ hasText: code }).click()
+  }
+  await open(); await choose('EPSG:3857')
+  expect(await snapshot()).toEqual(before)
+  await page.locator('.scene-property-window').getByRole('button', { name: '取消', exact: true }).click()
+  expect(await snapshot()).toEqual(before)
+  await open(); await choose('EPSG:3857')
+  await page.locator('.scene-property-window').getByRole('button', { name: '应用', exact: true }).click()
+  await expect(page.locator('.scene-property-window').getByRole('alert').filter({ hasText: '无效' })).toHaveCount(0)
+  const applied = await snapshot()
+  expect(applied.project.datasets.find(item => item.id === datasetId)).toMatchObject({ sourceCrs: 'EPSG:3857' })
+  expect(applied.featuresByDataset).toEqual(before.featuresByDataset)
+  expect(applied.project.crs).toBe(before.project.crs)
+  await choose('EPSG:4490')
+  await page.locator('.scene-property-window').getByRole('button', { name: '重新载入', exact: true }).click()
+  await expect(page.getByRole('combobox', { name: '源 CRS 赋值', exact: true })).toHaveValue('')
+  await expect(page.locator('.scene-property-window').getByRole('button', { name: '应用', exact: true })).toBeDisabled()
+  await page.locator('.scene-property-window').getByRole('button', { name: '取消', exact: true }).click()
+  await page.getByRole('tab', { name: '编辑', exact: true }).click()
+  await page.getByRole('button', { name: '撤销', exact: true }).click()
+  expect(await snapshot()).toEqual(before)
+  await page.getByRole('button', { name: '重做', exact: true }).click()
+  expect(await snapshot()).toEqual(applied)
+  const download = page.waitForEvent('download')
+  await page.getByRole('button', { name: '保存项目', exact: true }).click()
+  const path = info.outputPath('source-crs.webgis.json')
+  await (await download).saveAs(path)
+  const saved = JSON.parse(readFileSync(path, 'utf8'))
+  expect(saved.project.datasets).toEqual(applied.project.datasets)
+  expect(saved.featuresByDataset).toEqual(before.featuresByDataset)
+  await page.getByRole('button', { name: '文件', exact: true }).click()
+  const chooser = page.waitForEvent('filechooser')
+  await page.getByRole('menuitem', { name: /^打开/ }).click()
+  await (await chooser).setFiles(path)
+  expect(await snapshot()).toEqual(saved)
+})

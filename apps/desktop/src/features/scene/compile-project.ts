@@ -168,8 +168,8 @@ export function compileProjectToScene(
         if (dataset.source.queryExtentWgs84) meta.wfsQueryExtentWgs84 = dataset.source.queryExtentWgs84
       }
       if (filter.length > 0) meta.vectorFilter = filter
-      // Preserve original CRS metadata from first feature when present.
-      const sourceCrs = features.find((f) => f.metadata?.sourceCrs)?.metadata?.sourceCrs
+      // Explicit dataset declarations supersede the original per-feature provenance.
+      const sourceCrs = (dataset.kind === 'vector' ? dataset.sourceCrs : undefined) ?? features.find((f) => f.metadata?.sourceCrs)?.metadata?.sourceCrs
       if (sourceCrs) meta.sourceCrs = sourceCrs
 
       layers.push({

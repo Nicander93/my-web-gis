@@ -112,6 +112,13 @@ rtk pnpm --filter @desktop-webgis/desktop test:e2e folders.e2e.ts --project=desk
 
 第四批补齐二维完整属性窗口的弹窗草稿分类：启停、标题字段、显示字段及字段标签统一随 Apply/OK 提交，Cancel 丢弃未应用值，一次 Undo 恢复全部配置。补齐三维 Graphic 标注字段，并修正可选字段清空：移回根目录和清空 Popup 标题字段会移除对应键，不向严格 JSON 场景写入 undefined。1440×900、1366×768 共 4 项行为 E2E 与 Desktop 构建通过；未使用截图或逐像素比较。证据见 `evidence/behavior-property-popup-report.json`。
 
+## M2 源 CRS 赋值批次（2026-10-16）
+
+- 二维图层完整属性的数据源页新增 Ant Design 源 CRS 赋值选择，支持已注册预设；随 Apply/OK 原子提交，Cancel 丢弃，重新载入恢复最新数据源声明。
+- 赋值修改 Dataset 的 `sourceCrs`，不改内部 WGS84 要素坐标、原始要素来源元数据、显示 CRS 或图层符号；共享该数据集的图层使用同一声明。数据源被外部修改或任一共享图层的文件夹被锁定时拒绝应用。
+- 项目保存重开和可移植 SceneDocument 均保留声明，资源的 `dataProjection` 仍为 EPSG:4326；发布场景的来源说明优先使用显式声明。坐标变换仍由已有重投影导出承担，不在本命令中重新解释已归一化坐标。
+- 1440×900、1366×768 两项行为 E2E 通过，覆盖未提交快照不变、Cancel、Apply、重新载入、单步 Undo/Redo、真实下载及文件重开。未使用截图或逐像素比较。复杂拓扑及多要素顶点编辑仍按顺序推进，未将 M2 全量标为完成。
+
 ## 验证记录
 
 M0 资料/基线提交：`41a57e0`。
@@ -275,7 +282,7 @@ Desktop build 通过；`attribute-tabs.e2e.ts`、`field-schema.e2e.ts` 在 1366�
 | E04 | 浏览器通过 | 点击选中、双击定位/编辑、IME/输入历史与焦点隔离；antd Table、多 Tab、列宽/显示/排序、字段管理与共享引用迁移回归通过 |
 | E05 | 浏览器通过 | 表内字段计算原子写入原数据；逐行错误、类型、空值约束提前校验；一个 Undo/Redo 恢复字段定义与记录 |
 | E06 | 部分 | 真实缓冲结果层及处理算法单测通过；四组空间处理专项矩阵待补 |
-| E07 | 部分 | 国内地图投影、导出 CRS、历史一致性通过；源 CRS 赋值工作流待接入 |
+| E07 | 浏览器通过 | 国内地图投影、重投影导出和源 CRS 元数据赋值分离；赋值不改坐标、历史一致性与保存重开通过；原生专项未签收 |
 | E08 | 浏览器通过 | 实际 GLB 与 Tileset 真实指针轴向拖动、单次历史提交、撤销；Tileset 重做与 Esc 手势回滚通过；XY/XZ/YZ 射线约束另有单测。见 browser-scene3d-gizmo-pointer-report.json |
 | E09 | 浏览器通过 | 连续单击创建 3 个独立 Graphic，每次独立进入历史；Esc 后点击不再创建，Undo/Redo 通过 |
 | E10 | 浏览器通过 | 500 Graphic 仅使用 1 个原生 CustomDataSource；搜索、10 对象多选与批量显隐范围、保存重开 ID/样式/位置通过 |

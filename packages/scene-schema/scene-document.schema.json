@@ -316,6 +316,9 @@
         "dataProjection": {
           "type": "string"
         },
+        "sourceCrs": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
         "idField": {
           "type": "string"
         },

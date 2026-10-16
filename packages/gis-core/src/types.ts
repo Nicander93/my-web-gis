@@ -197,6 +197,8 @@ export type VectorDataset = {
   id: string
   name: string
   kind: 'vector'
+  /** Declared source CRS only; cached feature coordinates remain WGS84. */
+  sourceCrs?: string
   fields?: DatasetField[]
   source: LocalVectorSource
   processing?: ProcessingRecord

@@ -13,6 +13,8 @@ import type { PropertyWindowRequest } from './property-window-request'
 import { FolderPropertyWindow } from './FolderPropertyWindow'
 import { createMapPropertyPreview } from '@/features/map/map-runtime-host'
 import { PopupDraftFields } from './PopupDraftFields'
+import { CRS_PRESETS } from '@desktop-webgis/vector-io'
+import { assignSourceCrs } from './source-crs'
 
 /** Host captures a target and epoch at the explicit open action, never at selection changes. */
 export function LayerPropertyWindowHost() {
@@ -35,6 +37,8 @@ function LayerPropertyWindow({ id, onClose }: { id: string; onClose(): void }) {
   const title = useState(() => current?.name ?? id)[0]
   const [base, setBase] = useState(() => structuredClone(current))
   const [draft, setDraft] = useState(() => structuredClone(current))
+  const [baseDataset, setBaseDataset] = useState(() => structuredClone(project.datasets.find(dataset => dataset.id === current?.datasetId)))
+  const [sourceCrs, setSourceCrs] = useState(() => baseDataset?.kind === 'vector' ? baseDataset.sourceCrs ?? '' : '')
   const [section, setSection] = useState('general'), [query, setQuery] = useState(''), [error, setError] = useState('')
   const [preview, setPreview] = useState(false)
   useEffect(() => {
@@ -47,7 +51,8 @@ function LayerPropertyWindow({ id, onClose }: { id: string; onClose(): void }) {
   const dataset = project.datasets.find(dataset => dataset.id === draft.datasetId)
   const vector = dataset?.kind === 'vector' || dataset?.kind === 'wfs'
   const style = isLegacyStyle(draft.style) ? migrateLegacyStyle(draft.style) : draft.style
-  const dirty = JSON.stringify(base) !== JSON.stringify(draft)
+  const crsDirty = baseDataset?.kind === 'vector' && sourceCrs !== (baseDataset.sourceCrs ?? '')
+  const dirty = JSON.stringify(base) !== JSON.stringify(draft) || crsDirty
   const patch = (patch: Partial<Layer>) => setDraft({ ...draft, ...patch })
   const setStyle = (style: LayerStyle) => patch({ style })
   function field(label: string, alias: string, control: ReactNode) {
@@ -66,16 +71,20 @@ function LayerPropertyWindow({ id, onClose }: { id: string; onClose(): void }) {
       if (!draft?.name.trim()) throw new Error('请输入图层名称。')
       if (!Number.isFinite(draft.opacity) || draft.opacity < 0 || draft.opacity > 1) throw new Error('不透明度必须在 0–100% 之间。')
       if (draft.minZoom !== undefined && draft.maxZoom !== undefined && draft.minZoom > draft.maxZoom) throw new Error('最小缩放不能大于最大缩放。')
-      const after = structuredClone(snapshot)
+      const after = crsDirty && baseDataset?.kind === 'vector' ? assignSourceCrs(snapshot, baseDataset, sourceCrs) : structuredClone(snapshot)
       after.project.layers = after.project.layers.map(layer => layer.id === id ? structuredClone(draft) : layer)
       if (dirty) store.executeEditCommand(new ApplyProjectSnapshotEditCommand(createId('cmd'), '应用完整图层属性', snapshot, after))
-      setBase(structuredClone(draft)); setError(''); if (close) onClose()
+      setBase(structuredClone(draft)); setBaseDataset(structuredClone(after.project.datasets.find(dataset => dataset.id === draft.datasetId))); setError(''); if (close) onClose()
     } catch (reason) { setError(reason instanceof Error ? reason.message : '属性无效') }
   }
   const symbol = style.mode === 'single' ? style.symbol : style.fallback
   const setSymbol = (symbol: Symbol) => setStyle(style.mode === 'single' ? { ...style, symbol } : { ...style, fallback: symbol })
   const popupFields = [...new Set([...(dataset?.fields?.map(field => field.name) ?? []), ...(useProjectStore.getState().featuresByDataset[draft.datasetId] ?? []).slice(0, 100).flatMap(feature => Object.keys(feature.properties))])]
-  return <PropertyWindow title={`完整属性：${title}`} subtitle={`图层 · ${id}`} dirty={dirty} categories={[{ key: 'general', label: '常规与显示' }, { key: 'style', label: '样式' }, { key: 'label', label: '标注' }, { key: 'popup', label: '属性弹窗' }, { key: 'source', label: '数据源' }]} section={section} onSection={setSection} query={query} onQuery={setQuery} onClose={onClose} footer={<><label><Switch aria-label="实时预览" checked={preview} onChange={setPreview} /> 实时预览</label><Button disabled={!current} onClick={() => { setBase(structuredClone(current)); setDraft(structuredClone(current)); setError('') }}>重新载入</Button><span /><Button onClick={onClose}>取消</Button><Button disabled={!current || !dirty} onClick={() => apply()}>应用</Button><Button type="primary" disabled={!current} onClick={() => apply(true)}>确定</Button></>}>
+  function reload(): void {
+    setBase(structuredClone(current)); setDraft(structuredClone(current))
+    setBaseDataset(structuredClone(dataset)); setSourceCrs(dataset?.kind === 'vector' ? dataset.sourceCrs ?? '' : ''); setError('')
+  }
+  return <PropertyWindow title={`完整属性：${title}`} subtitle={`图层 · ${id}`} dirty={dirty} categories={[{ key: 'general', label: '常规与显示' }, { key: 'style', label: '样式' }, { key: 'label', label: '标注' }, { key: 'popup', label: '属性弹窗' }, { key: 'source', label: '数据源' }]} section={section} onSection={setSection} query={query} onQuery={setQuery} onClose={onClose} footer={<><label><Switch aria-label="实时预览" checked={preview} onChange={setPreview} /> 实时预览</label><Button disabled={!current} onClick={reload}>重新载入</Button><span /><Button onClick={onClose}>取消</Button><Button disabled={!current || !dirty} onClick={() => apply()}>应用</Button><Button type="primary" disabled={!current} onClick={() => apply(true)}>确定</Button></>}>
     {(!current || error) && <Alert type="error" title={error || '图层已删除，无法应用。'} />}
     {section === 'general' && <>
       {field('图层名称', 'name', <Input aria-label="图层名称" value={draft.name} onChange={event => patch({ name: event.target.value })} />)}
@@ -98,6 +107,12 @@ function LayerPropertyWindow({ id, onClose }: { id: string; onClose(): void }) {
       {style.label && field('字号（px）', 'label.fontSize', <InputNumber min={6} max={72} value={style.label.fontSize ?? 12} onChange={fontSize => { if (fontSize !== null && style.label) setStyle({ ...style, label: { ...style.label, fontSize } }) }} />)}
     </> : <p>服务影像的标注由服务端提供。</p>)}
     {section === 'popup' && (vector ? <PopupDraftFields popup={draft.interaction?.popup} fields={popupFields} onChange={popup => { const { popup: _previous, ...interaction } = draft.interaction ?? {}; patch({ interaction: popup ? { ...interaction, popup } : interaction }) }} /> : <p>服务影像不提供本地属性弹窗。</p>)}
-    {section === 'source' && <dl><dt>数据集 ID</dt><dd>{draft.datasetId}</dd><dt>数据类型</dt><dd>{dataset?.kind}</dd><dt>项目坐标系</dt><dd>{project.crs}</dd><dt>数据来源</dt><dd style={{ overflowWrap: 'anywhere' }}>{dataset ? 'path' in dataset.source ? dataset.source.path : 'url' in dataset.source ? dataset.source.url : 'label' in dataset.source ? dataset.source.label : '内存数据' : '数据集已删除'}</dd></dl>}
+    {section === 'source' && <>
+      {dataset?.kind === 'vector' && <>
+        <Alert type="info" title="源 CRS 赋值只修订数据源声明，不改变现有要素坐标。坐标转换请使用重投影导出。共享此数据集的图层使用同一声明。" />
+        {field('源 CRS 赋值', 'sourceCrs', <Select aria-label="源 CRS 赋值" showSearch optionFilterProp="label" value={sourceCrs || undefined} placeholder="未覆盖导入时的来源声明" options={CRS_PRESETS.map(preset => ({ value: preset.code, label: `${preset.code} · ${preset.name}` }))} onChange={setSourceCrs} />)}
+      </>}
+      <dl><dt>数据集 ID</dt><dd>{draft.datasetId}</dd><dt>数据类型</dt><dd>{dataset?.kind}</dd><dt>显示坐标系</dt><dd>{project.crs}</dd><dt>内部要素坐标系</dt><dd>EPSG:4326</dd><dt>数据来源</dt><dd style={{ overflowWrap: 'anywhere' }}>{dataset ? 'path' in dataset.source ? dataset.source.path : 'url' in dataset.source ? dataset.source.url : 'label' in dataset.source ? dataset.source.label : '内存数据' : '数据集已删除'}</dd></dl>
+    </>}
   </PropertyWindow>
 }
