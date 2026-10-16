@@ -5,6 +5,7 @@ import { X } from 'lucide-react'
 import { attributeRows, parseAttributeRows } from './graphic-attributes'
 import type { AttributeRow, AttributeType } from './graphic-attributes'
 import { TilesetEffectsDraft } from './TilesetEffectsDraft'
+import { BillboardDraftFields } from './BillboardDraftFields'
 import type { CesiumScene, CesiumSceneNode, GeoPosition } from '@desktop-webgis/cesium-scene-schema'
 import '@/components/ui/property-window.css'
 
@@ -94,9 +95,10 @@ export function ScenePropertyWindow({ initial, scene, onApply, onClose, onPrevie
           {draft.type === '3dtiles' && <>{numeric('屏幕误差（px）', 'maximumScreenSpaceError', draft.maximumScreenSpaceError ?? 16, maximumScreenSpaceError => patch({ maximumScreenSpaceError }), 1, 128)}{numeric('缓存预算（MB）', 'cacheBytes', (draft.cacheBytes ?? 268435456) / 1048576, value => patch({ cacheBytes: value * 1048576 }), 1, 4096)}</>}
           {draft.type === 'geojson' && field('颜色', 'color', <Input aria-label="颜色" value={draft.color ?? '#55a6ff'} onChange={event => patch({ color: event.target.value })} />)}
           {draft.type === 'graphic' && <>
+            {draft.geometry.type === 'point' && <BillboardDraftFields value={draft.style.billboard} onChange={billboard => { const { billboard: _previous, ...style } = draft.style; patch({ style: billboard ? { ...style, billboard } : style }) }} />}
             {field('颜色', 'style.color', <Input aria-label="颜色" value={draft.style.color} onChange={event => patch({ style: { ...draft.style, color: event.target.value } })} />)}
             {numeric('线宽（px）', 'style.width', draft.style.width, width => patch({ style: { ...draft.style, width } }), 1, 64)}
-            {numeric('点大小（px）', 'style.pointSize', draft.style.pointSize, pointSize => patch({ style: { ...draft.style, pointSize } }), 1, 128)}
+            {!draft.style.billboard && numeric('点大小（px）', 'style.pointSize', draft.style.pointSize, pointSize => patch({ style: { ...draft.style, pointSize } }), 1, 128)}
             {field('标注文字', 'style.label', <Input aria-label="标注文字" value={draft.style.label ?? ''} onChange={event => patch({ style: { ...draft.style, label: event.target.value } })} />)}
             {field('标注字段', 'style.labelField', <Select aria-label="标注字段" value={draft.style.labelField} allowClear options={Object.keys(draft.properties).map(field => ({ value: field, label: field }))} onChange={labelField => { const { labelField: _previous, ...style } = draft.style; patch({ style: labelField ? { ...style, labelField } : style }) }} />)}
           </>}

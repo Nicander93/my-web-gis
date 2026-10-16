@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Cartesian3, CustomDataSource, EntityCollection, JulianDate, ScreenSpaceEventType } from 'cesium'
 import type { Viewer } from 'cesium'
 import { DrawSession, EditSession, Graphic, GraphicLayer, resolveGraphicLabel } from './index'
-import type { GraphicNode } from '@desktop-webgis/cesium-scene-schema'
+import { createBillboardStyle, type GraphicNode } from '@desktop-webgis/cesium-scene-schema'
 
 const handlers = vi.hoisted(() => [] as Array<{ actions: Map<number, (event: unknown) => void>; destroy: ReturnType<typeof vi.fn> }>)
 vi.mock('cesium', async original => ({ ...await original<typeof import('cesium')>(), ScreenSpaceEventHandler: class {
@@ -26,6 +26,19 @@ function viewer() {
 function click(): void { handlers.at(-1)?.actions.get(ScreenSpaceEventType.LEFT_CLICK)?.({ position: {} }) }
 
 describe('draw session lifecycle', () => {
+  it('previews the billboard image and commits a detached point style while releasing temporary objects', async () => {
+    const v = viewer(), billboard = createBillboardStyle(), session = new DrawSession(v.value, { type: 'point', style: { billboard } })
+    billboard.width = 100
+    handlers.at(-1)?.actions.get(ScreenSpaceEventType.MOUSE_MOVE)?.({ endPosition: {} })
+    expect(v.host.entities.values[0].billboard?.width?.getValue(JulianDate.now())).toBe(32)
+    expect(v.host.entities.values[0].point).toBeUndefined()
+    click()
+    const result = await session.result
+    if (result.status !== 'completed') throw new Error('Expected completed drawing')
+    expect(result.graphic.geometry.type).toBe('point')
+    expect(result.graphic.style.billboard?.width).toBe(32)
+    expect(v.host.entities.values).toHaveLength(0)
+  })
   it('removes the preview when Backspace removes the final vertex', async () => {
     vi.stubGlobal('Element', class {})
     const v = viewer(), session = new DrawSession(v.value, { type: 'polygon' })
@@ -65,6 +78,31 @@ describe('draw session lifecycle', () => {
 })
 
 describe('independent GraphicLayer', () => {
+  it('renders billboard plus label, updates native dimensions and switches back to point without leaking entities', async () => {
+    const v = viewer(), node = graphic(); node.style.billboard = createBillboardStyle(); node.style.label = 'Icon'
+    const layer = new GraphicLayer({ id: 'icons', graphics: [node] })
+    await layer.mount(v.value)
+    const source = v.sources[0] as CustomDataSource, entity = source.entities.values[0], time = JulianDate.now()
+    expect(entity.billboard?.image?.getValue(time)).toBe(node.style.billboard.image)
+    expect(entity.billboard?.width?.getValue(time)).toBe(32)
+    expect(entity.point).toBeUndefined(); expect(entity.label?.text?.getValue(time)).toBe('Icon')
+    const item = layer.getGraphic(node.id)!
+    item.setOptions({ style: { ...node.style, billboard: { ...node.style.billboard, width: 64 } } })
+    expect(layer.getGraphicPresentation(node.id)).toMatchObject({ point: false, billboard: { width: 64 }, label: 'Icon' })
+    expect(source.entities.values).toHaveLength(1)
+    const editing = layer.startEditing(node.id)
+    editing.setVertexPosition(0, [117,39,12]); editing.cancel()
+    await expect(editing.result).resolves.toEqual({ status: 'cancelled' })
+    expect(item.toJSON().geometry).toEqual(node.geometry)
+    expect(layer.getGraphicPresentation(node.id)).toMatchObject({ billboard: { width: 64 }, label: 'Icon' })
+    expect(v.host.entities.values).toHaveLength(0)
+    const { billboard: _icon, ...style } = node.style
+    item.setOptions({ style })
+    expect(layer.getGraphicPresentation(node.id)).toEqual({ point: true, label: 'Icon' })
+    expect(source.entities.values[0].billboard).toBeUndefined()
+    expect(v.host.dataSources.add).toHaveBeenCalledOnce()
+    layer.destroy(); expect(source.entities.values).toHaveLength(0)
+  })
   it('owns one native data source, updates style without remount and cleans gestures on hiding/removal', async () => {
     const v = viewer(), layer = new GraphicLayer({ id: 'drawings', graphics: [graphic()] })
     await layer.mount(v.value)

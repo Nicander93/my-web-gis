@@ -19,6 +19,10 @@
 
 二维样式、标注和 Popup 延续既有共享样式结构。三维对象保留原有变换、精度、缓存预算、图形属性和高度模式。vector 的 filter 是字段条件数组，使用受限操作和 JSON 值；文档操作不会烘焙过滤或删掉未显示数据。
 
+点 Graphic 可携带 `style.billboard: { image, width, height }`，图标和 `label`/`labelField` 同时显示；几何仍为单个 WGS84 点，继续使用原有坐标编辑、Popup 和历史。宽高单位为 px，范围 1–512；图标底部锚定该点，保留图片原色。没有 billboard 时继续渲染原有圆点。`createBillboardStyle()` 每次返回独立默认值；不改变已有图形。
+
+图片支持内嵌 PNG/JPEG/WebP/GIF、URI 编码的 SVG 与不携带凭据的 HTTP(S)。内嵌字符串最长 3,000,000 字符；Desktop 上传限 2 MB，解码后才进入属性草稿。blob/file URL 不进入持久化契约；网络图片由 Cesium 加载，依赖网络及图片服务器的跨域配置。矩形、椭圆等参数化几何不由 Billboard 表达。
+
 ## 校验与迁移约束
 
 - 拒绝循环、非有限数、类实例、函数和 JSON 会丢弃的 undefined。顶层及环境的未知字段须进入扩展。

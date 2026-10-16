@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+test.use({ screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
 
 async function pointCount(page: import('@playwright/test').Page): Promise<number> {
   return page.evaluate(async () => {
@@ -7,7 +8,7 @@ async function pointCount(page: import('@playwright/test').Page): Promise<number
   })
 }
 
-test('continuous point placement commits each click and Esc releases the tool', async ({ page }, testInfo) => {
+test('continuous point placement commits each click and Esc releases the tool', async ({ page }) => {
   test.setTimeout(90_000)
   await page.route('**/*tile.openstreetmap.org/**', route => route.abort())
   await page.goto('/')
@@ -33,5 +34,4 @@ test('continuous point placement commits each click and Esc releases the tool', 
   await expect.poll(() => pointCount(page)).toBe(2)
   await page.getByRole('button', { name: '重做', exact: true }).click()
   await expect.poll(() => pointCount(page)).toBe(3)
-  await page.screenshot({ path: testInfo.outputPath('scene3d-continuous-points.png') })
 })

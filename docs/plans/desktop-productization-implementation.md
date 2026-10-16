@@ -85,7 +85,7 @@ rtk pnpm --filter @desktop-webgis/desktop test:e2e folders.e2e.ts --project=desk
 | M2 | 点线面编辑、捕捉、选择、CRS 赋值/导出；嵌套 Folder、原子树命令、多要素顶点手势与几何有效性预检 | 完整编辑矩阵、跨日期变更线处理及原生专项仍需签收 |
 | M3 | 模型/Tileset 选择、整体 Gizmo、专业 Inspector、旧 CityScene 兼容；已接入嵌套 Folder | 文件夹/对象混排；完整属性窗的全部专业参数与预览（二维/三维对象、文件夹窗口及三维检查器固定已实现） |
 | M4 | 分页、搜索、过滤、统计、属性单元格、处理算法/取消；多图层 Tab、原子字段计算、字段管理、面合并/分割、列显示/排序/宽度和 antd Table | 完整空间运算验收及处理工具控件迁移 |
-| M5 | point/polyline/polygon Graphic、几何编辑、对象独立样式、共享原生渲染池、连续 POI 与 Esc、500 对象搜索/多选/批量显隐/保存重开 | Billboard、rectangle、ellipse 等扩展标绘类型 |
+| M5 | point/polyline/polygon Graphic、点 Billboard、几何编辑、对象独立样式、共享原生渲染池、连续 POI 与 Esc、500 对象搜索/多选/批量显隐/保存重开 | rectangle、ellipse 等扩展标绘类型 |
 | M6 | 本地二维文件、多 GeoJSON 批次、原子导入/Undo/Redo、读取取消与工程归属保护；WMS/WMTS/WFS、三维资源加载、失败重试 | 混合格式配置队列、服务导入历史、大文件 Worker；二三维添加数据壳、基于项目路径的资源引用/另存重算、父目录重定位 |
 | M7 | 原生原子替换、串行保存/版本与工程会话保护、格式校验及草稿保护；独立恢复缓存、启动恢复/舍弃、容量/保留期与保存清理；Tauri 二维属性/三维 GLB 强制退出恢复 | 系统文件选择窗口、原生完整本地资源组合与 Windows 125% 缩放验收 |
 | M8 | 独立 Gizmo（轴向与 XY/XZ/YZ 平面）、Tileset 原生裁剪、局部 ENU 压平、多变换隔离、项目保存重开与物理 GPU/LOD 验收；空间距离、贴地距离、面积和高度差，临时结果与保留 Graphic 分离 | 功能实现与 E08 浏览器真实指针验收已闭环 |
@@ -133,6 +133,14 @@ rtk pnpm --filter @desktop-webgis/desktop test:e2e folders.e2e.ts --project=desk
 - 绘制工具不再让 Draw 无条件向源添加结果；通过校验和宿主提交后才安装，避免错误绘制留下幽灵要素，宿主已同步的相同 ID 不重复添加。有效线交叉允许存在；既有 XYZ 不因 XY 拓扑校验被删掉。跨日期变更线及不支持的几何类型给出拒绝原因。
 - 提交时复核实际绑定的编辑图层、数据集、服务能力与继承锁定，浏览其他图层不改变提交目标。保留现有工作台编辑会话语义。
 - 两尺寸真实鼠标验收覆盖无效绘制拒绝、无效多要素手势回滚、拒绝后的有效提交及单步 Undo/Redo；已有公共顶点/共享边、孔洞/多部件、Esc 和真实保存重开同时回归。Desktop 16、ol-runtime 33 项相关单元测试通过。证据见 `evidence/behavior-geometry-validity-report.json`；未使用截图/像素比较。自动修复、跨日期变更线编辑和原生桌面专项不在本批签收范围。
+
+## M5 Billboard 批次（2026-10-16）
+
+- 标绘 Ribbon 新增“放置图标”，连续单击创建独立点 Graphic，Esc 结束；默认图标由工厂每次复制，保留原有点工具和兼容数据。图标属于 `style.billboard`，不新增城市专属 API 或把图片伪装成几何。
+- Cesium 使用原生 Billboard 与 Label，同时支持高度模式、选择、Popup 和坐标编辑。图标宽高独立于圆点大小；原生属性诊断可读取图标/标签，仍复用共享 CustomDataSource。鼠标悬停预览和完成/取消会释放临时对象。
+- 检查器与固定对象完整属性窗共用 Ant Design 控件：启停、恢复默认、宽高、图片地址和本地图片上传。上传先检查 MIME/大小和解码，坏图不改草稿；内嵌图片随项目及可移植场景保存，禁止持久化 blob/file 或带凭据 URL。完整属性继续支持实时预览、Apply、Cancel 与单步 Undo/Redo。
+- 两尺寸行为 E2E 覆盖图标/点连续放置、Esc、原生图标和标签、坏图拒绝、图片嵌入、预览/取消、历史与真实项目下载重开；不生成截图。矩形、椭圆及原生专项仍待后续实施。证据见 `evidence/behavior-billboard-report.json`。
+- 验证结果：行为 E2E 4/4，相关单元测试 133 项通过；相关包与 Desktop 生产构建通过。
 
 ## 验证记录
 

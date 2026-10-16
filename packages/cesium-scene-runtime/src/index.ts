@@ -46,7 +46,7 @@ export interface SceneRuntimeDiagnostics {
   managedLayers: number
   dataSources: number
   primitives: number
-  presentation?: { id: string; visible: boolean; transform?: Transform; position?: GeoPosition; water?: { height: number; amplitude: number; frequency: number; speed: number } }
+  presentation?: { id: string; visible: boolean; transform?: Transform; position?: GeoPosition; graphic?: ReturnType<GraphicLayer['getGraphicPresentation']>; water?: { height: number; amplitude: number; frequency: number; speed: number } }
 }
 
 interface PreparedEnvironment { key: string; imagery: ImageryProvider; terrain: TerrainProvider }
@@ -420,7 +420,8 @@ export class CesiumSceneRuntime {
       ...(layer ? { presentation: { id: layer.id, visible: layer.show,
         ...(layer instanceof ModelLayer || layer instanceof TilesetLayer ? { transform: layer.getTransform() } : {}),
         ...(modelPosition ? { position: [CesiumMath.toDegrees(modelPosition.longitude), CesiumMath.toDegrees(modelPosition.latitude), modelPosition.height] as GeoPosition } : {}),
-        ...(layer instanceof WaterLayer ? { water: layer.getParameters() } : {})
+          ...(layer instanceof WaterLayer ? { water: layer.getParameters() } : {}),
+          ...(layer instanceof GraphicLayer && id ? { graphic: layer.getGraphicPresentation(id) } : {})
       } } : {})
     }
   }

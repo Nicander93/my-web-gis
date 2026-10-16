@@ -1,4 +1,4 @@
-import { Cartesian3, Cartographic, Color, ConstantPositionProperty, ConstantProperty, HeightReference, Math as CesiumMath, PolygonHierarchy, ScreenSpaceEventHandler, ScreenSpaceEventType } from 'cesium'
+import { Cartesian3, Cartographic, Color, ConstantPositionProperty, ConstantProperty, HeightReference, Math as CesiumMath, PolygonHierarchy, ScreenSpaceEventHandler, ScreenSpaceEventType, VerticalOrigin } from 'cesium'
 import type { Cartesian2, Entity, Viewer } from 'cesium'
 import type { GeoPosition, GraphicNode, GraphicStyle, GraphicType } from '@desktop-webgis/cesium-scene-schema'
 import { validateGraphic } from '@desktop-webgis/cesium-scene-schema'
@@ -68,7 +68,7 @@ export class DrawSession {
   }
   private updatePreview(cursor?: Cartesian3): void {
     if (!this.active || this.viewer.isDestroyed()) return
-    const positions = cursor && this.points.length ? [...this.points, cursor] : [...this.points]
+    const positions = cursor && (this.points.length || this.options.style?.billboard) ? [...this.points, cursor] : [...this.points]
     if (!positions.length) {
       if (this.preview) this.viewer.entities.remove(this.preview)
       this.preview = undefined
@@ -76,7 +76,8 @@ export class DrawSession {
       return
     }
     const color = Color.fromCssColorString(this.options.style?.color ?? '#3b796a')
-    this.preview ??= this.viewer.entities.add({ point: { pixelSize: 7, color, heightReference: this.options.heightMode === 'absolute' ? HeightReference.NONE : HeightReference.CLAMP_TO_GROUND }, polyline: { positions: [], width: 3, material: color, clampToGround: this.options.heightMode !== 'absolute' }, polygon: { hierarchy: new PolygonHierarchy([]), material: color.withAlpha(.18), perPositionHeight: this.options.heightMode === 'absolute' } })
+    const heightReference = this.options.heightMode === 'absolute' ? HeightReference.NONE : HeightReference.CLAMP_TO_GROUND
+    this.preview ??= this.viewer.entities.add({ point: this.options.style?.billboard ? undefined : { pixelSize: 7, color, heightReference }, billboard: this.options.style?.billboard ? { ...this.options.style.billboard, heightReference, verticalOrigin: VerticalOrigin.BOTTOM } : undefined, polyline: { positions: [], width: 3, material: color, clampToGround: this.options.heightMode !== 'absolute' }, polygon: { hierarchy: new PolygonHierarchy([]), material: color.withAlpha(.18), perPositionHeight: this.options.heightMode === 'absolute' } })
     this.preview.position = new ConstantPositionProperty(positions.at(-1))
     if (this.preview.polyline) this.preview.polyline.positions = new ConstantProperty(this.options.type === 'polygon' && positions.length >= 3 ? [...positions, positions[0]] : positions)
     if (this.preview.polygon) { this.preview.polygon.show = new ConstantProperty(this.options.type === 'polygon' && positions.length >= 3); this.preview.polygon.hierarchy = new ConstantProperty(new PolygonHierarchy(positions)) }

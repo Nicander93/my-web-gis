@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createCesiumScene, parseCesiumScene, validateGraphic } from './index'
+import { createBillboardStyle, createCesiumScene, parseCesiumScene, validateGraphic } from './index'
 import type { GraphicNode } from './index'
 
 function graphic(): GraphicNode {
@@ -7,6 +7,18 @@ function graphic(): GraphicNode {
 }
 
 describe('serializable graphics', () => {
+  it('round trips independent billboard defaults and rejects unsafe or malformed images and sizes', () => {
+    const node = graphic(); node.geometry = { type: 'point', positions: [[116,39,12]], heightMode: 'absolute' }
+    node.style.billboard = createBillboardStyle()
+    expect(validateGraphic(node)).toBe(true)
+    const scene = createCesiumScene(); scene.nodes.push(node)
+    expect(parseCesiumScene(JSON.stringify(scene))).toEqual(scene)
+    node.style.billboard.width = 64
+    expect(createBillboardStyle().width).toBe(32)
+    for (const image of ['javascript:alert(1)', 'file:///C:/icon.png', 'blob:temporary', 'https://example.test/icon?token=secret', 'https://user:secret@example.test/icon.png', '']) expect(validateGraphic({ ...node, style: { ...node.style, billboard: { ...node.style.billboard, image } } })).toBe(false)
+    expect(validateGraphic({ ...node, style: { ...node.style, billboard: { ...node.style.billboard, height: 513 } } })).toBe(false)
+    expect(validateGraphic({ ...graphic(), style: node.style })).toBe(false)
+  })
   it('round trips geometry, style, properties, popup and lock without sharing references', () => {
     const scene = createCesiumScene(); scene.nodes.push(graphic())
     const result = parseCesiumScene(JSON.stringify(scene))

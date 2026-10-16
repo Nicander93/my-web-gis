@@ -1,0 +1,15 @@
+{
+  "date": "2026-10-16",
+  "scope": "Billboard as point Graphic style with independent label and portable image bytes",
+  "e2e": {
+    "command": "pnpm --filter @desktop-webgis/desktop exec playwright test e2e/billboard.e2e.ts e2e/scene3d-continuous-point.e2e.ts --project=desktop --project=laptop",
+    "result": "4 passed",
+    "viewports": [[1440, 900], [1366, 768]],
+    "checks": ["continuous icon and point placement", "Esc releases input", "native billboard and label coexist", "one-step creation undo/redo", "property previews leave project unchanged", "malformed uploaded image rejected", "valid uploaded PNG embedded", "Apply then preview and Cancel restores applied style", "property undo/redo", "downloaded project reopens with embedded image and native properties"]
+  },
+  "unitTests": { "cesiumSceneSchema": "25 passed", "cesiumLayer": "27 passed", "cesiumSceneRuntime": "39 passed", "sceneSchema": "27 passed", "desktopPortableDocument": "15 passed" },
+  "build": "cesium-scene-schema, cesium-layer, cesium-scene-runtime and Desktop production builds passed",
+  "validationBoundary": "Browser behavior and native object properties only. No screenshots or pixel comparison. Native desktop and physical GPU acceptance remain separate.",
+  "remaining": ["rectangle geometry", "ellipse geometry", "native desktop acceptance"],
+  "externalImages": "Remote HTTP(S) images require network availability and server CORS; embedded uploaded images do not depend on temporary local paths."
+}

@@ -2255,6 +2255,31 @@
             "labelField": {
               "type": "string",
               "pattern": "\\S"
+            },
+            "billboard": {
+              "type": "object",
+              "required": [
+                "image",
+                "width",
+                "height"
+              ],
+              "properties": {
+                "image": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 3000000
+                },
+                "width": {
+                  "type": "number",
+                  "minimum": 1,
+                  "maximum": 512
+                },
+                "height": {
+                  "type": "number",
+                  "minimum": 1,
+                  "maximum": 512
+                }
+              }
             }
           },
           "required": [
@@ -2278,6 +2303,30 @@
         "geometry",
         "style",
         "properties"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "style": {
+                "required": [
+                  "billboard"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "geometry": {
+                "properties": {
+                  "type": {
+                    "const": "point"
+                  }
+                }
+              }
+            }
+          }
+        }
       ]
     },
     "cityGroup": {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createDefaultLayerStyle, createProject, parseProjectSnapshot, serializeProjectSnapshot, type ProjectSnapshot } from '@desktop-webgis/gis-core'
-import { createCesiumScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
+import { createBillboardStyle, createCesiumScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
 import { parseSceneDocument } from '@desktop-webgis/scene-schema'
 import { createProjectFromSceneDocument, createProjectSceneDocument, createProjectSceneProjection } from './project-scene-document'
 import { createCategorizedStyle, createGraduatedStyle } from '@desktop-webgis/ol-style'
@@ -33,6 +33,13 @@ function snapshot(): ProjectSnapshot {
 }
 
 describe('full project scene content', () => {
+  it('preserves point billboard style and label in portable documents', () => {
+    const input = snapshot(), scene = createCesiumScene()
+    scene.nodes = [{ id: 'icon', name: 'Icon', visible: true, type: 'graphic', geometry: { type: 'point', positions: [[116,39,12]], heightMode: 'absolute' }, style: { color: '#336699', width: 3, pointSize: 10, label: 'POI', billboard: createBillboardStyle() }, properties: { name: 'Icon' } }]
+    input.project.city = scene
+    const restored = createProjectFromSceneDocument(JSON.stringify(createProjectSceneDocument(input)))
+    expect(restored.project.city?.nodes).toEqual(scene.nodes)
+  })
   it('keeps local three-dimensional GeoJSON references and unused assets outside map datasets', () => {
     const project = createProject(); project.city = createCesiumScene()
     project.city.assets.points = { type: 'geojson', reference: { kind: 'relative', path: '数据/points.geojson' } }

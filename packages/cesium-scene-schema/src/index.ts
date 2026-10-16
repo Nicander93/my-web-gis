@@ -45,7 +45,17 @@ interface NodeBase {
 
 export type GraphicType = 'point' | 'polyline' | 'polygon'
 export interface GraphicGeometry { type: GraphicType; positions: GeoPosition[]; heightMode: 'ground' | 'absolute' }
-export interface GraphicStyle { color: string; width: number; pointSize: number; label?: string; labelField?: string }
+export interface BillboardStyle { image: string; width: number; height: number }
+export interface GraphicStyle { color: string; width: number; pointSize: number; label?: string; labelField?: string; billboard?: BillboardStyle }
+export { createBillboardStyle } from './graphic-presets.js'
+
+/** Embedded images are portable; external images must use credential-free HTTP(S). */
+export function isGraphicImage(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length > 3_000_000) return false
+  if (/^data:image\/(png|jpeg|gif|webp);base64,[a-z\d+/]+={0,2}$/i.test(value)) return true
+  if (/^data:image\/svg\+xml,%3Csvg[^\s]+$/i.test(value)) return true
+  return /^https?:\/\//i.test(value) && isSceneResourceUrl(value)
+}
 export interface GraphicNode extends NodeBase {
   type: 'graphic'
   geometry: GraphicGeometry
@@ -64,6 +74,10 @@ export function validateGraphic(value: unknown): value is GraphicNode {
   if (value.locked !== undefined && typeof value.locked !== 'boolean') return false
   if (value.groupId !== undefined && (typeof value.groupId !== 'string' || !value.groupId.trim())) return false
   if (value.popup !== undefined && !validatePopup(value.popup)) return false
+  if (record(style) && style.billboard !== undefined) {
+    const icon = style.billboard
+    if (geometry.type !== 'point' || !record(icon) || !isGraphicImage(icon.image) || !finite(icon.width) || icon.width < 1 || icon.width > 512 || !finite(icon.height) || icon.height < 1 || icon.height > 512) return false
+  }
   return record(style) && typeof style.color === 'string' && /^#[\da-f]{6}([\da-f]{2})?$/i.test(style.color) && finite(style.width) && style.width > 0 && style.width <= 64 && finite(style.pointSize) && style.pointSize > 0 && style.pointSize <= 128 && (style.label === undefined || typeof style.label === 'string') && (style.labelField === undefined || typeof style.labelField === 'string' && !!style.labelField.trim()) && record(value.properties) && jsonValue(value.properties)
 }
 

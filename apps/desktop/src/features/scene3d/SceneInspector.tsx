@@ -7,6 +7,7 @@ import { GraphicAttributes } from './GraphicAttributes'
 import { SceneRenderSettings } from './SceneRenderSettings'
 import { SceneInfo, ScenePropertyGroup } from './ScenePropertyGroup'
 import { LivePropertyInput } from './LivePropertyInput'
+import { BillboardDraftFields } from './BillboardDraftFields'
 
 export type SceneInspectorSection = 'object' | 'popup' | 'source' | 'style' | 'properties'
 
@@ -130,8 +131,9 @@ function GraphicFields({ node, onPatch }: { node: GraphicNode; onPatch: SceneIns
   const [error, setError] = useState('')
   return <form className="scene3d-property-section" onSubmit={event => { event.preventDefault(); try { onPatch({ style }, '设置图形样式'); setError('') } catch (reason) { setError(reason instanceof Error ? reason.message : '样式无效') } }}>
     <h3>样式与标注<SceneInfo label="图形标注">标注可使用固定文字或属性字段；文本、数字和布尔属性变化时自动更新。</SceneInfo></h3>
+    {node.geometry.type === 'point' && <BillboardDraftFields value={style.billboard} onChange={billboard => { const { billboard: _previous, ...rest } = style; setStyle(billboard ? { ...rest, billboard } : rest) }} />}
     <label className="editor-field">颜色<input type="color" value={style.color.slice(0,7)} onChange={event => setStyle({ ...style, color: event.target.value })} /></label>
-    <label className="editor-field">{node.geometry.type === 'point' ? '点大小（像素）' : '线宽（像素）'}<input type="number" required min="1" max={node.geometry.type === 'point' ? 128 : 64} value={node.geometry.type === 'point' ? style.pointSize : style.width} onChange={event => setStyle({ ...style, [node.geometry.type === 'point' ? 'pointSize' : 'width']: Number(event.target.value) })} /></label>
+    {!style.billboard && <label className="editor-field">{node.geometry.type === 'point' ? '点大小（像素）' : '线宽（像素）'}<input type="number" required min="1" max={node.geometry.type === 'point' ? 128 : 64} value={node.geometry.type === 'point' ? style.pointSize : style.width} onChange={event => setStyle({ ...style, [node.geometry.type === 'point' ? 'pointSize' : 'width']: Number(event.target.value) })} /></label>}
     <label className="editor-field">标注字段<select value={style.labelField ?? ''} onChange={event => setStyle({ ...style, labelField: event.target.value || undefined })}><option value="">固定文字</option>{[...new Set(['name', ...Object.keys(node.properties), ...(style.labelField ? [style.labelField] : [])])].map(field => <option key={field} value={field}>{field}{field in node.properties || field === 'name' ? '' : '（字段已移除）'}</option>)}</select></label>
     <label className="editor-field">{style.labelField ? '字段缺失时的文字' : '标注文字'}<input value={style.label ?? ''} onChange={event => setStyle({ ...style, label: event.target.value })} /></label>
     {error && <p className="editor-error" role="alert">{error}</p>}<button type="submit" className="button-primary">应用样式</button>

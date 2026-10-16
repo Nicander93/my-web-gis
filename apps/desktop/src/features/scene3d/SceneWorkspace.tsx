@@ -25,7 +25,7 @@ import { SceneResourceDialog } from './SceneResourceDialog'
 import type { SceneResourceType } from './SceneResourceDialog'
 import { SceneInspector, SceneSettings } from './SceneInspector'
 import type { SceneAction } from './scene3d-actions'
-import { useSceneDrawing } from './useSceneDrawing'
+import { isContinuousDraw, useSceneDrawing } from './useSceneDrawing'
 import { useSceneGraphicEditing } from './useSceneGraphicEditing'
 import { GraphicVertexInspector } from './GraphicVertexInspector'
 import { SceneTree } from './SceneTree'
@@ -55,7 +55,7 @@ import { isTauri } from '@tauri-apps/api/core'
 import type { ResourceReference } from '@desktop-webgis/cesium-scene-schema'
 
 interface LayerState { state: 'loading' | 'ready' | 'error'; error?: string }
-const drawLabels = { point: '点', polyline: '线', polygon: '面', water: '水面边界', clip: '裁剪范围', flatten: '压平范围', 'spatial-distance': '空间距离', 'ground-distance': '贴地距离', area: '面积', 'height-difference': '高度差' }
+const drawLabels = { billboard: '图标', point: '点', polyline: '线', polygon: '面', water: '水面边界', clip: '裁剪范围', flatten: '压平范围', 'spatial-distance': '空间距离', 'ground-distance': '贴地距离', area: '面积', 'height-difference': '高度差' }
 const measurementKinds: SceneMeasurementKind[] = ['spatial-distance', 'ground-distance', 'area', 'height-difference']
 const isMeasurementKind = (kind: SceneDrawKind): kind is SceneMeasurementKind => measurementKinds.includes(kind as SceneMeasurementKind)
 
@@ -223,8 +223,8 @@ export function SceneWorkspace() {
         graphic.properties.name = graphic.name
         graphic.popup = { fields: [{ field: 'name', label: '名称' }] }
         updateScene('绘制图形', scene => { scene.nodes.push(graphic); return scene })
-        if (kind !== 'point') select(graphic.id)
-        notify(kind === 'point' ? '点已创建；继续单击放置，Esc 退出' : '图形已创建，可配置样式和属性弹窗'); return
+        if (!isContinuousDraw(kind)) select(graphic.id)
+        notify(isContinuousDraw(kind) ? '点已创建；继续单击放置，Esc 退出' : '图形已创建，可配置样式和属性弹窗'); return
       }
       const boundary = graphic.geometry.positions
       const nextId = id ?? `water-${crypto.randomUUID()}`
@@ -237,7 +237,7 @@ export function SceneWorkspace() {
     } catch (reason) { report(reason) }
   }, report, () => notify('已取消绘制'))
 
-  useEffect(() => { if (syncStatus === 'ready' && drawing.kind === 'point') drawing.resume() }, [syncStatus, scene.nodes.length])
+  useEffect(() => { if (syncStatus === 'ready' && isContinuousDraw(drawing.kind)) drawing.resume() }, [syncStatus, scene.nodes.length])
 
   async function completeMeasurement(graphic: GraphicNode, kind: SceneMeasurementKind): Promise<void> {
     const currentRuntime = runtime.current
@@ -331,7 +331,7 @@ export function SceneWorkspace() {
     if (!ready) return
     if (measurement) clearMeasurement()
     stopEditing(); drawing.start(kind, id)
-    notify(kind === 'point' ? '连续放置点：单击创建，Esc 退出' : `绘制${drawLabels[kind]}：单击添加顶点，右键或 Enter 完成，Esc 取消`)
+    notify(isContinuousDraw(kind) ? '连续放置：单击创建，Esc 退出' : `绘制${drawLabels[kind]}：单击添加顶点，右键或 Enter 完成，Esc 取消`)
   }
   function history(redo = false): void {
     drawing.cancel(); stopEditing()
@@ -426,6 +426,7 @@ export function SceneWorkspace() {
     command('add', '添加数据', Plus, () => setAdding(true)),
     command('select', '选择', MousePointer2, () => { drawing.cancel(); stopEditing(); notify('选择对象') }, undefined, !editing && !drawing.drawing && !graphicEditing.active),
     command('point', '绘制点', MousePointer2, () => startDraw('point'), ready ? undefined : '场景尚未就绪', drawing.kind === 'point'),
+    command('billboard', '放置图标', LocateFixed, () => startDraw('billboard'), ready ? undefined : '场景尚未就绪', drawing.kind === 'billboard'),
     command('line', '绘制线', Move, () => startDraw('polyline'), ready ? undefined : '场景尚未就绪', drawing.kind === 'polyline'),
     command('polygon', '绘制面', Shapes, () => startDraw('polygon'), ready ? undefined : '场景尚未就绪', drawing.kind === 'polygon'),
     command('vertices', '编辑顶点', Shapes, startGraphicEditing, selectionReason ?? (node?.type !== 'graphic' ? '请选择标绘图形' : undefined), graphicEditing.active),
@@ -506,7 +507,7 @@ export function SceneWorkspace() {
         <div className="scene3d-canvas__viewport" ref={target} />
         {editing && !preview && <div className="scene3d-drawing-bar"><Move size={16} aria-hidden="true" /><span>{editing === 'translate' ? '移动' : editing === 'rotate' ? '旋转' : '等比缩放'}</span><SceneInfo label="变换工具">{`${editing === 'translate' ? '红：东向，绿：北向，蓝：高度；黄色框：水平移动。' : editing === 'rotate' ? '拖动对象局部轴环。' : '拖动白色箭头等比缩放。'}松开应用，Esc 取消本次拖动。`}</SceneInfo><button className="button-secondary" onClick={() => { stopEditing(); notify('已退出模型编辑') }}>结束编辑</button></div>}
         {graphicEditing.state && <div className="scene3d-drawing-bar"><Shapes size={16} aria-hidden="true" /><span>编辑几何 · {graphicEditing.state.geometry.positions.length} 个顶点</span><button className="button-primary" onClick={graphicEditing.finish}><Check size={14} aria-hidden="true" />应用修改</button><button className="button-secondary" onClick={() => { stopEditing(); notify('已取消几何编辑，原几何已恢复') }}>取消编辑</button></div>}
-        {drawing.drawing && <div className="scene3d-drawing-bar"><DrawingIcon size={16} aria-hidden="true" /><span>{drawing.kind === 'point' ? '连续放置点 · 单击创建，Esc 退出' : `${drawing.kind ? drawLabels[drawing.kind] : '绘制'} · ${drawing.count} 个顶点`}</span>{drawing.kind !== 'point' && <Button variant="primary" size="small" disabled={drawing.count < drawing.minimum} onClick={drawing.finish}><Check size={14} aria-hidden="true" />完成</Button>}<Button size="small" onClick={() => { drawing.cancel(); notify(drawing.kind === 'point' ? '已退出连续放置' : '已取消绘制') }}>{drawing.kind === 'point' ? '结束放置' : '取消'}</Button></div>}
+        {drawing.drawing && <div className="scene3d-drawing-bar"><DrawingIcon size={16} aria-hidden="true" /><span>{isContinuousDraw(drawing.kind) ? `连续放置${drawing.kind === 'billboard' ? '图标' : '点'} · 单击创建，Esc 退出` : `${drawing.kind ? drawLabels[drawing.kind] : '绘制'} · ${drawing.count} 个顶点`}</span>{!isContinuousDraw(drawing.kind) && <Button variant="primary" size="small" disabled={drawing.count < drawing.minimum} onClick={drawing.finish}><Check size={14} aria-hidden="true" />完成</Button>}<Button size="small" onClick={() => { drawing.cancel(); notify(isContinuousDraw(drawing.kind) ? '已退出连续放置' : '已取消绘制') }}>{isContinuousDraw(drawing.kind) ? '结束放置' : '取消'}</Button></div>}
         {measurement && !drawing.drawing && <section className="scene3d-measurement-card" aria-label="三维测量结果">
           <div><span>{drawLabels[measurement.result.kind]}</span><output>{measurement.result.label}</output><small>临时结果，尚未写入项目</small></div>
           <footer><Button variant="primary" size="small" onClick={retainMeasurement}>保留测量</Button><Button size="small" onClick={() => clearMeasurement('已清除临时测量')}>清除</Button></footer>
@@ -519,7 +520,7 @@ export function SceneWorkspace() {
         </div>
       </RightPanel>}
     </div>
-    <footer className="status-bar scene3d-footer"><span className={`scene3d-footer__state${error ? ' scene3d-footer__state--error' : ''}`} role="status">{error || (drawing.kind === 'point' ? '连续放置点：单击创建 · Esc 退出' : drawing.drawing ? `绘制${drawing.kind ? drawLabels[drawing.kind] : '图形'}：单击添加顶点 · Enter 完成 · Esc 取消` : status)}</span><span>{group ? group.name : liveIds.length > 1 ? `已选 ${liveIds.length} 个对象` : node?.name ?? '未选择对象'}</span><span>WGS84 · 椭球高度</span></footer>
+    <footer className="status-bar scene3d-footer"><span className={`scene3d-footer__state${error ? ' scene3d-footer__state--error' : ''}`} role="status">{error || (isContinuousDraw(drawing.kind) ? '连续放置：单击创建 · Esc 退出' : drawing.drawing ? `绘制${drawing.kind ? drawLabels[drawing.kind] : '图形'}：单击添加顶点 · Enter 完成 · Esc 取消` : status)}</span><span>{group ? group.name : liveIds.length > 1 ? `已选 ${liveIds.length} 个对象` : node?.name ?? '未选择对象'}</span><span>WGS84 · 椭球高度</span></footer>
     {context && <LayerPopupMenu x={context.x} y={context.y} label="对象菜单" onClose={() => setContext(null)}>
       <div className="scene3d-context-title">{group?.name ?? (liveIds.length > 1 ? `${liveIds.length} 个对象` : node?.name)}</div>
       <MenuItem icon={Table2} label="对象属性" onClick={() => { showProperties('object'); setContext(null) }} />

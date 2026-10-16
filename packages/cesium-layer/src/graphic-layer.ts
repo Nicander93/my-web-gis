@@ -1,7 +1,7 @@
-import { Cartesian2, Cartesian3, Color, CustomDataSource, Entity, HeightReference, LabelStyle, PolygonHierarchy } from 'cesium'
+import { Cartesian2, Cartesian3, Color, CustomDataSource, Entity, HeightReference, JulianDate, LabelStyle, PolygonHierarchy, VerticalOrigin } from 'cesium'
 import type { Viewer } from 'cesium'
 import { validateGraphic } from '@desktop-webgis/cesium-scene-schema'
-import type { GraphicNode, PopupDefinition } from '@desktop-webgis/cesium-scene-schema'
+import type { BillboardStyle, GraphicNode, PopupDefinition } from '@desktop-webgis/cesium-scene-schema'
 import type { PopupContent } from '@desktop-webgis/cesium-popup'
 import { BaseLayer } from './base-layer.js'
 import type { LayerClickEvent, LayerOptions } from './base-layer.js'
@@ -81,6 +81,13 @@ export class GraphicLayer extends BaseLayer {
     this.allGraphics.forEach(graphic => this.renderGraphic(graphic))
   }
   toJSON(): GraphicNode[] { return this.allGraphics.map(graphic => graphic.toJSON()) }
+  /** Native property values used by diagnostics without exposing mutable Cesium objects. */
+  getGraphicPresentation(id: string): { point: boolean; billboard?: BillboardStyle; label?: string } | undefined {
+    const nativeId = this.nativeIds.get(id), entity = nativeId ? this.source?.entities.getById(nativeId) : undefined
+    if (!entity) return
+    const time = JulianDate.now()
+    return { point: Boolean(entity.point), ...(entity.billboard ? { billboard: { image: entity.billboard.image?.getValue(time), width: entity.billboard.width?.getValue(time), height: entity.billboard.height?.getValue(time) } } : {}), ...(entity.label ? { label: entity.label.text?.getValue(time) } : {}) }
+  }
   startDraw(options: DrawOptions): DrawSession {
     if (!this.viewer || this.state !== 'ready' || !this.show) throw new Error('请先挂载并显示图形层')
     this.drawing?.cancel(); return this.drawing = new DrawSession(this.viewer, options)
@@ -128,10 +135,11 @@ export class GraphicLayer extends BaseLayer {
     this.nativeIds.set(node.id, nativeId); this.source.entities.removeById(nativeId)
     this.source.entities.add({
       id: nativeId, name: node.name, show: this.show && node.visible, properties: { name: node.name, ...node.properties }, position: positions[0],
-      point: node.geometry.type === 'point' ? { pixelSize: node.style.pointSize, color, outlineColor: stroke, outlineWidth: selected ? 3 : 0, heightReference: ground ? HeightReference.CLAMP_TO_GROUND : HeightReference.NONE, disableDepthTestDistance: Number.POSITIVE_INFINITY } : undefined,
+      point: node.geometry.type === 'point' && !node.style.billboard ? { pixelSize: node.style.pointSize, color, outlineColor: stroke, outlineWidth: selected ? 3 : 0, heightReference: ground ? HeightReference.CLAMP_TO_GROUND : HeightReference.NONE, disableDepthTestDistance: Number.POSITIVE_INFINITY } : undefined,
+      billboard: node.style.billboard ? { ...node.style.billboard, scale: selected ? 1.12 : 1, verticalOrigin: VerticalOrigin.BOTTOM, heightReference: ground ? HeightReference.CLAMP_TO_GROUND : HeightReference.NONE, disableDepthTestDistance: Number.POSITIVE_INFINITY } : undefined,
       polyline: node.geometry.type !== 'point' ? { positions: node.geometry.type === 'polygon' ? [...positions,positions[0]] : positions, width: selected ? Math.max(node.style.width, 4) : node.style.width, material: stroke, clampToGround: ground } : undefined,
       polygon: node.geometry.type === 'polygon' ? { hierarchy: new PolygonHierarchy(positions), material: color.withAlpha(color.alpha * .35), perPositionHeight: !ground } : undefined,
-      label: label ? { text: label, font: '14px sans-serif', fillColor: color, style: LabelStyle.FILL_AND_OUTLINE, outlineColor: Color.WHITE, outlineWidth: 3, pixelOffset: new Cartesian2(0, -16), disableDepthTestDistance: Number.POSITIVE_INFINITY, heightReference: ground ? HeightReference.CLAMP_TO_GROUND : HeightReference.NONE } : undefined
+      label: label ? { text: label, font: '14px sans-serif', fillColor: color, style: LabelStyle.FILL_AND_OUTLINE, outlineColor: Color.WHITE, outlineWidth: 3, pixelOffset: new Cartesian2(0, node.style.billboard ? -node.style.billboard.height - 8 : -16), disableDepthTestDistance: Number.POSITIVE_INFINITY, heightReference: ground ? HeightReference.CLAMP_TO_GROUND : HeightReference.NONE } : undefined
     })
     this.viewer?.scene.requestRender()
   }
