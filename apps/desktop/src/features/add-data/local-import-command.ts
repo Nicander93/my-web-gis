@@ -2,6 +2,7 @@ import { ApplyProjectSnapshotEditCommand, cloneValue, createDefaultLayerStyle, c
   type EditContext, type ProjectSnapshot } from '@desktop-webgis/gis-core'
 import { useProjectStore } from '@/stores/project.store'
 import type { ImportResult } from '@/services/import'
+import { useTaskLogStore } from '@/stores/task-log.store'
 
 /** Validate the complete selection before constructing one same-project content transaction. */
 export function prepareLocalImport(before: ProjectSnapshot, result: ImportResult): ProjectSnapshot {
@@ -50,4 +51,7 @@ export function commitLocalImport(result: ImportResult): void {
   const state = useProjectStore.getState()
   const before = state.getSnapshot(), after = prepareLocalImport(before, result)
   state.executeEditCommand(new ImportLocalLayersCommand(before, after, state.selectedLayerId))
+  const logs = useTaskLogStore.getState()
+  const task = logs.start(state.projectEpoch, '导入数据')
+  logs.finish(task, 'succeeded', `已导入 ${result.layers.length} 个图层、${result.layers.reduce((sum, layer) => sum + layer.features.length, 0)} 个要素，可撤销。`)
 }

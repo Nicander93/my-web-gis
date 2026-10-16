@@ -5,6 +5,7 @@ import { viewCommands } from '@/app/commands/view.commands'
 import { useWorkspaceStore } from '@/stores/workspace.store'
 import { useProjectStore } from '@/stores/project.store'
 import { getProjectType } from '@/services/project-type'
+import { useActivityPanelStore } from '@/stores/activity-panel.store'
 
 interface ViewMenuProps {
   onClose(): void
@@ -12,6 +13,7 @@ interface ViewMenuProps {
 
 export function ViewMenu({ onClose }: ViewMenuProps) {
   const layout = useWorkspaceStore()
+  const tab = useActivityPanelStore(state => state.tab)
   const city = useProjectStore(state => getProjectType(state.project) === '3d')
   function handleAction(action: () => void) {
     action()
@@ -35,10 +37,12 @@ export function ViewMenu({ onClose }: ViewMenuProps) {
       <MenuItem
         icon={FileText}
         label="属性表"
-        checked={layout.bottom.open}
+        checked={layout.bottom.open && tab === 'attributes'}
         disabled={city}
         onClick={() => handleAction(viewCommands.toggleAttributeTable)}
       />
+      <MenuItem icon={FileText} label="任务日志" checked={layout.bottom.open && tab === 'tasks'} onClick={() => handleAction(viewCommands.openTaskLog)} />
+      <MenuItem icon={Eye} label="诊断" checked={layout.bottom.open && tab === 'diagnostics'} onClick={() => handleAction(viewCommands.openDiagnostics)} />
       <MenuSeparator />
       <MenuItem
         icon={Maximize2}

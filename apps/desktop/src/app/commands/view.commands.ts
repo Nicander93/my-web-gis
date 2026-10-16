@@ -6,9 +6,12 @@ import { emitCommandStatus } from './status'
 import { getMapRuntime } from '@/features/map/map-runtime-host'
 import { projectedMapView } from '@/features/map/map-projections'
 import { createProjectSceneController } from '@/features/scene/project-scene-controller'
+import { openActivityPanel, useActivityPanelStore } from '@/stores/activity-panel.store'
 
 /** 视图命令直接操作 Workspace Store，供 Header、快捷键和菜单复用。 */
 export const viewCommands = {
+  openTaskLog(): void { openActivityPanel('tasks') },
+  openDiagnostics(): void { openActivityPanel('diagnostics') },
   setMapProjection(code: string): void {
     const runtime = getMapRuntime()
     if (!runtime || code === useProjectStore.getState().project.crs) return
@@ -41,7 +44,8 @@ export const viewCommands = {
   },
   toggleAttributeTable(): void {
     const state = useWorkspaceStore.getState()
-    const open = !state.bottom.open
+    const open = !state.bottom.open || useActivityPanelStore.getState().tab !== 'attributes'
+    useActivityPanelStore.getState().setTab('attributes')
     if (open && !useWorkbenchStore.getState().tableLayerId)
       useWorkbenchStore
         .getState()
@@ -50,6 +54,7 @@ export const viewCommands = {
     emitCommandStatus(open ? '属性表已打开' : '属性表已收起')
   },
   openAttributeTable(): void {
+    useActivityPanelStore.getState().setTab('attributes')
     if (!useWorkbenchStore.getState().tableLayerId)
       useWorkbenchStore
         .getState()

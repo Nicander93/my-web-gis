@@ -38,7 +38,7 @@ export function createSceneDocumentSession(options: SceneDocumentSessionOptions)
         (!definition || !('resource' in definition) || JSON.stringify(requested.document.resources[definition.resource]) === JSON.stringify(applied?.document.resources[definition.resource]))
       const native = mounted?.runtime.layers.getLayer(documentId)
       const state = status === 'ready' || unchanged ? native?.state === 'ready' ? 'ready' : 'loading' : status
-      states[hostId] = { state, ...(state === 'error' ? { error: '资源加载失败。请检查地址或重试；已显示的场景保留。' } : {}) }
+      states[hostId] = { state, ...(state === 'error' ? { error: error instanceof Error ? error.message : typeof error === 'string' ? error : '资源加载失败。请检查地址或重试；已显示的场景保留。' } : {}) }
     }
     onState({ status, runtime: mounted?.runtime, states, ...(error === undefined ? {} : { error }) })
   }

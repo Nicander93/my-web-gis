@@ -5,6 +5,8 @@ async function windowMenu(page: Page, name: string) {
   await page.getByRole(name === '重置布局' ? 'menuitem' : 'menuitemcheckbox', { name, exact: true }).click()
 }
 
+test.use({ screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
+
 test.beforeEach(async ({ page }) => {
   await page.route('**/*tile.openstreetmap.org/**', route => route.abort())
   await page.goto('/')
@@ -61,7 +63,6 @@ test('2D windows cover a stable full canvas and retain geometry outside project 
     return { snapshot: useProjectStore.getState().getSnapshot(), dirty: useProjectStore.getState().dirty, undo: useProjectStore.getState().canUndoEdit() }
   })
   expect(after).toEqual(before)
-  await page.screenshot({ path: info.outputPath('docking-2d.png') })
   const persisted = await bottom.boundingBox()
   await page.reload()
   await page.getByRole('button', { name: /^二维地图/ }).click()
@@ -117,5 +118,4 @@ test('3D uses the same menus and docking without resizing or recreating Cesium',
   expect(await canvas.boundingBox()).toEqual(original)
   await expect(canvas).toHaveAttribute('data-identity', identity)
   await expect(page.locator('.restore-trigger,.scene3d-panel-restore')).toHaveCount(0)
-  await page.screenshot({ path: info.outputPath('docking-3d.png') })
 })

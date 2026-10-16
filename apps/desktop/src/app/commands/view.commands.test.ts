@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useWorkspaceStore } from '@/stores/workspace.store'
 import { viewCommands } from './view.commands'
+import { useActivityPanelStore } from '@/stores/activity-panel.store'
 
 describe('view commands', () => {
   beforeEach(() => {
+    useActivityPanelStore.getState().setTab('attributes')
     const storage = {
       getItem: () => null,
       setItem: () => undefined,
@@ -25,6 +27,19 @@ describe('view commands', () => {
       focusMode: false,
       savedLayout: null
     })
+  })
+
+  it('opens log and diagnostic tabs and switches back to the attribute table without closing the dock', () => {
+    viewCommands.openTaskLog()
+    expect(useActivityPanelStore.getState().tab).toBe('tasks')
+    expect(useWorkspaceStore.getState().bottom.open).toBe(true)
+    viewCommands.openDiagnostics()
+    expect(useActivityPanelStore.getState().tab).toBe('diagnostics')
+    viewCommands.toggleAttributeTable()
+    expect(useWorkspaceStore.getState().bottom.open).toBe(true)
+    expect(useActivityPanelStore.getState().tab).toBe('attributes')
+    viewCommands.toggleAttributeTable()
+    expect(useWorkspaceStore.getState().bottom.open).toBe(false)
   })
 
   it('reports the state after toggling a panel', () => {

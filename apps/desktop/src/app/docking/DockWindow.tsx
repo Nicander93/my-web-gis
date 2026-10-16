@@ -153,7 +153,7 @@ export function DockWindow({ id, title, label, actions, children, footer, onClos
         </select>
         <button type="button" className="ui-button ui-button-icon" title={current.dock === 'floating' ? '停靠窗口' : '浮动窗口'} aria-label={current.dock === 'floating' ? `停靠${title}` : `浮动${title}`} onClick={() => dock(current.dock === 'floating' ? id : 'floating')}><PanelsTopLeft size={14} /></button>
         <button type="button" className="ui-button ui-button-icon" aria-label={`${current.maximized ? '还原' : '最大化'}${title}`} onClick={() => useDockingStore.getState().update(id, { ...current, maximized: !current.maximized })}>{current.maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}</button>
-        <button type="button" className="ui-button ui-button-icon" title={`关闭${title}`} aria-label={id === 'left' ? '收起图层面板' : id === 'right' ? '收起右侧面板' : '关闭属性表窗口'} onClick={close}><X size={14} /></button>
+        <button type="button" className="ui-button ui-button-icon" title={`关闭${title}`} aria-label={id === 'left' ? '收起图层面板' : id === 'right' ? '收起右侧面板' : `关闭${title}窗口`} onClick={close}><X size={14} /></button>
       </div>
     </header>
     <div className="panel-body">{children}</div>

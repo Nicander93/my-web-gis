@@ -1,5 +1,6 @@
 import { applyFieldFilter, capabilitiesForDataset, inferLayerStyleKind, type GisFeature, type Layer, type SelectionState, type ProcessingOptions, type ProcessingResult, type ProcessingRecord } from '@desktop-webgis/gis-core'
 import { useProjectStore } from '@/stores/project.store'
+import { runLoggedTask } from './task-log'
 
 export type ProcessingScope = 'all' | 'filtered' | 'selected'
 
@@ -28,6 +29,15 @@ export function runProcessing(features: GisFeature[], options: ProcessingOptions
 
 /** Shared worker lifecycle for read-only reports and result-producing operations. */
 export function runProcessingWorker<T>(request: unknown, signal: AbortSignal): Promise<T> {
+  const check = !!request && typeof request === 'object' && 'kind' in request && request.kind === 'check-geometry'
+  return runLoggedTask(check ? '检查几何' : '空间处理', operation => executeProcessingWorker<T>(request, operation), signal, result => {
+    const detail = result && typeof result === 'object' && 'issues' in result && Array.isArray(result.issues) ? `检查完成，发现 ${result.issues.length} 项问题`
+      : result && typeof result === 'object' && 'features' in result && Array.isArray(result.features) ? `处理完成，生成 ${result.features.length} 个要素，等待添加结果` : '处理完成'
+    return { detail }
+  })
+}
+
+function executeProcessingWorker<T>(request: unknown, signal: AbortSignal): Promise<T> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) { reject(new DOMException('已取消', 'AbortError')); return }
     const worker = new Worker(new URL('../features/processing/processing.worker.ts', import.meta.url), { type: 'module' })

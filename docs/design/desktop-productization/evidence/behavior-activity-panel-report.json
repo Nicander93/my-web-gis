@@ -1,0 +1,34 @@
+{
+  "date": "2026-10-16",
+  "scope": "Shared docking panel for task logs and diagnostics",
+  "validation": {
+    "desktopUnitTests": { "passed": 310, "skipped": 5, "files": 61 },
+    "activityPanelE2E": { "file": "apps/desktop/e2e/activity-panel.e2e.ts", "projects": ["desktop", "laptop"], "passed": 6 },
+    "regressionE2E": { "files": ["docking.e2e.ts", "import-transaction.e2e.ts", "file-import.e2e.ts"], "project": "desktop", "passed": 11 },
+    "additionalProjectIsolationE2E": "passed on laptop",
+    "desktopProductionBuild": "passed",
+    "visualAcceptance": "No screenshots or pixel comparison; visual review remains with the user"
+  },
+  "assertions": [
+    "Window menu opens task logs or diagnostics in the existing bottom dock; attributes retain their own tab and entry points",
+    "Ant Design tables, tabs, status filters, details, copy controls, descriptions and collapsible environment section",
+    "Actual import parsing and confirmation are distinct logged operations; malformed imports produce failed records",
+    "Log cancellation aborts a real pending import worker; clearing completed records preserves active cancellation controls",
+    "Processing and geometry-check tasks link caller cancellation, panel cancellation and project replacement to the same worker",
+    "3D resource loading transitions create bounded records without logging every render; failed resources navigate to their source inspector",
+    "Diagnostic counts derive from project snapshots and public runtime diagnostics; unknown/loading/ready/failure remain distinct",
+    "Real browser clipboard readback verifies copied task details and structured diagnostics",
+    "URL credentials, sensitive query parameters and authorization headers are redacted from copied errors and resource addresses",
+    "Completed history is capped at 200 while retaining active tasks; terminal records reject late completion updates",
+    "Project replacement isolates old records; diagnostics, filters, copy and docking preserve project snapshots, dirty flags and undo state",
+    "Existing full-canvas geometry, docking restoration, Cesium identity and all four import formats remain covered"
+  ],
+  "boundaries": [
+    "Logs are in-memory and scoped to a project epoch, not persisted project history or a complete audit log",
+    "Per-resource 3D loads do not expose a cancel control because the current resource loader has no independent cancel contract",
+    "2D remote-service tile health remains unknown when the runtime provides no reliable aggregate load state",
+    "No invented FPS or GPU-memory metrics; existing WebGL context and actual managed-object counters are read only",
+    "Native clipboard, Windows 125 percent scaling and physical GPU performance are not signed off by browser E2E",
+    "Global drawing/editing/measurement tool-session coordination remains a separate next task"
+  ]
+}
