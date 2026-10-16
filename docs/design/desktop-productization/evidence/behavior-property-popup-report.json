@@ -1,0 +1,17 @@
+{
+  "date": "2026-10-16",
+  "command": "pnpm --filter @desktop-webgis/desktop exec playwright test e2e/property-popup-draft.e2e.ts --project=desktop --project=laptop",
+  "result": "4 passed",
+  "viewports": ["1440x900", "1366x768"],
+  "checks": [
+    "2D popup draft changes remain outside Project until Apply",
+    "Field labels commit with the configured fields",
+    "Cancel discards subsequent edits while retaining the last applied popup",
+    "One Undo restores the exact previous layer configuration",
+    "3D groupId and popup.titleField can be cleared without leaving undefined values in the serialized scene",
+    "Clearing optional fields retains popup field definitions and is undone atomically"
+  ],
+  "desktopBuild": "passed",
+  "method": "Behavioral E2E only, with screenshots disabled. Visual review belongs to the user.",
+  "boundary": "E14 specialized field coverage and native acceptance remain partial."
+}

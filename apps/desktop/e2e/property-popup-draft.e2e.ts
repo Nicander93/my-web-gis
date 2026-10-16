@@ -1,0 +1,62 @@
+import { expect, test, type Page } from '@playwright/test'
+import { createCesiumScene } from '@desktop-webgis/cesium-scene-schema'
+
+test.use({ screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
+async function state(page: Page) { return page.evaluate(async () => (await import('/src/stores/project.store.ts')).useProjectStore.getState().getSnapshot()) }
+test.beforeEach(async ({ page }) => {
+  await page.route('**/*tile.openstreetmap.org/**', route => route.abort())
+  await page.goto('/')
+})
+test('2D popup drafts apply atomically, retain labels, cancel and undo', async ({ page }) => {
+  test.setTimeout(90_000)
+  await page.getByRole('button', { name: /^二维地图/ }).click()
+  await page.getByRole('tab', { name: '数据', exact: true }).click()
+  await page.getByRole('region', { name: '二维功能区' }).getByRole('button', { name: '添加数据', exact: true }).click()
+  await page.locator('input[type=file]').setInputFiles({ name: 'popup.geojson', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: { name: 'Alpha', code: '001' }, geometry: { type: 'Point', coordinates: [116.4, 39.9] } }] })) })
+  await page.getByRole('button', { name: '确认导入', exact: true }).click()
+  await page.locator('.layer-item').filter({ hasText: 'popup' }).click({ button: 'right' })
+  await page.getByRole('menuitem', { name: '完整属性', exact: true }).click()
+  const dialog = page.locator('.scene-property-window'), before = await state(page)
+  await dialog.getByRole('menuitem', { name: '属性弹窗', exact: true }).click()
+  await dialog.getByRole('switch', { name: '启用属性弹窗', exact: true }).click()
+  await dialog.getByRole('checkbox', { name: 'name', exact: true }).check()
+  await dialog.getByRole('textbox', { name: '弹窗字段标签 name', exact: true }).fill('名称')
+  expect(await state(page)).toEqual(before)
+  await dialog.getByRole('button', { name: '应用', exact: true }).click()
+  await expect.poll(async () => (await state(page)).project.layers[0].interaction?.popup).toMatchObject({ fields: [{ field: 'name', label: '名称' }] })
+  await dialog.getByRole('checkbox', { name: 'code', exact: true }).check()
+  await dialog.getByRole('button', { name: '取消', exact: true }).click()
+  expect((await state(page)).project.layers[0].interaction?.popup?.fields).toEqual([{ field: 'name', label: '名称' }])
+  await page.getByRole('tab', { name: '编辑', exact: true }).click()
+  await page.getByRole('button', { name: '撤销', exact: true }).click()
+  expect((await state(page)).project.layers[0]).toEqual(before.project.layers[0])
+})
+
+test('3D root folder and cleared popup title field remain serializable and undoable', async ({ page }) => {
+  test.setTimeout(90_000)
+  await page.getByRole('button', { name: /^三维场景/ }).click()
+  await expect(page.locator('.scene3d-footer__state')).toHaveText('就绪', { timeout: 30_000 })
+  const scene = createCesiumScene()
+  scene.groups = [{ id: 'folder', name: 'Folder', visible: true }]
+  scene.nodes = [{ id: 'point', name: 'Point', type: 'graphic', visible: true, groupId: 'folder', properties: { name: 'Alpha' }, geometry: { type: 'point', heightMode: 'ground', positions: [[116.4,39.9,0]] }, style: { color: '#2f7655', width: 3, pointSize: 8, labelField: 'name' }, popup: { titleField: 'name', fields: [{ field: 'name' }] } }]
+  await page.getByRole('button', { name: '文件', exact: true }).click()
+  const chooser = page.waitForEvent('filechooser')
+  await page.getByRole('menuitem', { name: '导入场景', exact: true }).click()
+  await (await chooser).setFiles({ name: 'point.scene.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(scene)) })
+  await page.locator('.scene3d-layer-row__select').click({ button: 'right' })
+  await page.getByRole('menuitem', { name: '完整属性', exact: true }).click()
+  const dialog = page.locator('.scene-property-window'), before = await state(page)
+  await dialog.getByRole('combobox', { name: '所属文件夹', exact: true }).click()
+  await page.locator('.ant-select-dropdown .ant-select-item-option-content').getByText('根目录', { exact: true }).click()
+  await dialog.getByRole('menuitem', { name: '属性弹窗', exact: true }).click()
+  await dialog.getByRole('textbox', { name: '标题字段', exact: true }).fill('')
+  await dialog.getByRole('button', { name: '应用', exact: true }).click()
+  await expect(dialog.getByRole('alert')).toHaveCount(0)
+  const applied = (await state(page)).project.city!.nodes[0]
+  expect(applied.groupId).toBeUndefined()
+  expect(applied.popup?.titleField).toBeUndefined()
+  expect(applied.popup?.fields).toEqual([{ field: 'name' }])
+  await dialog.getByRole('button', { name: '取消', exact: true }).click()
+  await page.getByRole('button', { name: '撤销', exact: true }).click()
+  expect((await state(page)).project.city!.nodes).toEqual(before.project.city!.nodes)
+})

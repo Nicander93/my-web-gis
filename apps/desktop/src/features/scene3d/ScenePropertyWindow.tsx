@@ -40,7 +40,7 @@ export function ScenePropertyWindow({ initial, scene, onApply, onClose, onPrevie
     catch (reason) { setPreviewError(reason instanceof Error ? reason.message : '预览失败') }
     return () => { previewHandler.current?.(null) }
   }, [preview, previewReady, draft, current, base])
-  function patch(value: Partial<CesiumSceneNode>): void { setDraft(node => ({ ...node, ...value } as CesiumSceneNode)) }
+  function patch(value: Partial<CesiumSceneNode>): void { setDraft(node => Object.fromEntries(Object.entries({ ...node, ...value }).filter(([, item]) => item !== undefined)) as unknown as CesiumSceneNode) }
   function apply(close = false): void {
     if (Object.values(invalid).some(Boolean)) { setError('请先修正无效的字段。'); return }
     try { onApply(base, draft); setBase(structuredClone(draft)); setError(''); if (close) onClose() }
@@ -98,6 +98,7 @@ export function ScenePropertyWindow({ initial, scene, onApply, onClose, onPrevie
             {numeric('线宽（px）', 'style.width', draft.style.width, width => patch({ style: { ...draft.style, width } }), 1, 64)}
             {numeric('点大小（px）', 'style.pointSize', draft.style.pointSize, pointSize => patch({ style: { ...draft.style, pointSize } }), 1, 128)}
             {field('标注文字', 'style.label', <Input aria-label="标注文字" value={draft.style.label ?? ''} onChange={event => patch({ style: { ...draft.style, label: event.target.value } })} />)}
+            {field('标注字段', 'style.labelField', <Select aria-label="标注字段" value={draft.style.labelField} allowClear options={Object.keys(draft.properties).map(field => ({ value: field, label: field }))} onChange={labelField => { const { labelField: _previous, ...style } = draft.style; patch({ style: labelField ? { ...style, labelField } : style }) }} />)}
           </>}
           {draft.type === 'model' && <p>模型的材质与纹理由 GLB/GLTF 资源定义。</p>}
           {draft.type === 'water' && <>{numeric('水面高度（m）', 'height', draft.height, height => patch({ height }))}{numeric('波幅', 'amplitude', draft.amplitude, amplitude => patch({ amplitude }), 0)}{numeric('频率', 'frequency', draft.frequency, frequency => patch({ frequency }), 0)}{numeric('速度', 'speed', draft.speed, speed => patch({ speed }), 0)}</>}
@@ -105,7 +106,7 @@ export function ScenePropertyWindow({ initial, scene, onApply, onClose, onPrevie
         <div hidden={section !== 'properties'}>{draft.type === 'graphic' ? <AttributeDraft key={`${revision}:properties`} value={draft.properties} onValidity={valid => setInvalid(state => ({ ...state, properties: !valid }))} onChange={properties => patch({ properties } as Partial<CesiumSceneNode>)} /> : <p>此类对象的构件属性由资源提供；在画布中拾取后通过检查器查看。</p>}</div>
         {section === 'popup' && <>
           {field('弹窗标题', 'popup.title', <Input aria-label="弹窗标题" value={draft.popup?.title ?? ''} onChange={event => patch({ popup: { fields: [], ...draft.popup, title: event.target.value } })} />)}
-          {field('标题字段', 'popup.titleField', <Input aria-label="标题字段" value={draft.popup?.titleField ?? ''} onChange={event => patch({ popup: { fields: [], ...draft.popup, titleField: event.target.value || undefined } })} />)}
+          {field('标题字段', 'popup.titleField', <Input aria-label="标题字段" value={draft.popup?.titleField ?? ''} onChange={event => { const { titleField: _previous, ...popup } = draft.popup ?? { fields: [] }; patch({ popup: event.target.value ? { ...popup, titleField: event.target.value } : popup }) }} />)}
           {(draft.popup?.fields ?? []).map((item, index) => <div className="scene-property-window__attribute" key={index}>
             <Input aria-label={`弹窗字段 ${index + 1}`} placeholder="字段名" value={item.field} onChange={event => patch({ popup: { ...draft.popup, fields: (draft.popup?.fields ?? []).map((field, i) => i === index ? { ...field, field: event.target.value } : field) } })} />
             <Input aria-label={`弹窗字段标签 ${index + 1}`} placeholder="显示名称" value={item.label ?? ''} onChange={event => patch({ popup: { ...draft.popup, fields: (draft.popup?.fields ?? []).map((field, i) => i === index ? { ...field, label: event.target.value } : field) } })} />

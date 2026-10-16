@@ -110,6 +110,8 @@ rtk pnpm --filter @desktop-webgis/desktop test:e2e folders.e2e.ts --project=desk
 
 第三批增加“实时预览”开关：二维图层显隐、透明度、缩放范围和样式仅作用于原生图层，外部同目标修改后旧预览失效；三维模型锚点/变换、对象显隐/样式、Tileset 效果和水面参数仅作用于已安装对象。关闭或取消恢复最新已应用值，Apply 后继续预览再 Cancel 不回退已应用修改。模型保持原生实例，水面复用材质，仅高程或边界变化时替换几何，并确定性清理时钟监听。项目内容版本在纯预览期间不变。专项验收改用原生状态断言，见 `evidence/behavior-property-preview-report.json`；全部专业参数与原生专项仍保留未签收边界。
 
+第四批补齐二维完整属性窗口的弹窗草稿分类：启停、标题字段、显示字段及字段标签统一随 Apply/OK 提交，Cancel 丢弃未应用值，一次 Undo 恢复全部配置。补齐三维 Graphic 标注字段，并修正可选字段清空：移回根目录和清空 Popup 标题字段会移除对应键，不向严格 JSON 场景写入 undefined。1440×900、1366×768 共 4 项行为 E2E 与 Desktop 构建通过；未使用截图或逐像素比较。证据见 `evidence/behavior-property-popup-report.json`。
+
 ## 验证记录
 
 M0 资料/基线提交：`41a57e0`。

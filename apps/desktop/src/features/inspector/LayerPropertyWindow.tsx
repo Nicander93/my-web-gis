@@ -12,6 +12,7 @@ import { propertyWindowEvent } from './property-window-request'
 import type { PropertyWindowRequest } from './property-window-request'
 import { FolderPropertyWindow } from './FolderPropertyWindow'
 import { createMapPropertyPreview } from '@/features/map/map-runtime-host'
+import { PopupDraftFields } from './PopupDraftFields'
 
 /** Host captures a target and epoch at the explicit open action, never at selection changes. */
 export function LayerPropertyWindowHost() {
@@ -73,7 +74,8 @@ function LayerPropertyWindow({ id, onClose }: { id: string; onClose(): void }) {
   }
   const symbol = style.mode === 'single' ? style.symbol : style.fallback
   const setSymbol = (symbol: Symbol) => setStyle(style.mode === 'single' ? { ...style, symbol } : { ...style, fallback: symbol })
-  return <PropertyWindow title={`完整属性：${title}`} subtitle={`图层 · ${id}`} dirty={dirty} categories={[{ key: 'general', label: '常规与显示' }, { key: 'style', label: '样式' }, { key: 'label', label: '标注' }, { key: 'source', label: '数据源' }]} section={section} onSection={setSection} query={query} onQuery={setQuery} onClose={onClose} footer={<><label><Switch aria-label="实时预览" checked={preview} onChange={setPreview} /> 实时预览</label><Button disabled={!current} onClick={() => { setBase(structuredClone(current)); setDraft(structuredClone(current)); setError('') }}>重新载入</Button><span /><Button onClick={onClose}>取消</Button><Button disabled={!current || !dirty} onClick={() => apply()}>应用</Button><Button type="primary" disabled={!current} onClick={() => apply(true)}>确定</Button></>}>
+  const popupFields = [...new Set([...(dataset?.fields?.map(field => field.name) ?? []), ...(useProjectStore.getState().featuresByDataset[draft.datasetId] ?? []).slice(0, 100).flatMap(feature => Object.keys(feature.properties))])]
+  return <PropertyWindow title={`完整属性：${title}`} subtitle={`图层 · ${id}`} dirty={dirty} categories={[{ key: 'general', label: '常规与显示' }, { key: 'style', label: '样式' }, { key: 'label', label: '标注' }, { key: 'popup', label: '属性弹窗' }, { key: 'source', label: '数据源' }]} section={section} onSection={setSection} query={query} onQuery={setQuery} onClose={onClose} footer={<><label><Switch aria-label="实时预览" checked={preview} onChange={setPreview} /> 实时预览</label><Button disabled={!current} onClick={() => { setBase(structuredClone(current)); setDraft(structuredClone(current)); setError('') }}>重新载入</Button><span /><Button onClick={onClose}>取消</Button><Button disabled={!current || !dirty} onClick={() => apply()}>应用</Button><Button type="primary" disabled={!current} onClick={() => apply(true)}>确定</Button></>}>
     {(!current || error) && <Alert type="error" title={error || '图层已删除，无法应用。'} />}
     {section === 'general' && <>
       {field('图层名称', 'name', <Input aria-label="图层名称" value={draft.name} onChange={event => patch({ name: event.target.value })} />)}
@@ -95,6 +97,7 @@ function LayerPropertyWindow({ id, onClose }: { id: string; onClose(): void }) {
       {field('标注字段', 'label.field', <Select aria-label="标注字段" value={style.label?.field} allowClear options={(dataset?.fields ?? []).map(field => ({ value: field.name, label: field.name }))} onChange={field => setStyle({ ...style, label: field ? { fontSize: 12, ...style.label, field } : undefined })} />)}
       {style.label && field('字号（px）', 'label.fontSize', <InputNumber min={6} max={72} value={style.label.fontSize ?? 12} onChange={fontSize => { if (fontSize !== null && style.label) setStyle({ ...style, label: { ...style.label, fontSize } }) }} />)}
     </> : <p>服务影像的标注由服务端提供。</p>)}
+    {section === 'popup' && (vector ? <PopupDraftFields popup={draft.interaction?.popup} fields={popupFields} onChange={popup => { const { popup: _previous, ...interaction } = draft.interaction ?? {}; patch({ interaction: popup ? { ...interaction, popup } : interaction }) }} /> : <p>服务影像不提供本地属性弹窗。</p>)}
     {section === 'source' && <dl><dt>数据集 ID</dt><dd>{draft.datasetId}</dd><dt>数据类型</dt><dd>{dataset?.kind}</dd><dt>项目坐标系</dt><dd>{project.crs}</dd><dt>数据来源</dt><dd style={{ overflowWrap: 'anywhere' }}>{dataset ? 'path' in dataset.source ? dataset.source.path : 'url' in dataset.source ? dataset.source.url : 'label' in dataset.source ? dataset.source.label : '内存数据' : '数据集已删除'}</dd></dl>}
   </PropertyWindow>
 }
