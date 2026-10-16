@@ -384,3 +384,11 @@ Desktop build 通过；`attribute-tabs.e2e.ts`、`field-schema.e2e.ts` 在 1366�
 - 二维真实双击回归发现并修正外层 Tabs 容器高度规则：按 Ant Design 6 的 body-holder/body/content 结构限定直接子容器，避免影响内部属性表页签与行点击。没有用强制点击或截图跳过遮挡问题；修正后日志/诊断两个尺寸的 6 项行为回归继续通过。
 - 验证：desktop/laptop 共 6 项工具会话 E2E 通过；三维测量、矩形/椭圆、Billboard、连续点共 5 项回归通过；二维实际框选和两类 Esc 回滚共 3 项回归通过。Desktop 全量 317 项单测通过、5 项既有环境测试跳过，生产构建通过；无截图或像素比较。
 - Cesium 地形采样的底层请求没有在本批获得强制取消接口，已失效结果会被丢弃。Windows 失焦、物理输入设备、IME 与 GPU 组合仍需原生验收，不用浏览器结果代签。证据见 [工具会话行为报告](../design/desktop-productization/evidence/behavior-tool-session-report.json)。
+
+## M6/M7/M9 批次：无截图原生资源生命周期（2026-10-16）
+
+- 新增 `test:native-resources`，以隔离 Tauri 应用和 WebView2 profile 运行；不调用截图或像素比较。验收结束关闭自有进程并恢复普通 debug 配置。
+- 四组原生场景通过：中文及 `#%` 路径下的外部 GLTF 几何/UV/PNG 实际加载；真实保存后退出进程、读取文件并重开；通过产品重定位窗口应用新路径、请求新目录依赖并保存；跨目录写入副本，校验工作快照/当前路径/原文件字节不变及外部绝对引用。
+- 额外确认旧进程的目录授权在重启后返回 403；正式项目只保存资源引用，报告剔除临时授权 key。GLTF 状态读取真实 Cesium 模型矩阵，依赖校验来自 WebView2 实际请求及原生协议响应。
+- 文件路径由夹具提供；打开使用原生读取、引用解析与 Store 加载，跨目录写入调用保存服务。因此没有签收打开菜单、系统文件选择和另存对话框。本轮辅助功能工具未识别系统对话框；这些项继续待验收。Windows 125%、Tileset/GeoJSON 本地引用全生命周期、E01–E20 综合矩阵和独立 PR 仍未完成。
+- 证据见 [原生资源生命周期报告](../design/desktop-productization/evidence/native-resource-lifecycle-report.json)。本批只增加自动验收、执行入口与文档，未修改产品交互或视觉。

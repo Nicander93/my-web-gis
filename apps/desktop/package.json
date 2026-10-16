@@ -11,7 +11,8 @@
     "test:ui-restart": "node ./run-ui-restart-reverify.mjs",
     "preview": "vite preview",
     "tauri": "tauri",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:native-resources": "node scripts/native-resource-acceptance.mjs"
   },
   "dependencies": {
     "@desktop-webgis/cesium-measure": "workspace:*",

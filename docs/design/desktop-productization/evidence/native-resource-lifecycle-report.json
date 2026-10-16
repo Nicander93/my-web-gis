@@ -1,0 +1,130 @@
+{
+  "identifier": "com.desktop-webgis.resource-acceptance-1792155427394",
+  "output": "D:\\my-code-repo\\my-web-gis\\apps\\desktop\\test-results\\native-resources-1792155427394",
+  "scenarios": [
+    {
+      "name": "Native GLTF external binary loading with Unicode and reserved path characters",
+      "passed": true
+    },
+    {
+      "name": "Native save, relative reference persistence and reopen after process restart",
+      "passed": true
+    },
+    {
+      "name": "Native relocation loads external binary from new directory and persists the new relative path",
+      "passed": true
+    },
+    {
+      "name": "Cross-directory native snapshot save preserves working state, current file and original bytes; external reference rebased correctly",
+      "passed": true
+    }
+  ],
+  "screenshots": false,
+  "nativeFileChooser": "Not verified: fixture working paths assigned; native filesystem and resource protocol used",
+  "windowsScale125": "Not verified",
+  "resourceResponses": [
+    {
+      "path": "原始资源 #%/模型.gltf",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/几何.bin",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/纹理.png",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/坐标-0.bin",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/模型.gltf",
+      "status": 403
+    },
+    {
+      "path": "原始资源 #%/模型.gltf",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/几何.bin",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/坐标-0.bin",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/纹理.png",
+      "status": 200
+    },
+    {
+      "path": "迁移资源 #%/模型.gltf",
+      "status": 200
+    },
+    {
+      "path": "迁移资源 #%/几何.bin",
+      "status": 200
+    },
+    {
+      "path": "迁移资源 #%/坐标-0.bin",
+      "status": 200
+    },
+    {
+      "path": "迁移资源 #%/纹理.png",
+      "status": 200
+    }
+  ],
+  "appData": "C:\\Users\\PC\\AppData\\Local\\com.desktop-webgis.resource-acceptance-1792155427394",
+  "viewport": {
+    "width": 1036,
+    "height": 648,
+    "devicePixelRatio": 1.5927083492279053
+  },
+  "initial": {
+    "sceneObjects": 1,
+    "graphicObjects": 0,
+    "managedLayers": 1,
+    "dataSources": 0,
+    "primitives": 1,
+    "presentation": {
+      "id": "scene3d-mvaz35l5-3-z6rl7x",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": 1
+      },
+      "position": [
+        116.39099999999999,
+        39.907,
+        -1.3969838619232178e-09
+      ]
+    }
+  },
+  "date": "2026-10-16",
+  "command": "rtk pnpm --filter @desktop-webgis/desktop test:native-resources",
+  "limitations": [
+    "The OS chooser was not exposed by accessibility automation; assigned fixture paths do not validate native dialogs.",
+    "Windows 125 percent scale, complex Tileset and GeoJSON reference lifecycle remain unverified.",
+    "Cross-directory save invokes saveSnapshotToPath directly; Save As dialog and its interaction are not validated.",
+    "No screenshots, pixel comparisons or visual acceptance."
+  ],
+  "validation": {
+    "nativeHarnessExitCode": 0,
+    "isolatedNativeBuild": "passed",
+    "normalDebugConfigurationRestored": "passed",
+    "desktopProductionBuild": "passed",
+    "nodeSyntaxCheck": "passed",
+    "screenshots": "disabled"
+  }
+}
