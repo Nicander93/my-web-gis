@@ -23,6 +23,7 @@ import { useWorkspaceStore } from '@/stores/workspace.store'
 import { createProjectSceneDocument } from '../scene/project-scene-document'
 import { configureMapServiceLayer } from './map-service-requests'
 import { registerMapProjections } from './map-projections'
+import { assertValidGeometryEdits } from './geometry-edit-validation'
 
 registerMapProjections()
 
@@ -441,6 +442,18 @@ function createToolCallbacks(): ToolCallbacks {
       return selection.layerId === useWorkbenchStore.getState().editLayerId ? selection.featureIds : []
     },
     getFeatureGeometry: (datasetId, featureId) => useProjectStore.getState().featuresByDataset[datasetId]?.find(feature => feature.id === featureId)?.geometry,
+    validateGeometries: (datasetId, features) => {
+      try {
+        const state = useProjectStore.getState(), layerId = useWorkbenchStore.getState().editLayerId
+        const layer = state.project.layers.find(layer => layer.id === layerId && layer.datasetId === datasetId)
+        if (!layer || getEffectiveLocked(state.project, layer.id) || !capabilitiesForDataset(state.project.datasets.find(dataset => dataset.id === datasetId)).editGeometry) throw new Error('编辑目标已删除或锁定，未提交本次修改。')
+        assertValidGeometryEdits(features)
+        return true
+      } catch (error) {
+        window.dispatchEvent(new CustomEvent('desktop-webgis:command-status', { detail: error instanceof Error ? error.message : '几何校验失败，未提交本次修改。' }))
+        return false
+      }
+    },
     onUpdateGeometries: command => {
       try {
         useProjectStore.getState().executeEditCommand(command)
@@ -454,6 +467,7 @@ function createToolCallbacks(): ToolCallbacks {
     onAddFeature: (_datasetId, _feature, command) => {
       useProjectStore.getState().executeEditCommand(command)
       syncMapFromProject()
+      return true
     },
     onDeleteFeatures: (_datasetId, _features, commands) => {
       useProjectStore.getState().executeEditCommands(commands)

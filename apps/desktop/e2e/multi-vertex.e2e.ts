@@ -133,3 +133,28 @@ test('shared edge vertex insertion and Alt deletion each undo in one step', asyn
   await page.getByRole('button', { name: '撤销', exact: true }).click()
   expect(await snapshot(page)).toEqual(before)
 })
+
+test('invalid shared vertex geometry rolls back the complete gesture and leaves the next edit usable', async ({ page }) => {
+  const before = await snapshot(page)
+  const targets = await page.evaluate(async () => {
+    const { getMapRuntime } = await import('/src/features/map/map-runtime-host.ts')
+    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const runtime = getMapRuntime()!, map = runtime.getMap(), layer = useProjectStore.getState().project.layers[0]
+    map.getView().setZoom(map.getView().getZoom()! - 1)
+    map.renderSync()
+    const geometry = runtime.registry.getVector(layer.id)!.getSource()!.getFeatures().find(feature => feature.get('name') === 'A')!.getGeometry() as unknown as { getCoordinates(): number[][][] }
+    const ring = geometry.getCoordinates()[0]
+    return { from: map.getPixelFromCoordinate(ring[1]), to: map.getPixelFromCoordinate([ring[0][0] + (ring[2][0] - ring[0][0]) * .7, ring[2][1] + (ring[2][1] - ring[1][1]) * .2]) }
+  })
+  const from = await pointer(page, targets.from), to = await pointer(page, targets.to)
+  await page.mouse.move(from.x, from.y); await page.mouse.down()
+  await page.mouse.move(to.x, to.y, { steps: 12 }); await page.mouse.up()
+  await expect(page.locator('.status-message')).toContainText('未提交本次编辑')
+  await expect(page.locator('.status-message')).toContainText('自相交')
+  expect(await snapshot(page)).toEqual(before)
+  expect(await pixel(page)).toEqual(targets.from)
+  await drag(page, await pixel(page))
+  await expect.poll(async () => (await snapshot(page)).featuresByDataset).not.toEqual(before.featuresByDataset)
+  await page.getByRole('button', { name: '撤销', exact: true }).click()
+  expect(await snapshot(page)).toEqual(before)
+})

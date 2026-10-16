@@ -152,6 +152,39 @@ describe('editing capture', () => {
     expect(feature.getGeometry()!.getExtent()).toEqual(before.getExtent())
     f.tool.deactivate()
   })
+  it('rejects an entire shared gesture before callbacks and restores every native target', () => {
+    const f = fixture(), first = f.source.getFeatures()[0], second = new Feature(new Point([20, 20]))
+    first.setId('a'); second.setId('b'); f.source.addFeature(second)
+    f.callbacks.getSelectedFeatureIds = () => ['a', 'b']
+    f.callbacks.validateGeometries = vi.fn(() => false)
+    f.callbacks.onUpdateGeometries = vi.fn()
+    const before = [first.getGeometry()!.clone(), second.getGeometry()!.clone()]
+    f.tool.activate('modify', f.callbacks)
+    const modify = f.interactions.find(item => item instanceof Modify) as Modify, features = new Collection([first, second])
+    modify.dispatchEvent({ type: 'modifystart', features } as never)
+    first.setGeometry(new Point([30, 30])); second.setGeometry(new Point([40, 40]))
+    modify.dispatchEvent({ type: 'modifyend', features } as never)
+    expect(f.callbacks.validateGeometries).toHaveBeenCalledOnce()
+    expect(vi.mocked(f.callbacks.validateGeometries).mock.calls[0][1]).toHaveLength(2)
+    expect(f.callbacks.onUpdateGeometries).not.toHaveBeenCalled()
+    expect(first.getGeometry()!.getExtent()).toEqual(before[0].getExtent())
+    expect(second.getGeometry()!.getExtent()).toEqual(before[1].getExtent())
+    f.tool.deactivate()
+  })
+  it('keeps rejected drawings out of the source and permits the next accepted drawing once', () => {
+    const f = fixture(), count = f.source.getFeatures().length
+    f.callbacks.validateGeometries = vi.fn(() => false)
+    f.tool.activate('draw-point', f.callbacks)
+    const draw = f.interactions.find(item => item instanceof Draw) as Draw
+    draw.dispatchEvent({ type: 'drawend', feature: new Feature(new Point([10, 10])) } as never)
+    expect(f.source.getFeatures()).toHaveLength(count)
+    expect(f.callbacks.onAddFeature).not.toHaveBeenCalled()
+    f.callbacks.validateGeometries = () => true
+    draw.dispatchEvent({ type: 'drawend', feature: new Feature(new Point([20, 20])) } as never)
+    expect(f.callbacks.onAddFeature).toHaveBeenCalledOnce()
+    expect(f.source.getFeatures()).toHaveLength(count + 1)
+    f.tool.deactivate()
+  })
   it('excludes node-filtered records from capture and editing without deleting full source data', () => {
     const f = fixture(), hidden = f.source.getFeatures()[0]
     vi.spyOn(f.runtime, 'isFeatureIncluded').mockImplementation((_id, feature) => feature.get('allowed') !== false)

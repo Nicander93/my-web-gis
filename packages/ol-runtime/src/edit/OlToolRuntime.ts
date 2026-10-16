@@ -26,8 +26,9 @@ export interface ToolCallbacks {
   getActiveLayerId(): string | null
   getSelectedFeatureIds?(): string[]
   getFeatureGeometry?(datasetId: string, featureId: string): GisFeature['geometry'] | undefined
+  validateGeometries?(datasetId: string, features: { id: string; geometry: GisFeature['geometry'] }[]): boolean
   onUpdateGeometries?(command: UpdateGeometriesCommand): boolean | void
-  onAddFeature(datasetId: string, feature: GisFeature, command: AddFeatureCommand): void
+  onAddFeature(datasetId: string, feature: GisFeature, command: AddFeatureCommand): boolean | void
   onDeleteFeatures(datasetId: string, features: GisFeature[], commands: DeleteFeatureCommand[]): void
   onUpdateGeometry(datasetId: string, featureId: string, before: GisFeature['geometry'], after: GisFeature['geometry'], command: UpdateGeometryCommand): void
   onSelectionChange(featureIds: string[]): void
@@ -144,7 +145,8 @@ export class OlToolRuntime {
 
   private activateDraw(tool: EditTool, source: VectorSource, callbacks: ToolCallbacks): void {
     const type = tool === 'draw-point' ? 'Point' : tool === 'draw-line' ? 'LineString' : 'Polygon'
-    const draw = new Draw({ source, type })
+    // The host may reject invalid geometry; only accepted results enter the source.
+    const draw = new Draw({ type })
     draw.on('drawstart', () => { this.drawing = true })
     draw.on('drawabort', () => { this.drawing = false })
     draw.on('drawend', (event) => {
@@ -155,8 +157,10 @@ export class OlToolRuntime {
       feature.id = createId('feature')
       event.feature.setId(feature.id)
       event.feature.set('domainFeatureId', feature.id)
+      if (callbacks.validateGeometries?.(datasetId, [feature]) === false) return
       const command = new AddFeatureCommand(createId('cmd'), datasetId, feature)
-      callbacks.onAddFeature(datasetId, feature, command)
+      if (callbacks.onAddFeature(datasetId, feature, command) === false) return
+      if (!source.getFeatureById(feature.id)) source.addFeature(event.feature as Feature<Geometry>)
     })
     this.addInteractions(draw)
     this.editSource = source
@@ -218,6 +222,10 @@ export class OlToolRuntime {
       })
       beforeByFeature.clear()
       try {
+        if (changes.length && callbacks.validateGeometries?.(datasetId, changes.map(change => ({ id: change.featureId, geometry: change.after }))) === false) {
+          this.cancelModification()
+          return
+        }
         if (changes.length && callbacks.onUpdateGeometries) {
           if (callbacks.onUpdateGeometries(new UpdateGeometriesCommand(createId('cmd'), datasetId, changes)) === false) this.cancelModification()
         }

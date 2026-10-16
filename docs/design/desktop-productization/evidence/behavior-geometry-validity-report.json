@@ -1,0 +1,15 @@
+{
+  "date": "2026-10-16",
+  "scope": "Geometry validity preflight for drawing and multi-feature vertex gestures",
+  "e2e": {
+    "command": "pnpm --filter @desktop-webgis/desktop exec playwright test e2e/multi-vertex.e2e.ts e2e/geometry-validity.e2e.ts --project=desktop --project=laptop",
+    "result": "10 scenarios passed across the regression run and corrected-target rerun",
+    "rerunCommand": "pnpm --filter @desktop-webgis/desktop exec playwright test e2e/multi-vertex.e2e.ts --grep \"invalid shared\" --project=desktop --project=laptop",
+    "note": "Initial invalid-drag pointer targets were calculated before the zoom render; map.renderSync corrected test coordinate timing. Eight other scenarios passed in the first run; both corrected invalid-drag scenarios then passed.",
+    "viewports": [[1440, 900], [1366, 768]],
+    "checks": ["invalid drawing leaves no native ghost, project mutation or history step", "next valid drawing enters the project and source exactly once", "invalid shared vertex gesture restores all affected geometries", "rejected gesture leaves the next edit usable", "valid shared edits, Escape, insertion, Alt deletion, undo/redo and saved-project reopen regressions"]
+  },
+  "unitTests": { "desktopValidationAndWorkbench": "16 passed", "olRuntime": "33 passed" },
+  "build": "ol-runtime and Desktop production builds passed",
+  "validationBoundary": "Browser behavior/state assertions only; no screenshots or pixel comparisons. Automatic repair, dateline editing and native desktop acceptance are excluded."
+}
