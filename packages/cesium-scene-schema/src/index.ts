@@ -43,8 +43,10 @@ interface NodeBase {
   groupId?: string
 }
 
-export type GraphicType = 'point' | 'polyline' | 'polygon'
-export interface GraphicGeometry { type: GraphicType; positions: GeoPosition[]; heightMode: 'ground' | 'absolute' }
+export type GraphicType = 'point' | 'polyline' | 'polygon' | 'rectangle' | 'ellipse'
+export type GraphicGeometry = { positions: GeoPosition[]; heightMode: 'ground' | 'absolute' } & ({ type: 'point' } | { type: 'polyline' } | { type: 'polygon' } | { type: 'rectangle' } | { type: 'ellipse' })
+export function isParametricGraphic(type: GraphicType): boolean { return type === 'rectangle' || type === 'ellipse' }
+export function graphicMinimum(type: GraphicType): number { return type === 'point' ? 1 : type === 'polygon' ? 3 : 2 }
 export interface BillboardStyle { image: string; width: number; height: number }
 export interface GraphicStyle { color: string; width: number; pointSize: number; label?: string; labelField?: string; billboard?: BillboardStyle }
 export { createBillboardStyle } from './graphic-presets.js'
@@ -67,10 +69,16 @@ export interface GraphicNode extends NodeBase {
 export function validateGraphic(value: unknown): value is GraphicNode {
   if (!record(value) || value.type !== 'graphic' || typeof value.id !== 'string' || !value.id.trim() || typeof value.name !== 'string' || typeof value.visible !== 'boolean') return false
   const geometry = value.geometry, style = value.style
-  if (!record(geometry) || !['point','polyline','polygon'].includes(String(geometry.type)) || !['ground','absolute'].includes(String(geometry.heightMode)) || !Array.isArray(geometry.positions) || !geometry.positions.every(position)) return false
-  const minimum = geometry.type === 'point' ? 1 : geometry.type === 'polyline' ? 2 : 3
+  if (!record(geometry) || !['point','polyline','polygon','rectangle','ellipse'].includes(String(geometry.type)) || !['ground','absolute'].includes(String(geometry.heightMode)) || !Array.isArray(geometry.positions) || !geometry.positions.every(position)) return false
+  const minimum = graphicMinimum(geometry.type as GraphicType)
   if (geometry.positions.length < minimum || (geometry.type === 'point' && geometry.positions.length !== 1)) return false
   if (new Set(geometry.positions.map(p => geometry.type === 'polygon' ? `${p[0]},${p[1]}` : JSON.stringify(p))).size < minimum) return false
+  if (isParametricGraphic(geometry.type as GraphicType)) {
+    if (geometry.positions.length !== 2) return false
+    const [a,b] = geometry.positions, width = Math.abs(a[0] - b[0]), height = Math.abs(a[1] - b[1])
+    if (width < 1e-8 || height < 1e-8 || width > 180 || a[2] !== b[2]) return false
+    if (geometry.type === 'ellipse' && (width > 10 || height > 10 || Math.max(Math.abs(a[1]), Math.abs(b[1])) > 85)) return false
+  }
   if (value.locked !== undefined && typeof value.locked !== 'boolean') return false
   if (value.groupId !== undefined && (typeof value.groupId !== 'string' || !value.groupId.trim())) return false
   if (value.popup !== undefined && !validatePopup(value.popup)) return false

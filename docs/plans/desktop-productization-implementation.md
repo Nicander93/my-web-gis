@@ -85,7 +85,7 @@ rtk pnpm --filter @desktop-webgis/desktop test:e2e folders.e2e.ts --project=desk
 | M2 | 点线面编辑、捕捉、选择、CRS 赋值/导出；嵌套 Folder、原子树命令、多要素顶点手势与几何有效性预检 | 完整编辑矩阵、跨日期变更线处理及原生专项仍需签收 |
 | M3 | 模型/Tileset 选择、整体 Gizmo、专业 Inspector、旧 CityScene 兼容；已接入嵌套 Folder | 文件夹/对象混排；完整属性窗的全部专业参数与预览（二维/三维对象、文件夹窗口及三维检查器固定已实现） |
 | M4 | 分页、搜索、过滤、统计、属性单元格、处理算法/取消；多图层 Tab、原子字段计算、字段管理、面合并/分割、列显示/排序/宽度和 antd Table | 完整空间运算验收及处理工具控件迁移 |
-| M5 | point/polyline/polygon Graphic、点 Billboard、几何编辑、对象独立样式、共享原生渲染池、连续 POI 与 Esc、500 对象搜索/多选/批量显隐/保存重开 | rectangle、ellipse 等扩展标绘类型 |
+| M5 | point/polyline/polygon/rectangle/ellipse Graphic、点 Billboard、几何编辑、对象独立样式、共享原生渲染池、连续 POI 与 Esc、500 对象搜索/多选/批量显隐/保存重开 | 扩展标绘的原生综合验收；矩形/椭圆当前限定经纬方向 |
 | M6 | 本地二维文件、多 GeoJSON 批次、原子导入/Undo/Redo、读取取消与工程归属保护；WMS/WMTS/WFS、三维资源加载、失败重试 | 混合格式配置队列、服务导入历史、大文件 Worker；二三维添加数据壳、基于项目路径的资源引用/另存重算、父目录重定位 |
 | M7 | 原生原子替换、串行保存/版本与工程会话保护、格式校验及草稿保护；独立恢复缓存、启动恢复/舍弃、容量/保留期与保存清理；Tauri 二维属性/三维 GLB 强制退出恢复 | 系统文件选择窗口、原生完整本地资源组合与 Windows 125% 缩放验收 |
 | M8 | 独立 Gizmo（轴向与 XY/XZ/YZ 平面）、Tileset 原生裁剪、局部 ENU 压平、多变换隔离、项目保存重开与物理 GPU/LOD 验收；空间距离、贴地距离、面积和高度差，临时结果与保留 Graphic 分离 | 功能实现与 E08 浏览器真实指针验收已闭环 |
@@ -141,6 +141,14 @@ rtk pnpm --filter @desktop-webgis/desktop test:e2e folders.e2e.ts --project=desk
 - 检查器与固定对象完整属性窗共用 Ant Design 控件：启停、恢复默认、宽高、图片地址和本地图片上传。上传先检查 MIME/大小和解码，坏图不改草稿；内嵌图片随项目及可移植场景保存，禁止持久化 blob/file 或带凭据 URL。完整属性继续支持实时预览、Apply、Cancel 与单步 Undo/Redo。
 - 两尺寸行为 E2E 覆盖图标/点连续放置、Esc、原生图标和标签、坏图拒绝、图片嵌入、预览/取消、历史与真实项目下载重开；不生成截图。矩形、椭圆及原生专项仍待后续实施。证据见 `evidence/behavior-billboard-report.json`。
 - 验证结果：行为 E2E 4/4，相关单元测试 133 项通过；相关包与 Desktop 生产构建通过。
+
+## M5 矩形与椭圆批次（2026-10-16）
+
+- `GraphicGeometry` 使用带类型标记的分支，新增固定两个对角控制点的 rectangle/ellipse，并同步独立三维与 SceneDocument JSON Schema。UI 两次单击自动完成，第一次点击或取消不改 Project；无效第二点会报告范围限制并保留第一点供重选。
+- 使用原生 RectangleGraphics/EllipseGraphics；矩形按经纬范围，椭圆用 WGS84 椭球距离求中心半轴。高度统一由首点设置。排除零宽高、跨日期变更线、大范围/极区椭圆；没有把任意折线伪装成参数化图形，任意旋转不在本批能力内。
+- 编辑只保留两个实心控制柄，可拖动或数值修改；禁用中点插入与删除。坐标面板迁移到 Ant Design，空值阻止提交。预览不写 Project，Esc 恢复，Enter 一次写入历史。修复原有 Ribbon“编辑顶点”将鼠标事件误当作目标对象、点击后不进入编辑的问题。
+- 两尺寸行为 E2E 覆盖真实绘制、取消、固定控制点、坐标预览/空值、Esc/Enter、原子 Undo/Redo、真实项目下载与重开；另回归点和 Billboard。原生对象参数、椭球米制半轴、控制柄输入/相机恢复、释放、无效范围重选及可移植场景转换由单测覆盖。未使用截图/像素比较，原生桌面专项仍单列。证据见 `evidence/behavior-parametric-graphics-report.json`。
+- 验证结果：矩形/椭圆行为 E2E 4 项、原有点/Billboard 回归 2 项、相关单元测试 145 项通过；相关包和 Desktop 生产构建通过。
 
 ## 验证记录
 

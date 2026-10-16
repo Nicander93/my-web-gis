@@ -1,6 +1,6 @@
 import { Cartesian3, Cartographic, Color, EllipsoidGeodesic, HeightReference, Math as CesiumMath, ScreenSpaceEventHandler, ScreenSpaceEventType } from 'cesium'
 import type { Cartesian2, Entity, Viewer } from 'cesium'
-import { validateGraphic } from '@desktop-webgis/cesium-scene-schema'
+import { graphicMinimum, isParametricGraphic, validateGraphic } from '@desktop-webgis/cesium-scene-schema'
 import type { GeoPosition, GraphicGeometry } from '@desktop-webgis/cesium-scene-schema'
 import type { Graphic } from './graphic-layer.js'
 import { claimInteraction, releaseInteraction } from './interaction.js'
@@ -37,7 +37,7 @@ export class EditSession {
     claimInteraction(viewer, this)
     this.before = structuredClone(graphic.toJSON().geometry)
     this.geometry = structuredClone(this.before)
-    this.minimum = this.geometry.type === 'point' ? 1 : this.geometry.type === 'polyline' ? 2 : 3
+    this.minimum = graphicMinimum(this.geometry.type)
     this.input.setInputAction((event: { position: Cartesian2 }) => this.beginDrag(event.position), ScreenSpaceEventType.LEFT_DOWN)
     this.input.setInputAction((event: { endPosition: Cartesian2 }) => this.drag(event.endPosition), ScreenSpaceEventType.MOUSE_MOVE)
     this.input.setInputAction(() => this.endDrag(), ScreenSpaceEventType.LEFT_UP)
@@ -55,11 +55,12 @@ export class EditSession {
   setVertexPosition(index: number, position: GeoPosition): void {
     this.assertIndex(index)
     const next = structuredClone(this.geometry); next.positions[index] = [...position]
+    if (isParametricGraphic(next.type)) next.positions.forEach(point => { point[2] = index === 0 ? position[2] : next.positions[0][2] })
     this.apply(next, index)
   }
   insertVertex(afterIndex: number, position?: GeoPosition): void {
     this.assertIndex(afterIndex)
-    if (this.geometry.type === 'point' || (this.geometry.type === 'polyline' && afterIndex === this.geometry.positions.length - 1)) throw new Error('请选择一条边插入顶点')
+    if (this.geometry.type === 'point' || isParametricGraphic(this.geometry.type) || (this.geometry.type === 'polyline' && afterIndex === this.geometry.positions.length - 1)) throw new Error('请选择可插入顶点的线或面')
     const next = structuredClone(this.geometry)
     const value = position ?? this.midpoint(afterIndex)
     if (!value) throw new Error('无法计算此边的中点，请输入坐标')
@@ -90,7 +91,7 @@ export class EditSession {
     if (!Number.isInteger(index) || index < 0 || index >= this.geometry.positions.length) throw new Error('顶点索引无效')
   }
   private apply(geometry: GraphicGeometry, selectedIndex: number): void {
-    if (!validateGraphic({ ...this.graphic.toJSON(), geometry })) throw new Error('坐标无效或顶点重复')
+    if (!validateGraphic({ ...this.graphic.toJSON(), geometry })) throw new Error(isParametricGraphic(geometry.type) ? '范围无效：两个对角点须有非零经纬差，不能跨日期变更线；椭圆跨度不超过 10°，纬度须在 ±85° 内。' : '坐标无效或顶点重复')
     const distinct = new Set(geometry.positions.map(p => geometry.type === 'polygon' ? `${p[0]},${p[1]}` : JSON.stringify(p)))
     if (distinct.size !== geometry.positions.length) throw new Error('顶点不能重复')
     this.geometry = geometry; this.selectedIndex = selectedIndex
@@ -117,7 +118,7 @@ export class EditSession {
     }
     this.geometry.positions.forEach((position, index) => {
       add(position, index, false)
-      if (this.geometry.type === 'point' || (this.geometry.type === 'polyline' && index === this.geometry.positions.length - 1)) return
+      if (this.geometry.type === 'point' || isParametricGraphic(this.geometry.type) || (this.geometry.type === 'polyline' && index === this.geometry.positions.length - 1)) return
       const midpoint = this.midpoint(index); if (midpoint) add(midpoint, index, true)
     })
     this.viewer.scene.requestRender()

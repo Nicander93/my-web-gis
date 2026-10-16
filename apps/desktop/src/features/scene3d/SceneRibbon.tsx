@@ -28,7 +28,7 @@ export function SceneRibbon({ commands: all, target, preview, onPreview, onUndo,
   const add = all.find(item => item.id === 'add')
   return <WorkbenchRibbon categories={[
     { id:'scene', label:'场景', commands:commands(['select','initial','quality','lighting','surface','environment','camera','new-group']) },
-    { id:'draw', label:'标绘', commands:commands(['point','billboard','line','polygon','water']) },
+    { id:'draw', label:'标绘', commands:commands(['point','billboard','line','polygon','rectangle','ellipse','water']) },
     { id:'edit', label:'编辑', commands:commands(['select','vertices','move','rotate','scale','delete']) },
     { id:'tiles', label:'瓦片', commands:commands(['quality','clip','flatten']) },
     { id:'analysis', label:'分析', commands:commands(['measure-space','measure-ground','measure-area','measure-height']) }

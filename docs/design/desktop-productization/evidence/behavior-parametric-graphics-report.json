@@ -1,0 +1,16 @@
+{
+  "date": "2026-10-16",
+  "scope": "Fixed two-corner rectangle and ellipse Graphic geometry",
+  "e2e": {
+    "command": "pnpm --filter @desktop-webgis/desktop exec playwright test e2e/parametric-graphics.e2e.ts --project=desktop --project=laptop",
+    "result": "4 passed",
+    "regressionCommand": "pnpm --filter @desktop-webgis/desktop exec playwright test e2e/scene3d-continuous-point.e2e.ts e2e/billboard.e2e.ts --project=desktop",
+    "regressionResult": "2 passed",
+    "viewports": [[1440, 900], [1366, 768]],
+    "checks": ["two real clicks complete the shape", "cancel after first corner changes no content", "native RectangleGraphics/EllipseGraphics properties", "fixed control insertion/deletion disabled", "empty coordinate cannot submit", "numeric preview leaves project unchanged", "Esc restores native geometry", "Enter commits one history entry", "undo/redo", "downloaded project reopens with exact shape controls", "existing point and billboard workflows"]
+  },
+  "unitTests": { "cesiumSceneSchema": "27 passed", "cesiumLayer": "35 passed", "cesiumSceneRuntime": "39 passed", "sceneSchema": "27 passed", "desktopPortableDocument": "17 passed" },
+  "build": "cesium-scene-schema, cesium-layer, cesium-scene-runtime and Desktop production builds passed",
+  "validationBoundary": "Behavior and native-property assertions only. No screenshot or pixel comparison. Native desktop acceptance remains separate.",
+  "geometryLimits": "North-aligned geographic corner ranges; equal control heights; no zero width/height or dateline crossing. Ellipse spans <= 10 degrees per axis and stays within +/-85 latitude; no arbitrary rotation."
+}

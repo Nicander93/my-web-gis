@@ -98,7 +98,7 @@ export function ScenePropertyWindow({ initial, scene, onApply, onClose, onPrevie
             {draft.geometry.type === 'point' && <BillboardDraftFields value={draft.style.billboard} onChange={billboard => { const { billboard: _previous, ...style } = draft.style; patch({ style: billboard ? { ...style, billboard } : style }) }} />}
             {field('颜色', 'style.color', <Input aria-label="颜色" value={draft.style.color} onChange={event => patch({ style: { ...draft.style, color: event.target.value } })} />)}
             {numeric('线宽（px）', 'style.width', draft.style.width, width => patch({ style: { ...draft.style, width } }), 1, 64)}
-            {!draft.style.billboard && numeric('点大小（px）', 'style.pointSize', draft.style.pointSize, pointSize => patch({ style: { ...draft.style, pointSize } }), 1, 128)}
+            {draft.geometry.type === 'point' && !draft.style.billboard && numeric('点大小（px）', 'style.pointSize', draft.style.pointSize, pointSize => patch({ style: { ...draft.style, pointSize } }), 1, 128)}
             {field('标注文字', 'style.label', <Input aria-label="标注文字" value={draft.style.label ?? ''} onChange={event => patch({ style: { ...draft.style, label: event.target.value } })} />)}
             {field('标注字段', 'style.labelField', <Select aria-label="标注字段" value={draft.style.labelField} allowClear options={Object.keys(draft.properties).map(field => ({ value: field, label: field }))} onChange={labelField => { const { labelField: _previous, ...style } = draft.style; patch({ style: labelField ? { ...style, labelField } : style }) }} />)}
           </>}

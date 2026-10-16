@@ -33,6 +33,12 @@ function snapshot(): ProjectSnapshot {
 }
 
 describe('full project scene content', () => {
+  it.each(['rectangle','ellipse'] as const)('preserves %s geometry in portable documents', type => {
+    const input = snapshot(), scene = createCesiumScene()
+    scene.nodes = [{ id: type, name: type, visible: true, type: 'graphic', geometry: { type, positions: [[116,39,12],[116.01,39.02,12]], heightMode: 'absolute' }, style: { color: '#336699', width: 3, pointSize: 10 }, properties: { code: '001' } }]
+    input.project.city = scene
+    expect(createProjectFromSceneDocument(JSON.stringify(createProjectSceneDocument(input))).project.city?.nodes).toEqual(scene.nodes)
+  })
   it('preserves point billboard style and label in portable documents', () => {
     const input = snapshot(), scene = createCesiumScene()
     scene.nodes = [{ id: 'icon', name: 'Icon', visible: true, type: 'graphic', geometry: { type: 'point', positions: [[116,39,12]], heightMode: 'absolute' }, style: { color: '#336699', width: 3, pointSize: 10, label: 'POI', billboard: createBillboardStyle() }, properties: { name: 'Icon' } }]

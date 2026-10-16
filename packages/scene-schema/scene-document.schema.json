@@ -2158,7 +2158,9 @@
               "enum": [
                 "point",
                 "polyline",
-                "polygon"
+                "polygon",
+                "rectangle",
+                "ellipse"
               ]
             },
             "positions": {
@@ -2226,6 +2228,40 @@
                 "properties": {
                   "positions": {
                     "minItems": 3
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "type": {
+                    "const": "rectangle"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "positions": {
+                    "minItems": 2,
+                    "maxItems": 2
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "type": {
+                    "const": "ellipse"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "positions": {
+                    "minItems": 2,
+                    "maxItems": 2
                   }
                 }
               }

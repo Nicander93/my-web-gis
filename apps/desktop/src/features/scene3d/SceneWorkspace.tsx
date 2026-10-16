@@ -55,7 +55,12 @@ import { isTauri } from '@tauri-apps/api/core'
 import type { ResourceReference } from '@desktop-webgis/cesium-scene-schema'
 
 interface LayerState { state: 'loading' | 'ready' | 'error'; error?: string }
-const drawLabels = { billboard: '图标', point: '点', polyline: '线', polygon: '面', water: '水面边界', clip: '裁剪范围', flatten: '压平范围', 'spatial-distance': '空间距离', 'ground-distance': '贴地距离', area: '面积', 'height-difference': '高度差' }
+const drawLabels = { rectangle: '矩形', ellipse: '椭圆', billboard: '图标', point: '点', polyline: '线', polygon: '面', water: '水面边界', clip: '裁剪范围', flatten: '压平范围', 'spatial-distance': '空间距离', 'ground-distance': '贴地距离', area: '面积', 'height-difference': '高度差' }
+function drawInstruction(kind: SceneDrawKind): string {
+  if (isContinuousDraw(kind)) return `连续放置${drawLabels[kind]}：单击创建 · Esc 退出`
+  if (kind === 'rectangle' || kind === 'ellipse') return `绘制${drawLabels[kind]}：单击两个对角点自动完成 · Esc 取消`
+  return `绘制${drawLabels[kind]}：单击添加顶点 · Enter 完成 · Esc 取消`
+}
 const measurementKinds: SceneMeasurementKind[] = ['spatial-distance', 'ground-distance', 'area', 'height-difference']
 const isMeasurementKind = (kind: SceneDrawKind): kind is SceneMeasurementKind => measurementKinds.includes(kind as SceneMeasurementKind)
 
@@ -331,7 +336,7 @@ export function SceneWorkspace() {
     if (!ready) return
     if (measurement) clearMeasurement()
     stopEditing(); drawing.start(kind, id)
-    notify(isContinuousDraw(kind) ? '连续放置：单击创建，Esc 退出' : `绘制${drawLabels[kind]}：单击添加顶点，右键或 Enter 完成，Esc 取消`)
+    notify(drawInstruction(kind))
   }
   function history(redo = false): void {
     drawing.cancel(); stopEditing()
@@ -429,7 +434,9 @@ export function SceneWorkspace() {
     command('billboard', '放置图标', LocateFixed, () => startDraw('billboard'), ready ? undefined : '场景尚未就绪', drawing.kind === 'billboard'),
     command('line', '绘制线', Move, () => startDraw('polyline'), ready ? undefined : '场景尚未就绪', drawing.kind === 'polyline'),
     command('polygon', '绘制面', Shapes, () => startDraw('polygon'), ready ? undefined : '场景尚未就绪', drawing.kind === 'polygon'),
-    command('vertices', '编辑顶点', Shapes, startGraphicEditing, selectionReason ?? (node?.type !== 'graphic' ? '请选择标绘图形' : undefined), graphicEditing.active),
+    command('rectangle', '绘制矩形', SquareDashed, () => startDraw('rectangle'), ready ? undefined : '场景尚未就绪', drawing.kind === 'rectangle'),
+    command('ellipse', '绘制椭圆', Shapes, () => startDraw('ellipse'), ready ? undefined : '场景尚未就绪', drawing.kind === 'ellipse'),
+    command('vertices', '编辑顶点', Shapes, () => startGraphicEditing(), selectionReason ?? (node?.type !== 'graphic' ? '请选择标绘图形' : undefined), graphicEditing.active),
     command('move', '移动', Move, () => startEditing('translate'), transformReason, editing === 'translate'),
     command('rotate', '旋转', RotateCw, () => startEditing('rotate'), transformReason, editing === 'rotate'),
     command('scale', '缩放', Maximize2, () => startEditing('scale'), transformReason, editing === 'scale'),
@@ -520,7 +527,7 @@ export function SceneWorkspace() {
         </div>
       </RightPanel>}
     </div>
-    <footer className="status-bar scene3d-footer"><span className={`scene3d-footer__state${error ? ' scene3d-footer__state--error' : ''}`} role="status">{error || (isContinuousDraw(drawing.kind) ? '连续放置：单击创建 · Esc 退出' : drawing.drawing ? `绘制${drawing.kind ? drawLabels[drawing.kind] : '图形'}：单击添加顶点 · Enter 完成 · Esc 取消` : status)}</span><span>{group ? group.name : liveIds.length > 1 ? `已选 ${liveIds.length} 个对象` : node?.name ?? '未选择对象'}</span><span>WGS84 · 椭球高度</span></footer>
+    <footer className="status-bar scene3d-footer"><span className={`scene3d-footer__state${error ? ' scene3d-footer__state--error' : ''}`} role="status">{error || (drawing.kind ? drawInstruction(drawing.kind) : status)}</span><span>{group ? group.name : liveIds.length > 1 ? `已选 ${liveIds.length} 个对象` : node?.name ?? '未选择对象'}</span><span>WGS84 · 椭球高度</span></footer>
     {context && <LayerPopupMenu x={context.x} y={context.y} label="对象菜单" onClose={() => setContext(null)}>
       <div className="scene3d-context-title">{group?.name ?? (liveIds.length > 1 ? `${liveIds.length} 个对象` : node?.name)}</div>
       <MenuItem icon={Table2} label="对象属性" onClick={() => { showProperties('object'); setContext(null) }} />

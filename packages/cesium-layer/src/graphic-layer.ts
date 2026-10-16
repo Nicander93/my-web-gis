@@ -1,7 +1,7 @@
-import { Cartesian2, Cartesian3, Color, CustomDataSource, Entity, HeightReference, JulianDate, LabelStyle, PolygonHierarchy, VerticalOrigin } from 'cesium'
+import { Cartesian2, Cartesian3, Cartographic, Color, CustomDataSource, Entity, HeightReference, JulianDate, LabelStyle, Math as CesiumMath, PolygonHierarchy, VerticalOrigin } from 'cesium'
 import type { Viewer } from 'cesium'
 import { validateGraphic } from '@desktop-webgis/cesium-scene-schema'
-import type { BillboardStyle, GraphicNode, PopupDefinition } from '@desktop-webgis/cesium-scene-schema'
+import type { BillboardStyle, GeoPosition, GraphicNode, PopupDefinition } from '@desktop-webgis/cesium-scene-schema'
 import type { PopupContent } from '@desktop-webgis/cesium-popup'
 import { BaseLayer } from './base-layer.js'
 import type { LayerClickEvent, LayerOptions } from './base-layer.js'
@@ -10,11 +10,21 @@ import type { DrawOptions } from './draw.js'
 import { EditSession } from './graphic-edit.js'
 import type { GraphicEditOptions } from './graphic-edit.js'
 import { resolveGraphicLabel } from './graphic-label.js'
+import { parametricGraphic } from './parametric-graphic.js'
 
 interface SharedGraphicSource {
   source: CustomDataSource
   references: number
   ready: Promise<void>
+}
+
+export interface GraphicPresentation {
+  point: boolean
+  billboard?: BillboardStyle
+  label?: string
+  rectangle?: { west: number; south: number; east: number; north: number; height: number }
+  ellipse?: { semiMajorAxis: number; semiMinorAxis: number; rotation: number; height: number }
+  position?: GeoPosition
 }
 
 const graphicSources = new WeakMap<Viewer, SharedGraphicSource>()
@@ -82,11 +92,17 @@ export class GraphicLayer extends BaseLayer {
   }
   toJSON(): GraphicNode[] { return this.allGraphics.map(graphic => graphic.toJSON()) }
   /** Native property values used by diagnostics without exposing mutable Cesium objects. */
-  getGraphicPresentation(id: string): { point: boolean; billboard?: BillboardStyle; label?: string } | undefined {
+  getGraphicPresentation(id: string): GraphicPresentation | undefined {
     const nativeId = this.nativeIds.get(id), entity = nativeId ? this.source?.entities.getById(nativeId) : undefined
     if (!entity) return
     const time = JulianDate.now()
-    return { point: Boolean(entity.point), ...(entity.billboard ? { billboard: { image: entity.billboard.image?.getValue(time), width: entity.billboard.width?.getValue(time), height: entity.billboard.height?.getValue(time) } } : {}), ...(entity.label ? { label: entity.label.text?.getValue(time) } : {}) }
+    const rectangle = entity.rectangle?.coordinates?.getValue(time)
+    const anchor = entity.position?.getValue(time), position = anchor ? Cartographic.fromCartesian(anchor) : undefined
+    return { point: Boolean(entity.point), ...(entity.billboard ? { billboard: { image: entity.billboard.image?.getValue(time), width: entity.billboard.width?.getValue(time), height: entity.billboard.height?.getValue(time) } } : {}), ...(entity.label ? { label: entity.label.text?.getValue(time) } : {}),
+      ...(rectangle ? { rectangle: { west: CesiumMath.toDegrees(rectangle.west), south: CesiumMath.toDegrees(rectangle.south), east: CesiumMath.toDegrees(rectangle.east), north: CesiumMath.toDegrees(rectangle.north), height: entity.rectangle?.height?.getValue(time) } } : {}),
+      ...(entity.ellipse ? { ellipse: { semiMajorAxis: entity.ellipse.semiMajorAxis?.getValue(time), semiMinorAxis: entity.ellipse.semiMinorAxis?.getValue(time), rotation: entity.ellipse.rotation?.getValue(time), height: entity.ellipse.height?.getValue(time) } } : {}),
+      ...(position && (entity.rectangle || entity.ellipse) ? { position: [CesiumMath.toDegrees(position.longitude),CesiumMath.toDegrees(position.latitude),position.height] as GeoPosition } : {})
+    }
   }
   startDraw(options: DrawOptions): DrawSession {
     if (!this.viewer || this.state !== 'ready' || !this.show) throw new Error('请先挂载并显示图形层')
@@ -129,15 +145,18 @@ export class GraphicLayer extends BaseLayer {
   private renderGraphic(graphic: Graphic): void {
     if (!this.source) return
     const node = graphic.toJSON(), positions = node.geometry.positions.map(position => Cartesian3.fromDegrees(...position)), color = Color.fromCssColorString(node.style.color), ground = node.geometry.heightMode === 'ground'
+    const shape = parametricGraphic(node.geometry)
     const selected = this.selected.has(node.id), stroke = selected ? Color.fromCssColorString('#3984d7') : color
     const label = resolveGraphicLabel(node)
     const nativeId = this.nativeIds.get(node.id) ?? `${this.nativePrefix}${node.id}`
     this.nativeIds.set(node.id, nativeId); this.source.entities.removeById(nativeId)
     this.source.entities.add({
-      id: nativeId, name: node.name, show: this.show && node.visible, properties: { name: node.name, ...node.properties }, position: positions[0],
+      id: nativeId, name: node.name, show: this.show && node.visible, properties: { name: node.name, ...node.properties }, position: shape?.position ?? positions[0],
       point: node.geometry.type === 'point' && !node.style.billboard ? { pixelSize: node.style.pointSize, color, outlineColor: stroke, outlineWidth: selected ? 3 : 0, heightReference: ground ? HeightReference.CLAMP_TO_GROUND : HeightReference.NONE, disableDepthTestDistance: Number.POSITIVE_INFINITY } : undefined,
       billboard: node.style.billboard ? { ...node.style.billboard, scale: selected ? 1.12 : 1, verticalOrigin: VerticalOrigin.BOTTOM, heightReference: ground ? HeightReference.CLAMP_TO_GROUND : HeightReference.NONE, disableDepthTestDistance: Number.POSITIVE_INFINITY } : undefined,
-      polyline: node.geometry.type !== 'point' ? { positions: node.geometry.type === 'polygon' ? [...positions,positions[0]] : positions, width: selected ? Math.max(node.style.width, 4) : node.style.width, material: stroke, clampToGround: ground } : undefined,
+      polyline: node.geometry.type === 'polyline' || node.geometry.type === 'polygon' || shape?.corners ? { positions: shape?.corners ? [...shape.corners,shape.corners[0]] : node.geometry.type === 'polygon' ? [...positions,positions[0]] : positions, width: selected ? Math.max(node.style.width, 4) : node.style.width, material: stroke, clampToGround: ground } : undefined,
+      rectangle: shape?.rectangle ? { coordinates: shape.rectangle, material: color.withAlpha(color.alpha * .35), height: ground ? 0 : node.geometry.positions[0][2], heightReference: ground ? HeightReference.CLAMP_TO_GROUND : HeightReference.NONE } : undefined,
+      ellipse: shape?.ellipse ? { ...shape.ellipse, material: color.withAlpha(color.alpha * .35), outline: true, outlineColor: stroke, outlineWidth: node.style.width, height: ground ? 0 : node.geometry.positions[0][2], heightReference: ground ? HeightReference.CLAMP_TO_GROUND : HeightReference.NONE } : undefined,
       polygon: node.geometry.type === 'polygon' ? { hierarchy: new PolygonHierarchy(positions), material: color.withAlpha(color.alpha * .35), perPositionHeight: !ground } : undefined,
       label: label ? { text: label, font: '14px sans-serif', fillColor: color, style: LabelStyle.FILL_AND_OUTLINE, outlineColor: Color.WHITE, outlineWidth: 3, pixelOffset: new Cartesian2(0, node.style.billboard ? -node.style.billboard.height - 8 : -16), disableDepthTestDistance: Number.POSITIVE_INFINITY, heightReference: ground ? HeightReference.CLAMP_TO_GROUND : HeightReference.NONE } : undefined
     })

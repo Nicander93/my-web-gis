@@ -7,6 +7,17 @@ function graphic(): GraphicNode {
 }
 
 describe('serializable graphics', () => {
+  it.each(['rectangle','ellipse'] as const)('preserves fixed %s controls and rejects degenerate, oversized and mismatched height input', type => {
+    const node = graphic(); node.geometry = { type, heightMode: 'absolute', positions: [[116,39,12],[116.01,39.02,12]] }
+    expect(validateGraphic(node)).toBe(true)
+    const scene = createCesiumScene(); scene.nodes.push(node)
+    expect(parseCesiumScene(JSON.stringify(scene))).toEqual(scene)
+    for (const positions of [[[116,39,12],[116,40,12]], [[179,39,12],[-179,40,12]], [[116,39,12],[116.01,39.02,13]], [[116,39,12],[116.01,39.02,12],[116.02,39,12]]]) expect(validateGraphic({ ...node, geometry: { ...node.geometry, positions } })).toBe(false)
+    if (type === 'ellipse') {
+      expect(validateGraphic({ ...node, geometry: { ...node.geometry, positions: [[116,39,12],[140,40,12]] } })).toBe(false)
+      expect(validateGraphic({ ...node, geometry: { ...node.geometry, positions: [[116,86,12],[117,87,12]] } })).toBe(false)
+    }
+  })
   it('round trips independent billboard defaults and rejects unsafe or malformed images and sizes', () => {
     const node = graphic(); node.geometry = { type: 'point', positions: [[116,39,12]], heightMode: 'absolute' }
     node.style.billboard = createBillboardStyle()

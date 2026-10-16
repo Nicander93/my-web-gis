@@ -26,6 +26,31 @@ function viewer() {
 function click(): void { handlers.at(-1)?.actions.get(ScreenSpaceEventType.LEFT_CLICK)?.({ position: {} }) }
 
 describe('draw session lifecycle', () => {
+  it('keeps the first corner after an invalid second corner and completes after a corrected click', async () => {
+    const v = viewer(), onInvalid = vi.fn(), session = new DrawSession(v.value, { type: 'rectangle', onInvalid })
+    click()
+    v.host.scene.globe.pick.mockReturnValue(Cartesian3.fromDegrees(116,40,0)); click()
+    expect(session.count).toBe(1); expect(session.isActive).toBe(true)
+    expect(onInvalid).toHaveBeenCalledWith(expect.stringContaining('范围无效'))
+    v.host.scene.globe.pick.mockReturnValue(Cartesian3.fromDegrees(117,40,0)); click()
+    await expect(session.result).resolves.toMatchObject({ status: 'completed' })
+    expect(v.host.entities.values).toHaveLength(0)
+  })
+  it.each(['rectangle','ellipse'] as const)('creates %s with two clicks, normalizes height and releases native preview', async type => {
+    const v = viewer(), session = new DrawSession(v.value, { type, heightMode: 'absolute' })
+    click(); expect(session.count).toBe(1); expect(session.finish()).toBe(false)
+    v.host.scene.globe.pick.mockReturnValue(Cartesian3.fromDegrees(116.01,39.02,20))
+    handlers.at(-1)?.actions.get(ScreenSpaceEventType.MOUSE_MOVE)?.({ endPosition: {} })
+    expect(v.host.entities.values[0][type]?.show?.getValue(JulianDate.now())).toBe(true)
+    click()
+    const result = await session.result
+    if (result.status !== 'completed') throw new Error('Expected completed shape')
+    expect(result.graphic.geometry.type).toBe(type)
+    expect(result.graphic.geometry.positions).toHaveLength(2)
+    expect(result.graphic.geometry.positions[1][2]).toBe(result.graphic.geometry.positions[0][2])
+    expect(v.host.entities.values).toHaveLength(0)
+    expect(handlers[0].destroy).toHaveBeenCalledOnce()
+  })
   it('previews the billboard image and commits a detached point style while releasing temporary objects', async () => {
     const v = viewer(), billboard = createBillboardStyle(), session = new DrawSession(v.value, { type: 'point', style: { billboard } })
     billboard.width = 100
@@ -78,6 +103,40 @@ describe('draw session lifecycle', () => {
 })
 
 describe('independent GraphicLayer', () => {
+  it.each(['rectangle','ellipse'] as const)('uses native %s rendering and fixed control editing with cancel and apply', async type => {
+    const v = viewer(), node = graphic(); node.geometry = { type, heightMode: 'absolute', positions: [[116,39,12],[116.01,39.02,12]] }
+    const layer = new GraphicLayer({ id: type, graphics: [node] }); await layer.mount(v.value)
+    const source = v.sources[0] as CustomDataSource, item = layer.getGraphic(node.id)!
+    expect(source.entities.values[0][type]).toBeDefined()
+    expect(source.entities.values[0].polygon).toBeUndefined()
+    const initial = layer.getGraphicPresentation(node.id)!
+    expect(initial[type]?.height).toBe(12)
+    const editing = layer.startEditing(node.id)
+    expect(v.host.entities.values).toHaveLength(2)
+    expect(() => editing.insertVertex(0)).toThrow('插入')
+    expect(editing.removeVertex(0)).toBe(false)
+    const handle = v.host.entities.values[1]
+    v.host.scene.pick.mockReturnValue({ id: handle })
+    handlers.at(-1)?.actions.get(ScreenSpaceEventType.LEFT_DOWN)?.({ position: {} })
+    expect(v.host.scene.screenSpaceCameraController.enableInputs).toBe(false)
+    v.host.scene.globe.pick.mockReturnValue(Cartesian3.fromDegrees(116.02,39.02,12))
+    handlers.at(-1)?.actions.get(ScreenSpaceEventType.MOUSE_MOVE)?.({ endPosition: {} })
+    handlers.at(-1)?.actions.get(ScreenSpaceEventType.LEFT_UP)?.({})
+    expect(item.toJSON().geometry.positions[1][0]).toBeCloseTo(116.02,8)
+    expect(v.host.scene.screenSpaceCameraController.enableInputs).toBe(true)
+    editing.setVertexPosition(0, [115.99,39,30])
+    expect(item.toJSON().geometry.positions.every(position => position[2] === 30)).toBe(true)
+    editing.cancel(); expect(item.toJSON().geometry).toEqual(node.geometry)
+    expect(layer.getGraphicPresentation(node.id)).toEqual(initial)
+    const next = layer.startEditing(node.id)
+    next.setVertexPosition(1,[116.02,39.02,12]); next.finish()
+    const result = await next.result
+    expect(result.status).toBe('completed')
+    expect(item.toJSON().geometry.positions[1][0]).toBe(116.02)
+    expect(v.host.entities.values).toHaveLength(0)
+    expect(source.entities.values).toHaveLength(1)
+    layer.destroy()
+  })
   it('renders billboard plus label, updates native dimensions and switches back to point without leaking entities', async () => {
     const v = viewer(), node = graphic(); node.style.billboard = createBillboardStyle(); node.style.label = 'Icon'
     const layer = new GraphicLayer({ id: 'icons', graphics: [node] })

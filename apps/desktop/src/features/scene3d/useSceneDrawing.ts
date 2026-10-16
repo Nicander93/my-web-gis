@@ -29,7 +29,8 @@ export function useSceneDrawing(runtime: CesiumSceneRuntime | undefined, onCompl
         type,
         ...(next === 'billboard' ? { style: { billboard: createBillboardStyle() } } : {}),
         heightMode: next === 'clip' || next === 'flatten' || measurement ? 'absolute' : 'ground',
-        onChange: setCount
+        onChange: setCount,
+        onInvalid: message => error.current(new Error(message))
       })
       session.current = drawing; setKind(next)
       void drawing.result.then(result => {
@@ -47,6 +48,6 @@ export function useSceneDrawing(runtime: CesiumSceneRuntime | undefined, onCompl
   function resume(): void { const next = intent.current; if (next && isContinuousDraw(next.kind)) begin(next.kind, next.id) }
   function finish(): void { session.current?.finish() }
   useEffect(() => () => { intent.current = undefined; session.current?.cancel(); session.current = undefined }, [runtime])
-  const minimum = isContinuousDraw(kind) ? 1 : kind === 'polyline' || kind === 'spatial-distance' || kind === 'ground-distance' || kind === 'height-difference' ? 2 : 3
+  const minimum = isContinuousDraw(kind) ? 1 : kind === 'rectangle' || kind === 'ellipse' || kind === 'polyline' || kind === 'spatial-distance' || kind === 'ground-distance' || kind === 'height-difference' ? 2 : 3
   return { kind, count, drawing: kind !== null, minimum, start, resume, finish, cancel }
 }
