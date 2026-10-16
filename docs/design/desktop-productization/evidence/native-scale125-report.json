@@ -1,0 +1,138 @@
+{
+  "date": "2026-10-16",
+  "scope": "Controlled 125 percent WebView2 layout and existing-dock activation regression",
+  "validation": {
+    "nativeScenariosPassed": 6,
+    "desktopUnitTests": {
+      "passed": 318,
+      "skipped": 5,
+      "files": 62
+    },
+    "behaviorE2E": {
+      "files": [
+        "activity-panel.e2e.ts",
+        "docking.e2e.ts"
+      ],
+      "projects": [
+        "desktop",
+        "laptop"
+      ],
+      "passed": 14
+    },
+    "desktopProductionBuild": "passed",
+    "isolatedNativeAndRestoredDebugBuilds": "passed",
+    "screenshots": "disabled"
+  },
+  "commands": [
+    "rtk pnpm --filter @desktop-webgis/desktop test:native-layout125",
+    "rtk pnpm --filter @desktop-webgis/desktop test:native-layout125 --wide"
+  ],
+  "runs": [
+    {
+      "identifier": "com.desktop-webgis.resource-acceptance-1792157537575",
+      "output": "D:\\my-code-repo\\my-web-gis\\.artifacts\\native-resources-1792157537575",
+      "scenarios": [
+        {
+          "name": "125% native attribute cell double-click, Enter commit, single-step undo and Esc cancellation preserve feature values",
+          "passed": true
+        },
+        {
+          "name": "125% native 2D import modal, property draft/keyboard cancellation and dock controls remain reachable without data mutation",
+          "passed": true
+        },
+        {
+          "name": "125% native 3D property/footer reachability, modal Tab/Esc isolation and dock controls preserve scene and canvas identity",
+          "passed": true
+        }
+      ],
+      "screenshots": false,
+      "nativeFileChooser": "Not verified: fixture working paths assigned; native filesystem and resource protocol used",
+      "windowsScale125": "Not verified",
+      "resourceResponses": [],
+      "requestedWindow": {
+        "label": "main",
+        "title": "Desktop WebGIS · Resource acceptance",
+        "width": 1366,
+        "height": 768,
+        "minWidth": 1024,
+        "minHeight": 680
+      },
+      "appData": "C:\\Users\\PC\\AppData\\Local\\com.desktop-webgis.resource-acceptance-1792157537575",
+      "viewport": {
+        "width": 1252,
+        "height": 704,
+        "devicePixelRatio": 1.25
+      },
+      "nativeWindow": {
+        "scaleFactor": 1.1458333333333333,
+        "innerSize": {
+          "type": "Physical",
+          "width": 1565,
+          "height": 880
+        },
+        "outerSize": {
+          "type": "Physical",
+          "width": 1583,
+          "height": 924
+        }
+      },
+      "rendererScale125": "Verified controlled WebView scale; OS display setting is recorded separately"
+    },
+    {
+      "identifier": "com.desktop-webgis.resource-acceptance-1792157600955",
+      "output": "D:\\my-code-repo\\my-web-gis\\.artifacts\\native-resources-1792157600955",
+      "scenarios": [
+        {
+          "name": "125% native attribute cell double-click, Enter commit, single-step undo and Esc cancellation preserve feature values",
+          "passed": true
+        },
+        {
+          "name": "125% native 2D import modal, property draft/keyboard cancellation and dock controls remain reachable without data mutation",
+          "passed": true
+        },
+        {
+          "name": "125% native 3D property/footer reachability, modal Tab/Esc isolation and dock controls preserve scene and canvas identity",
+          "passed": true
+        }
+      ],
+      "screenshots": false,
+      "nativeFileChooser": "Not verified: fixture working paths assigned; native filesystem and resource protocol used",
+      "windowsScale125": "Not verified",
+      "resourceResponses": [],
+      "requestedWindow": {
+        "label": "main",
+        "title": "Desktop WebGIS · Resource acceptance",
+        "width": 1920,
+        "height": 1080,
+        "minWidth": 1024,
+        "minHeight": 680
+      },
+      "appData": "C:\\Users\\PC\\AppData\\Local\\com.desktop-webgis.resource-acceptance-1792157600955",
+      "viewport": {
+        "width": 1540,
+        "height": 847,
+        "devicePixelRatio": 1.25
+      },
+      "nativeWindow": {
+        "scaleFactor": 1.1458333333333333,
+        "innerSize": {
+          "type": "Physical",
+          "width": 1924,
+          "height": 1058
+        },
+        "outerSize": {
+          "type": "Physical",
+          "width": 1942,
+          "height": 1102
+        }
+      },
+      "rendererScale125": "Verified controlled WebView scale; OS display setting is recorded separately"
+    }
+  ],
+  "limitations": [
+    "Renderer DPR is forced to 1.25 through a WebView2 launch argument. Windows display settings were not changed; this does not sign off OS 125 percent scaling.",
+    "Requested Tauri window sizes are logical sizes. Actual CSS viewport, native physical sizes and native DPI scale are recorded for each run.",
+    "File input fixtures bypass OS file dialogs. System choosers and physical IME/input-device acceptance remain pending.",
+    "Visual detail review is left to the user; no screenshots or pixel comparisons."
+  ]
+}

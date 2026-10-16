@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import { chromium, expect } from '@playwright/test'
+import { verifyNativeLayout } from './native-layout-checks.mjs'
 
 const desktop = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const tauri = join(desktop, 'src-tauri')
@@ -13,6 +14,8 @@ const identifier = `com.desktop-webgis.resource-acceptance-${runId}`
 const output = resolve(desktop, '../../.artifacts', `native-resources-${runId}`)
 const serverPort = 5197, debugPort = 9229
 const url = `http://127.0.0.1:${serverPort}`
+const layoutOnly = process.argv.includes('--layout125')
+const wide = process.argv.includes('--wide')
 const report = { identifier, output, scenarios: [], screenshots: false,
   nativeFileChooser: 'Not verified: fixture working paths assigned; native filesystem and resource protocol used',
   windowsScale125: 'Not verified', resourceResponses: [] }
@@ -52,7 +55,7 @@ async function poll(check, message, timeout = 60_000) {
 async function launch() {
   assert.equal(await available(debugPort), false, 'Owned WebView debugging port must be free before launch')
   application = spawn(join(output, 'desktop-webgis.exe'), [], { cwd: tauri, windowsHide: true, stdio: 'inherit', env: {
-    ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${debugPort}`,
+    ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${debugPort}${layoutOnly ? ' --force-device-scale-factor=1.25' : ''}`,
     WEBVIEW2_USER_DATA_FOLDER: join(output, 'webview-profile')
   } })
   application.on('error', (error) => console.error(error))
@@ -87,6 +90,10 @@ async function launch() {
   assert.ok(identity.appData.includes(identifier))
   report.appData = identity.appData
   report.viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight, devicePixelRatio }))
+  report.nativeWindow = await page.evaluate(async () => {
+    const window = (await import('/node_modules/@tauri-apps/api/window.js')).getCurrentWindow()
+    return { scaleFactor: await window.scaleFactor(), innerSize: await window.innerSize(), outerSize: await window.outerSize() }
+  })
   console.log(`[native-resources] launched owned PID ${application.pid}, ${identity.identifier}`)
 }
 async function crash() {
@@ -154,7 +161,8 @@ try {
   await mkdir(output, { recursive: true })
   assert.equal(await available(serverPort), false, 'Owned server port is occupied')
   assert.equal(await available(debugPort), false, 'Owned debugging port is occupied')
-  const config = { identifier, build: { devUrl: url }, app: { windows: [{ label: 'main', title: 'Desktop WebGIS · Resource acceptance', width: 1440, height: 900, minWidth: 1024, minHeight: 680 }] } }
+  const config = { identifier, build: { devUrl: url }, app: { windows: [{ label: 'main', title: 'Desktop WebGIS · Resource acceptance', width: layoutOnly ? wide ? 1920 : 1366 : 1440, height: layoutOnly ? wide ? 1080 : 768 : 900, minWidth: 1024, minHeight: 680 }] } }
+  report.requestedWindow = config.app.windows[0]
   await writeFile(join(output, 'tauri-config.json'), JSON.stringify(config, null, 2))
   const build = start(['cargo', 'build', '--bin', 'desktop-webgis', '--locked'], tauri, { ...process.env, TAURI_CONFIG: JSON.stringify(config) })
   assert.equal(await finished(build), 0)
@@ -203,6 +211,9 @@ try {
   server = start(['pnpm', 'dev', '--port', String(serverPort), '--strictPort'], desktop)
   await poll(() => available(serverPort), 'Owned Vite server did not start')
   await launch()
+  if (layoutOnly) {
+    await verifyNativeLayout(page, report, output, saveTo)
+  } else {
   await page.getByRole('button', { name: /^三维场景/ }).click()
   await expect(page.locator('.scene3d-footer__state')).toHaveText('就绪', { timeout: 60_000 })
   await page.getByRole('button', { name: '添加数据', exact: true }).click()
@@ -331,6 +342,7 @@ try {
   })
   assert.deepEqual(afterAuthorization, beforeAuthorization)
   report.scenarios.push({ name: 'Copied project rejects unauthorized external roots; explicit same-directory authorization reloads all resources without project/history changes', passed: true })
+  }
 } catch (error) {
   report.error = error.stack ?? String(error)
   console.error(error); process.exitCode = 1

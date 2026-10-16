@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useWorkspaceStore } from '@/stores/workspace.store'
 import { viewCommands } from './view.commands'
 import { useActivityPanelStore } from '@/stores/activity-panel.store'
+import { useDockingStore } from '@/stores/docking.store'
 
 describe('view commands', () => {
   beforeEach(() => {
@@ -53,6 +54,18 @@ describe('view commands', () => {
     window.removeEventListener('desktop-webgis:command-status', listener)
     expect(useWorkspaceStore.getState().left.open).toBe(true)
     expect(messages.at(-1)).toBe('图层面板已打开')
+  })
+
+  it('raises an already open bottom window when opening logs, diagnostics or attributes', () => {
+    useWorkspaceStore.getState().setBottomOpen(true)
+    const layout = structuredClone(useDockingStore.getState().layout)
+    for (const command of [viewCommands.openTaskLog, viewCommands.openDiagnostics, viewCommands.toggleAttributeTable, viewCommands.openAttributeTable]) {
+      useDockingStore.getState().activate('left')
+      command()
+      expect(useDockingStore.getState().order.at(-1)).toBe('bottom')
+      expect(useWorkspaceStore.getState().bottom.open).toBe(true)
+      expect(useDockingStore.getState().layout).toEqual(layout)
+    }
   })
 
   it('keeps the last panel size when restoring it', () => {

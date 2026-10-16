@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "test:e2e": "playwright test",
-    "test:native-resources": "node scripts/native-resource-acceptance.mjs"
+    "test:native-resources": "node scripts/native-resource-acceptance.mjs",
+    "test:native-layout125": "node scripts/native-resource-acceptance.mjs --layout125"
   },
   "dependencies": {
     "@desktop-webgis/cesium-measure": "workspace:*",

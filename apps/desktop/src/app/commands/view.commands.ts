@@ -50,7 +50,8 @@ export const viewCommands = {
       useWorkbenchStore
         .getState()
         .bindTable(useProjectStore.getState().selectedLayerId)
-    state.setBottomOpen(open)
+    if (open) openActivityPanel('attributes')
+    else state.setBottomOpen(false)
     emitCommandStatus(open ? '属性表已打开' : '属性表已收起')
   },
   openAttributeTable(): void {
@@ -59,7 +60,7 @@ export const viewCommands = {
       useWorkbenchStore
         .getState()
         .bindTable(useProjectStore.getState().selectedLayerId)
-    useWorkspaceStore.getState().setBottomOpen(true)
+    openActivityPanel('attributes')
     emitCommandStatus('属性表已打开')
   },
   resetLayout(): void {

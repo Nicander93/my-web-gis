@@ -12,6 +12,24 @@ test.beforeEach(async ({ page, context }) => {
   await page.goto('/')
 })
 
+test('menu entries raise an already open dock above the focused layer panel', async ({ page }) => {
+  await page.getByRole('button', { name: /^二维地图/ }).click()
+  const before = await snapshot(page)
+  await open(page, '任务日志')
+  await page.getByLabel('移动图层窗口', { exact: true }).focus()
+  await open(page, '诊断')
+  const panel = page.getByRole('complementary', { name: '任务与诊断面板' })
+  const layers = page.getByRole('complementary', { name: '图层面板' })
+  const order = async () => Number(await panel.evaluate(element => getComputedStyle(element).zIndex)) - Number(await layers.evaluate(element => getComputedStyle(element).zIndex))
+  await expect.poll(order).toBeGreaterThan(0)
+  await panel.getByRole('button', { name: '刷新诊断', exact: true }).click()
+  await page.getByLabel('移动图层窗口', { exact: true }).focus()
+  await open(page, '属性表')
+  const attributes = page.getByRole('complementary', { name: '属性表面板' })
+  await expect.poll(async () => Number(await attributes.evaluate(element => getComputedStyle(element).zIndex)) - Number(await layers.evaluate(element => getComputedStyle(element).zIndex))).toBeGreaterThan(0)
+  expect(await snapshot(page)).toEqual(before)
+})
+
 test('real import logs, error filtering, clipboard, diagnostics and docking keep project data unchanged', async ({ page }) => {
   test.setTimeout(120_000)
   await page.getByRole('button', { name: /^二维地图/ }).click()
