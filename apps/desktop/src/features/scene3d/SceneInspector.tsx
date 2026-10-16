@@ -15,6 +15,7 @@ interface SceneInspectorProps {
   node: CesiumSceneNode
   section?: SceneInspectorSection
   pickedProperties?: Record<string, unknown>
+  onRelocate?: () => void
   assetUrl?: string
   error?: string
   onPatch(patch: Partial<CesiumSceneNode>, label?: string): void
@@ -30,7 +31,7 @@ interface SceneInspectorProps {
   onDelete(): void
 }
 
-export function SceneInspector({ node, section = 'object', pickedProperties = {}, assetUrl, error, onPatch, onResource, onReload, onDrawBoundary, onDrawClip, onDrawFlatten, onEditGeometry, geometryDisabled, groups, onMoveGroup, onDelete }: SceneInspectorProps) {
+export function SceneInspector({ node, section = 'object', pickedProperties = {}, onRelocate, assetUrl, error, onPatch, onResource, onReload, onDrawBoundary, onDrawClip, onDrawFlatten, onEditGeometry, geometryDisabled, groups, onMoveGroup, onDelete }: SceneInspectorProps) {
   const properties = node.type === 'graphic' ? { name: node.name, ...node.properties } : pickedProperties
   return <fieldset className="scene3d-properties scene3d-properties--fields" disabled={node.locked}>
     <section className="scene3d-property-section">
@@ -54,6 +55,7 @@ export function SceneInspector({ node, section = 'object', pickedProperties = {}
     {node.type === 'graphic' && section === 'properties' && <GraphicAttributes key={`${node.id}:${JSON.stringify(node.properties)}`} node={node} onApply={properties => onPatch({ properties }, '设置图形属性')} />}
     {section === 'properties' && node.type !== 'graphic' && <section className="scene3d-property-section"><h3>拾取对象属性</h3>{Object.keys(properties).length ? <dl className="scene3d-attribute-list">{Object.entries(properties).map(([key,value]) => <div key={key}><dt>{key}</dt><dd>{displayValue(value)}</dd></div>)}</dl> : <p className="editor-help">在三维视图中单击构件，查看实际属性。</p>}</section>}
     <PopupFields properties={properties} open={section === 'popup'} key={`${node.id}:${JSON.stringify(node.popup)}`} node={node} onApply={popup => onPatch({ popup }, '设置属性弹窗')} />
+    {onRelocate && <Button onClick={onRelocate}>重新定位本地资源</Button>}
     {assetUrl && <ResourceFields open={section === 'source'} key={`${node.id}:${assetUrl}`} url={assetUrl} onApply={onResource} onReload={onReload} />}
     <section className="scene3d-property-section scene3d-object-actions"><button className="scene3d-danger-action" onClick={onDelete}><Trash2 size={14} aria-hidden="true" />删除对象</button><SceneInfo label="删除对象">删除后可撤销恢复。</SceneInfo></section>
   </fieldset>

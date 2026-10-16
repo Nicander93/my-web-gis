@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { AlertCircle } from 'lucide-react'
-import { previewCsv } from '@desktop-webgis/vector-io'
+import { runImportTask } from '@/services/import-worker'
 import type { CsvPreviewResult, CrsInfo } from '@desktop-webgis/vector-io'
 import { CRS_PRESETS, isGeographicCrsCode } from '@desktop-webgis/vector-io'
 
@@ -25,7 +25,10 @@ export function CsvConfigDialog({
   onConfirm,
   onCancel
 }: CsvConfigDialogProps) {
-  const initialPreview = useMemo(() => previewCsv(csvContent), [csvContent])
+  const initialPreview: CsvPreviewResult = { fields: [], sampleRows: [], totalRows: 0, validRows: 0, invalidRows: 0, errors: [] }
+  const initialized = useRef(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   
   const [xField, setXField] = useState(() => 
     findCoordinateField(initialPreview.fields, ['x', 'lon', 'longitude', 'lng', 'jd', '经度'])
@@ -42,22 +45,30 @@ export function CsvConfigDialog({
   }, [open])
 
   useEffect(() => {
-    if (xField && yField && xField !== yField) {
-      const newPreview = previewCsv(csvContent, {
-        xField,
-        yField,
-        crs: { code: crsCode }
-      })
-      setPreview(newPreview)
-    } else {
-      const basePreview = previewCsv(csvContent)
-      setPreview(basePreview)
-    }
-  }, [xField, yField, crsCode, csvContent])
+    if (!open) return
+    const controller = new AbortController()
+    setLoading(true); setError('')
+    void runImportTask<CsvPreviewResult>({ kind: 'csv-preview', content: csvContent,
+      options: xField && yField && xField !== yField ? { xField, yField, crs: { code: crsCode } } : undefined
+    }, controller.signal).then(result => {
+      if (controller.signal.aborted) return
+      setPreview(result)
+      if (!initialized.current) {
+        initialized.current = true
+        setXField(findCoordinateField(result.fields, ['x', 'lon', 'longitude', 'lng', 'jd', '经度']))
+        setYField(findCoordinateField(result.fields, ['y', 'lat', 'latitude', 'wd', '纬度']))
+        if (result.declaredCrs) setCrsCode(result.declaredCrs)
+      }
+      setLoading(false)
+    }).catch(reason => {
+      if (!controller.signal.aborted) { setError(reason instanceof Error ? reason.message : String(reason)); setLoading(false) }
+    })
+    return () => controller.abort()
+  }, [open, xField, yField, crsCode, csvContent])
 
   if (!open) return null
 
-  const canConfirm = xField && yField && xField !== yField
+  const canConfirm = !loading && !error && xField && yField && xField !== yField
 
   function handleConfirm() {
     if (canConfirm) {
@@ -68,6 +79,8 @@ export function CsvConfigDialog({
   return (
     <>
         <div className="dialog-body csv-config-content">
+          {loading && <p role="status">正在后台检查 CSV…</p>}
+          {error && <p role="alert">{error}</p>}
           <div className="csv-config-section">
             <div className="csv-config-row">
               <label htmlFor="x-field">{isGeographicCrsCode(crsCode) ? '经度 (X)' : 'X (米)'}</label>

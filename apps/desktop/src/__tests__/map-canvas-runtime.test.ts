@@ -364,7 +364,7 @@ describe('MapCanvas OlMapRuntime selection tool wiring', () => {
 
     editCommands.modify()
     expect(getActiveEditTool()).toBe('modify')
-    expect(messages.at(-1)).toContain('修改工具已激活')
+    expect(messages.at(-1)).toContain('顶点编辑已激活')
 
     expect(setActiveEditTool('delete')).toBe(true)
     expect(getActiveEditTool()).toBe('delete')

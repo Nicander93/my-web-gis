@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { vi, describe, expect, it } from 'vitest'
 import { serializeVectorExport } from '@/features/export/serializeVectorExport'
 import { importCsvFile } from '@/services/import'
 import type { GisFeature } from '@desktop-webgis/gis-core'
@@ -31,4 +31,14 @@ describe('coordinate export workflow', () => {
     expect(() => serializeVectorExport([{ ...features[0], properties: { crs: 'existing' } }], 'coordinate-csv', 'EPSG:4326')).toThrow('列冲突')
     expect(() => serializeVectorExport([], 'geojson', 'EPSG:4326')).toThrow('没有要素')
   })
+})
+
+vi.mock('@/services/import-worker', async () => {
+  const parser = await import('../services/import-parser')
+  return { runImportWorker: async (request: import('../services/import-worker').ImportRequest) => {
+    if (request.kind === 'geojson') return parser.importGeoJson(request.source, request.options)
+    if (request.kind === 'csv') return parser.importCsvFile(request.source, request.options)
+    if (request.kind === 'shapefile') return parser.importShapefileZip(request.source, request.options)
+    return parser.importDxfFile(request.source, request.options)
+  } }
 })

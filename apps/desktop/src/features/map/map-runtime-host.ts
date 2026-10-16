@@ -578,6 +578,7 @@ export function _setMapRuntimeForTests(
     } as unknown as OlSelectionRuntime
     toolRuntime = {
       activate: () => undefined,
+      syncSelection: () => undefined,
       refreshSnapping: () => undefined,
       deactivate: () => undefined
     } as unknown as OlToolRuntime

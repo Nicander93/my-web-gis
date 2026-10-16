@@ -1,0 +1,32 @@
+{
+  "date": "2026-10-16",
+  "scope": "Single-file background import and local scene resource relocation",
+  "validation": {
+    "desktopUnits": { "passed": 302, "skipped": 5, "files": 59 },
+    "formatE2E": { "file": "apps/desktop/e2e/file-import.e2e.ts", "project": "desktop", "passed": 5 },
+    "workerTransactionE2E": { "file": "apps/desktop/e2e/import-transaction.e2e.ts", "projects": ["desktop", "laptop"], "passed": 6 },
+    "resourceRelocationE2E": { "file": "apps/desktop/e2e/resource-relocation.e2e.ts", "projects": ["desktop", "laptop"], "passed": 2 },
+    "desktopProductionBuild": "passed",
+    "screenshots": "disabled; no pixel comparison"
+  },
+  "assertions": [
+    "GeoJSON, SHP ZIP, DXF, CSV parse in module workers; DXF layer discovery and CSV preview also run in workers",
+    "One file per operation; multiple SHP layers within one ZIP remain supported",
+    "Cancellation, dialog disposal and project replacement terminate workers and reject stale results",
+    "Chinese fields, leading zeros, source IDs, CRS normalization and import warnings survive background parsing",
+    "30000 generated GeoJSON features parse with main-thread timer activity; not a maximum-size benchmark",
+    "Confirmation creates one undoable import; preview does not mutate the project",
+    "File or parent-directory relocation previews affected assets and preserves relative paths below the old directory",
+    "Sibling directories and network assets remain unchanged; inherited locks and stale references reject atomic updates",
+    "Cancel, undo and redo preserve exact project snapshots and scene nodes",
+    "Save As relative references resolve to the same relocated resources after serialization and reopening",
+    "Actual browser project download uses the live camera; reopening matches the complete saved scene"
+  ],
+  "boundaries": [
+    "Browser tests validate persisted references and product behavior; native directory picker and local GLTF/Tileset dependency rendering require Windows acceptance",
+    "Native filesystem read requests are checked for cancellation after completion; active parsing workers are terminated immediately",
+    "Not streaming or unbounded-memory import; native IPC reads, result cloning and rendering retain memory costs",
+    "Relocation updates references, not filesystem contents; load errors remain visible and retryable",
+    "Native Windows 125 percent scaling and physical GPU acceptance remain open"
+  ]
+}

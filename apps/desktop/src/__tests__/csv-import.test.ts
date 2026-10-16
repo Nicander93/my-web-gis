@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { vi, describe, it, expect } from 'vitest'
 import { importCsvFile } from '@/services/import'
 
 describe('CSV Import Service', () => {
@@ -83,4 +83,14 @@ describe('CSV Import Service', () => {
     expect(result.layers[0].features[0].geometry.coordinates[0]).toBeCloseTo(116.4, 1)
     expect(result.layers[0].features[0].geometry.coordinates[1]).toBeCloseTo(39.9, 1)
   })
+})
+
+vi.mock('@/services/import-worker', async () => {
+  const parser = await import('../services/import-parser')
+  return { runImportWorker: async (request: import('../services/import-worker').ImportRequest) => {
+    if (request.kind === 'geojson') return parser.importGeoJson(request.source, request.options)
+    if (request.kind === 'csv') return parser.importCsvFile(request.source, request.options)
+    if (request.kind === 'shapefile') return parser.importShapefileZip(request.source, request.options)
+    return parser.importDxfFile(request.source, request.options)
+  } }
 })

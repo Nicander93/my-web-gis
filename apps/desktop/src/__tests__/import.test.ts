@@ -1,16 +1,16 @@
 import { describe, it, expect, vi } from 'vitest'
 import { importGeoJson } from '../services/import'
-import { readFile } from '../services/files'
+import { readBinaryFile } from '../services/files'
 
 vi.mock('../services/files', () => ({ readFile: vi.fn(), readBinaryFile: vi.fn() }))
 
 describe('Import GeoJSON', () => {
   it('uses the native Windows source basename without altering the path passed to file IO', async () => {
     const path = 'D:\\地图数据\\roads.geojson'
-    vi.mocked(readFile).mockResolvedValueOnce(JSON.stringify({ type: 'Feature', id: 'road-1',
-      geometry: { type: 'LineString', coordinates: [[116, 39], [117, 40]] }, properties: { code: '0007' } }))
+    vi.mocked(readBinaryFile).mockResolvedValueOnce(new TextEncoder().encode(JSON.stringify({ type: 'Feature', id: 'road-1',
+      geometry: { type: 'LineString', coordinates: [[116, 39], [117, 40]] }, properties: { code: '0007' } })))
     const result = await importGeoJson(path)
-    expect(readFile).toHaveBeenCalledWith(path, false)
+    expect(readBinaryFile).toHaveBeenCalledWith(path)
     expect(result.errors).toEqual([])
     expect(result.layers[0].name).toBe('roads')
     expect(result.layers[0].features[0].properties.code).toBe('0007')
@@ -71,4 +71,14 @@ describe('Import GeoJSON', () => {
     expect(unknown.layers).toEqual([])
     expect(unknown.errors.length).toBeGreaterThan(0)
   })
+})
+
+vi.mock('@/services/import-worker', async () => {
+  const parser = await import('../services/import-parser')
+  return { runImportWorker: async (request: import('../services/import-worker').ImportRequest) => {
+    if (request.kind === 'geojson') return parser.importGeoJson(request.source, request.options)
+    if (request.kind === 'csv') return parser.importCsvFile(request.source, request.options)
+    if (request.kind === 'shapefile') return parser.importShapefileZip(request.source, request.options)
+    return parser.importDxfFile(request.source, request.options)
+  } }
 })

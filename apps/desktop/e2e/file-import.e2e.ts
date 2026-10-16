@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test'
 import { fileURLToPath } from 'node:url'
 
+test.use({ screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
+
 test.beforeEach(async ({ page }) => {
   await page.route('**/*tile.openstreetmap.org/**', route => route.abort())
   await page.goto('/')
@@ -60,7 +62,6 @@ test('projected Chinese shapefile ZIP imports only the two chosen source layers'
       })
     })
   })).toBe(true)
-  await page.screenshot({ path: info.outputPath('shapefile-chinese-projected.png') })
 })
 
 test('CSV preview identifies invalid coordinates and imports only valid records', async ({ page }, info) => {
@@ -98,7 +99,6 @@ test('CSV preview identifies invalid coordinates and imports only valid records'
   await expect(table).toContainText('006')
   await expect(table).not.toContainText('纬度错误')
   await expect(table).not.toContainText('经度无效')
-  await page.screenshot({ path: info.outputPath('csv-valid-records.png') })
 })
 
 test('GeoJSON rejects malformed input and preserves duplicate source IDs and null properties', async ({ page }) => {
@@ -154,7 +154,6 @@ test('DXF requires coordinate configuration and retains curve approximation warn
   await page.getByRole('button', { name: '属性表', exact: true }).click()
   await expect(page.locator('.table-scroll tbody tr')).toHaveCount(5)
   await expect(page.locator('.table-scroll')).toContainText('LWPOLYLINE')
-  await page.screenshot({ path: info.outputPath('dxf-basic-entities.png') })
 })
 
 test('DXF reports skipped bulged polylines before confirming supported entities', async ({ page }) => {
