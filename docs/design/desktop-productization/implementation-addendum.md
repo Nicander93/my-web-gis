@@ -96,6 +96,13 @@ A 完成不代表全部界面迁移完成。逐批记录剩余文件，不将 an
 接入依据：[官方 React 介绍](https://ant.design/docs/react/introduce/)、[ConfigProvider](https://ant.design/components/config-provider/)、[Modal](https://ant.design/components/modal/)。
 
 
-### 2026-10-17 GeoLibre first integration
+### 2026-10-17 GeoLibre 首项接入
 
-Geometry simplification uses pinned geolibre-wasm 1.7.1 in the processing Worker. Existing OpenLayers/Cesium and 18 processing tools remain. See [reuse audit](../../engineering/processing-reuse.md) and [behavior evidence](evidence/behavior-geolibre-simplify-report.json). Development and production browser flows plus native WebView2 verify real WASI, typed attributes, undo/redo and saved projects. This closes the first reuse slice, not all E06 processing acceptance.
+几何简化在处理 Worker 中调用固定版本 geolibre-wasm 1.7.1，保留 OpenLayers/Cesium 及原有 18 项工具。见[复用评估](../../engineering/processing-reuse.md)与[行为验收记录](evidence/behavior-geolibre-simplify-report.json)。开发和生产浏览器流程、原生 WebView2 均验证了真实 WASI、属性类型保留、撤销/重做及项目保存。本批完成首项成熟算法复用，E06 的其他验收项仍需继续推进。
+
+### 2026-10-17 文件拖放、地图导航与紧凑密度
+
+- 二维工程支持向地图、图层面板（包括已有图层行）或窗口空白处拖入单个 GeoJSON、SHP ZIP、DXF、CSV。浏览器 File 与原生 Tauri 拖放路径共用既有读取、Worker、配置和确认流程；确认前不写项目，导入可一步撤销。不增加混合格式队列。
+- 中键拖动、空格加左键拖动提供临时平移，保留当前选择、编辑工具及绘制草稿。导航手势在地图编辑交互前接管，指针捕获处理拖出视口；松键、失焦、取消、卸载均释放状态。输入框的空格仍作为文本输入。
+- Ant Design 小型控件采用 24px 高度、工作台行高采用 28px；同步收紧菜单、Ribbon、停靠标题、图层行、检查器、属性表和模态框间距。保持 12px 正文字号，不使用全局 zoom/transform 缩放地图。
+- 行为证据见[交互验收记录](evidence/behavior-map-navigation-drop-report.json)。不进行截图或逐像素对比，视觉细节由用户验收。原生事件桥与本地路径读取已验证；资源管理器真实鼠标拖放、操作系统 125% 缩放尚未自动验证。三维资源拖入暂不属于本批二维文件导入入口。

@@ -3,6 +3,7 @@ import { Header } from './Header'
 import { StatusBar } from './StatusBar'
 import { Workspace } from './Workspace'
 import { AddDataDialog } from '@/features/add-data/AddDataDialog'
+import { useWorkspaceFileDrop } from '@/features/add-data/use-workspace-file-drop'
 import { ExportDialog } from '@/features/export/ExportDialog'
 import {
   registerAddDataCallback,
@@ -58,6 +59,11 @@ export default function App() {
   const replacementResolve = useRef<((allow: boolean) => void) | null>(null)
   const [status, setStatus] = useState('就绪')
   const [addDataOpen, setAddDataOpen] = useState(false)
+  const [droppedFile, setDroppedFile] = useState<File | string | null>(null)
+  const draggingFile = useWorkspaceFileDrop(hasProject && sceneMode === '2d' && !addDataOpen, file => {
+    setDroppedFile(file)
+    setAddDataOpen(true)
+  })
   const [exportOpen, setExportOpen] = useState(false)
   const processingOpen = useWorkbenchStore(
     (state) => state.rightTask === 'processing'
@@ -212,6 +218,7 @@ export default function App() {
       className={`desktop-app${sceneMode === '3d' ? ' desktop-app--scene3d' : ''}`}
     >
       <Header showToolbar={hasProject} />
+      {draggingFile && <div className="workspace-file-drop" role="status">松开以添加数据 · 一次一个文件</div>}
       {!hasProject ? (
         <ProjectStartScreen />
       ) : sceneMode === '2d' ? (
@@ -252,7 +259,8 @@ export default function App() {
       {helpPage && <HelpDialog page={helpPage} onClose={() => setHelpPage(null)} />}
       <AddDataDialog
         open={addDataOpen}
-        onClose={() => setAddDataOpen(false)}
+        droppedFile={droppedFile}
+        onClose={() => { setAddDataOpen(false); setDroppedFile(null) }}
         onImport={handleImport}
         onAddServiceLayers={handleAddServiceLayers}
       />

@@ -68,7 +68,7 @@
 .workbench-ribbon-commands {
   display: flex;
   align-items: center;
-  height: 50px;
+  height: 38px;
   padding: 4px 10px;
   gap: 12px;
   overflow-x: auto;
@@ -918,14 +918,14 @@
 
 /* 方案基准：菜单与项目身份共占第一行，页签、工具各占一行。 */
 :root { --color-app-bg: #f7f9f6; --color-panel: #fafbf9; --color-border: #dfe4e2; --color-accent: #2f695b; --color-accent-hover: #265747; }
-.window-bar { height: 36px; padding: 0 12px; background: var(--color-panel); }
-.window-bar .menu-bar { height: 35px; padding: 0; border: 0; }
-.window-bar .menu-trigger { height: 35px; min-height: 35px; padding: 0 12px; font-size: 12px; }
+.window-bar { height: 30px; padding: 0 8px; background: var(--color-panel); }
+.window-bar .menu-bar { height: 29px; padding: 0; border: 0; }
+.window-bar .menu-trigger { height: 29px; min-height: 29px; padding: 0 12px; font-size: 12px; }
 .window-context { min-width: 0; gap: 10px; }
 .window-context .workspace-name { max-width: 250px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.workbench-ribbon-top { min-height: 33px; }
-.workbench-ribbon-commands { height: 50px; }
-.workbench-ribbon .ribbon-command { display: inline-flex; align-items: center; flex-shrink: 0; gap: 5px; padding: 0 7px; height: 30px; font-size: 11px; }
+.workbench-ribbon-top { min-height: 28px; }
+.workbench-ribbon-commands { height: 38px; }
+.workbench-ribbon .ribbon-command { display: inline-flex; align-items: center; flex-shrink: 0; gap: 5px; padding: 0 7px; height: 26px; font-size: 11px; }
 .ribbon-more { position: relative; flex-shrink: 0; }
 .ribbon-more summary { display: flex; align-items: center; justify-content: center; cursor: pointer; height: 30px; padding: 0 5px; }
 .ribbon-more .menu-dropdown { position: fixed; top: 115px; left: auto; right: 15px; }
@@ -937,3 +937,19 @@
 .scene3d-workspace .workbench-ribbon { flex: 0 0 auto; }
 .scene3d-workspace__body > .workspace-panel.dock-window { position: absolute; }
 .layer-folder-children { margin-left: 12px; border-left: 1px solid var(--color-border); }
+
+/* Compact desktop rhythm; GIS coordinates retain their actual CSS pixel scale. */
+:root { --desktop-control-height: 24px; --desktop-row-height: 28px; }
+.workbench-ribbon-top { min-height: 28px; }
+.workbench-ribbon-top [role=tab] { padding-inline: 12px; font-size: 12px; }
+.workbench-ribbon .toolbar-button { height: 26px; }
+.panel-titlebar { min-height: var(--desktop-row-height); height: var(--desktop-row-height); padding-block: 2px; }
+.layer-item, .desktop-app--scene3d .scene3d-layer-row { min-height: var(--desktop-row-height); padding-block: 2px; }
+.inspector-content .inspector-card { padding: 10px; }
+.inspector-content .inspector-row { min-height: var(--desktop-row-height); }
+.inspector-content .segmented-tabs button { min-height: var(--desktop-row-height); }
+.dialog-body { padding: 14px; }
+.dialog-header, .dialog-footer { padding: 9px 14px; }
+.dialog-footer button { min-height: var(--desktop-control-height); }
+.map-canvas__viewport .is-panning, .map-canvas__viewport .is-panning * { cursor: grabbing; }
+.workspace-file-drop { position: fixed; inset: 8px; z-index: 2000; display: grid; place-items: center; pointer-events: none; border: 2px dashed var(--color-accent); background: #edf6efe8; color: var(--color-accent); font-size: 14px; }

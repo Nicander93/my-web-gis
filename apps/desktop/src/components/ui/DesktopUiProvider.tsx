@@ -11,7 +11,7 @@ const desktopTheme: ThemeConfig = {
     colorInfoBg: '#f1f7f0', colorInfoBorder: '#d7e5d9',
     fontFamily: "'Segoe UI', 'Microsoft YaHei UI', system-ui, 'Noto Sans SC', sans-serif",
     fontSize: 12, borderRadius: 4, borderRadiusSM: 3, borderRadiusLG: 7,
-    controlHeight: 30, controlHeightSM: 29, motion: false
+    controlHeight: 28, controlHeightSM: 24, motion: false
   },
   components: {
     Button: { paddingInlineSM: 10, defaultColor: '#44624d', defaultShadow: 'none', primaryShadow: 'none' },

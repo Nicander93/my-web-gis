@@ -26,6 +26,7 @@ import {
 
 interface AddDataDialogProps {
   open: boolean
+  droppedFile?: File | string | null
   onClose: () => void
   onImport: (result: ImportResult) => void
   /** P15: add selected service layers (never called on failed connect). */
@@ -44,6 +45,7 @@ const COMMON_CRS = CRS_PRESETS
 
 export function AddDataDialog({
   open,
+  droppedFile,
   onClose,
   onImport,
   onAddServiceLayers
@@ -103,6 +105,10 @@ export function AddDataDialog({
     })
     return () => { unsubscribe(); parseGeneration.current++; parseController.current?.abort() }
   }, [open])
+
+  useEffect(() => {
+    if (open && droppedFile) void parseSources([droppedFile])
+  }, [open, droppedFile])
 
   if (!open) return null
 

@@ -19,7 +19,12 @@ export function HelpDialog({ page, onClose }: HelpDialogProps) {
           <dt>撤销</dt><dd><kbd>Ctrl + Z</kbd></dd>
           <dt>重做</dt><dd><kbd>Ctrl + Shift + Z</kbd></dd>
           <dt>专注模式</dt><dd><kbd>Ctrl + Shift + F</kbd></dd>
+          <dt>二维地图临时平移</dt><dd>中键拖动 / 空格 + 左键拖动</dd>
         </dl>
+        <details><summary>文件拖放与地图导航</summary>
+          <p>二维地图中可将 GeoJSON、SHP ZIP、DXF 或 CSV 文件拖到地图、图层面板或窗口空白处。一次一个文件，完成配置和确认后导入，可一步撤销。</p>
+          <p>选择、绘制和修改期间均可用中键，或按住空格再用左键拖动平移；当前工具和未完成的绘制草稿保留。输入框中的空格仍用于输入文字。</p>
+        </details>
         <details><summary>目标与数据范围</summary>
           <p>编辑目标、属性表和检查器分别绑定对象，浏览其他图层不会自动切换它们。</p>
           <p>表内搜索仅改变表格显示；图层过滤影响地图和表格。字段统计与“选择匹配记录”使用图层过滤结果，不随表内搜索缩小范围。</p>

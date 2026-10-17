@@ -1,0 +1,121 @@
+{
+  "date": "2026-10-17",
+  "baseline": "efed2b9",
+  "screenshots": false,
+  "scope": "2D workspace single-file drop, temporary pan and shared compact UI density",
+  "checks": {
+    "desktopBuild": "passed; existing bundle-size and mixed-import warnings",
+    "desktopUnit": {
+      "passed": 328,
+      "skipped": 5,
+      "files": 63
+    },
+    "newBehaviorE2E": {
+      "passed": 28,
+      "viewports": [
+        [
+          1440,
+          900
+        ],
+        [
+          1024,
+          680
+        ],
+        [
+          1366,
+          768
+        ],
+        [
+          1920,
+          1080
+        ]
+      ],
+      "scenarios": [
+        "map drop preview, confirm and single undo",
+        "layer-panel drop preview, confirm and single undo",
+        "multiple and unsupported file rejection; cancel without mutation",
+        "drop onto existing layer row without reorder",
+        "middle and space-left pan preserve selection, current tool and unfinished drawing",
+        "compact ribbon reachable with no horizontal document overflow",
+        "space in input; window blur clears pan; normal left selection restored"
+      ]
+    },
+    "geolibreRegressionE2E": {
+      "passed": 12,
+      "viewports": 4
+    }
+  },
+  "native": {
+    "identifier": "com.desktop-webgis.resource-acceptance-1792202670604",
+    "output": "D:\\my-code-repo\\my-web-gis\\.artifacts\\native-resources-1792202670604",
+    "scenarios": [
+      {
+        "name": "Native file-drop event bridge reads a local path; middle and space-left navigation",
+        "passed": true
+      },
+      {
+        "name": "Native WebView2 WASI simplification, typed data preservation, undo/redo and real filesystem save",
+        "passed": true
+      }
+    ],
+    "screenshots": false,
+    "nativeFileChooser": "Not verified: fixture working paths assigned; native filesystem and resource protocol used",
+    "windowsScale125": "Not verified",
+    "resourceResponses": [],
+    "requestedWindow": {
+      "label": "main",
+      "title": "Desktop WebGIS · Resource acceptance",
+      "width": 1440,
+      "height": 900,
+      "minWidth": 1024,
+      "minHeight": 680
+    },
+    "appData": "C:\\Users\\PC\\AppData\\Local\\com.desktop-webgis.resource-acceptance-1792202670604",
+    "viewport": {
+      "width": 1036,
+      "height": 648,
+      "devicePixelRatio": 1.5927083492279053
+    },
+    "nativeWindow": {
+      "scaleFactor": 1.1458333333333333,
+      "innerSize": {
+        "type": "Physical",
+        "width": 1650,
+        "height": 1031
+      },
+      "outerSize": {
+        "type": "Physical",
+        "width": 1668,
+        "height": 1075
+      }
+    },
+    "fileDrop": {
+      "nativeEventBridge": true,
+      "nativeFilesystemRead": true,
+      "physicalOsDrag": "Not verified: native drag event emitted by test"
+    },
+    "geolibre": {
+      "engine": {
+        "id": "geolibre-wasm",
+        "version": "1.7.1",
+        "tool": "simplify_features"
+      },
+      "options": {
+        "tool": "simplify",
+        "tolerance": 0.0001,
+        "unit": "degrees"
+      },
+      "wasmResponses": [
+        200
+      ],
+      "inputVertices": 3,
+      "outputVertices": 2
+    }
+  },
+  "boundaries": [
+    "Native drop event emitted through actual Tauri event bridge; physical Explorer drag not automated",
+    "Visual review delegated to user; no pixel comparisons",
+    "OS-level 125 percent scaling not verified",
+    "3D asset drag import not part of this 2D import entry"
+  ]
+}

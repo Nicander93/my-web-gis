@@ -3,6 +3,7 @@ import { useWorkbenchStore } from '@/stores/workbench.store'
 import { useProjectStore } from '@/stores/project.store'
 import { useSnappingStore } from '@/stores/snapping.store'
 import { MapPopup } from './MapPopup'
+import { installTemporaryPan } from './temporary-pan'
 import {
   getActiveEditTool,
   isSelectionRuntimeMounted,
@@ -55,6 +56,7 @@ export function MapCanvas() {
 
     const mapState = useProjectStore.getState().project.mapState
     const runtime = mountMapRuntime(target, mapState)
+    const disposePan = installTemporaryPan(runtime.getMap())
     runtime.onPointerMove((info) => {
       const [x, y] = info.coordinate
       useWorkbenchStore
@@ -68,6 +70,7 @@ export function MapCanvas() {
     setHint(toolHint(getActiveEditTool()))
 
     return () => {
+      disposePan()
       unmountMapRuntime()
       setRuntimeMounted(false)
       setSelectionMounted(false)
@@ -107,6 +110,7 @@ export function MapCanvas() {
       className="map-canvas"
       aria-label="地图工作区"
       tabIndex={0}
+      title="中键拖动或空格 + 左键拖动可随时平移地图"
       data-map-runtime={runtimeMounted ? 'mounted' : 'pending'}
       data-selection-runtime={selectionMounted ? 'mounted' : 'pending'}
       data-tool-runtime={toolMounted ? 'mounted' : 'pending'}

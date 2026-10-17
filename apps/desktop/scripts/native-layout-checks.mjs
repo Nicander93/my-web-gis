@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { join } from 'node:path'
+import { writeFile } from 'node:fs/promises'
 import { expect } from '@playwright/test'
 
 async function state(page) {
@@ -132,10 +133,26 @@ export async function verifyNativeSimplification(page, report, output, saveTo) {
   const wasmResponses = []
   page.on('response', response => { if (/geolibre-cli[^/]*\.wasm$/.test(new URL(response.url()).pathname)) wasmResponses.push(response.status()) })
   await page.getByRole('button', { name: /^二维地图/ }).click()
-  await page.getByRole('tab', { name: '数据', exact: true }).click()
-  await page.getByRole('region', { name: '二维功能区' }).getByRole('button', { name: '添加数据', exact: true }).click()
-  await page.locator('input[type=file]').setInputFiles({ name: 'native-routes.geojson', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ type: 'Feature', properties: { name: '原生道路', nested: { flags: [true, null] } }, geometry: { type: 'LineString', coordinates: [[116, 39], [116.001, 39.00001], [116.002, 39]] } })) })
+  const inputPath = join(output, 'native-routes.geojson')
+  await writeFile(inputPath, JSON.stringify({ type: 'Feature', properties: { name: '原生道路', nested: { flags: [true, null] } }, geometry: { type: 'LineString', coordinates: [[116, 39], [116.001, 39.00001], [116.002, 39]] } }))
+  await page.evaluate(async path => {
+    const { emitTo } = await import('/node_modules/@tauri-apps/api/event.js')
+    await emitTo({ kind: 'Webview', label: 'main' }, 'tauri://drag-drop', { paths: [path], position: { x: 400, y: 300 } })
+  }, inputPath)
   await page.getByRole('button', { name: '确认导入', exact: true }).click()
+  report.fileDrop = { nativeEventBridge: true, nativeFilesystemRead: true, physicalOsDrag: 'Not verified: native drag event emitted by test' }
+  const initialCenter = await page.evaluate(async () => (await import('/src/features/map/map-runtime-host.ts')).getMapRuntime().getMap().getView().getCenter())
+  const bounds = await page.getByTestId('map-runtime-viewport').boundingBox()
+  for (const button of ['middle', 'left']) {
+    await page.mouse.move(bounds.x + bounds.width * .55, bounds.y + bounds.height * .55)
+    if (button === 'left') await page.keyboard.down('Space')
+    await page.mouse.down({ button })
+    await page.mouse.move(bounds.x + bounds.width * .55 + 65, bounds.y + bounds.height * .55 + 25, { steps: 6 })
+    await page.mouse.up({ button })
+    if (button === 'left') await page.keyboard.up('Space')
+  }
+  assert.notDeepEqual(await page.evaluate(async () => (await import('/src/features/map/map-runtime-host.ts')).getMapRuntime().getMap().getView().getCenter()), initialCenter)
+  report.scenarios.push({ name: 'Native file-drop event bridge reads a local path; middle and space-left navigation', passed: true })
   const before = await state(page), source = before.snapshot.project.layers[0]
   const input = before.snapshot.featuresByDataset[source.datasetId][0]
   await page.getByRole('tab', { name: '分析', exact: true }).click()
