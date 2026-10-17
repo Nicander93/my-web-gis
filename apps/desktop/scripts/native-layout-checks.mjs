@@ -126,3 +126,42 @@ export async function verifyNativeLayout(page, report, output, saveTo) {
   await panelChecks(page, page.locator('.scene3d-canvas__viewport canvas'))
   report.scenarios.push({ name: '125% native 3D property/footer reachability, modal Tab/Esc isolation and dock controls preserve scene and canvas identity', passed: true })
 }
+
+/** Native IPC save and the real WebView WASI runtime are separate from browser acceptance. */
+export async function verifyNativeSimplification(page, report, output, saveTo) {
+  const wasmResponses = []
+  page.on('response', response => { if (/geolibre-cli[^/]*\.wasm$/.test(new URL(response.url()).pathname)) wasmResponses.push(response.status()) })
+  await page.getByRole('button', { name: /^二维地图/ }).click()
+  await page.getByRole('tab', { name: '数据', exact: true }).click()
+  await page.getByRole('region', { name: '二维功能区' }).getByRole('button', { name: '添加数据', exact: true }).click()
+  await page.locator('input[type=file]').setInputFiles({ name: 'native-routes.geojson', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ type: 'Feature', properties: { name: '原生道路', nested: { flags: [true, null] } }, geometry: { type: 'LineString', coordinates: [[116, 39], [116.001, 39.00001], [116.002, 39]] } })) })
+  await page.getByRole('button', { name: '确认导入', exact: true }).click()
+  const before = await state(page), source = before.snapshot.project.layers[0]
+  const input = before.snapshot.featuresByDataset[source.datasetId][0]
+  await page.getByRole('tab', { name: '分析', exact: true }).click()
+  await page.getByRole('button', { name: '空间处理', exact: true }).click()
+  const panel = page.getByRole('region', { name: '空间处理参数' })
+  await panel.getByRole('combobox', { name: '处理工具', exact: true }).selectOption('simplify')
+  await panel.getByRole('spinbutton', { name: '简化容差（度）', exact: true }).fill('0.0001')
+  await panel.getByLabel('结果图层名称', { exact: true }).fill('原生简化')
+  await panel.getByRole('button', { name: '生成结果图层', exact: true }).click()
+  await expect(page.locator('.layer-name-button').filter({ hasText: '原生简化' })).toBeVisible({ timeout: 60_000 })
+  const after = await state(page), layer = after.snapshot.project.layers.find(layer => layer.name === '原生简化')
+  assert.ok(layer)
+  const result = after.snapshot.featuresByDataset[layer.datasetId][0]
+  assert.deepEqual(result.geometry.coordinates, [input.geometry.coordinates[0], input.geometry.coordinates[2]])
+  assert.deepEqual(result.properties, input.properties)
+  assert.deepEqual(after.snapshot.featuresByDataset[source.datasetId], before.snapshot.featuresByDataset[source.datasetId])
+  await panel.getByRole('button', { name: '关闭', exact: true }).click()
+  await page.getByRole('button', { name: '撤销', exact: true }).click()
+  assert.deepEqual((await state(page)).snapshot, before.snapshot)
+  await page.getByRole('button', { name: '重做', exact: true }).click()
+  assert.deepEqual((await state(page)).snapshot, after.snapshot)
+  const saved = await saveTo(join(output, 'native-simplified.webgis.json'))
+  assert.deepEqual(saved.featuresByDataset, JSON.parse(JSON.stringify(after.snapshot.featuresByDataset)))
+  const processing = saved.project.datasets.find(dataset => dataset.id === layer.datasetId).processing
+  assert.deepEqual(processing.engine, { id: 'geolibre-wasm', version: '1.7.1', tool: 'simplify_features' })
+  assert.deepEqual(wasmResponses, [200])
+  report.geolibre = { engine: processing.engine, options: processing.options, wasmResponses, inputVertices: 3, outputVertices: 2 }
+  report.scenarios.push({ name: 'Native WebView2 WASI simplification, typed data preservation, undo/redo and real filesystem save', passed: true })
+}

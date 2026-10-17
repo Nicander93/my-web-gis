@@ -5,6 +5,8 @@ import { fileURLToPath, URL } from 'node:url'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
 
 export default defineConfig({
+  optimizeDeps: { exclude: ['geolibre-wasm'] },
+  worker: { format: 'es' },
   plugins: [react(), tailwindcss(), viteStaticCopy({ targets: [
     ...['Assets', 'Workers', 'ThirdParty', 'Widgets'].map(name => ({ src: `node_modules/cesium/Build/Cesium/${name}`, dest: 'cesium' })),
     { src: '../../examples/city-3d/city-sample', dest: '.' }

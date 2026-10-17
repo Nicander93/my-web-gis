@@ -13,7 +13,8 @@
     "tauri": "tauri",
     "test:e2e": "playwright test",
     "test:native-resources": "node scripts/native-resource-acceptance.mjs",
-    "test:native-layout125": "node scripts/native-resource-acceptance.mjs --layout125"
+    "test:native-layout125": "node scripts/native-resource-acceptance.mjs --layout125",
+    "test:processing-production": "playwright test --config playwright.processing-production.config.ts"
   },
   "dependencies": {
     "@desktop-webgis/cesium-measure": "workspace:*",
@@ -33,6 +34,7 @@
     "@tauri-apps/plugin-dialog": "^2.3.3",
     "antd": "6.6.6",
     "cesium": "^1.145.0",
+    "geolibre-wasm": "1.7.1",
     "lucide-react": "^1.38.0",
     "nanoid": "^5.1.5",
     "ol": "^10.6.1",

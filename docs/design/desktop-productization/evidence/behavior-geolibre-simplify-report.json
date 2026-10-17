@@ -1,0 +1,86 @@
+{
+  "date": "2026-10-17",
+  "baseline": "d5dd0fb",
+  "engine": {
+    "id": "geolibre-wasm",
+    "version": "1.7.1",
+    "tool": "simplify_features",
+    "manifests": 1065
+  },
+  "checks": {
+    "desktopUnit": {
+      "passed": 328,
+      "skipped": 5
+    },
+    "gisCoreUnit": {
+      "passed": 77
+    },
+    "desktopBuild": "passed",
+    "gisCoreBuild": "passed",
+    "developmentE2E": 6,
+    "productionE2E": 1
+  },
+  "native": {
+    "identifier": "com.desktop-webgis.resource-acceptance-1792202178619",
+    "output": "D:\\my-code-repo\\my-web-gis\\.artifacts\\native-resources-1792202178619",
+    "scenarios": [
+      {
+        "name": "Native WebView2 WASI simplification, typed data preservation, undo/redo and real filesystem save",
+        "passed": true
+      }
+    ],
+    "screenshots": false,
+    "nativeFileChooser": "Not verified: fixture working paths assigned; native filesystem and resource protocol used",
+    "windowsScale125": "Not verified",
+    "resourceResponses": [],
+    "requestedWindow": {
+      "label": "main",
+      "title": "Desktop WebGIS 路 Resource acceptance",
+      "width": 1440,
+      "height": 900,
+      "minWidth": 1024,
+      "minHeight": 680
+    },
+    "appData": "C:\\Users\\PC\\AppData\\Local\\com.desktop-webgis.resource-acceptance-1792202178619",
+    "viewport": {
+      "width": 1036,
+      "height": 648,
+      "devicePixelRatio": 1.5927083492279053
+    },
+    "nativeWindow": {
+      "scaleFactor": 1.1458333333333333,
+      "innerSize": {
+        "type": "Physical",
+        "width": 1650,
+        "height": 1031
+      },
+      "outerSize": {
+        "type": "Physical",
+        "width": 1668,
+        "height": 1075
+      }
+    },
+    "geolibre": {
+      "engine": {
+        "id": "geolibre-wasm",
+        "version": "1.7.1",
+        "tool": "simplify_features"
+      },
+      "options": {
+        "tool": "simplify",
+        "tolerance": 0.0001,
+        "unit": "degrees"
+      },
+      "wasmResponses": [
+        200
+      ],
+      "inputVertices": 3,
+      "outputVertices": 2
+    }
+  },
+  "limits": [
+    "XY WGS84 lines and polygons only; tolerance in degrees",
+    "No shared-edge topology guarantee",
+    "Native file chooser and Windows 125 percent scale not verified"
+  ]
+}

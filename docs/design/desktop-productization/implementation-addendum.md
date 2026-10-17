@@ -94,3 +94,8 @@ A 完成不代表全部界面迁移完成。逐批记录剩余文件，不将 an
 - 保留无关 `apps/desktop/src-tauri/Cargo.toml` 改动，不重新开始工程或清理他人工作。
 
 接入依据：[官方 React 介绍](https://ant.design/docs/react/introduce/)、[ConfigProvider](https://ant.design/components/config-provider/)、[Modal](https://ant.design/components/modal/)。
+
+
+### 2026-10-17 GeoLibre first integration
+
+Geometry simplification uses pinned geolibre-wasm 1.7.1 in the processing Worker. Existing OpenLayers/Cesium and 18 processing tools remain. See [reuse audit](../../engineering/processing-reuse.md) and [behavior evidence](evidence/behavior-geolibre-simplify-report.json). Development and production browser flows plus native WebView2 verify real WASI, typed attributes, undo/redo and saved projects. This closes the first reuse slice, not all E06 processing acceptance.

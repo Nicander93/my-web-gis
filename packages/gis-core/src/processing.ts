@@ -15,7 +15,7 @@ import { createId } from './id'
 import type { Geometry, GisFeature, Position, PolygonGeometry, MultiPolygonGeometry } from './types'
 
 export type OverlayTool = 'clip' | 'intersect' | 'difference'
-export type ProcessingTool = 'buffer' | 'centroid' | 'envelope' | 'explode' | OverlayTool | 'dissolve' | 'extract-location' | 'summarize-location' | 'attribute-join' | 'spatial-join' | 'clip-lines' | 'measure-area' | 'measure-length' | 'measure-perimeter' | 'calculate-field'
+export type ProcessingTool = 'buffer' | 'centroid' | 'envelope' | 'explode' | OverlayTool | 'dissolve' | 'extract-location' | 'summarize-location' | 'attribute-join' | 'spatial-join' | 'clip-lines' | 'measure-area' | 'measure-length' | 'measure-perimeter' | 'calculate-field' | 'simplify'
 export type GeometryProcessingOptions =
   | { tool: 'buffer'; distance: number; unit: 'meters' | 'kilometers' }
   | { tool: 'centroid' }
@@ -27,6 +27,7 @@ export type GeometryProcessingOptions =
 
 /** Serializable application requests; statistical algorithms are implemented by the analysis extension. */
 export type ProcessingOptions = GeometryProcessingOptions
+  | { tool: 'simplify'; tolerance: number; unit: 'degrees' }
   | { tool: 'clip-lines' }
   | { tool: 'measure-area'; field: string; unit: 'square-meters' | 'hectares' | 'square-kilometers' }
   | { tool: 'measure-length'; field: string; unit: 'meters' | 'kilometers' }
@@ -40,10 +41,12 @@ export interface ProcessingResult {
   features: GisFeature[]
   inputCount: number
   overlayCount?: number
+  engine?: { id: string; version: string; tool: string }
 }
 
 /** Provenance travels with a result dataset; it is descriptive, not a live dependency. */
 export interface ProcessingRecord {
+  engine?: ProcessingResult['engine']
   options: ProcessingOptions
   sourceLayerId: string
   sourceLayerName: string

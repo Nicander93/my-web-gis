@@ -4,6 +4,7 @@ export type DesktopProcessingTool = ProcessingTool | 'check-geometry'
 
 /** UI copy stays in Desktop; the complete record makes new protocol tools require a visible entry. */
 const definitions: Record<DesktopProcessingTool, { name: string; description: string }> = {
+  simplify: { name: '几何简化', description: '减少二维线、面的顶点。容差使用 WGS84 经纬度的度，不是米；不保证相邻面的共享边拓扑，无效结果整批拒绝。' },
   'measure-area': { name: '面积字段', description: '按 WGS84 球面模型计算每个面的面积，扣除孔洞；保留原几何和属性，新增测量字段。' },
   'measure-length': { name: '长度字段', description: '计算每条线的球面长度，多部件求和；保留原几何和属性，新增测量字段。' },
   'measure-perimeter': { name: '周长字段', description: '计算面的边界球面长度，包括外环及孔洞边界，多部件求和。' },

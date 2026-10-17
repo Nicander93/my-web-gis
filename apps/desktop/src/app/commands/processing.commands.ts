@@ -63,6 +63,7 @@ export const processingCommands = {
       ? '没有符合空间关系的要素，未创建图层。请检查输入范围或调整关系。'
       : '没有符合条件的面结果，未创建图层。请检查两层范围；仅边界接触不生成面。')
     const layerId = addProcessingResult(projectId, args.name, result, {
+      ...(result.engine ? { engine: result.engine } : {}),
       options, sourceLayerId: args.layerId, sourceLayerName: sourceLayer?.name ?? '', overlay: overlayRecord,
       scope: args.scope, inputCount: result.inputCount, outputCount: result.features.length, completedAt: new Date().toISOString()
     })

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
+import { InputNumber } from 'antd'
 import {
   capabilitiesForDataset,
   requiresOverlay,
@@ -97,6 +98,7 @@ export function ProcessingDialog({
   const [joinMode, setJoinMode] = useState<'left' | 'inner'>('left')
   const [resultLimit, setResultLimit] = useState('100000')
   const [distance, setDistance] = useState('100')
+  const [tolerance, setTolerance] = useState<number | null>(0.0001)
   const [unit, setUnit] = useState<'meters' | 'kilometers'>('meters')
   const [name, setName] = useState('')
   const [resultField, setResultField] = useState('area_m2')
@@ -125,7 +127,11 @@ export function ProcessingDialog({
     tool === 'measure-length' ||
     tool === 'measure-perimeter'
   const needsLine = tool === 'clip-lines' || tool === 'measure-length'
-  const candidates = needsLine
+  const simplifiableLayers = vectorLayers.filter(layer => {
+    const rows = featuresByDataset[layer.datasetId] ?? []
+    return rows.length > 0 && rows.every(feature => ['LineString', 'MultiLineString', 'Polygon', 'MultiPolygon'].includes(feature.geometry.type))
+  })
+  const candidates = tool === 'simplify' ? simplifiableLayers : needsLine
     ? lineLayers
     : !isCheck && requiresPolygon(tool)
       ? polygonLayers
@@ -192,7 +198,7 @@ export function ProcessingDialog({
 
   function selectTool(nextTool: Tool): void {
     const available =
-      nextTool === 'clip-lines' || nextTool === 'measure-length'
+      nextTool === 'simplify' ? simplifiableLayers : nextTool === 'clip-lines' || nextTool === 'measure-length'
         ? lineLayers
         : nextTool !== 'check-geometry' && requiresPolygon(nextTool)
           ? polygonLayers
@@ -357,6 +363,7 @@ export function ProcessingDialog({
       const options: ProcessingOptions =
         tool === 'buffer'
           ? { tool, distance: Number(distance), unit }
+          : tool === 'simplify' ? { tool, tolerance: tolerance ?? 0, unit: 'degrees' }
           : isMeasurement || tool === 'calculate-field'
             ? fieldOptions()
             : tool === 'dissolve'
@@ -889,6 +896,11 @@ export function ProcessingDialog({
                     </label>
                   </div>
                 )}
+                {tool === 'simplify' && <label htmlFor="simplify-tolerance">
+                  简化容差（度）
+                  <InputNumber id="simplify-tolerance" aria-label="简化容差（度）" min={0} max={180} step={0.0001} value={tolerance} disabled={busy} onChange={setTolerance} />
+                  <small>仅支持二维线、面。容差按经纬度计算，不是米；Z/M 数据暂不支持。相邻面的共享边不保证保持一致。</small>
+                </label>}
                 {(isMeasurement || tool === 'calculate-field') && (
                   <label>
                     新增结果字段

@@ -3,6 +3,7 @@ import { addGeometryMeasurements, calculateField, clipLines, joinAttributes, joi
 
 /** Route serializable UI requests to reusable package APIs, without project or runtime dependencies. */
 export function executeProcessing(features: GisFeature[], options: ProcessingOptions, overlay: GisFeature[] = []): ProcessingResult {
+  if (options.tool === 'simplify') throw new Error('几何简化需要异步 GeoLibre WASM 执行器。')
   if (options.tool === 'calculate-field') return { inputCount: features.length, features: calculateField(features, options) }
   if (options.tool === 'measure-area') return { inputCount: features.length, features: addGeometryMeasurements(features, { measurement: 'area', unit: options.unit, field: options.field }) }
   if (options.tool === 'measure-length' || options.tool === 'measure-perimeter') return { inputCount: features.length, features: addGeometryMeasurements(features, { measurement: options.tool === 'measure-length' ? 'length' : 'perimeter', unit: options.unit, field: options.field }) }

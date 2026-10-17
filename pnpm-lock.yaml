@@ -71,6 +71,9 @@ importers:
       cesium:
         specifier: ^1.145.0
         version: 1.145.0
+      geolibre-wasm:
+        specifier: 1.7.1
+        version: 1.7.1
       lucide-react:
         specifier: ^1.38.0
         version: 1.38.0(react@19.2.8)
@@ -726,6 +729,9 @@ packages:
   '@babel/types@7.29.8':
     resolution: {integrity: sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg==}
     engines: {node: '>=6.9.0'}
+
+  '@bjorn3/browser_wasi_shim@0.4.2':
+    resolution: {integrity: sha512-/iHkCVUG3VbcbmEHn5iIUpIrh7a7WPiwZ3sHy4HZKZzBdSadwdddYDZAII2zBvQYV0Lfi8naZngPCN7WPHI/hA==}
 
   '@cesium/engine@26.3.0':
     resolution: {integrity: sha512-jtgOewm/IZoypmqpbeTlYhMOKhQg+XPwUXoYat84vhIU8l8SfVSEat4Lc/Y4Fb7ypi3z1YmElKjVYvoI5CH6Pw==}
@@ -1929,6 +1935,9 @@ packages:
   geojson-polygon-self-intersections@1.2.2:
     resolution: {integrity: sha512-6XRNF4CsRHYmR9z5YuIk5f/aOototnDf0dgMqYGcS7y1l57ttt6MAIAxl3rXyas6lq1HEbTuLMh4PgvO+OV42w==}
 
+  geolibre-wasm@1.7.1:
+    resolution: {integrity: sha512-AFyENgRnlTPceEkyiruzAtdmVgA4OnijsfiKbQKEnGdBe62f+3GeHXraAbaKoan/rFx0Rz5vu620AWEFkozOuQ==}
+
   geotiff@3.1.0-beta.0:
     resolution: {integrity: sha512-wbVwOaQYuN+ywly5NoMXn37nHslwkQg5EFHqMeUTtjDACrSag0EEVlFsc+2DK3Pzmmp6XzJW2RTZOamPsBM6ng==}
     engines: {node: '>=10.19'}
@@ -2708,6 +2717,8 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
+
+  '@bjorn3/browser_wasi_shim@0.4.2': {}
 
   '@cesium/engine@26.3.0':
     dependencies:
@@ -4038,6 +4049,10 @@ snapshots:
   geojson-polygon-self-intersections@1.2.2:
     dependencies:
       rbush: 2.0.2
+
+  geolibre-wasm@1.7.1:
+    dependencies:
+      '@bjorn3/browser_wasi_shim': 0.4.2
 
   geotiff@3.1.0-beta.0:
     dependencies:

@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import { chromium, expect } from '@playwright/test'
-import { verifyNativeLayout } from './native-layout-checks.mjs'
+import { verifyNativeLayout, verifyNativeSimplification } from './native-layout-checks.mjs'
 
 const desktop = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const tauri = join(desktop, 'src-tauri')
@@ -15,6 +15,7 @@ const output = resolve(desktop, '../../.artifacts', `native-resources-${runId}`)
 const serverPort = 5197, debugPort = 9229
 const url = `http://127.0.0.1:${serverPort}`
 const layoutOnly = process.argv.includes('--layout125')
+const simplifyOnly = process.argv.includes('--simplify')
 const wide = process.argv.includes('--wide')
 const report = { identifier, output, scenarios: [], screenshots: false,
   nativeFileChooser: 'Not verified: fixture working paths assigned; native filesystem and resource protocol used',
@@ -211,7 +212,9 @@ try {
   server = start(['pnpm', 'dev', '--port', String(serverPort), '--strictPort'], desktop)
   await poll(() => available(serverPort), 'Owned Vite server did not start')
   await launch()
-  if (layoutOnly) {
+  if (simplifyOnly) {
+    await verifyNativeSimplification(page, report, output, saveTo)
+  } else if (layoutOnly) {
     await verifyNativeLayout(page, report, output, saveTo)
   } else {
   await page.getByRole('button', { name: /^三维场景/ }).click()
