@@ -27,7 +27,7 @@ test('table tabs retain drafts; typed field calculation rolls back and uses one 
   await filter.getByRole('button', { name: '添加条件', exact: true }).click()
   await importRows(page, 'second')
   await page.getByRole('button', { name: '属性表', exact: true }).click()
-  await expect(page.locator('.attribute-table-host').getByRole('tablist').getByRole('tab')).toHaveCount(2)
+  await expect(page.locator('.dock-feature-tabs').getByRole('tablist').getByRole('tab')).toHaveCount(2)
   await panel().getByLabel('表内搜索').fill('not-found')
   await page.getByRole('tab', { name: 'first', exact: true }).click()
   await expect(panel().getByLabel('表内搜索')).toHaveValue('001')
@@ -51,7 +51,6 @@ test('table tabs retain drafts; typed field calculation rolls back and uses one 
   const footerBounds = (await panel().getByLabel('表格状态与分页').boundingBox())!
   const windowBounds = (await page.getByRole('complementary', { name: '属性表面板' }).boundingBox())!
   expect(footerBounds.y + footerBounds.height).toBeLessThanOrEqual(windowBounds.y + windowBounds.height)
-  await page.screenshot({ path: info.outputPath('antd-field-calculator.png') })
   await page.getByRole('button', { name: '撤销', exact: true }).click()
   await expect(panel().getByRole('columnheader', { name: 'result', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: '重做', exact: true }).click()
@@ -64,5 +63,4 @@ test('table tabs retain drafts; typed field calculation rolls back and uses one 
   await page.locator('.ant-tabs-tab').filter({ has: page.getByRole('tab', { name: 'second', exact: true }) })
     .locator('.ant-tabs-tab-remove').click()
   await expect(page.getByRole('tab', { name: 'first', exact: true })).toHaveAttribute('aria-selected', 'true')
-  await page.screenshot({ path: info.outputPath('table-calculator.png') })
 })

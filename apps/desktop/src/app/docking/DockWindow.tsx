@@ -6,6 +6,7 @@ import { constrainWindow, panelDefinitions, type DockPanelId, type DockPosition,
 import './docking.css'
 
 interface DockWindowProps {
+  titleContent?: ReactNode
   id: DockPanelId
   title: string
   label: string
@@ -25,7 +26,7 @@ interface Gesture {
 }
 
 /** 覆盖式窗口：停靠和浮动都不参与地图的布局和生命周期。 */
-export function DockWindow({ id, title, label, actions, children, footer, onClose }: DockWindowProps) {
+export function DockWindow({ id, title, label, actions, children, footer, onClose, titleContent }: DockWindowProps) {
   const ref = useRef<HTMLElement>(null)
   const gesture = useRef<Gesture | null>(null)
   const placement = useDockingStore(state => state.layout[id])
@@ -81,7 +82,7 @@ export function DockWindow({ id, title, label, actions, children, footer, onClos
   }, [])
 
   function begin(event: PointerEvent<HTMLElement>, kind: Gesture['kind']): void {
-    if (event.button !== 0 || current.maximized || (kind === 'move' && (event.target as HTMLElement).closest('button,select,input'))) return
+    if (event.button !== 0 || current.maximized || (kind === 'move' && (event.target as HTMLElement).closest('button,select,input,[role="tab"],.ant-tabs'))) return
     const root = ref.current?.parentElement?.getBoundingClientRect()
     const rect = ref.current?.getBoundingClientRect()
     if (!root || !rect) return
@@ -146,6 +147,7 @@ export function DockWindow({ id, title, label, actions, children, footer, onClos
         useDockingStore.getState().update(id, { ...current, bounds: constrainWindow({ ...bounds, x: bounds.x + (event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0), y: bounds.y + (event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0) }, area) })
       }}>
       <h2 title={title}>{title}</h2>
+      {titleContent}
       <div className="panel-actions">
         {actions}
         <select className="dock-window__position" aria-label={`${title}停靠位置`} value={current.dock} onChange={event => dock(event.target.value as DockPosition)}>

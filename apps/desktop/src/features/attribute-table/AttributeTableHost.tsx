@@ -1,4 +1,7 @@
-import { Select, Tabs } from 'antd'
+import { Select, Tabs, theme } from 'antd'
+import { useContext } from 'react'
+import { createPortal } from 'react-dom'
+import { DockHeaderContext } from '@/components/ui/DockHeaderContext'
 import { useProjectStore } from '@/stores/project.store'
 import { useWorkbenchStore } from '@/stores/workbench.store'
 import { layerCommands, getLayerCapabilities } from '@/app/commands/layer.commands'
@@ -6,6 +9,8 @@ import { AttributeTable } from './AttributeTable'
 
 /** Each open layer retains its own drafts, filters, pagination and scroll state. */
 export function AttributeTableHost() {
+  const header = useContext(DockHeaderContext)
+  const { hashId } = theme.useToken()
   const project = useProjectStore((state) => state.project)
   const activeId = useWorkbenchStore((state) => state.tableLayerId)
   const openIds = useWorkbenchStore((state) => state.tableLayerIds)
@@ -21,6 +26,7 @@ export function AttributeTableHost() {
   return <div className="attribute-table-host">
     {layers.length === 0 ? <><div className="attribute-table-tab-bar">{picker}</div><AttributeTable /></> :
       <Tabs className="attribute-table-ant-tabs" type="editable-card" hideAdd activeKey={activeId ?? undefined}
+        renderTabBar={(props, DefaultTabBar) => header ? createPortal(<div className={`ant-tabs ant-tabs-top ant-tabs-small ant-tabs-card ${hashId}`}><DefaultTabBar {...props} /></div>, header) : <DefaultTabBar {...props} />}
         tabBarExtraContent={{ left: picker }} destroyOnHidden={false}
         onChange={(id) => useWorkbenchStore.getState().bindTable(id)}
         onEdit={(key, action) => {
