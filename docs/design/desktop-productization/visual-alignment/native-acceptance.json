@@ -1,0 +1,50 @@
+{
+  "identifier": "com.desktop-webgis.resource-acceptance-1792310962886",
+  "output": "D:\\my-code-repo\\my-web-gis\\.artifacts\\native-resources-1792310962886",
+  "scenarios": [
+    {
+      "name": "125% native attribute cell double-click, Enter commit, single-step undo and Esc cancellation preserve feature values",
+      "passed": true
+    },
+    {
+      "name": "125% native 2D import modal, property draft/keyboard cancellation and dock controls remain reachable without data mutation",
+      "passed": true
+    },
+    {
+      "name": "125% native 3D property/footer reachability, modal Tab/Esc isolation and dock controls preserve scene and canvas identity",
+      "passed": true
+    }
+  ],
+  "screenshots": false,
+  "nativeFileChooser": "Not verified: fixture working paths assigned; native filesystem and resource protocol used",
+  "windowsScale125": "Not verified",
+  "resourceResponses": [],
+  "requestedWindow": {
+    "label": "main",
+    "title": "Desktop WebGIS · Resource acceptance",
+    "width": 1366,
+    "height": 768,
+    "minWidth": 1024,
+    "minHeight": 680
+  },
+  "appData": "C:\\Users\\PC\\AppData\\Local\\com.desktop-webgis.resource-acceptance-1792310962886",
+  "viewport": {
+    "width": 1252,
+    "height": 704,
+    "devicePixelRatio": 1.25
+  },
+  "nativeWindow": {
+    "scaleFactor": 1.1458333333333333,
+    "innerSize": {
+      "type": "Physical",
+      "width": 1565,
+      "height": 880
+    },
+    "outerSize": {
+      "type": "Physical",
+      "width": 1583,
+      "height": 924
+    }
+  },
+  "rendererScale125": "Verified controlled WebView scale; OS display setting is recorded separately"
+}

@@ -117,7 +117,9 @@ test('middle and space-left pan preserve selection and an unfinished drawing', a
 test('compact ribbon leaves map space and keeps commands reachable', async ({ page }) => {
   await setup(page)
   const ribbon = page.getByRole('region', { name: '二维功能区' })
-  expect((await ribbon.boundingBox())!.height).toBeLessThanOrEqual(70)
+  // The visual specification replaces the previous compressed 70px ceiling.
+  expect((await ribbon.boundingBox())!.height).toBeGreaterThanOrEqual(74)
+  expect((await ribbon.boundingBox())!.height).toBeLessThanOrEqual(76)
   for (const name of ['数据', '编辑', '分析']) {
     await page.getByRole('tab', { name, exact: true }).click()
     await expect(page.getByTestId('map-runtime-viewport')).toBeVisible()

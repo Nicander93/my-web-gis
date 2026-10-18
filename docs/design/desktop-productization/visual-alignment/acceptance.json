@@ -1,0 +1,126 @@
+{
+  "date": "2026-10-18",
+  "baseline": "ee23d0208501cc0a2c2da1129839a2290da106de",
+  "scope": "S0-S5 only; UI presentation, no GIS engine/algorithm/project protocol changes",
+  "screenshots": false,
+  "visualSignoff": "Pending user review; no screenshot or pixel comparison performed",
+  "build": "passed; existing chunk-size and mixed import warnings remain",
+  "unit": {
+    "passed": 328,
+    "skipped": 5,
+    "files": 63
+  },
+  "initialMatrix": {
+    "command": "rtk pnpm --filter @desktop-webgis/desktop exec playwright test --config playwright.visual.config.ts --project=desktop --project=laptop --project=wide",
+    "stats": {
+      "startTime": "2026-10-18T07:52:24.431Z",
+      "duration": 639814.442,
+      "expected": 84,
+      "skipped": 0,
+      "unexpected": 3,
+      "flaky": 0
+    },
+    "failures": [
+      {
+        "title": "table binding survives browsing; filters apply explicitly and scope stays visible",
+        "project": "desktop",
+        "reason": "Old combined tools/status <=64 assertion conflicts with new 40+29 specification"
+      },
+      {
+        "title": "table binding survives browsing; filters apply explicitly and scope stays visible",
+        "project": "laptop",
+        "reason": "Old combined tools/status <=64 assertion conflicts with new 40+29 specification"
+      },
+      {
+        "title": "table binding survives browsing; filters apply explicitly and scope stays visible",
+        "project": "wide",
+        "reason": "Old combined tools/status <=64 assertion conflicts with new 40+29 specification"
+      }
+    ]
+  },
+  "rechecks": [
+    {
+      "command": "rtk pnpm --filter @desktop-webgis/desktop exec playwright test --config playwright.visual.config.ts e2e/workbench.e2e.ts --grep \"table binding survives browsing\" --project=desktop --project=laptop --project=wide --reporter=list",
+      "passed": 3,
+      "reason": "Explicit 40px toolbar and 29px status assertions replace stale combined ceiling; remaining business assertions also pass"
+    },
+    {
+      "command": "rtk pnpm --filter @desktop-webgis/desktop exec playwright test --config playwright.visual.config.ts e2e/core-ui-visual.e2e.ts --grep \"disabled reasons|real survey\" --project=desktop --project=laptop --project=wide --reporter=list",
+      "passed": 6,
+      "reason": "Final AntD tabs, keyboard disabled hints, compact quick icons, real geometry and dark theme"
+    }
+  ],
+  "verifiedUniqueScenarioCount": 90,
+  "coverageExplanation": "87 matrix cases closed by focused recheck, plus 3 additional keyboard/button cases; not a claim of one 90-case green invocation",
+  "actualGeometry": {
+    "desktop": {
+      "chrome": 40,
+      "ribbonTabs": 31,
+      "ribbonTools": 43,
+      "tool": 34,
+      "title": 36,
+      "toolbar": 40,
+      "header": 32,
+      "row": 30,
+      "footer": 29
+    },
+    "laptop": {
+      "chrome": 40,
+      "ribbonTabs": 31,
+      "ribbonTools": 43,
+      "tool": 34,
+      "title": 36,
+      "toolbar": 40,
+      "header": 32,
+      "row": 30,
+      "footer": 29
+    },
+    "wide": {
+      "chrome": 40,
+      "ribbonTabs": 31,
+      "ribbonTools": 43,
+      "tool": 34,
+      "title": 36,
+      "toolbar": 40,
+      "header": 32,
+      "row": 30,
+      "footer": 29
+    }
+  },
+  "semanticTokenDefinitions": {
+    "apps/desktop/src/styles/tokens.css": [
+      "--color-accent",
+      "--color-accent-hover",
+      "--color-accent-soft",
+      "--color-active",
+      "--color-app-bg",
+      "--color-border",
+      "--color-border-strong",
+      "--color-border-subtle",
+      "--color-danger",
+      "--color-hover",
+      "--color-panel",
+      "--color-selected",
+      "--color-success",
+      "--color-surface",
+      "--color-text-inverse",
+      "--color-text-muted",
+      "--color-text-primary",
+      "--color-text-secondary",
+      "--color-warning"
+    ]
+  },
+  "boundaries": [
+    "Visual signoff pending user review",
+    "Physical OS 125 percent scale and physical IME not verified",
+    "Controlled WebView DPR is not OS scale",
+    "Only three core component categories; no automatic global rollout"
+  ],
+  "native": {
+    "report": "native-acceptance.json",
+    "scenariosPassed": 3,
+    "controlledDevicePixelRatio": 1.25,
+    "osWindowScaleFactor": 1.1458333333333333,
+    "osScale125Verified": false
+  }
+}

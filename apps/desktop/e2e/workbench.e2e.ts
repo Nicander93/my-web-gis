@@ -37,14 +37,12 @@ test('start screen offers three work entries without duplicated navigation', asy
   await expect(start.getByRole('button')).toHaveCount(3)
   await expect(start.getByRole('complementary')).toHaveCount(0)
   await expect(start).not.toContainText('工作路径')
-  await page.screenshot({ path: testInfo.outputPath('start.png') })
 })
 
 test('CSV configuration keeps one modal and restores keyboard access after cancel', async ({ page }, testInfo) => {
   await page.getByRole('tab', { name: '数据', exact: true }).click()
   const add = page.getByRole('region', { name: '二维功能区' }).getByRole('button', { name: '添加数据', exact: true })
   await add.click()
-  await page.screenshot({ path: testInfo.outputPath('prototype-aligned-add-data.png') })
   await page.locator('input[type=file]').setInputFiles({
     name: 'coordinates.csv', mimeType: 'text/csv', buffer: Buffer.from('id,x,y\n1,116.4,39.9\n2,116.5,40.0')
   })
@@ -63,7 +61,6 @@ test('CSV configuration keeps one modal and restores keyboard access after cance
     await page.keyboard.press('Shift+Tab')
     expect(await dialog.evaluate(element => element.contains(document.activeElement))).toBe(true)
   }
-  await page.screenshot({ path: testInfo.outputPath('csv.png') })
   await dialog.getByLabel('坐标系', { exact: true }).selectOption('EPSG:4326')
   await dialog.getByRole('button', { name: /^确认/ }).click()
   await page.getByRole('button', { name: '确认导入', exact: true }).click()
@@ -168,7 +165,9 @@ test('table binding survives browsing; filters apply explicitly and scope stays 
   await expect(page.getByLabel('字段统计', { exact: true })).toBeHidden()
   const toolbar = page.getByLabel('属性表工具')
   const footer = page.getByLabel('表格状态与分页')
-  expect((await toolbar.boundingBox())!.height + (await footer.boundingBox())!.height).toBeLessThanOrEqual(64)
+  // V1 visual specification uses separate 40px tools and 29px status zones.
+  expect((await toolbar.boundingBox())!.height).toBe(40)
+  expect((await footer.boundingBox())!.height).toBe(29)
   await expect(page.locator('.panel-bottom .panel-header')).toHaveCount(0)
   const panelBounds = (await page.getByRole('complementary', { name: '属性表面板' }).boundingBox())!
   const mapBounds = (await page.getByRole('region', { name: '地图工作区' }).boundingBox())!
@@ -202,7 +201,6 @@ test('table binding survives browsing; filters apply explicitly and scope stays 
   await page.getByRole('button', { name: '样式', exact: true }).click()
   await page.getByRole('tab', { name: '地图', exact: true }).click()
   await page.getByRole('button', { name: '定位图层' }).click()
-  await page.screenshot({ path: testInfo.outputPath('workbench.png') })
 })
 
 test('editing has a locked target and style switches require a draft decision', async ({
@@ -254,7 +252,6 @@ test('processing runs in a dock and creates a real result layer', async ({
     page.locator('.layer-name-button').filter({ hasText: '测试缓冲区' })
   ).toBeVisible()
   await expect(page.locator('.processing-result')).toContainText('结果')
-  await page.screenshot({ path: testInfo.outputPath('processing.png') })
 })
 
 test('three-dimensional workspace keeps scene capabilities and shared panel rules', async ({
@@ -294,5 +291,4 @@ test('three-dimensional workspace keeps scene capabilities and shared panel rule
   await expect(page.getByRole('alert')).toContainText('雾浓度必须在 0–1 之间')
   await page.getByRole('button', { name: '撤销', exact: true }).click()
   await expect(fog).toHaveValue('0')
-  await page.screenshot({ path: testInfo.outputPath('city.png') })
 })
