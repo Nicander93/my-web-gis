@@ -240,7 +240,7 @@ button:disabled {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: var(--desktop-control-height, 24px);
+  min-height: var(--control-height);
   padding: 0 9px;
   color: var(--color-text-primary);
   background: transparent;
@@ -267,8 +267,9 @@ button:disabled {
 }
 
 .ui-button-icon {
-  width: 24px;
-  min-height: var(--desktop-control-height, 24px);
+  width: var(--control-icon-height);
+  min-height: var(--control-icon-height);
+  height: var(--control-icon-height);
   padding: 0;
 }
 

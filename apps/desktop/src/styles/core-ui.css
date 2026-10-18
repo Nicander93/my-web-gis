@@ -1,0 +1,30 @@
+/* Component geometry for the three calibrated surfaces; palette lives in tokens.css. */
+.ribbon-tool-anchor { display: inline-flex; flex: 0 0 auto; border-radius: 4px; }
+.ribbon-tool-anchor:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.ant-tooltip.ribbon-tool-tooltip, .ribbon-tool-tooltip .ant-tooltip-container { pointer-events: none; }
+.workbench-quick .toolbar-button { width: 26px; height: var(--control-icon-height); min-height: var(--control-icon-height); padding: 0; }
+.ribbon-tool-groups { display: flex; align-items: center; min-width: 0; flex: 1; gap: 12px; overflow-x: auto; scrollbar-width: thin; }
+.ribbon-tool-groups .workbench-ribbon-group { flex-shrink: 0; }
+.ribbon-tool-anchor[tabindex='0'] { cursor: not-allowed; }
+.panel-bottom > .dock-window__title { flex-basis: 36px; min-height: 36px; height: 36px; gap: 12px; padding: 0 10px; }
+.panel-bottom > .dock-window__title > h2 { flex: 0 0 auto; }
+.activity-panel-tabs--header { flex: 0 0 auto; height: 35px; }
+.activity-panel-tabs--header > .ant-tabs-nav { padding: 0; margin: 0; height: 35px; }
+.activity-panel-tabs--header .ant-tabs-tab { padding: 0 8px; margin: 0; font-size: 11px; }
+.activity-panel-tabs--header > .ant-tabs-body-holder { display: none; }
+.dock-feature-tabs { flex: 1; min-width: 0; overflow: hidden; }
+.dock-feature-tabs[hidden] { display: none; }
+.dock-feature-tabs .ant-tabs-nav { height: 35px; display: flex; margin: 0; }
+.dock-feature-tabs .ant-tabs-nav-wrap { display: flex; min-width: 0; overflow: hidden; }
+.dock-feature-tabs .ant-tabs-nav-list { display: flex; position: relative; }
+.dock-feature-tabs .ant-tabs-ink-bar { pointer-events: none; }
+.dock-feature-tabs .ant-tabs-tab { display: flex; align-items: center; gap: 6px; padding: 0 10px; border-inline-start: 1px solid var(--color-border-subtle); font-size: 12px; white-space: nowrap; }
+.dock-feature-tabs .ant-tabs-tab-active { background: var(--color-surface); color: var(--color-accent); box-shadow: inset 0 -2px var(--color-accent); }
+.dock-feature-tabs .ant-tabs-tab-remove { border: 0; background: transparent; color: var(--color-text-secondary); cursor: pointer; }
+.dock-feature-tabs .ant-tabs-extra-content { display: flex; align-items: center; padding-right: 8px; }
+.activity-attribute-body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+.activity-attribute-body[hidden] { display: none; }
+.attr-auxiliary { width: min(650px, calc(100vw - 48px)); max-height: min(380px, calc(100dvh - 180px)); overflow: auto; color: var(--color-text-primary); }
+.attr-auxiliary .attr-columns, .attr-auxiliary .attr-field-calculator { max-height: none; border: 0; }
+.attr-auxiliary .attr-filter-bar, .attr-auxiliary .attr-stats { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px; }
+@media (max-width: 1100px) { .dock-feature-tabs .table-target-picker { display: none; } .panel-bottom > .dock-window__title { gap: 6px; } }
