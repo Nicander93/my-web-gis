@@ -27,6 +27,7 @@
 位于 [\plans/\](plans/)：
 
 - [第一阶段执行计划](plans/phase-1-gis-workbench.md)
+- [WebView 一体化标题栏实施计划](plans/webview-titlebar-implementation.md) — 菜单与窗口控制合为一行，分阶段实施及 Windows 验收边界
 - [第一阶段进度交接](plans/phase-1-progress.md)
 - [第二阶段：空间处理工作流](plans/phase-2-spatial-processing.md)
 - [二维编辑捕捉](plans/editing-snapping.md)

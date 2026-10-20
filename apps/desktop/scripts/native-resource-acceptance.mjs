@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import { chromium, expect } from '@playwright/test'
 import { verifyNativeLayout, verifyNativeSimplification } from './native-layout-checks.mjs'
+import { verifyNativeTitlebar } from './native-titlebar-checks.mjs'
 
 const desktop = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const tauri = join(desktop, 'src-tauri')
@@ -16,6 +17,7 @@ const serverPort = 5197, debugPort = 9229
 const url = `http://127.0.0.1:${serverPort}`
 const layoutOnly = process.argv.includes('--layout125')
 const simplifyOnly = process.argv.includes('--simplify')
+const titlebarOnly = process.argv.includes('--titlebar')
 const wide = process.argv.includes('--wide')
 const report = { identifier, output, scenarios: [], screenshots: false,
   nativeFileChooser: 'Not verified: fixture working paths assigned; native filesystem and resource protocol used',
@@ -162,7 +164,8 @@ try {
   await mkdir(output, { recursive: true })
   assert.equal(await available(serverPort), false, 'Owned server port is occupied')
   assert.equal(await available(debugPort), false, 'Owned debugging port is occupied')
-  const config = { identifier, build: { devUrl: url }, app: { windows: [{ label: 'main', title: 'Desktop WebGIS · Resource acceptance', width: layoutOnly ? wide ? 1920 : 1366 : 1440, height: layoutOnly ? wide ? 1080 : 768 : 900, minWidth: 1024, minHeight: 680 }] } }
+  const baseConfig = JSON.parse(await readFile(join(tauri, 'tauri.conf.json'), 'utf8'))
+  const config = { identifier, build: { devUrl: url }, app: { windows: [{ ...baseConfig.app.windows[0], label: 'main', title: 'Desktop WebGIS · Resource acceptance', width: layoutOnly ? wide ? 1920 : 1366 : 1440, height: layoutOnly ? wide ? 1080 : 768 : 900, minWidth: 1024, minHeight: 680 }] } }
   report.requestedWindow = config.app.windows[0]
   await writeFile(join(output, 'tauri-config.json'), JSON.stringify(config, null, 2))
   const build = start(['cargo', 'build', '--bin', 'desktop-webgis', '--locked'], tauri, { ...process.env, TAURI_CONFIG: JSON.stringify(config) })
@@ -212,7 +215,9 @@ try {
   server = start(['pnpm', 'dev', '--port', String(serverPort), '--strictPort'], desktop)
   await poll(() => available(serverPort), 'Owned Vite server did not start')
   await launch()
-  if (simplifyOnly) {
+  if (titlebarOnly) {
+    await verifyNativeTitlebar(page, report)
+  } else if (simplifyOnly) {
     await verifyNativeSimplification(page, report, output, saveTo)
   } else if (layoutOnly) {
     await verifyNativeLayout(page, report, output, saveTo)

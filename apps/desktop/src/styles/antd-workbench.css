@@ -1,4 +1,11 @@
 /* Approved prototype geometry; Ant Design retains control and modal behavior. */
+/* AntD reapplies the border shorthand on hover/press. Keep its width token
+   aligned with our borderless controls rather than fighting each state rule. */
+.ant-btn-variant-text,
+.ant-btn-variant-link { --ant-btn-border-width: 0px; border-width: 0; }
+.ui-button.ant-btn { --ant-btn-border-width: 1px; border-width: 1px; }
+.toolbar-button.ant-btn,
+.window-controls .ant-btn { --ant-btn-border-width: 0px; }
 .desktop-editor-modal .ant-modal-close {
   top: 8px;
   inset-inline-end: 10px;

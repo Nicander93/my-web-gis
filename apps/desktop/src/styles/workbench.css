@@ -19,13 +19,15 @@
 .workbench-ribbon-top [role='tab'] {
   padding: 0 16px;
   border-radius: 0;
-  border-bottom: 2px solid transparent;
+  border-width: 0;
+  font-weight: 500;
+  box-shadow: inset 0 -2px transparent;
 }
 .workbench-ribbon-top [aria-selected='true'] {
   color: var(--color-accent);
-  border-bottom-color: var(--color-accent);
+  box-shadow: inset 0 -2px var(--color-accent);
   background: var(--color-accent-soft);
-  font-weight: 600;
+  font-weight: 500;
 }
 .workbench-context {
   display: flex;
@@ -751,13 +753,13 @@
   background: var(--color-panel);
 }
 .desktop-app--scene3d .scene3d-inspector-tabs button {
-  border-bottom: 2px solid transparent;
+  border-width: 0;
   border-radius: 0;
   height: 34px;
 }
 .desktop-app--scene3d .scene3d-inspector-tabs button[aria-selected='true'] {
   border: 0;
-  border-bottom: 2px solid var(--color-accent);
+  box-shadow: inset 0 -2px var(--color-accent);
   border-radius: 0;
   background: transparent;
 }
@@ -900,14 +902,25 @@
 .window-context { min-width: 0; gap: 10px; }
 .window-context .workspace-name { max-width: 250px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
+.window-bar--native { height: 36px; padding-right: 0; user-select: none; }
+.window-bar--native .brand-lockup { flex-shrink: 0; }
+.window-bar--native .menu-bar,
+.window-bar--native .menu-trigger { height: 35px; min-height: 35px; }
+.window-bar--native .window-context { flex: 1; align-self: stretch; justify-content: flex-end; margin-left: 24px; padding-right: 12px; }
+.window-controls { display: flex; flex-shrink: 0; height: 100%; }
+.window-controls .ant-btn { width: 46px; height: 100%; padding: 0; border: 0; border-radius: 0; color: var(--color-text-primary); }
+.window-controls .window-close:hover { background: #c42b1c !important; color: white !important; }
+
 
 .workbench-ribbon .ribbon-command { display: inline-flex; align-items: center; flex-shrink: 0; gap: 5px; padding: 0 7px; height: var(--ribbon-tool-height); font-size: 12px; }
 .ribbon-more { position: relative; flex-shrink: 0; }
 .ribbon-more summary { display: flex; align-items: center; justify-content: center; cursor: pointer; height: 30px; padding: 0 5px; }
 .ribbon-more .menu-dropdown { position: fixed; top: 115px; left: auto; right: 15px; }
 .ribbon-unavailable { color: var(--color-text-secondary); font-size: 11px; }
-.application-settings-section summary { padding: 8px 12px; cursor: pointer; }
+.application-settings-section__label { padding: 6px 12px 2px; color: var(--color-text-secondary); font-size: 11px; }
 .application-settings-section .menu-content { border-bottom: 1px solid var(--color-border); }
+.menu-dropdown--popup { position: static; margin-top: 0; }
+.window-menu-overlay.ant-dropdown { padding: 0; background: transparent; box-shadow: none; }
 .scene3d-workspace__body { position: relative; display: block; overflow: hidden; }
 .scene3d-canvas { position: absolute; inset: 0; }
 .scene3d-workspace .workbench-ribbon { flex: 0 0 auto; }

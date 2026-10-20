@@ -14,6 +14,7 @@
     "test:e2e": "playwright test",
     "test:native-resources": "node scripts/native-resource-acceptance.mjs",
     "test:native-layout125": "node scripts/native-resource-acceptance.mjs --layout125",
+    "test:native-titlebar": "node scripts/native-resource-acceptance.mjs --titlebar",
     "test:processing-production": "playwright test --config playwright.processing-production.config.ts"
   },
   "dependencies": {

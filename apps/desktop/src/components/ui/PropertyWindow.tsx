@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
+import { registerPendingPropertyEdit } from '@/services/pending-property-edits'
 import type { ReactNode } from 'react'
 import { Button, Input, Menu } from 'antd'
 import { X } from 'lucide-react'
@@ -20,6 +21,7 @@ interface Props {
 
 /** Modeless frame; drafts and project ownership remain with the feature. */
 export function PropertyWindow({ title, subtitle, dirty, categories, section, onSection, query, onQuery, onClose, children, footer }: Props) {
+  useLayoutEffect(() => dirty ? registerPendingPropertyEdit() : undefined, [dirty])
   const frame = useRef<HTMLElement>(null)
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const drag = useRef<{ x: number; y: number; offset: typeof offset } | null>(null)
