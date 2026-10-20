@@ -24,6 +24,7 @@ import { useSessionStore } from '@/stores/session.store'
 import { emitCommandStatus } from './commands/status'
 import '@/styles/editor.css'
 import '@/styles/workbench.css'
+import '@/styles/core-ui.css'
 import { ProcessingDialog } from '@/features/processing/ProcessingDialog'
 import { registerProcessingDialog } from './commands/processing.commands'
 import { NewProjectDialog } from '@/features/project/NewProjectDialog'
@@ -80,7 +81,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    document.documentElement.dataset.theme = 'light'
+    document.documentElement.dataset.theme ||= 'light'
 
     function handleCommandStatus(event: Event): void {
       setStatus((event as CustomEvent<string>).detail)

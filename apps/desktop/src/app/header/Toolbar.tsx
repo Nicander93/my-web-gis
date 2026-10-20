@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { Button } from 'antd'
 import {
   Check,
   Download,
@@ -95,10 +96,10 @@ export function Toolbar() {
           }}
         >
           {tabs.map(([id, label]) => (
-            <button
+            <Button
               key={id}
               id={`workbench-tab-${id}`}
-              type="button"
+              type="text" htmlType="button"
               role="tab"
               tabIndex={tab === id ? 0 : -1}
               aria-selected={tab === id}
@@ -106,7 +107,7 @@ export function Toolbar() {
               onClick={() => setTab(id)}
             >
               {label}
-            </button>
+            </Button>
           ))}
         </nav>
         <div
@@ -121,9 +122,9 @@ export function Toolbar() {
             <>
               <span className="editing-badge">编辑中</span>
               <strong>{target.name}</strong>
-              <button type="button" onClick={editCommands.end}>
+              <Button type="text" htmlType="button" onClick={editCommands.end}>
                 结束编辑
-              </button>
+              </Button>
             </>
           ) : (
             <>
@@ -136,19 +137,19 @@ export function Toolbar() {
           <ToolbarButton
             icon={Undo2}
             label="撤销"
-            disabled={!canUndo}
+            disabled={!canUndo} disabledReason="没有可撤销的编辑记录"
             onClick={editCommands.undo}
           />
           <ToolbarButton
             icon={Redo2}
             label="重做"
-            disabled={!canRedo}
+            disabled={!canRedo} disabledReason="没有可重做的编辑记录"
             onClick={editCommands.redo}
           />
           <ToolbarButton
             icon={Save}
             label="保存项目"
-            disabled={saving} loading={saving}
+            disabled={saving} disabledReason="正在保存项目，请稍候" loading={saving}
             onClick={projectCommands.saveProject}
           />
         </div>
@@ -186,7 +187,7 @@ export function Toolbar() {
               <ToolbarButton
                 icon={MapPinned}
                 label="定位图层"
-                disabled={!caps.exists}
+                disabled={!caps.exists} disabledReason="请先选择图层"
                 onClick={() => layerCommands.zoomToLayer()}
               />
             </Group>
@@ -200,7 +201,7 @@ export function Toolbar() {
               <ToolbarButton
                 icon={RotateCcw}
                 label="清除选择"
-                disabled={!selection.featureIds.length}
+                disabled={!selection.featureIds.length} disabledReason="当前没有选中要素"
                 onClick={mapCommands.clearSelection}
               />
             </Group>
@@ -208,13 +209,13 @@ export function Toolbar() {
               <ToolbarButton
                 icon={Table2}
                 label="属性表"
-                disabled={!caps.canAttributeTable}
+                disabled={!caps.canAttributeTable} disabledReason="请先选择支持属性表的数据图层"
                 onClick={() => layerCommands.openAttributeTable()}
               />
               <ToolbarButton
                 icon={Settings2}
                 label="图层属性"
-                disabled={!caps.exists}
+                disabled={!caps.exists} disabledReason="请先选择图层"
                 onClick={() => layerCommands.properties()}
               />
             </Group>
@@ -233,25 +234,25 @@ export function Toolbar() {
               <ToolbarButton
                 icon={Table2}
                 label="属性表"
-                disabled={!caps.canAttributeTable}
+                disabled={!caps.canAttributeTable} disabledReason="请先选择支持属性表的数据图层"
                 onClick={() => layerCommands.openAttributeTable()}
               />
               <ToolbarButton
                 icon={Filter}
                 label="图层过滤"
-                disabled={!caps.canFilter}
+                disabled={!caps.canFilter} disabledReason="请先选择支持字段过滤的矢量图层"
                 onClick={() => layerCommands.openFilter()}
               />
               <ToolbarButton
                 icon={Pencil}
                 label="样式"
-                disabled={!caps.canStyle}
+                disabled={!caps.canStyle} disabledReason="当前图层不支持样式编辑，请选择可配置样式的图层"
                 onClick={() => layerCommands.editStyle()}
               />
               <ToolbarButton
                 icon={Tag}
                 label="标注"
-                disabled={!caps.canLabel}
+                disabled={!caps.canLabel} disabledReason="请先选择支持标注的矢量图层"
                 onClick={() => layerCommands.editLabel()}
               />
             </Group>
@@ -259,7 +260,7 @@ export function Toolbar() {
               <ToolbarButton
                 icon={Download}
                 label="导出图层"
-                disabled={!caps.canExport}
+                disabled={!caps.canExport} disabledReason="请先选择支持导出的数据图层"
                 onClick={() => layerCommands.export()}
               />
             </Group>
@@ -271,13 +272,13 @@ export function Toolbar() {
               <ToolbarButton
                 icon={Pencil}
                 label="开始编辑"
-                disabled={Boolean(editLayerId) || !caps.canEditGeometry}
+                disabled={Boolean(editLayerId) || !caps.canEditGeometry} disabledReason={editLayerId ? "已有编辑会话，请先结束当前编辑" : "请先选择未锁定且支持几何编辑的图层"}
                 onClick={editCommands.begin}
               />
               <ToolbarButton
                 icon={Check}
                 label="结束编辑"
-                disabled={!editLayerId}
+                disabled={!editLayerId} disabledReason="请先开始编辑并固定编辑目标"
                 onClick={editCommands.end}
               />
             </Group>
@@ -285,21 +286,21 @@ export function Toolbar() {
               <ToolbarButton
                 icon={Plus}
                 label="绘制要素"
-                disabled={!editLayerId}
+                disabled={!editLayerId} disabledReason="请先开始编辑并固定编辑目标"
                 active={active.startsWith('draw-')}
                 onClick={editCommands.draw}
               />
               <ToolbarButton
                 icon={Pencil}
                 label="修改几何"
-                disabled={!editLayerId}
+                disabled={!editLayerId} disabledReason="请先开始编辑并固定编辑目标"
                 active={active === 'modify'}
                 onClick={editCommands.modify}
               />
               <ToolbarButton
                 icon={Trash2}
                 label="单击删除"
-                disabled={!editLayerId}
+                disabled={!editLayerId} disabledReason="请先开始编辑并固定编辑目标"
                 active={active === 'delete'}
                 onClick={editCommands.deleteSelected}
               />
@@ -321,13 +322,13 @@ export function Toolbar() {
               <ToolbarButton
                 icon={Filter}
                 label="图层过滤"
-                disabled={!caps.canFilter}
+                disabled={!caps.canFilter} disabledReason="请先选择支持字段过滤的矢量图层"
                 onClick={() => layerCommands.openFilter()}
               />
               <ToolbarButton
                 icon={Table2}
                 label="属性与统计"
-                disabled={!caps.canAttributeTable}
+                disabled={!caps.canAttributeTable} disabledReason="请先选择支持属性表的数据图层"
                 onClick={() => {
                   layerCommands.openAttributeTable()
                   if (browsedId)

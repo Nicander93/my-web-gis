@@ -112,6 +112,7 @@ export async function verifyNativeLayout(page, report, output, saveTo) {
     })
   })
   await propertiesChecks(page, page.locator('.scene3d-layer-row__select').filter({ hasText: 'Scaled Point' }), 'Scaled Point', '对象名称')
+  await page.getByRole('tab', { name: '场景', exact: true }).click()
   const before = await state(page)
   await page.getByRole('button', { name: '添加数据', exact: true }).click()
   const resource = page.getByRole('dialog', { name: '添加三维资源', exact: true })

@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-18",
+  "head": "ee23d0208501cc0a2c2da1129839a2290da106de",
+  "branch": "ui/visual-alignment-core",
+  "referencesSha256": {
+    "desktop-webgis-2d-final.html": "51e65ff143c79205049364aee857d53c4248a148a67dc761e89631c4394acd12",
+    "desktop-webgis-3d-final.html": "1dfbf4c4a7f0c91db8c963b9cd066efa76cbd67191393485d6426de36cdff433"
+  },
+  "build": "passed",
+  "desktopUnit": {
+    "passed": 328,
+    "skipped": 5
+  },
+  "relatedE2E": {
+    "passed": 4,
+    "failed": 1,
+    "existingFailure": "attribute-tabs: table-scroll height expected >40, actual 31 while field calculator remains inline"
+  },
+  "screenshots": false,
+  "reason": "User retained visual review and requested behavioral E2E rather than screenshot acceptance; visual sign-off remains pending."
+}

@@ -1,14 +1,21 @@
 /* Approved prototype geometry; Ant Design retains control and modal behavior. */
+/* AntD reapplies the border shorthand on hover/press. Keep its width token
+   aligned with our borderless controls rather than fighting each state rule. */
+.ant-btn-variant-text,
+.ant-btn-variant-link { --ant-btn-border-width: 0px; border-width: 0; }
+.ui-button.ant-btn { --ant-btn-border-width: 1px; border-width: 1px; }
+.toolbar-button.ant-btn,
+.window-controls .ant-btn { --ant-btn-border-width: 0px; }
 .desktop-editor-modal .ant-modal-close {
   top: 8px;
   inset-inline-end: 10px;
   width: 25px;
   height: 25px;
-  color: #71877a;
+  color: var(--color-text-secondary);
 }
-.desktop-editor-modal .ant-modal-close:hover { background: #eaf2eb; color: #3c6a50; }
+.desktop-editor-modal .ant-modal-close:hover { background: var(--color-hover); color: var(--color-accent); }
 .desktop-editor-modal .ant-modal-body > div > .ant-form { padding: 16px 18px 0; }
-.desktop-editor-modal .ant-form > p { margin: 10px 0; color: #77877c; line-height: 1.6; }
+.desktop-editor-modal .ant-form > p { margin: 10px 0; color: var(--color-text-secondary); line-height: 1.6; }
 .desktop-editor-modal .ant-form > p:first-child { margin-top: 0; margin-bottom: 14px; }
 .desktop-editor-modal .ant-alert { border-radius: 4px; margin: 10px 0; }
 .desktop-editor-modal .desktop-dialog-actions {
@@ -17,16 +24,16 @@
   gap: 8px;
   margin: 16px -18px 0;
   padding: 9px 14px;
-  border-top: 1px solid #ebefeb;
-  background: #fcfdfb;
+  border-top: 1px solid var(--color-border-subtle);
+  background: var(--color-panel);
 }
-.desktop-editor-modal .dialog-footer { background: #fcfdfb; border-color: #ebefeb; padding: 9px 14px; }
-.desktop-editor-modal .ant-btn { min-height: 26px; border-radius: 4px; }
-.desktop-editor-modal .ant-btn-primary:not(:disabled):hover { background: #2a604a; border-color: #2a604a; }
-.ui-button.ant-btn-default:not(:disabled) { background: #fff; border-color: #d3dfd5; color: #44624d; border-radius: 4px; }
-.ui-button.ant-btn-default:not(:disabled):hover { background: #eff7ef; border-color: #bacfc0; color: #346e55; }
-.ui-button.ant-btn-primary:not(:disabled) { background: #38745a; border-color: #38745a; color: #fff; border-radius: 4px; }
-.ui-button.ant-btn-primary:not(:disabled):hover { background: #2a604a; border-color: #2a604a; color: #fff; }
+.desktop-editor-modal .dialog-footer { background: var(--color-panel); border-color: var(--color-border-subtle); padding: 9px 14px; }
+.desktop-editor-modal .ant-btn { min-height: var(--control-height); border-radius: 4px; }
+.desktop-editor-modal .ant-btn-primary:not(:disabled):hover { background: var(--color-accent-hover); border-color: var(--color-accent-hover); }
+.ui-button.ant-btn-default:not(:disabled) { background: var(--color-surface); border-color: var(--color-border); color: var(--color-text-primary); border-radius: 4px; }
+.ui-button.ant-btn-default:not(:disabled):hover { background: var(--color-hover); border-color: var(--color-border-strong); color: var(--color-accent); }
+.ui-button.ant-btn-primary:not(:disabled) { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-surface); border-radius: 4px; }
+.ui-button.ant-btn-primary:not(:disabled):hover { background: var(--color-accent-hover); border-color: var(--color-accent-hover); color: var(--color-surface); }
 .ui-button.ant-btn:focus-visible,
 .desktop-editor-modal .ant-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
 .desktop-editor-modal .data-source-layout { display: block; }
@@ -35,13 +42,13 @@
   padding: 5px 14px;
   gap: 7px;
   border-right: 0;
-  border-bottom: 1px solid #dfe6e0;
-  background: #fff;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
 }
 .desktop-editor-modal .data-source-layout .dialog-tab { padding: 4px 10px; height: 28px; }
-.desktop-editor-modal .data-source-layout .dialog-tab.active { background: #eff6ef; color: #2c6b4a; }
-.desktop-editor-modal .file-drop-zone { background: #f9fcf8; border-color: #bacfc0; border-radius: 6px; }
-.desktop-editor-modal .dialog-footer .ant-btn-default:not(:disabled) { background: #fff; border-color: #d3dfd5; color: #44624d; }
+.desktop-editor-modal .data-source-layout .dialog-tab.active { background: var(--color-accent-soft); color: var(--color-accent); }
+.desktop-editor-modal .file-drop-zone { background: var(--color-panel); border-color: var(--color-border-strong); border-radius: 6px; }
+.desktop-editor-modal .dialog-footer .ant-btn-default:not(:disabled) { background: var(--color-surface); border-color: var(--color-border); color: var(--color-text-primary); }
 
 .attribute-table-content .attribute-data-table table { table-layout: fixed; width: 100%; border-collapse: separate; }
 .attribute-table-content .attribute-data-table .ant-table-container,
@@ -50,24 +57,24 @@
 .attribute-table-content .attribute-data-table .ant-table-cell {
   min-width: 0;
   max-width: none;
-  height: 28px;
-  padding: 4px 8px;
+  height: 30px;
+  padding: 0 10px;
   font-size: 12px;
   line-height: 19px;
-  border-color: #e4ebe5;
+  border-color: var(--color-border-subtle);
   white-space: nowrap;
 }
 .attribute-table-content .attribute-data-table .ant-table-thead .ant-table-cell {
   position: relative;
   top: auto;
-  height: 28px;
+  height: 32px;
   padding-right: 18px;
-  background: #f8faf8;
-  color: #596c5b;
+  background: var(--color-panel);
+  color: var(--color-text-secondary);
   font-weight: 600;
 }
-.attribute-table-content .attribute-data-table .row-selected > .ant-table-cell { background: #e6f0e5; }
-.attribute-table-content .attribute-data-table .row-selected:hover > .ant-table-cell { background: #dfeedd; }
+.attribute-table-content .attribute-data-table .row-selected > .ant-table-cell { background: var(--color-selected); }
+.attribute-table-content .attribute-data-table .row-selected:hover > .ant-table-cell { background: var(--color-active); }
 .attr-cell-value { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
 .attr-cell-number { font-variant-numeric: tabular-nums; }
 .attribute-table-content .attribute-data-table .attribute-locate { width: 22px; height: 22px; min-height: 22px; margin-right: 4px; }
@@ -85,8 +92,8 @@
   touch-action: none;
 }
 .attribute-table-content .attribute-data-table .attr-column-resize:hover,
-.attribute-table-content .attribute-data-table .attr-column-resize:focus-visible { background: #cfe2d4; }
-.attribute-table-content .attribute-data-table .ant-table-placeholder .ant-table-cell { padding: 24px 10px; text-align: center; color: #77877c; }
+.attribute-table-content .attribute-data-table .attr-column-resize:focus-visible { background: var(--color-active); }
+.attribute-table-content .attribute-data-table .ant-table-placeholder .ant-table-cell { padding: 24px 10px; text-align: center; color: var(--color-text-secondary); }
 .attribute-table-content .attr-filter-bar > .ant-select { min-width: 110px; width: 130px; }
 .attribute-table-content .attr-filter-bar > .ant-input { width: 140px; }
 .attribute-table-content .attr-stats .ant-select { width: 140px; margin-left: 6px; }

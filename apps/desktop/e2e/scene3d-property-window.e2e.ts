@@ -66,7 +66,6 @@ test('modeless properties bind an ID, apply atomically, cancel drafts and pin th
   await second.getByRole('button', { name: '添加弹窗字段', exact: true }).click()
   await second.getByRole('menuitem', { name: '常规与位置', exact: true }).click()
   await second.getByRole('textbox', { name: '对象名称', exact: true }).fill('Final Alpha')
-  await page.screenshot({ path: testInfo.outputPath('scene3d-property-window.png') })
   await second.getByRole('button', { name: '确定', exact: true }).click()
   await expect(second).toHaveCount(0)
   await expect.poll(() => names(page)).toEqual(['Final Alpha', 'Beta'])

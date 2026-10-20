@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import type { PointerEvent, ReactNode } from 'react'
-import { Alert, Button, Input, InputNumber, Menu, Select, Switch } from 'antd'
-import { X } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { Alert, Button, Input, InputNumber, Select, Switch } from 'antd'
+import { PropertyWindow } from '@/components/ui/PropertyWindow'
+import { PropertyField, PropertyGroup, PropertyVector3 } from '@/components/ui/PropertyFields'
 import { attributeRows, parseAttributeRows } from './graphic-attributes'
 import type { AttributeRow, AttributeType } from './graphic-attributes'
 import { TilesetEffectsDraft } from './TilesetEffectsDraft'
@@ -31,8 +32,6 @@ export function ScenePropertyWindow({ initial, scene, onApply, onClose, onPrevie
   const [previewError, setPreviewError] = useState('')
   const previewHandler = useRef(onPreview)
   previewHandler.current = onPreview
-  const [offset, setOffset] = useState({ x: 0, y: 0 })
-  const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null)
   const dirty = JSON.stringify(base) !== JSON.stringify(draft)
   const current = scene.nodes.find(node => node.id === initial.id)
   useEffect(() => {
@@ -47,36 +46,37 @@ export function ScenePropertyWindow({ initial, scene, onApply, onClose, onPrevie
     try { onApply(base, draft); setBase(structuredClone(draft)); setError(''); if (close) onClose() }
     catch (reason) { setError(reason instanceof Error ? reason.message : '属性无效') }
   }
-  function move(event: PointerEvent<HTMLElement>): void {
-    if (!drag.current) return
-    const height = event.currentTarget.parentElement?.getBoundingClientRect().height ?? 560
-    setOffset({ x: Math.max(-window.innerWidth / 2 + 180, Math.min(window.innerWidth / 2 - 180, drag.current.left + event.clientX - drag.current.x)), y: Math.max(0, Math.min(Math.max(0, window.innerHeight - height - 161), drag.current.top + event.clientY - drag.current.y)) })
-  }
   const categories = [{ key: 'object', label: '常规与位置' }, { key: 'style', label: '样式与参数' }, ...(draft.type === '3dtiles' ? [{ key: 'effects', label: '裁剪与压平' }] : []), { key: 'properties', label: '数据属性' }, { key: 'popup', label: '属性弹窗' }, { key: 'source', label: '数据源' }]
   function field(label: string, alias: string, control: ReactNode) {
     if (query && !`${label} ${alias}`.toLowerCase().includes(query.toLowerCase())) return null
-    return <label className="scene-property-window__field"><span>{label}<small>{alias}</small></span>{control}</label>
+    return <PropertyField label={label} alias={alias}>{control}</PropertyField>
   }
-  const numeric = (label: string, alias: string, value: number, change: (value: number) => void, min?: number, max?: number) => field(label, alias, <InputNumber aria-label={label} value={value} min={min} max={max} onChange={value => { if (value !== null && Number.isFinite(value)) change(value) }} />)
+  function numeric(label: string, alias: string, value: number, change: (value: number) => void, min?: number, max?: number) {
+    const unit = label.match(/（(.+)）$/)?.[1]
+    return field(label.replace(/（.+）$/, ''), alias, <div className="property-number"><InputNumber aria-label={label} value={value} min={min} max={max} onChange={value => { if (value !== null && Number.isFinite(value)) change(value) }} />{unit && <span>{unit}</span>}</div>)
+  }
   const transform = 'transform' in draft ? draft.transform : undefined
   function transformVector(key: 'translation' | 'rotation', index: number, value: number): void {
     if (!transform) return
     const next = structuredClone(transform); next[key][index] = value
     patch({ transform: next } as Partial<CesiumSceneNode>)
   }
-  return <section className="scene-property-window" role="dialog" aria-modal="false" aria-label={`完整属性：${initial.name}`} style={{ marginLeft: offset.x, top: 145 + offset.y }} onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); onClose() } }}>
-    <header onPointerDown={event => {
-      if (event.button || (event.target as HTMLElement).closest('button')) return
-      event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId)
-      drag.current = { x: event.clientX, y: event.clientY, left: offset.x, top: offset.y }
-    }} onPointerMove={move} onPointerUp={() => { drag.current = null }} onPointerCancel={() => { drag.current = null }} onLostPointerCapture={() => { drag.current = null }}>
-      <div><strong>对象属性 · {initial.name}</strong><small>{initial.type} · {initial.id}{dirty ? ' · 未应用' : ''}</small></div>
-      <Button type="text" size="small" aria-label="关闭完整属性" icon={<X size={15} />} onClick={onClose} />
-    </header>
-    <div className="scene-property-window__search"><Input.Search aria-label="搜索属性字段" placeholder="搜索字段名称或 API 名称" value={query} onChange={event => setQuery(event.target.value)} allowClear /></div>
-    <div className="scene-property-window__body">
-      <Menu selectedKeys={[section]} items={categories} onClick={({ key }) => setSection(key)} />
-      <div className="scene-property-window__fields">
+  function search(value: string): void {
+    setQuery(value)
+    if (!value.trim()) return
+    const words = value.toLowerCase().replace(/\[\d+\]/g, '')
+    const terms: Record<string, string> = {
+      object: '常规 位置 name visible groupId position transform.translation transform.rotation transform.scale 平移 旋转 缩放 对象名称',
+      style: '样式 参数 style.color style.width style.pointSize style.label style.labelField billboard maximumScreenSpaceError cacheBytes amplitude frequency speed height 颜色 标注 缓存 屏幕误差',
+      effects: '裁剪 压平 clipping flatten effects enabled mode positions',
+      popup: '弹窗 popup title titleField', properties: '数据 属性 properties', source: '数据源 asset url reference'
+    }
+    const match = categories.find(item => terms[item.key]?.toLowerCase().includes(words))
+    if (match) setSection(match.key)
+  }
+  return <PropertyWindow title={`完整属性：${initial.name}`} subtitle={`${initial.type} · ${initial.id}`} dirty={dirty}
+    categories={categories} section={section} onSection={setSection} query={query} onQuery={search} onClose={onClose}
+    footer={<>{onPreview && <label><Switch aria-label="实时预览" checked={preview} onChange={setPreview} /> 实时预览</label>}<Button disabled={!current} onClick={() => { if (current) { setBase(structuredClone(current)); setDraft(structuredClone(current)); setError(''); setInvalid({}); setRevision(value => value + 1) } }}>重新载入</Button><span /><Button onClick={onClose}>取消</Button><Button disabled={!current || !dirty || Object.values(invalid).some(Boolean)} onClick={() => apply()}>应用</Button><Button type="primary" disabled={!current || Object.values(invalid).some(Boolean)} onClick={() => dirty ? apply(true) : onClose()}>确定</Button></>}>
         {(!current || error) && <Alert type="error" showIcon title={error || '对象已删除，无法应用草稿。'} />}
         {previewError && <Alert type="warning" title={previewError} />}
         {preview && <p className="editor-help">位置、样式、变换、水面参数和瓦片效果正在预览；取消恢复已应用值。资源替换在应用后加载。</p>}
@@ -85,17 +85,17 @@ export function ScenePropertyWindow({ initial, scene, onApply, onClose, onPrevie
           {field('显示对象', 'visible', <Switch aria-label="显示对象" checked={draft.visible} onChange={visible => patch({ visible })} />)}
           {field('所属文件夹', 'groupId', <Select aria-label="所属文件夹" value={draft.groupId ?? ''} options={[{ value: '', label: '根目录' }, ...(scene.groups ?? []).filter(group => !group.locked).map(group => ({ value: group.id, label: group.name }))]} onChange={groupId => patch({ groupId: groupId || undefined })} />)}
           {draft.type === 'model' && draft.position.map((value, index) => numeric(['经度（°）', '纬度（°）', '椭球高度（m）'][index], `position[${index}]`, value, next => { const position = [...draft.position] as GeoPosition; position[index] = next; patch({ position }) }, index === 0 ? -180 : index === 1 ? -90 : undefined, index === 0 ? 180 : index === 1 ? 90 : undefined))}
-          {transform && <>
-            {(['translation', 'rotation'] as const).map(key => transform[key].map((value, index) => numeric(`${key === 'translation' ? '平移' : '旋转'} ${['X', 'Y', 'Z'][index]}（${key === 'translation' ? 'm' : '°'}）`, `transform.${key}[${index}]`, value, next => transformVector(key, index, next))))}
+          {transform && <PropertyGroup title="变换">
+            {(['translation', 'rotation'] as const).map(key => !query || `transform.${key} ${key === 'translation' ? '平移' : '旋转'}`.toLowerCase().includes(query.toLowerCase().replace(/\[\d+\]/g, '')) ? <PropertyVector3 key={key} label={key === 'translation' ? '平移' : '旋转'} alias={`transform.${key}`} unit={key === 'translation' ? 'm' : '°'} value={transform[key]} onChange={(index, value) => transformVector(key, index, value)} /> : null)}
             {numeric('等比缩放', 'transform.scale', transform.scale, scale => patch({ transform: { ...transform, scale } } as Partial<CesiumSceneNode>), .001, 10000)}
-          </>}
+          </PropertyGroup>}
           {draft.type === 'graphic' && <p>几何类型：{draft.geometry.type} · {draft.geometry.positions.length} 个顶点。顶点编辑通过画布中的“编辑顶点”工具进行。</p>}
         </>}
         {section === 'style' && <>
           {draft.type === '3dtiles' && <>{numeric('屏幕误差（px）', 'maximumScreenSpaceError', draft.maximumScreenSpaceError ?? 16, maximumScreenSpaceError => patch({ maximumScreenSpaceError }), 1, 128)}{numeric('缓存预算（MB）', 'cacheBytes', (draft.cacheBytes ?? 268435456) / 1048576, value => patch({ cacheBytes: value * 1048576 }), 1, 4096)}</>}
           {draft.type === 'geojson' && field('颜色', 'color', <Input aria-label="颜色" value={draft.color ?? '#55a6ff'} onChange={event => patch({ color: event.target.value })} />)}
           {draft.type === 'graphic' && <>
-            {draft.geometry.type === 'point' && <BillboardDraftFields value={draft.style.billboard} onChange={billboard => { const { billboard: _previous, ...style } = draft.style; patch({ style: billboard ? { ...style, billboard } : style }) }} />}
+            {draft.geometry.type === 'point' && <PropertyGroup title="POI 图标">{draft.style.billboard && <img className="property-icon-preview" src={draft.style.billboard.image} alt="当前 POI 图标" referrerPolicy="no-referrer" />}<BillboardDraftFields value={draft.style.billboard} onChange={billboard => { const { billboard: _previous, ...style } = draft.style; patch({ style: billboard ? { ...style, billboard } : style }) }} /></PropertyGroup>}
             {field('颜色', 'style.color', <Input aria-label="颜色" value={draft.style.color} onChange={event => patch({ style: { ...draft.style, color: event.target.value } })} />)}
             {numeric('线宽（px）', 'style.width', draft.style.width, width => patch({ style: { ...draft.style, width } }), 1, 64)}
             {draft.geometry.type === 'point' && !draft.style.billboard && numeric('点大小（px）', 'style.pointSize', draft.style.pointSize, pointSize => patch({ style: { ...draft.style, pointSize } }), 1, 128)}
@@ -118,10 +118,7 @@ export function ScenePropertyWindow({ initial, scene, onApply, onClose, onPrevie
         </>}
         {section === 'source' && <p>{'asset' in draft ? scene.assets[draft.asset]?.url ?? JSON.stringify(scene.assets[draft.asset]?.reference) : '独立标绘对象，不依赖外部资源。'}</p>}
         {section === 'effects' && draft.type === '3dtiles' && <TilesetEffectsDraft node={draft} onChange={effects => patch({ effects })} />}
-      </div>
-    </div>
-    <footer>{onPreview && <label><Switch aria-label="实时预览" checked={preview} onChange={setPreview} /> 实时预览</label>}<Button disabled={!current} onClick={() => { if (current) { setBase(structuredClone(current)); setDraft(structuredClone(current)); setError(''); setInvalid({}); setRevision(value => value + 1) } }}>重新载入</Button><span /><Button onClick={onClose}>取消</Button><Button disabled={!current || !dirty || Object.values(invalid).some(Boolean)} onClick={() => apply()}>应用</Button><Button type="primary" disabled={!current || Object.values(invalid).some(Boolean)} onClick={() => dirty ? apply(true) : onClose()}>确定</Button></footer>
-  </section>
+  </PropertyWindow>
 }
 
 function AttributeDraft({ value, onChange, onValidity }: { value: Record<string, unknown>; onChange(value: Record<string, unknown>): void; onValidity(valid: boolean): void }) {

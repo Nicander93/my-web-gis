@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { DockHeaderContext } from '@/components/ui/DockHeaderContext'
 import { DockWindow } from './docking/DockWindow'
 import { Tabs } from 'antd'
 import { useActivityPanelStore, type ActivityTab } from '@/stores/activity-panel.store'
@@ -12,10 +13,13 @@ export function BottomPanel({ children, sceneStates, onSelectResource }: { child
   const open = useWorkspaceStore(state => state.bottom.open)
   const tab = requested === 'attributes' && !children ? 'tasks' : requested
   const title = tab === 'attributes' ? '属性表' : '任务与诊断'
-  return <DockWindow id="bottom" title={title} label={`${title}面板`}>
-    <Tabs className="activity-panel-tabs" size="small" activeKey={tab} onChange={key => useActivityPanelStore.getState().setTab(key as ActivityTab)}
-      items={[...(children ? [{ key: 'attributes', label: '属性表', children }] : []),
-        { key: 'tasks', label: '任务日志', children: open && tab === 'tasks' && <ActivityPanel tab="tasks" sceneStates={sceneStates} onSelectResource={onSelectResource} /> },
-        { key: 'diagnostics', label: '诊断', children: open && tab === 'diagnostics' && <ActivityPanel tab="diagnostics" sceneStates={sceneStates} onSelectResource={onSelectResource} /> }]} />
-  </DockWindow>
+  const [header, setHeader] = useState<HTMLDivElement | null>(null)
+  return <DockHeaderContext.Provider value={header}><DockWindow id="bottom" title={title} label={`${title}面板`} titleContent={<>
+    <Tabs className="activity-panel-tabs activity-panel-tabs--header" size="small" activeKey={tab} onChange={key => useActivityPanelStore.getState().setTab(key as ActivityTab)}
+      items={[...(children ? [{ key: 'attributes', label: '属性表' }] : []), { key: 'tasks', label: '任务日志' }, { key: 'diagnostics', label: '诊断' }]} />
+    <div className="dock-feature-tabs" ref={setHeader} hidden={tab !== 'attributes'} />
+  </>}>
+    {children && <div className="activity-attribute-body" hidden={tab !== 'attributes'}>{children}</div>}
+    {open && tab !== 'attributes' && <ActivityPanel tab={tab} sceneStates={sceneStates} onSelectResource={onSelectResource} />}
+  </DockWindow></DockHeaderContext.Provider>
 }

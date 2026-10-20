@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react'
-import { Checkbox, Dropdown, Input, Select, Table, type TableColumnsType } from 'antd'
+import { Checkbox, ConfigProvider, Dropdown, Input, Popover, Select, Table, type TableColumnsType } from 'antd'
 import { ChevronLeft, ChevronRight, PanelBottomClose, LocateFixed } from 'lucide-react'
 import {
   applyFieldFilter,
@@ -106,6 +106,16 @@ export function AttributeTable({
   const [selectionMenuOpen, setSelectionMenuOpen] = useState(false)
   const selectionMenuTrigger = useRef<ComponentRef<typeof Button>>(null)
   const [fieldEdit, setFieldEdit] = useState<{ mode: 'add' | 'rename' | 'remove'; name?: string } | null>(null)
+  useEffect(() => {
+    if (!calculatorOpen && !columnsOpen && !filterOpen && !statisticsOpen) return
+    const close = (event: PointerEvent) => {
+      if ((event.target as Element)?.closest('.attr-auxiliary,.attr-toolbar,.ant-select-dropdown,.dock-feature-tabs,.activity-panel-tabs,.workbench-ribbon,.window-bar,[role="dialog"]')) return
+      setCalculatorOpen(false); setColumnsOpen(false)
+      if (selectedLayerId) setAttributeTableState(selectedLayerId, { filterOpen: false, statisticsOpen: false })
+    }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [calculatorOpen, columnsOpen, filterOpen, statisticsOpen, selectedLayerId, setAttributeTableState])
 
   const selectedLayer = selectedLayerId
     ? project.layers.find((layer) => layer.id === selectedLayerId)
@@ -335,87 +345,12 @@ export function AttributeTable({
   const emptySelectedOnly = selectedOnly && selectionIds.size === 0
   const recordStatus = `全部 ${allFeatures.length} · 过滤后 ${filteredFeatures.length} · 显示 ${viewFeatures.length}${selectionIds.size > 0 || selectedOnly ? ` · 选中 ${selectionIds.size}` : ''}`
 
-  return (
-    <div className="feature-panel attribute-table-content">
-      <div className="attr-toolbar" aria-label="属性表工具">
-        {targetPicker}
-        {selectedLayer && <>
-          <label className="attr-search">
-            <Input
-              type="search"
-              aria-label="表内搜索"
-              value={searchQuery}
-              placeholder="搜索当前表格"
-              title="只影响表格显示，不改变地图过滤或要素选择"
-              onChange={(event) =>
-                patchTable({ searchQuery: event.target.value, currentPage: 1 })
-              }
-            />
-          </label>
-
-          <Checkbox className="attr-check"
-              checked={selectedOnly}
-              onChange={(event) =>
-                patchTable({
-                  selectedOnly: event.target.checked,
-                  currentPage: 1
-                })
-              }
-            >仅选中</Checkbox>
-
-          <Dropdown trigger={['click']} autoFocus open={selectionMenuOpen} onOpenChange={(open) => {
-            setSelectionMenuOpen(open)
-            if (!open) queueMicrotask(() => selectionMenuTrigger.current?.focus())
-          }} menu={{ onClick: () => { setSelectionMenuOpen(false); selectionMenuTrigger.current?.focus() }, items: [
-            { key: 'matching', label: '选择匹配记录', title: '选择图层过滤结果；表内搜索不改变此范围',
-              onClick: () => selectedLayerId && selectMatching(selectedLayerId) },
-            { key: 'locate', label: '定位选中要素', disabled: selection.layerId !== selectedLayerId || !selection.featureIds.length,
-              onClick: () => zoomMapToSelected() },
-            { key: 'clear', label: '清除选择', disabled: selection.layerId !== selectedLayerId || !selection.featureIds.length,
-              onClick: () => clearSelection() }
-          ] }}>
-            <Button ref={selectionMenuTrigger} variant="ghost" className="attr-selection-actions"
-              aria-label="选择" aria-haspopup="menu" aria-expanded={selectionMenuOpen}>选择 ▾</Button>
-          </Dropdown>
-          <Button
-            variant="ghost"
-            aria-expanded={filterOpen}
-            onClick={() => {
-              patchTable({ filterOpen: !filterOpen, statisticsOpen: false })
-              setCalculatorOpen(false); setColumnsOpen(false)
-            }}
-          >
-            图层过滤{appliedFilter.length ? ` (${appliedFilter.length})` : ''}
-          </Button>
-          <Button
-            variant="ghost"
-            aria-expanded={statisticsOpen}
-            onClick={() => {
-              patchTable({ statisticsOpen: !statisticsOpen, filterOpen: false })
-              setCalculatorOpen(false); setColumnsOpen(false)
-            }}
-          >
-            字段统计
-          </Button>
-          <Button variant="ghost" aria-expanded={calculatorOpen}
-            onClick={() => {
-              setCalculatorOpen(!calculatorOpen); setColumnsOpen(false)
-              patchTable({ filterOpen: false, statisticsOpen: false })
-            }}>字段计算</Button>
-          <Button variant="ghost" aria-expanded={columnsOpen}
-            onClick={() => {
-              setColumnsOpen(!columnsOpen); setCalculatorOpen(false)
-              patchTable({ filterOpen: false, statisticsOpen: false })
-            }}>字段列表</Button>
-        </>}
-        {onClose && (
-          <Button variant="icon" aria-label="收起属性表" title="收起属性表" onClick={onClose}>
-            <PanelBottomClose size={16} />
-          </Button>
-        )}
-      </div>
-
-      {cellError && <div role="alert">{cellError}；原值未改变</div>}
+  const auxiliary = <div className="attr-auxiliary" onKeyDown={event => {
+    if (event.key === 'Escape' && !event.nativeEvent.isComposing) {
+      event.stopPropagation(); setCalculatorOpen(false); setColumnsOpen(false)
+      patchTable({ filterOpen: false, statisticsOpen: false })
+    }
+  }}>
       {selectedLayerId && calculatorOpen && <FieldCalculator layerId={selectedLayerId}
         filteredFeatures={filteredFeatures} selectedIds={selectionIds} onClose={() => setCalculatorOpen(false)} />}
       {selectedLayerId && columnsOpen && <section className="attr-columns" aria-label="字段列表">
@@ -537,6 +472,91 @@ export function AttributeTable({
         </div>
       )}
 
+  </div>
+  return (
+    <div className="feature-panel attribute-table-content">
+      <Popover open={Boolean(calculatorOpen || columnsOpen || filterOpen || statisticsOpen)} trigger={[]} placement="topLeft" content={auxiliary}
+        getPopupContainer={trigger => trigger.parentElement!}>
+      <div className="attr-toolbar" aria-label="属性表工具">
+        {targetPicker}
+        {selectedLayer && <>
+          <label className="attr-search">
+            <Input
+              type="search"
+              aria-label="表内搜索"
+              value={searchQuery}
+              placeholder="搜索当前表格"
+              title="只影响表格显示，不改变地图过滤或要素选择"
+              onChange={(event) =>
+                patchTable({ searchQuery: event.target.value, currentPage: 1 })
+              }
+            />
+          </label>
+
+          <Checkbox className="attr-check"
+              checked={selectedOnly}
+              onChange={(event) =>
+                patchTable({
+                  selectedOnly: event.target.checked,
+                  currentPage: 1
+                })
+              }
+            >仅选中</Checkbox>
+
+          <Dropdown trigger={['click']} autoFocus open={selectionMenuOpen} onOpenChange={(open) => {
+            setSelectionMenuOpen(open)
+            if (!open) queueMicrotask(() => selectionMenuTrigger.current?.focus())
+          }} menu={{ onClick: () => { setSelectionMenuOpen(false); selectionMenuTrigger.current?.focus() }, items: [
+            { key: 'matching', label: '选择匹配记录', title: '选择图层过滤结果；表内搜索不改变此范围',
+              onClick: () => selectedLayerId && selectMatching(selectedLayerId) },
+            { key: 'locate', label: '定位选中要素', disabled: selection.layerId !== selectedLayerId || !selection.featureIds.length,
+              onClick: () => zoomMapToSelected() },
+            { key: 'clear', label: '清除选择', disabled: selection.layerId !== selectedLayerId || !selection.featureIds.length,
+              onClick: () => clearSelection() }
+          ] }}>
+            <Button ref={selectionMenuTrigger} variant="ghost" className="attr-selection-actions"
+              aria-label="选择" aria-haspopup="menu" aria-expanded={selectionMenuOpen}>选择 ▾</Button>
+          </Dropdown>
+          <Button
+            variant="ghost"
+            aria-expanded={filterOpen}
+            onClick={() => {
+              patchTable({ filterOpen: !filterOpen, statisticsOpen: false })
+              setCalculatorOpen(false); setColumnsOpen(false)
+            }}
+          >
+            图层过滤{appliedFilter.length ? ` (${appliedFilter.length})` : ''}
+          </Button>
+          <Button
+            variant="ghost"
+            aria-expanded={statisticsOpen}
+            onClick={() => {
+              patchTable({ statisticsOpen: !statisticsOpen, filterOpen: false })
+              setCalculatorOpen(false); setColumnsOpen(false)
+            }}
+          >
+            字段统计
+          </Button>
+          <Button variant="ghost" aria-expanded={calculatorOpen}
+            onClick={() => {
+              setCalculatorOpen(!calculatorOpen); setColumnsOpen(false)
+              patchTable({ filterOpen: false, statisticsOpen: false })
+            }}>字段计算</Button>
+          <Button variant="ghost" aria-expanded={columnsOpen}
+            onClick={() => {
+              setColumnsOpen(!columnsOpen); setCalculatorOpen(false)
+              patchTable({ filterOpen: false, statisticsOpen: false })
+            }}>字段列表</Button>
+        </>}
+        {onClose && (
+          <Button variant="icon" aria-label="收起属性表" title="收起属性表" onClick={onClose}>
+            <PanelBottomClose size={16} />
+          </Button>
+        )}
+      </div>
+
+      </Popover>
+      {cellError && <div role="alert">{cellError}；原值未改变</div>}
       <div className="table-scroll" ref={scrollRef} onScroll={event => {
         if (!selectedLayerId) return
         const { scrollTop, scrollLeft } = event.currentTarget
@@ -544,7 +564,8 @@ export function AttributeTable({
           setAttributeTableState(selectedLayerId, { scrollTop, scrollLeft })
         }
       }}>
-        <Table<GisFeature> className="attribute-data-table" size="small" bordered tableLayout="fixed"
+        <ConfigProvider theme={{ components: { Table: { cellPaddingBlockSM: 0 } } }}>
+        <Table<GisFeature> className="attribute-data-table gis-attribute-table" size="small" bordered tableLayout="fixed"
           rowKey="id" pagination={false} columns={columns}
           dataSource={selectedLayer && !emptySelectedOnly ? pageRows : []}
           style={{ width: tableWidth, minWidth: '100%' }}
@@ -570,6 +591,7 @@ export function AttributeTable({
             <p>当前无选中要素（仅选中模式）</p>
             <Button variant="ghost" onClick={() => patchTable({ selectedOnly: false, currentPage: 1 })}>清除“仅选中”查看模式</Button>
           </div> : allFeatures.length === 0 ? '该图层暂无属性数据' : '无匹配记录' }} />
+        </ConfigProvider>
       </div>
 
       {selectedLayer && (

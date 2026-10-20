@@ -1,22 +1,27 @@
 :root {
   --color-app-bg: #f7f9f6;
-  --color-panel: #fdfefc;
+  --color-panel: #fafbf9;
   --color-surface: #ffffff;
   --color-text-primary: #26352d;
   --color-text-secondary: #77877c;
   --color-text-muted: #8a998c;
   --color-text-inverse: #ffffff;
   --color-border: #dfe6e0;
+  --color-border-subtle: #ebefeb;
   --color-border-strong: #cfdcd2;
   --color-hover: #eff4ef;
   --color-selected: #e3efe5;
   --color-active: #cfe2d4;
-  --color-accent: #38745a;
+  --color-accent: #2f695b;
   --color-accent-hover: #2a604a;
   --color-accent-soft: #e3f0e6;
   --color-danger: #a64c47;
   --color-warning: #9a742f;
   --color-success: #56835b;
+  --control-height: 30px;
+  --control-icon-height: 24px;
+  --ribbon-tool-height: 34px;
+  --desktop-row-height: 28px;
   --font-ui:
     'Segoe UI', 'Microsoft YaHei UI', system-ui, 'Noto Sans SC', sans-serif;
   --font-mono:
@@ -33,6 +38,7 @@
   --color-text-muted: #788079;
   --color-text-inverse: #171a18;
   --color-border: #353c37;
+  --color-border-subtle: #2c332e;
   --color-border-strong: #485149;
   --color-hover: #292f2a;
   --color-selected: #303a32;
@@ -55,11 +61,16 @@
     --color-text-muted: #788079;
     --color-text-inverse: #171a18;
     --color-border: #353c37;
+    --color-border-subtle: #2c332e;
     --color-border-strong: #485149;
     --color-hover: #292f2a;
     --color-selected: #303a32;
     --color-active: #364438;
     --color-accent: #93b39a;
     --color-accent-hover: #acc8b2;
+    --color-accent-soft: #29382c;
+    --color-danger: #ef8b83;
+    --color-warning: #d9b76a;
+    --color-success: #8dc696;
   }
 }
