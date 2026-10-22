@@ -1,10 +1,57 @@
-import { cloneValue, type DatasetField, type GisFeature } from '@desktop-webgis/gis-core'
-import { compileFieldExpression } from '@desktop-webgis/spatial-analysis'
+import { applyFieldFilter, cloneValue, type DatasetField, type FieldFilterCondition, type GisFeature } from '@desktop-webgis/gis-core'
+import { compileFieldExpression, type FieldValue } from '@desktop-webgis/spatial-analysis'
+
+export type FieldCalculationScope = 'all' | 'table' | 'layer-filtered' | 'selected'
+
+export interface FieldCalculationPreviewRow {
+  index: number
+  value?: FieldValue
+  error?: string
+}
 
 export function validateFieldName(name: string): void {
   if (!name.trim() || name !== name.trim() || ['__proto__', 'constructor', 'prototype'].includes(name)) {
     throw new Error('字段名不能为空、包含首尾空格或使用保留名称')
   }
+}
+
+/** Resolve an explicit calculator scope from the same row sets shown by the table. */
+export function resolveFieldCalculationTargets(
+  scope: FieldCalculationScope,
+  allFeatures: readonly GisFeature[],
+  tableFeatures: readonly GisFeature[],
+  layerFilter: readonly FieldFilterCondition[],
+  selectedIds: ReadonlySet<string>
+): GisFeature[] {
+  if (scope === 'all') return [...allFeatures]
+  if (scope === 'table') return [...tableFeatures]
+  if (scope === 'layer-filtered') return applyFieldFilter(allFeatures, [...layerFilter])
+  return allFeatures.filter((feature) => selectedIds.has(feature.id))
+}
+
+/** Evaluate the first five target rows through the production expression engine. */
+export function previewTableField(
+  allFeatures: readonly GisFeature[],
+  targets: readonly GisFeature[],
+  field: DatasetField,
+  expression: string,
+  declaredFields: readonly DatasetField[] = []
+): FieldCalculationPreviewRow[] {
+  validateFieldName(field.name)
+  const compiled = compileFieldExpression(expression)
+  const fields = resolveDatasetFields(allFeatures, declaredFields)
+  for (const name of compiled.fields) {
+    if (!fields.some((item) => item.name === name)) throw new Error(`表达式引用了不存在的字段 ${name}`)
+  }
+  return targets.slice(0, 5).map((feature, index) => {
+    try {
+      const value = compiled.evaluate(feature.properties)
+      validateFieldValue(field, value)
+      return { index: index + 1, value }
+    } catch (error) {
+      return { index: index + 1, error: error instanceof Error ? error.message : String(error) }
+    }
+  })
 }
 
 /** Legacy imports infer fields once; declared field types always take precedence. */

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createProject, createDefaultLayerStyle, SetDatasetContentCommand, type GisFeature } from '@desktop-webgis/gis-core'
-import { calculateTableField, parseCellValue, resolveDatasetFields } from './field-edits'
+import { calculateTableField, parseCellValue, previewTableField, resolveDatasetFields, resolveFieldCalculationTargets } from './field-edits'
 import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
 import { useWorkbenchStore } from '@/stores/workbench.store'
@@ -32,6 +32,32 @@ describe('typed table edits', () => {
     expect(() => calculateTableField(features, undefined, { ...numeric, name: '__proto__' }, '1', new Set(['row-0']))).toThrow(/保留/)
     expect(() => calculateTableField(features, undefined, numeric, '1', new Set())).toThrow(/没有/)
     expect(() => calculateTableField(features, [numeric], { ...numeric, type: 'string' }, '"x"', new Set(['row-0']))).toThrow(/类型/)
+  })
+
+  it('resolves calculator scopes from table results, project filters and selection independently', () => {
+    const tableRows = [features[2]]
+    const selectedIds = new Set(['row-0'])
+    const layerFilter = [{ field: 'value', op: 'gt' as const, value: 1 }]
+    expect(resolveFieldCalculationTargets('all', features, tableRows, layerFilter, selectedIds).map((row) => row.id))
+      .toEqual(['row-0', 'row-1', 'row-2'])
+    expect(resolveFieldCalculationTargets('table', features, tableRows, layerFilter, selectedIds).map((row) => row.id))
+      .toEqual(['row-2'])
+    expect(resolveFieldCalculationTargets('layer-filtered', features, tableRows, layerFilter, selectedIds).map((row) => row.id))
+      .toEqual(['row-0', 'row-2'])
+    expect(resolveFieldCalculationTargets('selected', features, tableRows, layerFilter, selectedIds).map((row) => row.id))
+      .toEqual(['row-0'])
+    expect(features.map((row) => row.properties.value)).toEqual([2, 0, 4])
+  })
+
+  it('previews real expression results for five rows and reports a row error without mutating data', () => {
+    const original = structuredClone(features)
+    const preview = previewTableField(features, features, numeric, '10 / field("value")')
+    expect(preview).toEqual([
+      { index: 1, value: 5 },
+      { index: 2, error: expect.stringContaining('除数不能为零') },
+      { index: 3, value: 2.5 }
+    ])
+    expect(features).toEqual(original)
   })
 })
 

@@ -27,7 +27,7 @@ export function AttributeTableHost() {
     {layers.length === 0 ? <><div className="attribute-table-tab-bar">{picker}</div><AttributeTable /></> :
       <Tabs className="attribute-table-ant-tabs" type="editable-card" hideAdd activeKey={activeId ?? undefined}
         renderTabBar={(props, DefaultTabBar) => header ? createPortal(<div className={`ant-tabs ant-tabs-top ant-tabs-small ant-tabs-card ${hashId}`}><DefaultTabBar {...props} /></div>, header) : <DefaultTabBar {...props} />}
-        tabBarExtraContent={{ left: picker }} destroyOnHidden={false}
+        destroyOnHidden={false}
         onChange={(id) => useWorkbenchStore.getState().bindTable(id)}
         onEdit={(key, action) => {
           if (action === 'remove' && typeof key === 'string') useWorkbenchStore.getState().closeTable(key)

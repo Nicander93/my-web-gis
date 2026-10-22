@@ -29,16 +29,16 @@ export function FieldSchemaDialog({ layerId, mode, name, onClose }: {
   const title = { add: '新增字段', rename: '重命名字段', remove: '删除字段' }[mode]
   const locked = affected.find((item) => getEffectiveLocked(project, item.id))
   const canEdit = !!dataset && capabilitiesForDataset(dataset).editGeometry && editLayerId === layerId && !locked
-  const pendingReferences = name ? affected.filter((item) => sessions[item.id]?.attributeTable?.filterDraft?.some((condition) => condition.field === name)
-    && JSON.stringify(sessions[item.id]?.attributeTable?.filterDraft) !== JSON.stringify(item.filter ?? []))
-    .map((item) => `${item.name}：未应用的过滤草稿`) : []
-  const references = name ? [...getFieldReferences(affected, name), ...pendingReferences] : []
+  const tableFilterReferences = name ? affected.filter((item) =>
+    sessions[item.id]?.attributeTable?.filterDraft?.some((condition) => condition.field === name))
+    .map((item) => `${item.name}：属性表筛选`) : []
+  const references = name ? [...getFieldReferences(project, affected, name), ...tableFilterReferences] : []
 
   function apply(): void {
     try {
       if (!dataset || !canEdit) throw new Error('当前图层不是可写编辑目标，或已被锁定')
       if (mode !== 'add' && !name) throw new Error('原字段已不存在')
-      if (mode === 'remove' && pendingReferences.length && !clearReferences) throw new Error('请先调整过滤草稿，或勾选同时移除引用')
+      if (mode === 'remove' && tableFilterReferences.length && !clearReferences) throw new Error('请先调整属性表筛选，或勾选同时移除引用')
       const field = { name: newName, type, nullable }
       const edit: FieldSchemaEdit = mode === 'add'
         ? { type: 'add', field, defaultValue: nullDefault ? null : parseCellValue(field, draft) }
@@ -47,6 +47,16 @@ export function FieldSchemaDialog({ layerId, mode, name, onClose }: {
       const result = prepareFieldSchemaEdit(project, dataset.id, featuresByDataset[dataset.id] ?? [], edit)
       if (!useProjectStore.getState().executeEditCommand(new SetDatasetContentCommand(
         createId('cmd'), title, dataset.id, result.before, result.after, result.change))) throw new Error('字段操作未应用')
+      for (const item of affected) {
+        const tableFilter = sessions[item.id]?.attributeTable?.filterDraft
+        if (!tableFilter?.length) continue
+        if (mode === 'rename' && name) {
+          useSessionStore.getState().setAttributeTableState(item.id, { filterDraft: tableFilter.map((condition) =>
+            condition.field === name ? { ...condition, field: newName } : condition) })
+        } else if (mode === 'remove' && clearReferences) {
+          useSessionStore.getState().setAttributeTableState(item.id, { filterDraft: tableFilter.filter((condition) => condition.field !== name) })
+        }
+      }
       onClose()
       // Rename/delete can remove the original row button; use the stable field-list entry.
       queueMicrotask(() => document.querySelector<HTMLElement>('.attribute-table-tab-panel:not([hidden]) .attr-columns button')?.focus())

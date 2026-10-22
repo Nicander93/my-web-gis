@@ -6,8 +6,43 @@ export type FieldSchemaEdit =
   | { type: 'rename'; from: string; to: string }
   | { type: 'remove'; name: string; clearReferences: boolean }
 
-/** Lists project references that deletion would otherwise leave dangling. */
-export function getFieldReferences(layers: readonly Layer[], name: string): string[] {
+const FILTER_FIELD_OPERATORS = new Set(['==', '!=', 'in', '!in', 'has', '!has', '>', '>=', '<', '<='])
+
+function expressionReferencesField(value: unknown, name: string): boolean {
+  if (Array.isArray(value)) {
+    if (value[0] === 'literal') return false
+    if ((value[0] === 'get' || value[0] === 'has') && value[1] === name) return true
+    if (typeof value[0] === 'string' && FILTER_FIELD_OPERATORS.has(value[0]) && value[1] === name
+      && name !== '$id' && name !== '$type') return true
+    return value.some((child) => expressionReferencesField(child, name))
+  }
+  if (value && typeof value === 'object') {
+    return Object.values(value).some((child) => expressionReferencesField(child, name))
+  }
+  return false
+}
+
+function cartographyReferencesField(project: Project, layers: readonly Layer[], name: string): boolean {
+  const layerIds = new Set(layers.map((layer) => layer.id))
+  const styleIds = new Set(project.cartography?.bindings
+    .filter((binding) => layerIds.has(binding.gisLayerId))
+    .flatMap((binding) => binding.styleLayerIds) ?? [])
+  for (const style of project.cartography?.styleLayers ?? []) {
+    if (!styleIds.has(style.id)) continue
+    const candidate = style as unknown as Record<string, unknown>
+    const metadata = candidate.metadata
+    if (metadata && typeof metadata === 'object') {
+      const editor = Reflect.get(metadata, 'my-web-gis:cartography')
+      const classification = editor && typeof editor === 'object' ? Reflect.get(editor, 'classification') : undefined
+      if (classification && typeof classification === 'object' && Reflect.get(classification, 'field') === name) return true
+    }
+    if (['paint', 'layout', 'filter'].some((key) => expressionReferencesField(candidate[key], name))) return true
+  }
+  return false
+}
+
+/** Lists legacy and standard-style references that deletion would otherwise leave dangling. */
+export function getFieldReferences(project: Project, layers: readonly Layer[], name: string): string[] {
   return layers.flatMap((layer) => {
     const refs: string[] = []
     if (layer.filter?.some((condition) => condition.field === name)) refs.push('图层过滤')
@@ -17,7 +52,8 @@ export function getFieldReferences(layers: readonly Layer[], name: string): stri
     }
     const popup = layer.interaction?.popup
     if (popup?.titleField === name || popup?.fields.some((field) => field.field === name)) refs.push('弹窗')
-    return refs.map((ref) => `${layer.name}：${ref}`)
+    if (cartographyReferencesField(project, [layer], name)) refs.push('高级样式表达式')
+    return [...new Set(refs)].map((ref) => `${layer.name}：${ref}`)
   })
 }
 
@@ -74,7 +110,7 @@ export function prepareFieldSchemaEdit(project: Project, datasetId: string, feat
     if (to === from) throw new Error('字段名称未改变')
     if (fields.some((field) => field.name === to)) throw new Error(`字段 ${to} 已存在`)
   }
-  const refs = getFieldReferences(layers, from)
+  const refs = getFieldReferences(project, layers, from)
   if (edit.type === 'remove' && refs.length && !edit.clearReferences) {
     throw new Error(`字段仍被引用：${refs.join('；')}。请勾选同时移除引用，或先调整这些配置`)
   }

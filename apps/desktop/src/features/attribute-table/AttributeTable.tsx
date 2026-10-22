@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react'
-import { Checkbox, ConfigProvider, Dropdown, Input, Popover, Select, Table, type TableColumnsType } from 'antd'
-import { ChevronLeft, ChevronRight, PanelBottomClose, LocateFixed } from 'lucide-react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentRef, type KeyboardEvent, type ReactNode } from 'react'
+import { Checkbox, ConfigProvider, Dropdown, Input, Popover, Select, Table, Tooltip, type TableColumnsType } from 'antd'
+import { Calculator, ChevronLeft, ChevronRight, Columns3, Filter, PanelBottomClose, LocateFixed, MousePointer2, Sigma } from 'lucide-react'
 import {
   applyFieldFilter,
   computeFieldStats,
@@ -14,13 +14,17 @@ import { useWorkbenchStore } from '@/stores/workbench.store'
 import { capabilitiesForDataset, getEffectiveLocked } from '@desktop-webgis/gis-core'
 import { useSessionStore } from '@/stores/session.store'
 import { Button } from '@/components/ui/Button'
+import { ModelessWindow } from '@/components/ui/ModelessWindow'
 import { zoomMapToFeature, zoomMapToSelected } from '@/features/map/map-runtime-host'
 import { FieldCalculator } from './FieldCalculator'
+import './attribute-table.css'
 import { parseCellValue, resolveDatasetFields } from './field-edits'
 import { FieldSchemaDialog } from './FieldSchemaDialog'
 import { ColumnResizeHandle } from './ColumnResizeHandle'
 
 const PAGE_SIZE = 100
+// A stored marker keeps the technical ID hidden by default while allowing per-tab restoration.
+const SHOW_FEATURE_ID = '$show-feature-id'
 
 const FILTER_OPS: { value: FieldFilterOp; label: string }[] = [
   { value: 'eq', label: '等于' },
@@ -57,8 +61,6 @@ export function AttributeTable({
   const project = useProjectStore((state) => state.project)
   const featuresByDataset = useProjectStore((state) => state.featuresByDataset)
   const selection = useProjectStore((state) => state.selection)
-  const setLayerFilter = useProjectStore((state) => state.setLayerFilter)
-  const selectMatching = useProjectStore((state) => state.selectMatching)
   const toggleFeatureSelection = useProjectStore(
     (state) => state.toggleFeatureSelection
   )
@@ -107,15 +109,15 @@ export function AttributeTable({
   const selectionMenuTrigger = useRef<ComponentRef<typeof Button>>(null)
   const [fieldEdit, setFieldEdit] = useState<{ mode: 'add' | 'rename' | 'remove'; name?: string } | null>(null)
   useEffect(() => {
-    if (!calculatorOpen && !columnsOpen && !filterOpen && !statisticsOpen) return
+    if (!columnsOpen && !filterOpen && !statisticsOpen) return
     const close = (event: PointerEvent) => {
-      if ((event.target as Element)?.closest('.attr-auxiliary,.attr-toolbar,.ant-select-dropdown,.dock-feature-tabs,.activity-panel-tabs,.workbench-ribbon,.window-bar,[role="dialog"]')) return
-      setCalculatorOpen(false); setColumnsOpen(false)
+      if ((event.target as Element)?.closest('.attr-auxiliary,.attr-toolbar,.ant-select-dropdown,.dock-feature-tabs,.activity-panel-tabs,.workbench-ribbon,.window-bar,.modeless-window,[role="dialog"]')) return
+      setColumnsOpen(false)
       if (selectedLayerId) setAttributeTableState(selectedLayerId, { filterOpen: false, statisticsOpen: false })
     }
     document.addEventListener('pointerdown', close)
     return () => document.removeEventListener('pointerdown', close)
-  }, [calculatorOpen, columnsOpen, filterOpen, statisticsOpen, selectedLayerId, setAttributeTableState])
+  }, [columnsOpen, filterOpen, statisticsOpen, selectedLayerId, setAttributeTableState])
 
   const selectedLayer = selectedLayerId
     ? project.layers.find((layer) => layer.id === selectedLayerId)
@@ -133,24 +135,12 @@ export function AttributeTable({
     ? (featuresByDataset[selectedLayer.datasetId] ?? [])
     : []
   const dataset = project.datasets.find((item) => item.id === selectedLayer?.datasetId)
-  const layerFilter = selectedLayer?.filter
-  const appliedFilter = layerFilter ?? []
-  const filterDraft = tableState?.filterDraft ?? appliedFilter
-  const previousFilter = useRef(appliedFilter)
+  const filterDraft = tableState?.filterDraft ?? []
   function setFilterDraft(draft: FieldFilterCondition[]): void { patchTable({ filterDraft: draft }) }
-  useEffect(() => {
-    const current = selectedLayerId ? useSessionStore.getState().sessions[selectedLayerId]?.attributeTable?.filterDraft : undefined
-    if (selectedLayerId && (!current || JSON.stringify(current) === JSON.stringify(previousFilter.current))) {
-      setAttributeTableState(selectedLayerId, { filterDraft: layerFilter ?? [] })
-    }
-    previousFilter.current = layerFilter ?? []
-  }, [layerFilter, selectedLayerId])
-  const filterDirty =
-    JSON.stringify(filterDraft) !== JSON.stringify(appliedFilter)
 
   const filteredFeatures = useMemo(
-    () => applyFieldFilter(allFeatures, appliedFilter),
-    [allFeatures, layerFilter]
+    () => applyFieldFilter(allFeatures, filterDraft),
+    [allFeatures, filterDraft]
   )
 
   const selectionIds = useMemo(() => {
@@ -247,6 +237,7 @@ export function AttributeTable({
 
   function startEdit(featureId: string, field: string, current: unknown): void {
     if (!canEditCells) return
+    if (editing && cellError) return
     cancelledEdit.current = false
     setCellError('')
     setEditing({ featureId, field })
@@ -274,10 +265,10 @@ export function AttributeTable({
       const next = { ...feature.properties, [editing.field]: parseCellValue(field, editValue) }
       if (!updateFeatureProperties(selectedLayerId, editing.featureId, next)) throw new Error('当前记录未能写入')
       setCellError('')
+      setEditing(null)
     } catch (error) {
       setCellError(error instanceof Error ? error.message : String(error))
     }
-    setEditing(null)
   }
 
   function columnWidth(field: string): number {
@@ -292,18 +283,18 @@ export function AttributeTable({
       onClick={(event) => event.stopPropagation()}
       onChange={() => selectedLayerId && toggleFeatureSelection(selectedLayerId, feature.id, true)} /> },
     { key: 'index', title: '#', width: 44, render: (_, __, index) => (safePage - 1) * PAGE_SIZE + index + 1 },
-    { key: 'id', title: 'ID', width: 220, onHeaderCell: () => ({ tabIndex: 0, className: 'sortable',
+    ...(tableState?.hiddenFields?.includes(SHOW_FEATURE_ID) ? [{ key: 'id', title: 'ID', width: 220, onHeaderCell: () => ({ tabIndex: 0, className: 'sortable',
       title: '按稳定 Feature ID 排序（清除字段排序）',
       onClick: () => patchTable({ sortField: null, sortDirection: 'asc', currentPage: 1 }),
-      onKeyDown: (event) => {
+      onKeyDown: (event: KeyboardEvent<HTMLTableCellElement>) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault(); patchTable({ sortField: null, sortDirection: 'asc', currentPage: 1 })
         }
-      } }), render: (_, feature) => <><Button variant="icon" className="attribute-locate"
+      } }), render: (_value: unknown, feature: GisFeature) => <><Button variant="icon" className="attribute-locate"
         title={`定位 ${feature.id}`} aria-label={`定位 ${feature.id}`}
         onClick={(event) => { event.stopPropagation(); if (selectedLayerId) zoomMapToFeature(selectedLayerId, feature.id, null) }}>
         <LocateFixed size={12} />
-      </Button><span className="attr-cell-value">{feature.id}</span></> },
+      </Button><span className="attr-cell-value">{feature.id}</span></> }] : []),
     ...visibleFields.map((field): TableColumnsType<GisFeature>[number] => ({
       key: `field:${field}`, width: columnWidth(field),
       title: <><span>{field}{sortField === field ? sortDirection === 'asc' ? ' ↑' : ' ↓' : ''}</span>
@@ -334,16 +325,16 @@ export function AttributeTable({
         onKeyDown={(event) => {
           if (event.nativeEvent.isComposing) return
           if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); commitEdit() }
-          if (event.key === 'Escape') { event.stopPropagation(); cancelledEdit.current = true; setEditing(null) }
+          if (event.key === 'Escape') { event.stopPropagation(); cancelledEdit.current = true; setEditing(null); setCellError('') }
         }} /> : <span className={`attr-cell-value${typeof feature.properties[field] === 'number' ? ' attr-cell-number' : ''}`}>
         {feature.properties[field] == null || feature.properties[field] === '' ? '—' : typeof feature.properties[field] === 'object'
           ? JSON.stringify(feature.properties[field]) : String(feature.properties[field])}
       </span>
     }))
   ]
-  const tableWidth = 300 + visibleFields.reduce((sum, field) => sum + columnWidth(field), 0)
+  const tableWidth = (80 + (tableState?.hiddenFields?.includes(SHOW_FEATURE_ID) ? 220 : 0)) + visibleFields.reduce((sum, field) => sum + columnWidth(field), 0)
   const emptySelectedOnly = selectedOnly && selectionIds.size === 0
-  const recordStatus = `全部 ${allFeatures.length} · 过滤后 ${filteredFeatures.length} · 显示 ${viewFeatures.length}${selectionIds.size > 0 || selectedOnly ? ` · 选中 ${selectionIds.size}` : ''}`
+  const recordStatus = `全部 ${allFeatures.length} · 筛选后 ${filteredFeatures.length} · 当前结果 ${viewFeatures.length} · 选中 ${selectionIds.size}`
 
   const auxiliary = <div className="attr-auxiliary" onKeyDown={event => {
     if (event.key === 'Escape' && !event.nativeEvent.isComposing) {
@@ -351,10 +342,14 @@ export function AttributeTable({
       patchTable({ filterOpen: false, statisticsOpen: false })
     }
   }}>
-      {selectedLayerId && calculatorOpen && <FieldCalculator layerId={selectedLayerId}
-        filteredFeatures={filteredFeatures} selectedIds={selectionIds} onClose={() => setCalculatorOpen(false)} />}
       {selectedLayerId && columnsOpen && <section className="attr-columns" aria-label="字段列表">
         <Button variant="primary" disabled={!canEditCells} onClick={() => setFieldEdit({ mode: 'add' })}>新增字段</Button>
+        <div>
+          <Checkbox checked={tableState?.hiddenFields?.includes(SHOW_FEATURE_ID) ?? false}
+            onChange={(event) => patchTable({ hiddenFields: event.target.checked
+              ? [...(tableState?.hiddenFields ?? []), SHOW_FEATURE_ID]
+              : (tableState?.hiddenFields ?? []).filter((field) => field !== SHOW_FEATURE_ID) })}>显示 Feature ID（技术标识）</Checkbox>
+        </div>
         {orderedFields.map((name, index) => <div key={name}>
           <Checkbox checked={!tableState?.hiddenFields?.includes(name)}
             onChange={(event) => patchTable({ hiddenFields: event.target.checked
@@ -382,9 +377,9 @@ export function AttributeTable({
         onClose={() => setFieldEdit(null)} />}
 
       {selectedLayer && filterOpen && (
-        <div className="attr-filter-bar" aria-label="图层字段过滤">
-          <span className="attr-filter-label" title="应用后同时影响地图与此表">
-            图层过滤 · 影响地图和表格
+        <div className="attr-filter-bar" aria-label="表格筛选">
+          <span className="attr-filter-label" title="只影响当前表格">
+            表格筛选 · 仅当前表
           </span>
           <Select aria-label="过滤字段" placeholder="字段…" value={draftField || undefined}
             onChange={setDraftField} options={fieldNames.map((field) => ({ value: field, label: field }))} />
@@ -401,36 +396,17 @@ export function AttributeTable({
             onClick={addFilterCondition}
             disabled={!draftField}
           >
-            添加条件
+            添加筛选
           </Button>
-          <Button
-            variant="primary"
-            disabled={!filterDirty}
-            onClick={() => {
-              if (selectedLayerId) setLayerFilter(selectedLayerId, filterDraft)
-              patchTable({ currentPage: 1 })
-            }}
-          >
-            应用过滤
-          </Button>
-          {filterDirty && (
-            <Button
-              variant="ghost"
-              onClick={() => setFilterDraft(appliedFilter)}
-            >
-              还原条件
-            </Button>
-          )}
-          {(appliedFilter.length > 0 || filterDraft.length > 0) && (
+          {filterDraft.length > 0 && (
             <Button
               variant="ghost"
               onClick={() => {
-                if (selectedLayerId) setLayerFilter(selectedLayerId, [])
                 setFilterDraft([])
                 patchTable({ currentPage: 1 })
               }}
             >
-              清除过滤
+              清除筛选
             </Button>
           )}
           <ul className="attr-filter-chips">
@@ -462,8 +438,8 @@ export function AttributeTable({
             <Select aria-label="统计字段" value={statsTargetField} onChange={(value) => patchTable({ statsField: value })}
               options={fieldNames.map((field) => ({ value: field, label: field }))} />
           </label>
-          <span>
-            范围：图层过滤结果 · 非空 {stats.nonNull} / 空{' '}
+            <span>
+            范围：当前表格筛选结果 · 非空 {stats.nonNull} / 空{' '}
             {stats.nullCount} / 合计 {stats.total}
             {stats.numeric
               ? ` · 最小 ${stats.numeric.min} · 最大 ${stats.numeric.max} · 合计 ${stats.numeric.sum} · 平均 ${formatMean(stats.numeric.mean)}`
@@ -475,7 +451,7 @@ export function AttributeTable({
   </div>
   return (
     <div className="feature-panel attribute-table-content">
-      <Popover open={Boolean(calculatorOpen || columnsOpen || filterOpen || statisticsOpen)} trigger={[]} placement="topLeft" content={auxiliary}
+      <Popover open={Boolean(columnsOpen || filterOpen || statisticsOpen)} trigger={[]} placement="topLeft" content={auxiliary}
         getPopupContainer={trigger => trigger.parentElement!}>
       <div className="attr-toolbar" aria-label="属性表工具">
         {targetPicker}
@@ -507,56 +483,52 @@ export function AttributeTable({
             setSelectionMenuOpen(open)
             if (!open) queueMicrotask(() => selectionMenuTrigger.current?.focus())
           }} menu={{ onClick: () => { setSelectionMenuOpen(false); selectionMenuTrigger.current?.focus() }, items: [
-            { key: 'matching', label: '选择匹配记录', title: '选择图层过滤结果；表内搜索不改变此范围',
-              onClick: () => selectedLayerId && selectMatching(selectedLayerId) },
+            { key: 'matching', label: '选择当前表格结果', title: '选择当前搜索和表格筛选结果，不改变地图图层过滤',
+              onClick: () => selectedLayerId && useProjectStore.getState().setSelection({
+                layerId: selectedLayerId, featureIds: viewFeatures.map((feature) => feature.id)
+              }) },
             { key: 'locate', label: '定位选中要素', disabled: selection.layerId !== selectedLayerId || !selection.featureIds.length,
               onClick: () => zoomMapToSelected() },
             { key: 'clear', label: '清除选择', disabled: selection.layerId !== selectedLayerId || !selection.featureIds.length,
               onClick: () => clearSelection() }
           ] }}>
-            <Button ref={selectionMenuTrigger} variant="ghost" className="attr-selection-actions"
-              aria-label="选择" aria-haspopup="menu" aria-expanded={selectionMenuOpen}>选择 ▾</Button>
+            <Tooltip title="选择与定位"><Button ref={selectionMenuTrigger} variant="icon" className="attr-selection-actions"
+              aria-label="选择与定位" aria-haspopup="menu" aria-expanded={selectionMenuOpen}><MousePointer2 size={16} /></Button></Tooltip>
           </Dropdown>
-          <Button
-            variant="ghost"
-            aria-expanded={filterOpen}
-            onClick={() => {
+          <Tooltip title={filterDraft.length ? `表格筛选（${filterDraft.length} 条）` : '表格筛选'}>
+          <Button variant="icon" aria-label="表格筛选" aria-expanded={filterOpen} onClick={() => {
               patchTable({ filterOpen: !filterOpen, statisticsOpen: false })
               setCalculatorOpen(false); setColumnsOpen(false)
-            }}
-          >
-            图层过滤{appliedFilter.length ? ` (${appliedFilter.length})` : ''}
-          </Button>
-          <Button
-            variant="ghost"
-            aria-expanded={statisticsOpen}
-            onClick={() => {
+            }}>{filterDraft.length > 0 && <span aria-hidden="true">{filterDraft.length}</span>}<Filter size={15} />
+          </Button></Tooltip>
+          <Tooltip title="字段统计"><Button variant="icon" aria-label="字段统计" aria-expanded={statisticsOpen} onClick={() => {
               patchTable({ statisticsOpen: !statisticsOpen, filterOpen: false })
               setCalculatorOpen(false); setColumnsOpen(false)
-            }}
-          >
-            字段统计
-          </Button>
-          <Button variant="ghost" aria-expanded={calculatorOpen}
-            onClick={() => {
+            }}><Sigma size={16} /></Button></Tooltip>
+          <Tooltip title="字段计算器"><Button variant="icon" aria-label="字段计算器" aria-expanded={calculatorOpen} onClick={() => {
               setCalculatorOpen(!calculatorOpen); setColumnsOpen(false)
               patchTable({ filterOpen: false, statisticsOpen: false })
-            }}>字段计算</Button>
-          <Button variant="ghost" aria-expanded={columnsOpen}
-            onClick={() => {
+            }}><Calculator size={16} /></Button></Tooltip>
+          <Tooltip title="列显示与字段管理"><Button variant="icon" aria-label="列显示与字段管理" aria-expanded={columnsOpen} onClick={() => {
               setColumnsOpen(!columnsOpen); setCalculatorOpen(false)
               patchTable({ filterOpen: false, statisticsOpen: false })
-            }}>字段列表</Button>
+            }}><Columns3 size={16} /></Button></Tooltip>
         </>}
         {onClose && (
-          <Button variant="icon" aria-label="收起属性表" title="收起属性表" onClick={onClose}>
+          <Tooltip title="收起属性表"><Button variant="icon" aria-label="收起属性表" onClick={onClose}>
             <PanelBottomClose size={16} />
-          </Button>
+          </Button></Tooltip>
         )}
       </div>
 
       </Popover>
-      {cellError && <div role="alert">{cellError}；原值未改变</div>}
+      {selectedLayerId && calculatorOpen && <ModelessWindow title="字段计算器" width={760} height={520} className="attribute-field-calculator-window"
+        onClose={() => setCalculatorOpen(false)}>
+        <FieldCalculator layerId={selectedLayerId} tableFeatures={viewFeatures} selectedIds={selectionIds} onClose={() => setCalculatorOpen(false)} />
+      </ModelessWindow>}
+      {cellError && <div role="alert">{cellError}；草稿已保留，原值未改变。<Button variant="ghost" onClick={() => {
+        setEditing(null); setCellError('')
+      }}>放弃草稿</Button></div>}
       <div className="table-scroll" ref={scrollRef} onScroll={event => {
         if (!selectedLayerId) return
         const { scrollTop, scrollLeft } = event.currentTarget

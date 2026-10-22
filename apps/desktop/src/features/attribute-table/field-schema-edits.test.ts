@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { createProject, createDefaultLayerStyle, SetDatasetContentCommand, type GisFeature, type Project } from '@desktop-webgis/gis-core'
-import { prepareFieldSchemaEdit, type FieldSchemaEdit } from './field-schema-edits'
+import { createProject, createDefaultLayerStyle, reconcileProjectCartography, SetDatasetContentCommand, type GisFeature, type Project } from '@desktop-webgis/gis-core'
+import { getFieldReferences, prepareFieldSchemaEdit, type FieldSchemaEdit } from './field-schema-edits'
 import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
 import { useWorkbenchStore } from '@/stores/workbench.store'
@@ -25,6 +25,16 @@ function command(edit: FieldSchemaEdit) {
   const state = useProjectStore.getState()
   const result = prepareFieldSchemaEdit(state.project, 'data', state.featuresByDataset.data, edit)
   return new SetDatasetContentCommand('schema', '字段编辑', 'data', result.before, result.after, result.change)
+}
+
+function advancedProject(): Project {
+  const project = reconcileProjectCartography(fixture())
+  const circle = project.cartography?.styleLayers.find((layer) => layer.type === 'circle')
+  if (!circle || circle.type !== 'circle') throw new Error('fixture did not create a circle style layer')
+  circle.paint = { ...circle.paint, 'circle-color': [
+    'case', ['boolean', ['has', 'value'], false], ['to-string', ['get', 'value']], '#123456'
+  ] as never }
+  return project
 }
 
 describe('dataset field schema transactions', () => {
@@ -92,6 +102,24 @@ describe('dataset field schema transactions', () => {
     expect(useProjectStore.getState().getSnapshot()).toEqual(before)
     expect(useProjectStore.getState().undoEdit()).toBe(true)
     expect(useProjectStore.getState().project.layers[1].style).not.toEqual(before.project.layers[1].style)
+  })
+
+  it('finds nested references in standard style ASTs and preserves unrelated AST when renaming and undoing', () => {
+    const project = advancedProject()
+    useProjectStore.getState().loadSnapshot({ project, featuresByDataset: { data: rows } })
+    const references = getFieldReferences(project, project.layers.filter((layer) => layer.datasetId === 'data'), 'value')
+    expect(references).toContain('First：高级样式表达式')
+    expect(() => prepareFieldSchemaEdit(project, 'data', rows, { type: 'remove', name: 'value', clearReferences: false }))
+      .toThrow(/仍被引用/)
+
+    const before = useProjectStore.getState().getSnapshot()
+    useProjectStore.getState().executeEditCommand(command({ type: 'rename', from: 'value', to: 'population' }))
+    const renamed = useProjectStore.getState().project.cartography?.styleLayers.find((layer) => layer.type === 'circle')
+    expect(renamed?.type === 'circle' ? renamed.paint?.['circle-color'] : undefined).toEqual([
+      'case', ['boolean', ['has', 'population'], false], ['to-string', ['get', 'population']], '#123456'
+    ])
+    expect(useProjectStore.getState().undoEdit()).toBe(true)
+    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
   })
 
   it('adds typed defaults to every feature and preserves the string value on undo/redo', () => {
