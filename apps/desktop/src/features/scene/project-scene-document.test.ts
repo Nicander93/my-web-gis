@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { createDefaultLayerStyle, createProject, parseProjectSnapshot, serializeProjectSnapshot, type ProjectSnapshot } from '@desktop-webgis/gis-core'
+import { createDefaultLayerStyle, createProject, getLayerCartography, prepareProjectContent, setLayerCartography, parseProjectSnapshot, serializeProjectSnapshot, type ProjectSnapshot } from '@desktop-webgis/gis-core'
 import { createBillboardStyle, createCesiumScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
-import { parseSceneDocument } from '@desktop-webgis/scene-schema'
+import { CARTOGRAPHY_EXTENSION, parseSceneDocument } from '@desktop-webgis/scene-schema'
 import { createProjectFromSceneDocument, createProjectSceneDocument, createProjectSceneProjection } from './project-scene-document'
 import { createCategorizedStyle, createGraduatedStyle } from '@desktop-webgis/ol-style'
 
@@ -33,6 +33,21 @@ function snapshot(): ProjectSnapshot {
 }
 
 describe('full project scene content', () => {
+  it('round trips standard drawing expressions and shared-source binding IDs through a required scene extension', () => {
+    const input = snapshot()
+    input.project = prepareProjectContent(input.project)
+    const binding = getLayerCartography(input.project, 'a')!.binding
+    input.project = setLayerCartography(input.project, 'a', [{ id: 'advanced', type: 'circle', source: binding.styleSourceId,
+      paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 0, 2, 20, 12], 'circle-color': '#ff0000' } }])
+    const document = createProjectSceneDocument(input)
+    expect(document.extensions?.[CARTOGRAPHY_EXTENSION]).toMatchObject({ version: 1, required: true })
+    const restored = createProjectFromSceneDocument(JSON.parse(JSON.stringify(document)))
+    expect(restored.project.cartography).toEqual(input.project.cartography)
+    expect(createProjectSceneDocument(restored).extensions).toEqual(document.extensions)
+    const malformed = structuredClone(document)
+    malformed.nodes = malformed.nodes.filter(node => node.id !== 'a')
+    expect(() => parseSceneDocument(malformed)).toThrow()
+  })
   it.each(['rectangle','ellipse'] as const)('preserves %s geometry in portable documents', type => {
     const input = snapshot(), scene = createCesiumScene()
     scene.nodes = [{ id: type, name: type, visible: true, type: 'graphic', geometry: { type, positions: [[116,39,12],[116.01,39.02,12]], heightMode: 'absolute' }, style: { color: '#336699', width: 3, pointSize: 10 }, properties: { code: '001' } }]

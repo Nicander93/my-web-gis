@@ -75,7 +75,6 @@ export const projectCommands = {
       operation.signal.throwIfAborted()
       if (useProjectStore.getState().dirty && replacementGuard && !await replacementGuard()) return
       operation.signal.throwIfAborted()
-      if (Object.values(useSessionStore.getState().sessions).some(session => session.styleDraft?.dirty)) throw new Error('请先应用或放弃样式草稿，再导入场景')
       const before = JSON.stringify(useProjectStore.getState().getSnapshot())
       const epoch = useProjectStore.getState().projectEpoch
       const opened = await openSceneDocument(operation.signal)
@@ -137,7 +136,6 @@ export const projectCommands = {
         return
       }
       if (epoch !== useProjectStore.getState().projectEpoch || version !== getProjectContentVersion()) throw new Error('选择或读取文件期间工程已改变，原内容保留')
-      if (Object.values(useSessionStore.getState().sessions).some((session) => session.styleDraft?.dirty)) throw new Error('选择或读取文件期间出现新样式草稿，原内容保留；请处理草稿后重试')
       bumpProjectGeneration()
       // credentialRef keys only in file — hydrate secrets from OS secure store when available.
       useProjectStore.getState().loadSnapshot(opened.snapshot)
@@ -146,7 +144,7 @@ export const projectCommands = {
       await hydrateCredentialsFromRefs(
         collectCredentialRefKeys(opened.snapshot.project.datasets.filter(dataset => dataset.kind !== 'vector'))
       )
-      if (installedEpoch === useProjectStore.getState().projectEpoch) emitCommandStatus(`已打开项目：${opened.path}`)
+      if (installedEpoch === useProjectStore.getState().projectEpoch) emitCommandStatus(`已打开项目：${opened.path}${opened.migration ? '；旧样式已在内存迁移，保存时将写入新版工程格式' : ''}`)
     } catch (error) {
       emitCommandStatus(error instanceof Error ? `打开失败：${error.message}` : '打开失败')
     }

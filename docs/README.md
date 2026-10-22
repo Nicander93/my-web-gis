@@ -15,12 +15,14 @@
 - [Scene Manifest 与发布 V0.1](specs/05-Scene-Manifest-and-Publishing-V0.1.md)
 - [二维与三维统一工作台](specs/06-Unified-Workbench.md) — 最新 Ribbon、对象菜单与面板交互规则
 - [统一场景文档 v3](specs/scene-document-v3.md) — 已实现的资源／节点／视图协议、旧格式迁移与纯操作；完整工程适配、JSON Schema 和运行时接入待完成
+- [二维制图系统技术设计 V1.1](design/2d-cartography-technical-design-v1.1.md) — 当前设计基线，含[原型索引](design/2d-cartography-prototype-index.md)；各阶段实际状态见[实施记录](plans/2d-cartography-implementation.md)，[V1](specs/07-2D-Cartography-Technical-Design-V1.md) 保留为历史资料
 - [全产品设计原则与改进计划（2026-10-08）](design/product-design-review-2026-10-08.md) — 用户设计理念、全产品目标、12 批整改与验收；A–C 和 D 部分已实施，见实施记录
 - [全量界面设计审计（2026-10-08）](design/product-interface-audit-2026-10-08.md) — 51 个界面／功能区、全部 18 个处理工具、问题证据与异常／恢复状态；源码审计，未逐项完成原生验收
 
 
 ### 阶段计划与验收
 
+- [二维制图实施记录](plans/2d-cartography-implementation.md)：P0–P6 的实现、测试及原生/浏览器边界；[GeoServer 验收证据](design/2d-cartography-geoserver/README.md)、[P6 MBStyle 与 WebGL](design/2d-cartography-p6/README.md)。
 - [2026-10-13 Desktop 产品化实施记录](plans/desktop-productization-implementation.md)：采用用户交付包的 M0–M9 方案，首批 Shell/Docking 改动、回归基线及尚未实施的范围。
 - [实施补充细则](design/desktop-productization/implementation-addendum.md)：已确认原型直接实施、明确采用 Ant Design、组件迁移顺序与最终 PR 验收要求。
 

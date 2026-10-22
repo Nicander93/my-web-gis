@@ -5,6 +5,7 @@ import { useSaveStore } from '@/stores/save.store'
 import { emitCommandStatus } from '@/app/commands/status'
 import { createSnapshotFromState, getCurrentProjectPath, pickAndSaveSnapshot, saveSnapshotToPath, setCurrentProjectPath } from './project-io'
 import { projectRecovery, recoveryOwner } from './project-recovery'
+import { finishStyleInteraction } from '@/features/inspector/style-interaction'
 
 let queue: Promise<unknown> = Promise.resolve()
 const waiting = new Map<string, Promise<boolean>>()
@@ -30,6 +31,7 @@ function sameSavedContent(before: ProjectSnapshot, after: ProjectSnapshot): bool
 
 /** Serialize disk writes; one queued request per project/mode captures the latest content when it starts. */
 export function requestProjectSave(saveAs = false): Promise<boolean> {
+  finishStyleInteraction()
   const owner = useProjectStore.getState()
   const epoch = owner.projectEpoch
   const key = `${epoch}:${saveAs}`

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>二维制图 P0 Canvas Spike</title>
+    <style>
+      :root { font: 14px/1.5 "Segoe UI", "Microsoft YaHei", sans-serif; color: #2f302e; background: #f3f1eb; }
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 20px; }
+      header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+      h1 { margin: 0; font-size: 20px; font-weight: 650; }
+      #status { color: #4f6d55; }
+      .toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
+      button { border: 1px solid #cbc8bd; border-radius: 5px; background: white; padding: 6px 10px; color: inherit; cursor: pointer; }
+      button[aria-pressed="true"] { background: #354a3d; color: white; border-color: #354a3d; }
+      .maps { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      figure { margin: 0; overflow: hidden; border: 1px solid #d6d2c9; border-radius: 7px; background: white; }
+      figcaption { padding: 8px 11px; font-weight: 600; }
+      .map { height: min(62vh, 560px); min-height: 420px; background: #e8e6df; }
+      .notes { margin-top: 12px; color: #67675f; font-size: 12px; }
+      .ol-zoom { display: none; }
+      @media (max-width: 800px) { .maps { grid-template-columns: 1fr; } body { padding: 12px; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>二维制图 P0 · OpenLayers Canvas</h1>
+      <output id="status" data-ready="false">正在加载本地样式与固定数据…</output>
+    </header>
+    <nav class="toolbar" aria-label="GIS 图层控制">
+      <button data-layer="roads" aria-pressed="true">道路</button>
+      <button data-layer="rivers" aria-pressed="true">河流</button>
+      <button data-layer="parcels" aria-pressed="true">地块</button>
+      <button data-layer="places" aria-pressed="true">POI</button>
+      <button id="filter-local">仅主干道</button>
+      <button id="reset-filter">清除过滤</button>
+    </nav>
+    <main class="maps">
+      <figure>
+        <figcaption>MapLibre Style v8 → ol-mapbox-style → Canvas</figcaption>
+        <div id="spike-map" class="map" aria-label="MapLibre 样式 Canvas 地图"></div>
+      </figure>
+      <figure>
+        <figcaption>同数据、同视图的 OL 固定样式参考</figcaption>
+        <div id="reference-map" class="map" aria-label="OpenLayers 固定样式参考地图"></div>
+      </figure>
+    </main>
+    <p class="notes">固定本地 GeoJSON-like 要素 · 256 px OL View 与 512 px MapLibre zoom 对齐（zOL = zML + 1）· 无在线底图、字体或服务</p>
+    <script type="module" src="/src/cartography-spike/main.ts"></script>
+  </body>
+</html>

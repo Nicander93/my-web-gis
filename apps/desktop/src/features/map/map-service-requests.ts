@@ -5,7 +5,8 @@ import TileWMS from 'ol/source/TileWMS'
 import WMTS from 'ol/source/WMTS'
 import ImageTile from 'ol/ImageTile'
 import TileState from 'ol/TileState'
-import { ensureCredentialLoaded } from '@/services/credentials'
+import { credentialAuthorization, ensureCredentialLoaded } from '@/services/credentials'
+import { createGeoServerTransport } from '@/services/geoserver-transport'
 
 /** Credentials are resolved for each request; layer and document definitions remain shareable. */
 export function configureMapServiceLayer(
@@ -32,11 +33,13 @@ export function configureMapServiceLayer(
       try {
         const credential = await ensureCredentialLoaded(credentialKey)
         operation.signal.throwIfAborted()
-        if (!credential || credential.kind !== authentication.mode) throw new Error('服务凭据不可用')
+        if (!credential || credential.kind !== authentication.mode && !(authentication.mode === 'bearer' && credential.kind === 'http-authorization')) throw new Error('服务凭据不可用')
         const url = new URL(src), headers: Record<string, string> = {}
         if (authentication.mode === 'query-token') url.searchParams.set(authentication.tokenParam ?? credential.param ?? 'token', credential.value)
-        else headers.Authorization = `Bearer ${credential.value}`
-        const response = await fetch(url.href, { headers, signal: operation.signal })
+        else headers.Authorization = credentialAuthorization(credential) ?? ''
+        const response = credential.kind === 'http-authorization'
+          ? await createGeoServerTransport({ credentialRef: credentialKey, allowedOrigin: new URL(resource.url).origin })(url.href, { method: 'GET', headers: {}, signal: operation.signal })
+          : await fetch(url.href, { headers, signal: operation.signal })
         if (!response.ok) throw new Error('服务瓦片请求失败')
         const blob = await response.blob()
         operation.signal.throwIfAborted()

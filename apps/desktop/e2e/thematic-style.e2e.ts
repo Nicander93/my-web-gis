@@ -1,92 +1,93 @@
-import { test, expect } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { fileURLToPath } from 'node:url'
 
-test('classified style, native symbols, legend and clean inspector follow undo and redo', async ({ page }, info) => {
-  const errors: string[] = []
-  page.on('pageerror', error => errors.push(error.message))
-  await page.route('**/*tile.openstreetmap.org/**', route => route.abort())
+async function importPoints(page: Page) {
+  await page.addInitScript(() => performance.setResourceTimingBufferSize(5000))
   await page.goto('/')
   await page.getByRole('button', { name: /^二维地图/ }).click()
   await page.getByRole('tab', { name: '数据', exact: true }).click()
   await page.getByRole('region', { name: '二维功能区' }).getByRole('button', { name: '添加数据', exact: true }).click()
   await page.locator('input[type=file]').setInputFiles(fileURLToPath(new URL('../../../examples/phase-1/points.geojson', import.meta.url)))
   await page.getByRole('dialog', { name: '添加数据', exact: true }).getByRole('button', { name: '确认导入', exact: true }).click()
-  await page.locator('.layer-name-button').click()
-  await page.getByRole('button', { name: '样式', exact: true }).click()
-  await page.getByRole('tab', { name: '地图', exact: true }).click()
-  await page.getByRole('button', { name: '定位图层', exact: true }).click()
-  await expect.poll(() => page.evaluate(async () => {
-    const { getMapRuntime } = await import('/src/features/map/map-runtime-host.ts')
-    return getMapRuntime()!.getMap().getView().getAnimating()
-  })).toBe(false)
-  const panel = page.locator('.style-panel')
-  const legend = page.locator('.legend-panel')
-  await page.getByText('图例预览', { exact: true }).click()
-  await expect(legend.locator('.legend-item')).toHaveCount(1)
-  const originalSymbols = await nativeSymbols(page)
-  await panel.getByLabel('模式').selectOption('categorized')
-  await panel.getByLabel('字段').selectOption('name')
-  await panel.getByRole('button', { name: '重新分类', exact: true }).click()
-  await panel.getByLabel('分类 北京市中心 颜色', { exact: true }).fill('#ff0000')
-  await expect(legend.locator('.legend-item')).toHaveCount(1)
-  expect(await nativeSymbols(page)).toEqual(originalSymbols)
-  await panel.getByRole('button', { name: '应用', exact: true }).click()
-  expect(errors).toEqual([])
-  await expect(legend).toContainText('北京市中心')
-  await expect(legend).toContainText('上海市中心')
-  await expect(legend).toContainText('广州市中心')
-  await expect.poll(() => nativeSymbols(page)).not.toEqual(originalSymbols)
-  const classifiedSymbols = await nativeSymbols(page)
-  expect(classifiedSymbols.find(item => item.name === '北京市中心')!.color).toBe('rgba(255,0,0,1)')
-  await page.getByRole('button', { name: '撤销', exact: true }).click()
-  await expect(legend.locator('.legend-item')).toHaveCount(1)
-  await expect.poll(() => nativeSymbols(page)).toEqual(originalSymbols)
-  await expect(panel.getByLabel('模式')).toHaveValue('single')
-  await page.getByRole('button', { name: '重做', exact: true }).click()
-  await expect(legend).toContainText('北京市中心')
-  await expect.poll(() => nativeSymbols(page)).toEqual(classifiedSymbols)
-  await expect(panel.getByLabel('模式')).toHaveValue('categorized')
-  await expect(panel.locator('.draft-badge')).toHaveCount(0)
-  await panel.getByLabel('模式').selectOption('graduated')
-  await panel.getByLabel('字段').selectOption('value')
-  await panel.getByLabel('分段数').fill('3')
-  await panel.getByRole('button', { name: '重新分类', exact: true }).click()
-  await panel.getByPlaceholder('标签').first().fill('')
-  expect(await nativeSymbols(page)).toEqual(classifiedSymbols)
-  await panel.getByRole('button', { name: '应用', exact: true }).click()
-  expect(errors).toEqual([])
-  await expect.poll(() => nativeSymbols(page)).not.toEqual(classifiedSymbols)
-  const graduatedSymbols = await nativeSymbols(page)
-  expect(new Set(graduatedSymbols.map(item => item.color)).size).toBe(3)
-  await expect(legend).not.toContainText('北京市中心')
-  await page.getByRole('button', { name: '撤销', exact: true }).click()
-  await expect(panel.getByLabel('模式')).toHaveValue('categorized')
-  await expect.poll(() => nativeSymbols(page)).toEqual(classifiedSymbols)
-  await page.getByRole('button', { name: '重做', exact: true }).click()
-  await expect(panel.getByLabel('模式')).toHaveValue('graduated')
-  await expect.poll(() => nativeSymbols(page)).toEqual(graduatedSymbols)
-  await panel.getByLabel('Fallback 颜色', { exact: true }).fill('#00ff00')
-  await page.getByRole('button', { name: '撤销', exact: true }).click()
-  await expect(panel.getByLabel('模式')).toHaveValue('graduated')
-  await expect(panel.locator('.draft-badge')).toBeVisible()
-  await expect(panel.getByLabel('Fallback 颜色', { exact: true })).toHaveValue('#00ff00')
-  await expect.poll(() => nativeSymbols(page)).toEqual(classifiedSymbols)
-  await panel.getByRole('button', { name: '重置草稿', exact: true }).click()
-  await expect(panel.getByLabel('模式')).toHaveValue('categorized')
-  await expect(panel.locator('.draft-badge')).toHaveCount(0)
-  await page.screenshot({ path: info.outputPath('classified-style.png') })
-})
+  await page.locator('.layer-name-button').first().click()
+  await page.getByRole('region', { name: '二维功能区' }).getByRole('button', { name: '样式', exact: true }).click()
+}
 
-async function nativeSymbols(page: import('@playwright/test').Page) {
+async function state(page: Page) {
   return page.evaluate(async () => {
-    const { getMapRuntime } = await import('/src/features/map/map-runtime-host.ts')
-    const runtime = getMapRuntime()!
-    const layer = runtime.registry.entries().map(([, layer]) => layer).find(layer => 'getStyleFunction' in layer)!
-    const style = layer.getStyleFunction()!
-    return layer.getSource()!.getFeatures().map(feature => {
-      const result = style(feature, runtime.getMap().getView().getResolution()!)
-      const symbol = Array.isArray(result) ? result[0] : result
-      return { name: feature.get('name'), color: symbol!.getImage()!.getFill()!.getColor() }
-    })
+    const loaded = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
+    const { useProjectStore } = await import(loaded('/src/stores/project.store.ts')) as typeof import('../src/stores/project.store')
+    const project = useProjectStore.getState().project
+    const { getMapRuntime } = await import(loaded('/src/features/map/map-runtime-host.ts')) as typeof import('../src/features/map/map-runtime-host')
+    const layer = project.layers.find(item => item.id === useProjectStore.getState().selectedLayerId)!
+    const binding = project.cartography.bindings.find(item => item.gisLayerId === layer.id)!
+    const runtime = getMapRuntime(), native = runtime?.registry.getVector(layer.id)
+    const samples = native?.getSource()?.getFeatures().map(feature => {
+      const result = native.getStyleFunction()?.(feature, runtime!.getMap().getView().getResolution()!)
+      const styles = Array.isArray(result) ? result : result ? [result] : []
+      return { name: feature.get('name'), color: styles.find(style => style.getImage())?.getImage()?.getFill()?.getColor(),
+        text: styles.find(style => style.getText())?.getText()?.getText() }
+    }) ?? []
+    return { layer: structuredClone(layer), samples, fragment: structuredClone({ binding,
+      styleLayers: project.cartography.styleLayers.filter(item => binding.styleLayerIds.includes(item.id)) }) }
   })
 }
+
+test('categorized and graduated styles and labels update the native map, legend and history immediately', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.route('**/*tile.openstreetmap.org/**', route => route.abort())
+  await importPoints(page)
+  const panel = page.locator('.style-panel')
+  await page.getByText('图例预览', { exact: true }).click()
+  const legend = page.locator('.legend-panel')
+  const initial = await state(page)
+
+  await panel.getByLabel('渲染方式').click()
+  await page.locator('.ant-select-dropdown:visible').getByText('分类渲染', { exact: true }).click()
+  await panel.getByLabel('点半径', { exact: true }).first().fill('8')
+  await panel.getByLabel('点半径', { exact: true }).first().blur()
+  await expect.poll(async () => (await state(page)).layer.style.fallback?.radius).toBe(8)
+  await panel.getByLabel('分类字段').click()
+  await page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').filter({ hasText: /^name$/ }).click()
+  await panel.getByRole('button', { name: '重新分类', exact: true }).click()
+  await expect.poll(async () => (await state(page)).layer.style.mode).toBe('categorized')
+  await expect(legend).toContainText('北京市中心')
+  await expect.poll(async () => (await state(page)).fragment.styleLayers).not.toEqual(initial.fragment.styleLayers)
+  await expect.poll(async () => new Set((await state(page)).samples.map(sample => String(sample.color))).size).toBe(3)
+
+  const label = panel.getByLabel('北京市中心 图例名称', { exact: true })
+  await label.fill('北京地标')
+  await expect.poll(async () => (await state(page)).layer.style.categories.find(category => category.value === '北京市中心')?.label).toBe('北京地标')
+  await expect(legend).toContainText('北京地标')
+  await label.blur()
+  await page.getByRole('tab', { name: '标注', exact: true }).click()
+  await page.getByLabel('启用标注').click()
+  const enabledLabel = (await state(page)).layer.style.label
+  await page.getByLabel('标注字段').click()
+  await page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').filter({ hasText: /^name$/ }).click()
+  await expect.poll(async () => (await state(page)).layer.style.label?.field).toBe('name')
+  await expect.poll(async () => (await state(page)).fragment.styleLayers.some(layer => layer.type === 'symbol')).toBe(true)
+  await expect.poll(async () => (await state(page)).samples.find(sample => sample.name === '北京市中心')?.text).toBe('北京市中心')
+
+  await page.getByRole('button', { name: '撤销', exact: true }).click()
+  await expect.poll(async () => (await state(page)).layer.style.label).toEqual(enabledLabel)
+  await page.getByRole('button', { name: '重做', exact: true }).click()
+  await expect.poll(async () => (await state(page)).layer.style.label?.field).toBe('name')
+  await page.getByRole('tab', { name: '样式', exact: true }).click()
+  await panel.getByLabel('渲染方式').click()
+  await page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').filter({ hasText: /^分级渲染$/ }).click()
+  await panel.getByLabel('分级字段').click()
+  await page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').filter({ hasText: /^value$/ }).click()
+  await panel.getByLabel('分段数').fill('3')
+  await panel.getByRole('button', { name: '重新分级', exact: true }).click()
+  await expect.poll(async () => (await state(page)).layer.style.breaks?.length).toBe(3)
+  await expect.poll(async () => new Set((await state(page)).samples.map(sample => String(sample.color))).size).toBe(3)
+  await expect(legend).not.toContainText('北京地标')
+  const graduated = (await state(page)).fragment
+  await page.getByRole('button', { name: '撤销', exact: true }).click()
+  await expect.poll(async () => (await state(page)).fragment).not.toEqual(graduated)
+  await page.getByRole('button', { name: '重做', exact: true }).click()
+  await expect.poll(async () => (await state(page)).fragment).toEqual(graduated)
+  expect(errors).toEqual([])
+})

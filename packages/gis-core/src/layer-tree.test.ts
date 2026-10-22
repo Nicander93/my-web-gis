@@ -36,6 +36,7 @@ describe('P14 layer tree / groups', () => {
   it('preserves mixed nested sibling order, ancestor state and JSON round trips', () => {
     let project = createProject('Nested')
     project.layers = [layer('a'), layer('b'), layer('c')]
+    project.datasets = project.layers.map(layer => ({ id: layer.datasetId, name: layer.name, kind: 'vector', source: { type: 'memory', label: layer.name } }))
     project.groups = [{ id: 'outer', name: 'Outer', visible: false, locked: true, layerIds: ['b'], childOrder: [{ type: 'group', id: 'inner' }, { type: 'layer', id: 'b' }] }, { id: 'inner', parentId: 'outer', name: 'Inner', visible: true, layerIds: ['a'] }]
     project.rootOrder = [{ type: 'layer', id: 'c' }, { type: 'group', id: 'outer' }]
     project = normalizeLayerTree(project)
@@ -61,7 +62,7 @@ describe('P14 layer tree / groups', () => {
       version: 1,
       name: 'Legacy',
       crs: 'EPSG:3857',
-      datasets: [],
+      datasets: ['a', 'b', 'c'].map(id => ({ id: `ds-${id}`, name: id, kind: 'vector', source: { type: 'memory', label: id } })),
       layers: [layer('a'), layer('b'), layer('c')],
       mapState: { center: [0, 0] as [number, number], zoom: 2, rotation: 0 },
       basemap: { type: 'osm' as const },
@@ -75,6 +76,7 @@ describe('P14 layer tree / groups', () => {
   it('persists group membership and root order across serialize/parse', () => {
     let project = createProject('Grouped')
     project.layers = [layer('a'), layer('b'), layer('c')]
+    project.datasets = project.layers.map(layer => ({ id: layer.datasetId, name: layer.name, kind: 'vector', source: { type: 'memory', label: layer.name } }))
     const group = createLayerGroup('G1', ['b', 'c'])
     project.groups = [group]
     project.rootOrder = [

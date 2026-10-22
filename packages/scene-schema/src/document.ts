@@ -1,6 +1,7 @@
 import { createCesiumScene, parseCesiumScene, validateCesiumScene, validateResourceReference, type ResourceReference, type CesiumSceneCamera, type CesiumSceneNode, type CesiumScene } from '@desktop-webgis/cesium-scene-schema'
 import { parseScene, SceneValidationError } from './parse.js'
 import { validateScene } from './validate.js'
+import { CARTOGRAPHY_EXTENSION, validateSceneCartography } from './cartography.js'
 import type { GeoJsonFeatureCollection, JsonValue, SceneManifest, SceneSource, SceneView, TileLayer, VectorLayer, ValidationIssue, ValidationResult } from './types.js'
 
 export const SCENE_DOCUMENT_VERSION = 3 as const
@@ -239,6 +240,9 @@ export function validateSceneDocument(input: unknown): ValidationResult {
     if (record(input.extensions)) for (const [name, extension] of Object.entries(input.extensions)) {
       check(/^[a-z][a-z\d-]*(\.[a-z][a-z\d-]*)+$/i.test(name) && record(extension) && Number.isInteger(extension.version) && Number(extension.version) > 0 && typeof extension.required === 'boolean' && Object.hasOwn(extension, 'data'), `$.extensions.${name}`, 'extension.definition', '扩展需要命名空间、正整数版本、required 和 JSON 数据')
     }
+  }
+  if (issues.length === 0) for (const message of validateSceneCartography(input as unknown as SceneDocument)) {
+    issues.push({ path: `$.extensions.${CARTOGRAPHY_EXTENSION}`, code: 'cartography.invalid', message })
   }
   return { valid: issues.length === 0, issues }
 }

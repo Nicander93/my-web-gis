@@ -1,5 +1,5 @@
 import { createCesiumScene, parseCesiumScene, type CesiumSceneNode, type CesiumScene } from '@desktop-webgis/cesium-scene-schema'
-import { getUnsupportedSceneExtensions, parseSceneDocument, type SceneDocument, type SceneNode } from '@desktop-webgis/scene-schema'
+import { CARTOGRAPHY_SCENE_EXTENSIONS, getUnsupportedSceneExtensions, parseSceneDocument, type SceneDocument, type SceneNode } from '@desktop-webgis/scene-schema'
 
 export interface CesiumDocumentIssue { path: string; code: string; message: string }
 export interface CesiumDocumentProjection {
@@ -26,7 +26,7 @@ function deriveAncestorState(node: SceneNode, nodes: Map<string, SceneNode>): { 
 export function projectCesiumDocument(input: unknown, viewId?: string): CesiumDocumentProjection {
   const document = parseSceneDocument(input), view = document.views[viewId ?? document.activeView]
   if (!view || view.type !== '3d') throw new Error('Cesium requires a three-dimensional view')
-  const extensions = getUnsupportedSceneExtensions(document)
+  const extensions = getUnsupportedSceneExtensions(document, CARTOGRAPHY_SCENE_EXTENSIONS)
   if (extensions.some(issue => issue.code === 'extension.required')) {
     throw new Error(extensions.filter(issue => issue.code === 'extension.required').map(issue => issue.message).join('; '))
   }

@@ -1,0 +1,15 @@
+{
+  "level": "approximated",
+  "issues": [
+    {
+      "path": "/layers/0/source",
+      "level": "approximated",
+      "reason": "源绑定由目标 GeoServer 图层决定，导出时省略"
+    },
+    {
+      "path": "/layers/0/metadata",
+      "level": "approximated",
+      "reason": "MapLibre 本地元数据不参与 GeoServer 样式渲染，导出时省略"
+    }
+  ]
+}

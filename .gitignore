@@ -17,3 +17,4 @@ packages/ol-style/*.tgz
 
 apps/desktop/test-results/
 apps/desktop/playwright-report/
+/.cache/cartography-geoserver/

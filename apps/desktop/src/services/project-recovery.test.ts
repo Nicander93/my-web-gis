@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { createProject, createDefaultLayerStyle, type ProjectSnapshot } from '@desktop-webgis/gis-core'
+import { createProject, createDefaultLayerStyle, reconcileProjectCartography, type ProjectSnapshot } from '@desktop-webgis/gis-core'
 import { createCesiumScene } from '@desktop-webgis/cesium-scene-schema'
 import { ProjectRecovery, parseRecoveryEntry, recoveryKey } from './project-recovery'
 import { RECOVERY_RETENTION_MS, type RecoveryCache } from './recovery-cache'
@@ -22,7 +22,7 @@ function snapshot(id = 'p'): ProjectSnapshot {
   const project = createProject('Recovery'); project.id = id
   project.datasets = [{ id: 'd', name: 'Data', kind: 'vector', source: { type: 'memory', label: 'Data' } }]
   project.layers = [{ id: 'l', datasetId: 'd', name: 'Data', visible: true, opacity: 1, editable: true, style: createDefaultLayerStyle('point') }]
-  return { project, featuresByDataset: { d: [{ id: 'f', geometry: { type: 'Point', coordinates: [116, 39] }, properties: { code: '001', value: 2 } }] } }
+  return { project: reconcileProjectCartography(project), featuresByDataset: { d: [{ id: 'f', geometry: { type: 'Point', coordinates: [116, 39] }, properties: { code: '001', value: 2 } }] } }
 }
 
 it('persists detached 2D/3D snapshots by collision-free IDs without UI bookkeeping', async () => {

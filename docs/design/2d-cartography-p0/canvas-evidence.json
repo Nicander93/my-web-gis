@@ -1,0 +1,151 @@
+{
+  "pixels": {
+    "classification": {
+      "drawn": 9364,
+      "orangeRoad": 2368,
+      "clinicMagenta": 0,
+      "hatchGreen": 0,
+      "darkText": 0
+    },
+    "casing": {
+      "drawn": 9364,
+      "orangeRoad": 2368,
+      "clinicMagenta": 0,
+      "hatchGreen": 0,
+      "darkText": 0
+    },
+    "icon": {
+      "drawn": 1661,
+      "orangeRoad": 0,
+      "clinicMagenta": 36,
+      "hatchGreen": 0,
+      "darkText": 0
+    },
+    "labels": {
+      "drawn": 1277,
+      "orangeRoad": 0,
+      "clinicMagenta": 0,
+      "hatchGreen": 0,
+      "darkText": 83
+    },
+    "pattern": {
+      "drawn": 586,
+      "orangeRoad": 0,
+      "clinicMagenta": 0,
+      "hatchGreen": 0,
+      "darkText": 0
+    }
+  },
+  "references": {
+    "classification": {
+      "drawn": 9682,
+      "orangeRoad": 1992,
+      "clinicMagenta": 0,
+      "hatchGreen": 0,
+      "darkText": 87
+    },
+    "casing": {
+      "drawn": 9682,
+      "orangeRoad": 1992,
+      "clinicMagenta": 0,
+      "hatchGreen": 0,
+      "darkText": 87
+    },
+    "icon": {
+      "drawn": 1689,
+      "orangeRoad": 0,
+      "clinicMagenta": 81,
+      "hatchGreen": 0,
+      "darkText": 0
+    },
+    "labels": {
+      "drawn": 9682,
+      "orangeRoad": 1992,
+      "clinicMagenta": 0,
+      "hatchGreen": 0,
+      "darkText": 87
+    },
+    "pattern": {
+      "drawn": 583,
+      "orangeRoad": 0,
+      "clinicMagenta": 0,
+      "hatchGreen": 0,
+      "darkText": 0
+    }
+  },
+  "referenceSources": {
+    "classification": {
+      "sourceId": "roads",
+      "sameSource": true,
+      "visible": true
+    },
+    "casing": {
+      "sourceId": "roads",
+      "sameSource": true,
+      "visible": true
+    },
+    "icon": {
+      "sourceId": "places",
+      "sameSource": true,
+      "visible": true
+    },
+    "labels": {
+      "sourceId": "roads",
+      "sameSource": true,
+      "visible": true
+    },
+    "pattern": {
+      "sourceId": "parcels",
+      "sameSource": true,
+      "visible": true
+    }
+  },
+  "styles": {
+    "classification": [
+      {
+        "image": false
+      },
+      {
+        "image": false
+      }
+    ],
+    "casing": [
+      {
+        "image": false
+      },
+      {
+        "image": false
+      }
+    ],
+    "icon": [
+      {
+        "text": "社区医院\nCommunity Clinic",
+        "placement": "point",
+        "font": "normal 400 10px/1.2 \"Segoe UI\",sans-serif",
+        "overflow": true,
+        "textFill": "rgba(127,42,69,1)",
+        "image": true
+      }
+    ],
+    "labels": [
+      {
+        "text": "人民路 Renmin Road",
+        "placement": "line",
+        "font": "normal 400 11px/1.2 \"Segoe UI\",sans-serif",
+        "repeat": 500,
+        "overflow": false,
+        "textFill": "rgba(67,63,56,1)",
+        "image": false
+      }
+    ],
+    "pattern": [
+      {
+        "fill": {
+          "src": "ol-mapbox-style:1:park-hatch.0.78",
+          "scale": 1
+        },
+        "image": false
+      }
+    ]
+  }
+}

@@ -8,7 +8,8 @@ import {
   serializeProjectSnapshot,
   type GisFeature,
   type Project,
-  type ProjectSnapshot
+  type ProjectSnapshot,
+  type ProjectFormatMigration
 } from '@desktop-webgis/gis-core'
 import { pickFile, pickSaveFile, readTextFile, writeTextFile } from '@/services/files'
 import { getLiveMapState } from '@/features/map/map-runtime-host'
@@ -17,6 +18,7 @@ import { useProjectStore } from '@/stores/project.store'
 import { isTauri } from '@tauri-apps/api/core'
 import { downloadProject, pickBrowserProject } from './browser-project-files'
 import { prepareProjectResourceReferences, resolveProjectResourceReferences } from './project-resource-references'
+import { verifyStyleAssets } from '@desktop-webgis/ol-style/style-assets'
 
 export const PROJECT_FILE_FILTER = {
   name: 'Web GIS 项目',
@@ -83,18 +85,22 @@ export async function pickAndSaveSnapshot(snapshot: ProjectSnapshot, suggestedNa
   return path
 }
 
-export async function openSnapshotFromDisk(): Promise<{ path: string; snapshot: ProjectSnapshot } | null> {
+export async function openSnapshotFromDisk(): Promise<{ path: string; snapshot: ProjectSnapshot; migration?: ProjectFormatMigration } | null> {
+  let migration: ProjectFormatMigration | undefined
+  const options = { onMigration: (value: ProjectFormatMigration) => { migration = value } }
   if (!isTauri()) {
     const file = await pickBrowserProject()
     if (!file) return null
-    const snapshot = parseProjectSnapshot(await file.text())
+    const snapshot = parseProjectSnapshot(await file.text(), options)
+    await verifyStyleAssets(snapshot.project.cartography?.assets ?? [])
     assertNoSecretValues(snapshot)
-    return { path: file.name, snapshot }
+    return { path: file.name, snapshot, migration }
   }
   const path = await pickFile([PROJECT_FILE_FILTER])
   if (!path) return null
   const text = await readTextFile(path)
-  const snapshot = parseProjectSnapshot(text)
+  const snapshot = parseProjectSnapshot(text, options)
+  await verifyStyleAssets(snapshot.project.cartography?.assets ?? [])
   assertNoSecretValues(snapshot)
-  return { path, snapshot: resolveProjectResourceReferences(snapshot, path) }
+  return { path, snapshot: resolveProjectResourceReferences(snapshot, path), migration }
 }

@@ -1,0 +1,36 @@
+{
+  "level": "unsupported",
+  "publishable": false,
+  "issues": [
+    {
+      "path": "/layers/0/source",
+      "level": "approximated",
+      "reason": "源绑定由目标 GeoServer 图层决定，导出时省略"
+    },
+    {
+      "path": "/layers/0/metadata",
+      "level": "approximated",
+      "reason": "MapLibre 本地元数据不参与 GeoServer 样式渲染，导出时省略"
+    },
+    {
+      "path": "/layers/0/filter",
+      "level": "unsupported",
+      "reason": "过滤器超出支持的字段比较/逻辑/存在性子集"
+    },
+    {
+      "path": "/layers/1/source",
+      "level": "approximated",
+      "reason": "源绑定由目标 GeoServer 图层决定，导出时省略"
+    },
+    {
+      "path": "/layers/1/metadata",
+      "level": "approximated",
+      "reason": "MapLibre 本地元数据不参与 GeoServer 样式渲染，导出时省略"
+    },
+    {
+      "path": "/layers/1/filter",
+      "level": "unsupported",
+      "reason": "过滤器超出支持的字段比较/逻辑/存在性子集"
+    }
+  ]
+}

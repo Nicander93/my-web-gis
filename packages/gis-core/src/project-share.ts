@@ -4,6 +4,7 @@
  */
 import { cloneValue } from './clone'
 import type { Dataset, Project, ProjectSnapshot, ServiceSource } from './types'
+import { prepareProjectContent } from './project'
 
 const SECRET_KEY_PATTERN = /(password|secret|token|authorization|api[_-]?key)/i
 
@@ -36,7 +37,7 @@ export function findSecretLeaks(value: unknown, path = '$'): string[] {
 
 /** Strip runtime-only fields that must not be shared (none currently on Project). */
 export function sanitizeProjectForPersistence(project: Project): Project {
-  return cloneValue(project)
+  return prepareProjectContent(project)
 }
 
 /**

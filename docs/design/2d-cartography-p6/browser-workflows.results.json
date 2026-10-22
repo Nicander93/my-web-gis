@@ -1,0 +1,497 @@
+{
+  "config": {
+    "argv": [
+      "C:\\nvm4w\\nodejs\\node.exe",
+      "D:\\my-code-repo\\my-web-gis\\apps\\desktop\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "--config",
+      "playwright.cartography-project.config.ts"
+    ],
+    "configFile": "D:\\my-code-repo\\my-web-gis\\apps\\desktop\\playwright.cartography-project.config.ts",
+    "rootDir": "D:/my-code-repo/my-web-gis/apps/desktop/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "D:/my-code-repo/my-web-gis/apps/desktop/test-results/cartography-project-acceptance",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "cartography-project",
+        "name": "cartography-project",
+        "testDir": "D:/my-code-repo/my-web-gis/apps/desktop/e2e",
+        "testIgnore": [
+          "**/viewer-document.e2e.ts",
+          "**/desktop-viewer-workflow.e2e.ts",
+          "**/geolibre-production.e2e.ts"
+        ],
+        "testMatch": [
+          "**/cartography-project.e2e.ts",
+          "**/cartography-editor.e2e.ts",
+          "**/cartography-professional.e2e.ts",
+          "**/thematic-style.e2e.ts"
+        ],
+        "timeout": 45000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "./test-results/cartography-project-acceptance/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 1,
+    "webServer": {
+      "command": "pnpm dev --port 5182 --strictPort",
+      "url": "http://127.0.0.1:5182",
+      "reuseExistingServer": false,
+      "timeout": 30000
+    }
+  },
+  "suites": [
+    {
+      "title": "cartography-editor.e2e.ts",
+      "file": "cartography-editor.e2e.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "point radius edits coalesce by gesture, undo separately and save the focused value",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "cartography-project",
+              "projectName": "cartography-project",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 9621,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-22T01:10:56.108Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "192efd23b949527f8e6d-8da11999b4b5dafcfefc",
+          "file": "cartography-editor.e2e.ts",
+          "line": 44,
+          "column": 1
+        },
+        {
+          "title": "switching layers preserves immediate edits without a draft dialog",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "cartography-project",
+              "projectName": "cartography-project",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2385,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-22T01:11:05.867Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "192efd23b949527f8e6d-c217f2f588606b2a55e9",
+          "file": "cartography-editor.e2e.ts",
+          "line": 90,
+          "column": 1
+        },
+        {
+          "title": "advanced standard expressions remain intact when compatibility controls are read-only",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "cartography-project",
+              "projectName": "cartography-project",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1638,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-22T01:11:08.263Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "192efd23b949527f8e6d-8e394b73e83b572325d3",
+          "file": "cartography-editor.e2e.ts",
+          "line": 110,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "cartography-professional.e2e.ts",
+      "file": "cartography-professional.e2e.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "professional layered roads, zoom widths and undo retain standard AST",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "cartography-project",
+              "projectName": "cartography-project",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2864,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-22T01:11:09.920Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1fa5630e2e88140d6022-f2a690bf553df1651c2f",
+          "file": "cartography-professional.e2e.ts",
+          "line": 44,
+          "column": 1
+        },
+        {
+          "title": "safe SVG survives resource import, actual icon rendering, save and project reopen",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "cartography-project",
+              "projectName": "cartography-project",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2551,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-22T01:11:12.790Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1fa5630e2e88140d6022-853d54f08de8496c400a",
+          "file": "cartography-professional.e2e.ts",
+          "line": 74,
+          "column": 1
+        },
+        {
+          "title": "sld GeoServer wizard publishes against the isolated real server and persists only a credential reference",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "cartography-project",
+              "projectName": "cartography-project",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3296,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-22T01:11:15.350Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1fa5630e2e88140d6022-2b6e0c94a0e9fe6081d6",
+          "file": "cartography-professional.e2e.ts",
+          "line": 110,
+          "column": 1
+        },
+        {
+          "title": "mbstyle GeoServer wizard publishes against the isolated real server and persists only a credential reference",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "cartography-project",
+              "projectName": "cartography-project",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3332,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-22T01:11:18.653Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1fa5630e2e88140d6022-2c46cbf4d62f6f504014",
+          "file": "cartography-professional.e2e.ts",
+          "line": 110,
+          "column": 1
+        },
+        {
+          "title": "embedded WOFF2 installs before label compilation and survives project history",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "cartography-project",
+              "projectName": "cartography-project",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3013,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-22T01:11:21.995Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1fa5630e2e88140d6022-6853cdcf97bbac459b0b",
+          "file": "cartography-professional.e2e.ts",
+          "line": 162,
+          "column": 1
+        },
+        {
+          "title": "offline SLD export requires an explicit geometry field and exports real XML",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "cartography-project",
+              "projectName": "cartography-project",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1803,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-22T01:11:25.015Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1fa5630e2e88140d6022-54c68bf1f5ad60c25279",
+          "file": "cartography-professional.e2e.ts",
+          "line": 188,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "cartography-project.e2e.ts",
+      "file": "cartography-project.e2e.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "standard styles survive scene import, node deletion undo, project save and reopen over a shared source",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "cartography-project",
+              "projectName": "cartography-project",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1807,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-22T01:11:26.838Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "f14f48607413cc7167b3-92a8d55abeed6a6e9015",
+          "file": "cartography-project.e2e.ts",
+          "line": 42,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "thematic-style.e2e.ts",
+      "file": "thematic-style.e2e.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "categorized and graduated styles and labels update the native map, legend and history immediately",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "cartography-project",
+              "projectName": "cartography-project",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3887,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-22T01:11:28.659Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1985d1bacaea7df3a99a-70bb2bc507120e36d138",
+          "file": "thematic-style.e2e.ts",
+          "line": 36,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-22T01:10:53.330Z",
+    "duration": 39823.195,
+    "expected": 11,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

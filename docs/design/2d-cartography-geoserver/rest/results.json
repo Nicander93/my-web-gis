@@ -1,0 +1,721 @@
+{
+  "version": {
+    "about": {
+      "resource": [
+        {
+          "@name": "GeoServer",
+          "Build-Timestamp": "21-Jan-2026 14:18",
+          "Version": "2.28.2",
+          "Git-Revision": "a734dff4450bfceaabcd0366a8b4b948e0656861"
+        },
+        {
+          "@name": "GeoTools",
+          "Build-Timestamp": "21-Jan-2026 00:23",
+          "Version": 34.2,
+          "Git-Revision": "d43e0c0bc071f7f427c961f540cfb35a60895800"
+        },
+        {
+          "@name": "GeoWebCache",
+          "Version": "1.28.2",
+          "Git-Revision": "1.28.x/ad2f2a10ac01c2af718ca2a7bb13d30d672ce3bb"
+        }
+      ]
+    }
+  },
+  "results": [
+    {
+      "name": "road-casing",
+      "target": "sf:roads",
+      "styleName": "cartography-road-casing-rev-d9f145f7484a477b",
+      "oldStylePreserved": true,
+      "store": "sf",
+      "geometryField": "the_geom",
+      "compatibility": "supported",
+      "ink": {
+        "width": 256,
+        "height": 256,
+        "nontransparent": 33827,
+        "expectedColorPixels": 0
+      },
+      "remoteHash": "7aecacb860ab68488002376e968b86d2a1f39eab6e0c51d592a86611a084c62e",
+      "steps": [
+        {
+          "step": "preflight",
+          "status": "started"
+        },
+        {
+          "step": "immutable-revision",
+          "status": "passed",
+          "message": "服务器未提供条件写入标识；保留原样式并创建新版本"
+        },
+        {
+          "step": "preflight",
+          "status": "passed"
+        },
+        {
+          "step": "upload",
+          "status": "started"
+        },
+        {
+          "step": "upload",
+          "status": "passed"
+        },
+        {
+          "step": "readback",
+          "status": "started"
+        },
+        {
+          "step": "readback",
+          "status": "passed"
+        },
+        {
+          "step": "associate",
+          "status": "started"
+        },
+        {
+          "step": "associate",
+          "status": "passed"
+        },
+        {
+          "step": "wms",
+          "status": "started"
+        },
+        {
+          "step": "wms",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "name": "river",
+      "target": "sf:streams",
+      "styleName": "cartography-river-rev-96a22035bcf44e2e",
+      "oldStylePreserved": true,
+      "store": "sf",
+      "geometryField": "the_geom",
+      "compatibility": "supported",
+      "ink": {
+        "width": 256,
+        "height": 256,
+        "nontransparent": 15593,
+        "expectedColorPixels": 0
+      },
+      "remoteHash": "ba44eb90d0022b414eb3a0437320ffa0e8095b9ce2b9c8a9059b390a97c8aa19",
+      "steps": [
+        {
+          "step": "preflight",
+          "status": "started"
+        },
+        {
+          "step": "immutable-revision",
+          "status": "passed",
+          "message": "服务器未提供条件写入标识；保留原样式并创建新版本"
+        },
+        {
+          "step": "preflight",
+          "status": "passed"
+        },
+        {
+          "step": "upload",
+          "status": "started"
+        },
+        {
+          "step": "upload",
+          "status": "passed"
+        },
+        {
+          "step": "readback",
+          "status": "started"
+        },
+        {
+          "step": "readback",
+          "status": "passed"
+        },
+        {
+          "step": "associate",
+          "status": "started"
+        },
+        {
+          "step": "associate",
+          "status": "passed"
+        },
+        {
+          "step": "wms",
+          "status": "started"
+        },
+        {
+          "step": "wms",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "name": "boundary",
+      "target": "sf:restricted",
+      "styleName": "cartography-boundary-rev-26c4de29d88b42c7",
+      "oldStylePreserved": true,
+      "store": "sf",
+      "geometryField": "the_geom",
+      "compatibility": "supported",
+      "ink": {
+        "width": 256,
+        "height": 256,
+        "nontransparent": 2263,
+        "expectedColorPixels": 0
+      },
+      "remoteHash": "6c4c05000786845a9d75b911091dfffed6e61f0a1dac81261f7dbbfa59226a10",
+      "steps": [
+        {
+          "step": "preflight",
+          "status": "started"
+        },
+        {
+          "step": "immutable-revision",
+          "status": "passed",
+          "message": "服务器未提供条件写入标识；保留原样式并创建新版本"
+        },
+        {
+          "step": "preflight",
+          "status": "passed"
+        },
+        {
+          "step": "upload",
+          "status": "started"
+        },
+        {
+          "step": "upload",
+          "status": "passed"
+        },
+        {
+          "step": "readback",
+          "status": "started"
+        },
+        {
+          "step": "readback",
+          "status": "passed"
+        },
+        {
+          "step": "associate",
+          "status": "started"
+        },
+        {
+          "step": "associate",
+          "status": "passed"
+        },
+        {
+          "step": "wms",
+          "status": "started"
+        },
+        {
+          "step": "wms",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "name": "dash",
+      "target": "sf:roads",
+      "styleName": "cartography-dash-rev-6bda9a43902d426d",
+      "oldStylePreserved": true,
+      "store": "sf",
+      "geometryField": "the_geom",
+      "compatibility": "supported",
+      "ink": {
+        "width": 256,
+        "height": 256,
+        "nontransparent": 18607,
+        "expectedColorPixels": 0
+      },
+      "remoteHash": "6816cd4b85dae4281786f0a3f4ae1316dcb1c80d7cd72970865a096059cd3eb0",
+      "steps": [
+        {
+          "step": "preflight",
+          "status": "started"
+        },
+        {
+          "step": "immutable-revision",
+          "status": "passed",
+          "message": "服务器未提供条件写入标识；保留原样式并创建新版本"
+        },
+        {
+          "step": "preflight",
+          "status": "passed"
+        },
+        {
+          "step": "upload",
+          "status": "started"
+        },
+        {
+          "step": "upload",
+          "status": "passed"
+        },
+        {
+          "step": "readback",
+          "status": "started"
+        },
+        {
+          "step": "readback",
+          "status": "passed"
+        },
+        {
+          "step": "associate",
+          "status": "started"
+        },
+        {
+          "step": "associate",
+          "status": "passed"
+        },
+        {
+          "step": "wms",
+          "status": "started"
+        },
+        {
+          "step": "wms",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "name": "label-halo",
+      "target": "sf:roads",
+      "styleName": "cartography-label-halo-rev-e69ce2e6dfe54e60",
+      "oldStylePreserved": true,
+      "store": "sf",
+      "geometryField": "the_geom",
+      "compatibility": "supported",
+      "ink": {
+        "width": 256,
+        "height": 256,
+        "nontransparent": 36832,
+        "expectedColorPixels": 0
+      },
+      "remoteHash": "d5a8df716104f9ba7bf44b476f0d549b946060932365d30278304c36871e2d79",
+      "steps": [
+        {
+          "step": "preflight",
+          "status": "started"
+        },
+        {
+          "step": "immutable-revision",
+          "status": "passed",
+          "message": "服务器未提供条件写入标识；保留原样式并创建新版本"
+        },
+        {
+          "step": "preflight",
+          "status": "passed"
+        },
+        {
+          "step": "upload",
+          "status": "started"
+        },
+        {
+          "step": "upload",
+          "status": "passed"
+        },
+        {
+          "step": "readback",
+          "status": "started"
+        },
+        {
+          "step": "readback",
+          "status": "passed"
+        },
+        {
+          "step": "associate",
+          "status": "started"
+        },
+        {
+          "step": "associate",
+          "status": "passed"
+        },
+        {
+          "step": "wms",
+          "status": "started"
+        },
+        {
+          "step": "wms",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "name": "svg-icon",
+      "target": "sf:bugsites",
+      "styleName": "cartography-svg-icon-rev-1b8419a2360f4169",
+      "oldStylePreserved": true,
+      "store": "sf",
+      "geometryField": "the_geom",
+      "compatibility": "supported",
+      "ink": {
+        "width": 256,
+        "height": 256,
+        "nontransparent": 16242,
+        "expectedColorPixels": 15883
+      },
+      "remoteHash": "230ccf97a0e8be85de95acb273e5ca182fd247420dd25795d8c349c028a31495",
+      "steps": [
+        {
+          "step": "preflight",
+          "status": "started"
+        },
+        {
+          "step": "immutable-revision",
+          "status": "passed",
+          "message": "服务器未提供条件写入标识；保留原样式并创建新版本"
+        },
+        {
+          "step": "preflight",
+          "status": "passed"
+        },
+        {
+          "step": "upload",
+          "status": "started"
+        },
+        {
+          "step": "upload",
+          "status": "passed"
+        },
+        {
+          "step": "readback",
+          "status": "started"
+        },
+        {
+          "step": "readback",
+          "status": "passed"
+        },
+        {
+          "step": "associate",
+          "status": "started"
+        },
+        {
+          "step": "associate",
+          "status": "passed"
+        },
+        {
+          "step": "wms",
+          "status": "started"
+        },
+        {
+          "step": "wms",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "name": "fill-pattern",
+      "target": "sf:restricted",
+      "styleName": "cartography-fill-pattern-rev-33b829eb55ac4f71",
+      "oldStylePreserved": true,
+      "store": "sf",
+      "geometryField": "the_geom",
+      "compatibility": "supported",
+      "ink": {
+        "width": 256,
+        "height": 256,
+        "nontransparent": 12592,
+        "expectedColorPixels": 8899
+      },
+      "remoteHash": "36eed9a91172fed0a58f99846c1d2dfd6e9a0b729524ca23b28b04daeb2cfddf",
+      "steps": [
+        {
+          "step": "preflight",
+          "status": "started"
+        },
+        {
+          "step": "immutable-revision",
+          "status": "passed",
+          "message": "服务器未提供条件写入标识；保留原样式并创建新版本"
+        },
+        {
+          "step": "preflight",
+          "status": "passed"
+        },
+        {
+          "step": "upload",
+          "status": "started"
+        },
+        {
+          "step": "upload",
+          "status": "passed"
+        },
+        {
+          "step": "readback",
+          "status": "started"
+        },
+        {
+          "step": "readback",
+          "status": "passed"
+        },
+        {
+          "step": "associate",
+          "status": "started"
+        },
+        {
+          "step": "associate",
+          "status": "passed"
+        },
+        {
+          "step": "wms",
+          "status": "started"
+        },
+        {
+          "step": "wms",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "name": "migrated-category",
+      "target": "sf:roads",
+      "styleName": "cartography-migrated-category-rev-67f35ad4bf134af4",
+      "oldStylePreserved": true,
+      "store": "sf",
+      "geometryField": "the_geom",
+      "compatibility": "supported",
+      "ink": {
+        "width": 256,
+        "height": 256,
+        "nontransparent": 16496,
+        "expectedColorPixels": 0
+      },
+      "remoteHash": "0d3de614f894496b7d07cc5828677ae6d848c66746e42a65ac384128e6e1509b",
+      "steps": [
+        {
+          "step": "preflight",
+          "status": "started"
+        },
+        {
+          "step": "immutable-revision",
+          "status": "passed",
+          "message": "服务器未提供条件写入标识；保留原样式并创建新版本"
+        },
+        {
+          "step": "preflight",
+          "status": "passed"
+        },
+        {
+          "step": "upload",
+          "status": "started"
+        },
+        {
+          "step": "upload",
+          "status": "passed"
+        },
+        {
+          "step": "readback",
+          "status": "started"
+        },
+        {
+          "step": "readback",
+          "status": "passed"
+        },
+        {
+          "step": "associate",
+          "status": "started"
+        },
+        {
+          "step": "associate",
+          "status": "passed"
+        },
+        {
+          "step": "wms",
+          "status": "started"
+        },
+        {
+          "step": "wms",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "name": "migrated-graduated",
+      "target": "sf:roads",
+      "styleName": "cartography-migrated-graduated-rev-420b4a25c1e54741",
+      "oldStylePreserved": true,
+      "store": "sf",
+      "geometryField": "the_geom",
+      "compatibility": "supported",
+      "ink": {
+        "width": 256,
+        "height": 256,
+        "nontransparent": 16963,
+        "expectedColorPixels": 0
+      },
+      "remoteHash": "0154e408fdd0462cf2d67e79ae5d10cfa237327b2da3a223f44b6ab675de31e5",
+      "steps": [
+        {
+          "step": "preflight",
+          "status": "started"
+        },
+        {
+          "step": "immutable-revision",
+          "status": "passed",
+          "message": "服务器未提供条件写入标识；保留原样式并创建新版本"
+        },
+        {
+          "step": "preflight",
+          "status": "passed"
+        },
+        {
+          "step": "upload",
+          "status": "started"
+        },
+        {
+          "step": "upload",
+          "status": "passed"
+        },
+        {
+          "step": "readback",
+          "status": "started"
+        },
+        {
+          "step": "readback",
+          "status": "passed"
+        },
+        {
+          "step": "associate",
+          "status": "started"
+        },
+        {
+          "step": "associate",
+          "status": "passed"
+        },
+        {
+          "step": "wms",
+          "status": "started"
+        },
+        {
+          "step": "wms",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "name": "zoom-preview",
+      "target": "sf:roads",
+      "styleName": "cartography-zoom-preview-rev-a49fc1fb7c2042cc",
+      "oldStylePreserved": true,
+      "store": "sf",
+      "geometryField": "the_geom",
+      "compatibility": "approximated",
+      "ink": {
+        "width": 256,
+        "height": 256,
+        "nontransparent": 27626,
+        "expectedColorPixels": 0
+      },
+      "remoteHash": "f6341b105ceb905d463f1cc99550e7adb531896f5f2589321303d74da2fce622",
+      "steps": [
+        {
+          "step": "preflight",
+          "status": "started"
+        },
+        {
+          "step": "immutable-revision",
+          "status": "passed",
+          "message": "服务器未提供条件写入标识；保留原样式并创建新版本"
+        },
+        {
+          "step": "preflight",
+          "status": "passed"
+        },
+        {
+          "step": "upload",
+          "status": "started"
+        },
+        {
+          "step": "upload",
+          "status": "passed"
+        },
+        {
+          "step": "readback",
+          "status": "started"
+        },
+        {
+          "step": "readback",
+          "status": "passed"
+        },
+        {
+          "step": "associate",
+          "status": "started"
+        },
+        {
+          "step": "associate",
+          "status": "passed"
+        },
+        {
+          "step": "wms",
+          "status": "started"
+        },
+        {
+          "step": "wms",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "name": "field-width",
+      "target": "sf:roads",
+      "styleName": "cartography-field-width-rev-d6b63a87c3fe483d",
+      "oldStylePreserved": true,
+      "store": "sf",
+      "geometryField": "the_geom",
+      "compatibility": "supported",
+      "ink": {
+        "width": 256,
+        "height": 256,
+        "nontransparent": 19370,
+        "expectedColorPixels": 0
+      },
+      "remoteHash": "02568b054a7a16c48bc3a95939614cae65c66ebc0bb36b887c5325bde29ca91a",
+      "steps": [
+        {
+          "step": "preflight",
+          "status": "started"
+        },
+        {
+          "step": "immutable-revision",
+          "status": "passed",
+          "message": "服务器未提供条件写入标识；保留原样式并创建新版本"
+        },
+        {
+          "step": "preflight",
+          "status": "passed"
+        },
+        {
+          "step": "upload",
+          "status": "started"
+        },
+        {
+          "step": "upload",
+          "status": "passed"
+        },
+        {
+          "step": "readback",
+          "status": "started"
+        },
+        {
+          "step": "readback",
+          "status": "passed"
+        },
+        {
+          "step": "associate",
+          "status": "started"
+        },
+        {
+          "step": "associate",
+          "status": "passed"
+        },
+        {
+          "step": "wms",
+          "status": "started"
+        },
+        {
+          "step": "wms",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "evidence": "Real GeoServer REST upload/readback/association and decoded WMS/legend PNG; no native Desktop or visual-equivalence claim"
+}

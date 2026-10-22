@@ -1,0 +1,23 @@
+{
+  "version": 8,
+  "name": "mbstyle-migrated-point-circle-1792632218373",
+  "layers": [
+    {
+      "id": "gis-f19d9acc16c83bc4-single-0-point-0-0",
+      "type": "circle",
+      "filter": [
+        "==",
+        [
+          "geometry-type"
+        ],
+        "Point"
+      ],
+      "paint": {
+        "circle-radius": 7,
+        "circle-color": "rgba(225, 87, 61, 1)",
+        "circle-stroke-color": "rgba(255, 255, 255, 1)",
+        "circle-stroke-width": 1.5
+      }
+    }
+  ]
+}

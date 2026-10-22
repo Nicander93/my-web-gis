@@ -15,6 +15,7 @@ import {
   type ToolCallbacks
 } from '@desktop-webgis/ol-runtime'
 import { transform, transformExtent } from 'ol/proj'
+import type { StyleFunction } from 'ol/style/Style'
 import { getSessionCredential } from '@/services/credentials'
 import { useProjectStore } from '@/stores/project.store'
 import { useSessionStore } from '@/stores/session.store'
@@ -41,7 +42,7 @@ let snappingUnsub: (() => void) | null = null
 /** Avoid echoing map?store?map selection sync loops. */
 let applyingStoreSelection = false
 let viewOwner: { epoch: number; id: string; preset: string } | null = null
-const propertyPreviews = new Map<string, { owner: object; epoch: number; base: string; draft: Layer }>()
+const propertyPreviews = new Map<string, { owner: object; epoch: number; base: string; draft: Layer; native: object | undefined; originalStyle: StyleFunction | undefined }>()
 
 function refreshPropertyPreviews(): void {
   const state = useProjectStore.getState()
@@ -52,19 +53,23 @@ function refreshPropertyPreviews(): void {
     const layer = valid ? preview.draft : current
     if (!layer) continue
     const project = { ...state.project, layers: state.project.layers.map(item => item.id === id ? layer : item) }
-    runtime?.previewLayer({ ...layer, visible: getEffectiveVisible(project, id) })
+    const styleChanged = valid && JSON.stringify(layer.style) !== JSON.stringify(current.style)
+    const native = runtime?.registry.getVector(id)
+    if (!styleChanged && native === preview.native) native?.setStyle(preview.originalStyle)
+    runtime?.previewLayer({ ...layer, visible: getEffectiveVisible(project, id) }, { style: styleChanged })
   }
 }
 
 /** A disposable overlay owned by one property window and one project revision. */
 export function createMapPropertyPreview(base: Layer, epoch: number) {
   const owner = {}, id = base.id
+  const native = runtime?.registry.getVector(id), originalStyle = native?.getStyleFunction()
   return {
     update(draft: Layer): boolean {
       const state = useProjectStore.getState(), current = state.project.layers.find(layer => layer.id === id)
       if (!mounted || !runtime || epoch !== state.projectEpoch || !current || JSON.stringify(current) !== JSON.stringify(base) || getEffectiveLocked(state.project, id)) return false
       if (draft.id !== id || draft.datasetId !== base.datasetId || !Number.isFinite(draft.opacity) || draft.opacity < 0 || draft.opacity > 1 || (draft.minZoom ?? -Infinity) > (draft.maxZoom ?? Infinity)) return false
-      propertyPreviews.set(id, { owner, epoch, base: JSON.stringify(base), draft: structuredClone(draft) })
+      propertyPreviews.set(id, { owner, epoch, base: JSON.stringify(base), draft: structuredClone(draft), native, originalStyle })
       refreshPropertyPreviews()
       return true
     },
@@ -72,7 +77,10 @@ export function createMapPropertyPreview(base: Layer, epoch: number) {
       if (propertyPreviews.get(id)?.owner !== owner) return
       propertyPreviews.delete(id)
       const state = useProjectStore.getState(), current = state.project.layers.find(layer => layer.id === id)
-      if (mounted && epoch === state.projectEpoch && current) runtime?.previewLayer({ ...current, visible: getEffectiveVisible(state.project, id) })
+      if (mounted && epoch === state.projectEpoch && current) {
+        if (runtime?.registry.getVector(id) === native) native?.setStyle(originalStyle)
+        runtime?.previewLayer({ ...current, visible: getEffectiveVisible(state.project, id) }, { style: false })
+      }
     }
   }
 }

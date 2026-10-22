@@ -36,23 +36,22 @@ describe('Project-owned public scene controller', () => {
     expect(useProjectStore.getState().redoEdit()).toBe(true)
     expect(useProjectStore.getState().project.city?.nodes[0].id).toBe(id)
   })
-  it('invalidates only changed style drafts, keeps the table and guards history against a newer dirty draft', () => {
+  it('applies immediate styles through the scene API while preserving table sessions and history', () => {
     useProjectStore.getState().addLayer('points', 'Points', [], 'point')
     const id = useProjectStore.getState().project.layers[0].id, controller = attach(), session = useSessionStore.getState()
     session.setAttributeTableState(id, { searchQuery: 'keep' })
-    session.ensureStyleDraft(id, { mode: 'single', symbol: { type: 'circle', radius: 3 } })
     controller.transaction('Style API', draft => {
       const node = draft.nodes.find(node => node.id === id)
       if (node?.type === 'vector') node.style = { mode: 'single', symbol: { type: 'circle', radius: 9 } }
     })
-    expect(useSessionStore.getState().sessions[id].styleDraft).toBeUndefined()
+    const after = useProjectStore.getState().getSnapshot()
+    expect(after.project.layers[0].style).toMatchObject({ symbol: { radius: 9 } })
     expect(useSessionStore.getState().sessions[id].attributeTable?.searchQuery).toBe('keep')
-    session.setStyleDraft(id, { style: { mode: 'single', symbol: { type: 'circle', radius: 7 } }, dirty: true, classCount: 5, colorRampId: 'BlueRed' })
-    expect(useProjectStore.getState().undoEdit()).toBe(false)
-    expect(useProjectStore.getState().getHistoryBlockReason('undo')).toContain('受影响')
-    session.patchStyleDraft(id, { dirty: false })
+    expect(useProjectStore.getState().getHistoryBlockReason('undo')).toBeNull()
     expect(useProjectStore.getState().undoEdit()).toBe(true)
     expect(useSessionStore.getState().sessions[id].attributeTable?.searchQuery).toBe('keep')
+    expect(useProjectStore.getState().redoEdit()).toBe(true)
+    expect(useProjectStore.getState().getSnapshot()).toEqual(after)
   })
   it('clears deleted layer targets while preserving another layer session', () => {
     useProjectStore.getState().addLayer('a', 'A', [], 'point'); useProjectStore.getState().addLayer('b', 'B', [], 'point')
@@ -72,14 +71,13 @@ describe('Project-owned public scene controller', () => {
     expect(useProjectStore.getState().project.layers.some(layer => layer.id === a.id)).toBe(true)
     expect(useSessionStore.getState().sessions[b.id]).toEqual(retained)
   })
-  it('retains selection, table target, search and unrelated dirty drafts for display edits and undo', () => {
+  it('retains selection, table target and search for display edits and undo', () => {
     useProjectStore.getState().addLayer('points', 'Points', [{ id: 'p', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { value: 1 } }], 'point')
     const id = useProjectStore.getState().project.layers[0].id, controller = attach()
     const session = useSessionStore.getState(), workbench = useWorkbenchStore.getState()
     useProjectStore.getState().setSelectedLayer(id); useProjectStore.getState().setSelection({ layerId: id, featureIds: ['p'] })
     workbench.bindTable(id); workbench.bindInspector(id)
     session.setAttributeTableState(id, { searchQuery: 'keep', currentPage: 3 })
-    session.setStyleDraft(id, { style: { mode: 'single', symbol: { type: 'circle', radius: 8 } }, dirty: true, classCount: 5, colorRampId: 'BlueRed' })
     const before = structuredClone(useSessionStore.getState().sessions)
     controller.setNodeOpacity(id, 0.6)
     expect(useProjectStore.getState().selection).toEqual({ layerId: id, featureIds: ['p'] })
@@ -155,18 +153,11 @@ describe('Project-owned public scene controller', () => {
     useProjectStore.getState().undoEdit()
     expect(useProjectStore.getState().project.layers[0].opacity).toBe(1)
   })
-  it('honors draft guards and rejects unsupported edits before changing Project or history', () => {
+  it('rejects unsupported edits before changing Project or history', () => {
     useProjectStore.getState().addLayer('points', 'Points', [], 'point')
-    const id = useProjectStore.getState().project.layers[0].id, controller = attach()
-    useSessionStore.getState().setStyleDraft(id, { style: { mode: 'single', symbol: { type: 'circle', radius: 5 } }, dirty: true, classCount: 5, colorRampId: 'BlueRed' })
-    const before = useProjectStore.getState().getSnapshot()
-    expect(() => controller.transaction('Change style', draft => {
-      const node = draft.nodes.find(node => node.id === id)
-      if (node?.type === 'vector') node.style = { mode: 'single', symbol: { type: 'circle', radius: 9 } }
-    })).toThrow('样式草稿')
-    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
-    useSessionStore.getState().patchStyleDraft(id, { dirty: false })
-    const document = controller.getDocument(); document.extensions = { future: { version: 1, required: true, data: {} } }
+    const controller = attach(), before = useProjectStore.getState().getSnapshot()
+    const document = controller.getDocument()
+    document.extensions = { 'org.example.future': { version: 1, required: true, data: {} } }
     expect(() => controller.replaceDocument(document)).toThrow('扩展')
     expect(useProjectStore.getState().getSnapshot()).toEqual(before)
     expect(useProjectStore.getState().canUndoEdit()).toBe(false)

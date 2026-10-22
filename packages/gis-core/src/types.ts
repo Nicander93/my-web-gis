@@ -244,6 +244,18 @@ export interface LegacyLayerStyle {
   pointRadius: number
 }
 
+export interface PublishedStyleLink {
+  connectionId: string
+  workspace: string
+  store?: string
+  layerName: string
+  styleName: string
+  remoteFormat: 'sld' | 'mbstyle'
+  lastPublishedHash: string
+  lastPublishedAt: string
+  lastPublishedContentHash: string
+}
+
 export interface Layer {
   id: string
   datasetId: string
@@ -257,6 +269,7 @@ export interface Layer {
   minZoom?: number
   maxZoom?: number
   interaction?: LayerInteraction
+  publishedStyle?: PublishedStyleLink
 }
 
 export interface MapState {
@@ -304,6 +317,8 @@ export type LayerTreeEntry =
   | { type: 'group'; id: string }
 
 export interface Project {
+  /** Standard v8 layers; absent only on legacy in-memory inputs before migration. */
+  cartography?: import('@desktop-webgis/ol-style/cartography-model').CartographyState
   /** Optional 3D scene stored under the legacy compatibility key. */
   city?: import('@desktop-webgis/cesium-scene-schema').CesiumScene
   id: string

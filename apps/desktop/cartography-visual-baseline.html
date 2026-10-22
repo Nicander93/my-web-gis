@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cartography rendering baseline</title>
+    <style>
+      html, body { margin: 0; width: 256px; height: 256px; overflow: hidden; background: transparent; }
+      #map { width: 256px; height: 256px; overflow: hidden; background: transparent; }
+      .ol-zoom, .ol-rotate, .ol-attribution { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <div id="map" aria-label="OpenLayers MapLibre Canvas rendering"></div>
+    <script type="module" src="/src/cartography-visual-baseline/main.ts"></script>
+  </body>
+</html>

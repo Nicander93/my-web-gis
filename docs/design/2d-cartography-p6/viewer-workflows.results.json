@@ -1,0 +1,262 @@
+{
+  "config": {
+    "argv": [
+      "C:\\nvm4w\\nodejs\\node.exe",
+      "D:\\my-code-repo\\my-web-gis\\apps\\desktop\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "--config",
+      "playwright.cartography-p6-viewer.config.ts"
+    ],
+    "configFile": "D:\\my-code-repo\\my-web-gis\\apps\\desktop\\playwright.cartography-p6-viewer.config.ts",
+    "rootDir": "D:/my-code-repo/my-web-gis/apps/desktop/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "D:/my-code-repo/my-web-gis/apps/desktop/test-results/cartography-p6-viewer/artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "p6-viewer",
+        "name": "p6-viewer",
+        "testDir": "D:/my-code-repo/my-web-gis/apps/desktop/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/viewer-document.e2e.ts"
+        ],
+        "timeout": 45000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/cartography-p6-viewer/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 1,
+    "webServer": {
+      "command": "pnpm --filter @desktop-webgis/viewer exec vite --config vite.config.mjs --configLoader runner --host 127.0.0.1 --port 5187 --strictPort",
+      "url": "http://127.0.0.1:5187",
+      "reuseExistingServer": false,
+      "timeout": 30000
+    }
+  },
+  "suites": [
+    {
+      "title": "viewer-document.e2e.ts",
+      "file": "viewer-document.e2e.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "Viewer loads version 2, resolves resources and preserves popup and visibility",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "p6-viewer",
+              "projectName": "p6-viewer",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 7071,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-22T01:06:24.057Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "2599bf5d9f6e9ef13220-d5c9b5c3705d917bcaa8",
+          "file": "viewer-document.e2e.ts",
+          "line": 9,
+          "column": 3
+        },
+        {
+          "title": "Viewer loads version 3, resolves resources and preserves popup and visibility",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "p6-viewer",
+              "projectName": "p6-viewer",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6963,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-22T01:06:31.244Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "2599bf5d9f6e9ef13220-09dc9eb08cf4ff11f79b",
+          "file": "viewer-document.e2e.ts",
+          "line": 9,
+          "column": 3
+        },
+        {
+          "title": "Viewer prepares a real GLB while hidden before publishing the city scene",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "p6-viewer",
+              "projectName": "p6-viewer",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8527,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-22T01:06:38.214Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "2599bf5d9f6e9ef13220-470a514521f3ab89f112",
+          "file": "viewer-document.e2e.ts",
+          "line": 69,
+          "column": 1
+        },
+        {
+          "title": "Viewer reports retained unsupported objects and load failures",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "p6-viewer",
+              "projectName": "p6-viewer",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1240,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-22T01:06:46.755Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "2599bf5d9f6e9ef13220-37d35499fc7ef49c350a",
+          "file": "viewer-document.e2e.ts",
+          "line": 93,
+          "column": 1
+        },
+        {
+          "title": "Viewer respects the canonical active view and can explicitly open the 3D runtime",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "p6-viewer",
+              "projectName": "p6-viewer",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3919,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-22T01:06:48.009Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "2599bf5d9f6e9ef13220-7396666b21ba453376aa",
+          "file": "viewer-document.e2e.ts",
+          "line": 103,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-22T01:06:22.640Z",
+    "duration": 29732.19,
+    "expected": 5,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

@@ -1,0 +1,163 @@
+{
+  "server": {
+    "supported": true,
+    "reason": "GeoServer 2.28.2 已加载匹配版本的 MBStyle 扩展",
+    "moduleName": "gs-mbstyle-2.28.2",
+    "serverVersion": "2.28.2"
+  },
+  "probe": {
+    "method": "GET version + manifest only",
+    "mutations": 0
+  },
+  "positiveCases": [
+    {
+      "name": "migrated-point-circle",
+      "workspace": "sf",
+      "store": "sf",
+      "targetLayer": "bugsites",
+      "targetCrs": "EPSG:26713",
+      "featureTypeBounds": [
+        -103.86796131703647,
+        44.373938816704396,
+        -103.63773523234195,
+        44.43418821380063
+      ],
+      "styleName": "mbstyle-migrated-point-circle-1792632218373",
+      "drawingLayerType": "circle",
+      "geometryFilter": [
+        "==",
+        [
+          "geometry-type"
+        ],
+        "Point"
+      ],
+      "decodedWmsPixels": {
+        "width": 256,
+        "height": 256,
+        "nontransparent": 11877,
+        "expectedColorPixels": 5439
+      },
+      "compatibility": "approximated",
+      "remoteHash": "0121a88cdb40b691b2bc20c834f1c8f9864f35711d76f5732d2b104b99b45639",
+      "steps": [
+        {
+          "step": "preflight",
+          "status": "started"
+        },
+        {
+          "step": "preflight",
+          "status": "passed"
+        },
+        {
+          "step": "upload",
+          "status": "started"
+        },
+        {
+          "step": "upload",
+          "status": "passed"
+        },
+        {
+          "step": "readback",
+          "status": "started"
+        },
+        {
+          "step": "readback",
+          "status": "passed"
+        },
+        {
+          "step": "associate",
+          "status": "started"
+        },
+        {
+          "step": "associate",
+          "status": "passed"
+        },
+        {
+          "step": "wms",
+          "status": "started"
+        },
+        {
+          "step": "wms",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "name": "migrated-line-stroke",
+      "workspace": "sf",
+      "store": "sf",
+      "targetLayer": "roads",
+      "targetCrs": "EPSG:26713",
+      "featureTypeBounds": [
+        -103.87741691493184,
+        44.37087275281798,
+        -103.62231404880659,
+        44.50015918338962
+      ],
+      "styleName": "mbstyle-migrated-line-stroke-1792632218558",
+      "drawingLayerType": "line",
+      "geometryFilter": [
+        "==",
+        [
+          "geometry-type"
+        ],
+        "LineString"
+      ],
+      "decodedWmsPixels": {
+        "width": 256,
+        "height": 256,
+        "nontransparent": 21217,
+        "expectedColorPixels": 20251
+      },
+      "compatibility": "approximated",
+      "remoteHash": "29a5ff0709e02671c3a7b95851d03a0bf74cd1444805bb6f30e59caaad939e63",
+      "steps": [
+        {
+          "step": "preflight",
+          "status": "started"
+        },
+        {
+          "step": "preflight",
+          "status": "passed"
+        },
+        {
+          "step": "upload",
+          "status": "started"
+        },
+        {
+          "step": "upload",
+          "status": "passed"
+        },
+        {
+          "step": "readback",
+          "status": "started"
+        },
+        {
+          "step": "readback",
+          "status": "passed"
+        },
+        {
+          "step": "associate",
+          "status": "started"
+        },
+        {
+          "step": "associate",
+          "status": "passed"
+        },
+        {
+          "step": "wms",
+          "status": "started"
+        },
+        {
+          "step": "wms",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "negativeCase": {
+    "name": "migrated-categorized-typeof-guard",
+    "result": "unsupported; no publish request was made"
+  },
+  "evidenceScope": "Real GeoServer 2.28.2 REST MBStyle upload/readback and WMS; browser decoded 256x256 PNG pixels for visible and expected-color counts. This is not native Desktop or pixel-equivalence acceptance."
+}

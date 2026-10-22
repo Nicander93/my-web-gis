@@ -1,4 +1,4 @@
-import { parseSceneDocument, type SceneDocument } from '@desktop-webgis/scene-schema'
+import { CARTOGRAPHY_EXTENSION, mergeSceneCartography, parseSceneDocument, type SceneDocument } from '@desktop-webgis/scene-schema'
 
 export interface SceneMergeResult {
   document: SceneDocument
@@ -44,7 +44,10 @@ export function mergeSceneDocuments(target: SceneDocument, incoming: SceneDocume
     credentials: allocate(Object.keys(source.credentials ?? {}), Object.keys(document.credentials ?? {}))
   }
   const remapped = Object.values(ids).some(mapping => Object.entries(mapping).some(([before, after]) => before !== after))
-  if (remapped && Object.keys(source.extensions ?? {}).length) throw new Error('Extension ID references require an extension merge adapter')
+  if (remapped && Object.keys(source.extensions ?? {}).some(name => name !== CARTOGRAPHY_EXTENSION)) throw new Error('Extension ID references require an extension merge adapter')
+  const cartography = mergeSceneCartography(document, source, ids)
+  if (document.extensions) delete document.extensions[CARTOGRAPHY_EXTENSION]
+  if (source.extensions) delete source.extensions[CARTOGRAPHY_EXTENSION]
   for (const [id, resource] of Object.entries(source.resources)) {
     if (resource.type === 'provider') resource.credential = ids.credentials[resource.credential]
     if (resource.authentication?.credential) resource.authentication.credential = ids.credentials[resource.authentication.credential]
@@ -59,6 +62,7 @@ export function mergeSceneDocuments(target: SceneDocument, incoming: SceneDocume
     const merged = combine(document[field] as Record<string, unknown> | undefined, source[field] as Record<string, unknown> | undefined, field)
     if (merged) Object.assign(document, { [field]: merged })
   }
+  if (cartography) document.extensions = { ...document.extensions, [CARTOGRAPHY_EXTENSION]: cartography }
   if (source.presentation?.chapters) source.presentation.chapters = source.presentation.chapters.map(chapter => ({ ...chapter,
     ...(chapter.visibleLayers ? { visibleLayers: chapter.visibleLayers.map(id => ids.nodes[id]) } : {}) }))
   for (const field of ['widgets', 'theme', 'presentation'] as const) {

@@ -14,6 +14,26 @@
     "./classification": {
       "types": "./dist/classification/index.d.ts",
       "import": "./dist/classification/index.js"
+    },
+    "./cartography": {
+      "types": "./dist/cartography.d.ts",
+      "import": "./dist/cartography.js"
+    },
+    "./cartography-model": {
+      "types": "./dist/cartography-model.d.ts",
+      "import": "./dist/cartography-model.js"
+    },
+    "./style-assets": {
+      "types": "./dist/style-assets.d.ts",
+      "import": "./dist/style-assets.js"
+    },
+    "./symbol-library": {
+      "types": "./dist/symbol-library.d.ts",
+      "import": "./dist/symbol-library.js"
+    },
+    "./cartography-operations": {
+      "types": "./dist/cartography-operations.d.ts",
+      "import": "./dist/cartography-operations.js"
     }
   },
   "files": [
@@ -45,5 +65,10 @@
     "classification",
     "legend",
     "gis"
-  ]
+  ],
+  "dependencies": {
+    "@maplibre/maplibre-gl-style-spec": "26.4.1",
+    "@xmldom/xmldom": "0.9.12",
+    "ol-mapbox-style": "13.8.0"
+  }
 }

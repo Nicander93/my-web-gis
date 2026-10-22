@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import type { LayerStyle } from '@desktop-webgis/ol-style'
 import { cloneValue } from '@desktop-webgis/gis-core'
 import type { FieldFilterCondition } from '@desktop-webgis/gis-core'
 import { useWorkbenchStore } from './workbench.store'
@@ -27,15 +26,6 @@ interface AttributeTableState {
   columnWidths: Record<string, number>
 }
 
-/** 样式草稿：改草稿不改项目，应用后才写入图层配置 */
-export interface StyleDraftState {
-  style: LayerStyle
-  dirty: boolean
-  /** 分级/分类参数（重新分类才消费） */
-  classCount: number
-  colorRampId: string
-}
-
 interface LayerSession {
   /** Session-only loading indicator for LayerPanel. */
   loading?: boolean
@@ -43,7 +33,6 @@ interface LayerSession {
   inspector?: {
     activeTab: InspectorTab
   }
-  styleDraft?: StyleDraftState
 }
 
 /** Map view extent in WGS84 [west,south,east,north]; updated from OlMapRuntime moveend when mounted. */
@@ -71,26 +60,8 @@ interface SessionState {
     updates: Partial<AttributeTableState>
   ): void
   setInspectorTab(layerId: string, tab: InspectorTab): void
-  ensureStyleDraft(layerId: string, applied: LayerStyle): StyleDraftState
-  setStyleDraft(layerId: string, draft: StyleDraftState): void
-  patchStyleDraft(layerId: string, patch: Partial<StyleDraftState>): void
   clearLayerSession(layerId: string): void
   setLayerLoading(layerId: string, loading: boolean): void
-}
-
-const DEFAULT_CLASS_COUNT = 5
-const DEFAULT_RAMP = 'BlueRed'
-
-function createDraftFromApplied(applied: LayerStyle): StyleDraftState {
-  return {
-    style: cloneValue(applied),
-    dirty: false,
-    classCount:
-      applied.mode === 'graduated'
-        ? Math.max(applied.breaks.length, 1)
-        : DEFAULT_CLASS_COUNT,
-    colorRampId: DEFAULT_RAMP
-  }
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -173,45 +144,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           [layerId]: {
             ...existing,
             inspector: { activeTab: tab }
-          }
-        }
-      }
-    }),
-  ensureStyleDraft: (layerId, applied) => {
-    const existing = get().sessions[layerId]?.styleDraft
-    if (existing && (existing.dirty || JSON.stringify(existing.style) === JSON.stringify(applied))) return existing
-    const draft = { ...createDraftFromApplied(applied), ...(existing ? { colorRampId: existing.colorRampId } : {}) }
-    set((prev) => ({
-      sessions: {
-        ...prev.sessions,
-        [layerId]: {
-          ...prev.sessions[layerId],
-          styleDraft: draft
-        }
-      }
-    }))
-    return draft
-  },
-  setStyleDraft: (layerId, draft) =>
-    set((prev) => ({
-      sessions: {
-        ...prev.sessions,
-        [layerId]: {
-          ...prev.sessions[layerId],
-          styleDraft: draft
-        }
-      }
-    })),
-  patchStyleDraft: (layerId, patch) =>
-    set((prev) => {
-      const existing = prev.sessions[layerId]?.styleDraft
-      if (!existing) return prev
-      return {
-        sessions: {
-          ...prev.sessions,
-          [layerId]: {
-            ...prev.sessions[layerId],
-            styleDraft: { ...existing, ...patch, dirty: patch.dirty ?? true }
           }
         }
       }

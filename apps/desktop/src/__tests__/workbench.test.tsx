@@ -55,18 +55,14 @@ function addLayer(datasetId: string, name: string, field: string) {
   return useProjectStore.getState().selectedLayerId!
 }
 
-it('refreshes clean style drafts from applied history while preserving dirty drafts', () => {
-  const id = addLayer('draft-history', 'Draft history', 'name')
+it('keeps styles in Project while inspector sessions contain only UI state', () => {
+  const id = addLayer('style-history', 'Style history', 'name')
   const original = useProjectStore.getState().getNormalizedLayerStyle(id)!
-  const session = useSessionStore.getState()
-  const initial = session.ensureStyleDraft(id, original)
-  const next = { ...original, label: { field: 'name' } }
-  expect(session.ensureStyleDraft(id, next).style).toEqual(next)
-  session.patchStyleDraft(id, { style: original, dirty: true })
-  const dirty = useSessionStore.getState().sessions[id].styleDraft!
-  expect(session.ensureStyleDraft(id, next)).toBe(dirty)
-  session.setStyleDraft(id, initial)
-  expect(session.ensureStyleDraft(id, next).dirty).toBe(false)
+  useProjectStore.getState().setLayerStyle(id, { ...original, label: { field: 'name' } })
+  expect(useProjectStore.getState().getNormalizedLayerStyle(id)?.label?.field).toBe('name')
+  expect(useSessionStore.getState().sessions[id] ?? {}).not.toHaveProperty('styleDraft')
+  expect(useProjectStore.getState().undoEdit()).toBe(true)
+  expect(useProjectStore.getState().getNormalizedLayerStyle(id)).toEqual(original)
 })
 
 beforeEach(() => {
@@ -123,20 +119,17 @@ describe('workbench task targets', () => {
     expect(useWorkbenchStore.getState().activeTool).toBe('select')
   })
 
-  it('pins the table and inspector independently of the browsed layer and preserves drafts', () => {
+  it('pins the table and inspector independently of the browsed layer and preserves styles', () => {
     const first = addLayer('ds-first', 'First', 'firstField')
     const second = addLayer('ds-second', 'Second', 'secondField')
     layerCommands.openAttributeTable(first)
     layerCommands.editStyle(first)
     const style = useProjectStore.getState().getNormalizedLayerStyle(first)!
-    useSessionStore.getState().ensureStyleDraft(first, style)
-    useSessionStore.getState().patchStyleDraft(first, { classCount: 7 })
+    useProjectStore.getState().setLayerStyle(first, { ...style, label: { field: 'firstField' } })
     useProjectStore.getState().setSelectedLayer(second)
     expect(useWorkbenchStore.getState().tableLayerId).toBe(first)
     expect(useWorkbenchStore.getState().inspectorLayerId).toBe(first)
-    expect(
-      useSessionStore.getState().getLayerSession(first).styleDraft?.dirty
-    ).toBe(true)
+    expect(useProjectStore.getState().getNormalizedLayerStyle(first)?.label?.field).toBe('firstField')
     expect(
       useSessionStore.getState().getLayerSession(first).attributeTable
         ?.filterOpen ?? false
@@ -149,27 +142,17 @@ describe('workbench task targets', () => {
     expect(useWorkbenchStore.getState().tableLayerId).toBe(first)
   })
 
-  it('requires a decision before changing an inspector with an unapplied draft', () => {
+  it('switches the inspector directly after immediate style edits without losing them', () => {
     const first = addLayer('ds-first', 'First', 'firstField')
     const second = addLayer('ds-second', 'Second', 'secondField')
     layerCommands.editStyle(first)
-    useSessionStore
-      .getState()
-      .ensureStyleDraft(
-        first,
-        useProjectStore.getState().getNormalizedLayerStyle(first)!
-      )
-    useSessionStore.getState().patchStyleDraft(first, { classCount: 7 })
-    layerCommands.properties(second)
-    expect(useWorkbenchStore.getState().inspectorLayerId).toBe(first)
-    expect(useWorkbenchStore.getState().pendingInspector).toEqual({
-      layerId: second,
-      tab: 'layer'
-    })
-    useWorkbenchStore.getState().setPendingInspector(null)
-    expect(
-      useSessionStore.getState().getLayerSession(first).styleDraft?.dirty
-    ).toBe(true)
+    const style = useProjectStore.getState().getNormalizedLayerStyle(first)!
+    useProjectStore.getState().setLayerStyle(first, { ...style, label: { field: 'firstField' } })
+    layerCommands.editStyle(second)
+    expect(useWorkbenchStore.getState().inspectorLayerId).toBe(second)
+    expect(useProjectStore.getState().getNormalizedLayerStyle(first)?.label?.field).toBe('firstField')
+    expect(useProjectStore.getState().undoEdit()).toBe(true)
+    expect(useProjectStore.getState().getNormalizedLayerStyle(first)).toEqual(style)
   })
 
   it('clears targets on project replacement without dirtying the project for UI changes', () => {

@@ -1,7 +1,9 @@
 import { OlDocumentRuntime, toOlLayerStyle } from '@desktop-webgis/ol-scene-runtime'
 import { buildLegendItems } from '@desktop-webgis/ol-style'
+import { buildCartographyLegendItems } from '@desktop-webgis/ol-style/cartography-model'
 import { bindSceneRuntime, SceneController } from '@desktop-webgis/scene-core'
 import {
+  getSceneCartography,
   type PopupField,
   type SceneColor,
   type SceneDocument,
@@ -61,15 +63,24 @@ async function start(): Promise<void> {
     const cityView = active.type === '3d' ? scene.activeView : Object.entries(scene.views).find(([, view]) => view.type === '3d')?.[0]
     const mode = new URLSearchParams(window.location.search).get('mode')
     if (cityView && mode !== '2d' && (mode === '3d' || active.type === '3d')) {
+      requireElement<HTMLSelectElement>('vector-renderer').closest('label')?.setAttribute('hidden', '')
       const { renderSceneViewer } = await import('./scene3d-viewer')
       await renderSceneViewer(scene, sceneUrl, cityView)
       return
     }
     if (!mapView) throw new Error('场景没有二维视图')
     sceneController = new SceneController(scene)
+    const renderer = requireElement<HTMLSelectElement>('vector-renderer')
+    renderer.value = new URLSearchParams(location.search).get('renderer') === 'webgl' ? 'webgl' : 'canvas'
+    renderer.addEventListener('change', () => {
+      const url = new URL(location.href)
+      url.searchParams.set('renderer', renderer.value)
+      location.assign(url.href)
+    })
     const runtime = new OlDocumentRuntime({
       target: mapTarget,
       viewId: mapView,
+      vectorRenderer: renderer.value === 'webgl' ? 'webgl' : 'canvas',
       credentials: runtimeConfig.credentials
     })
     let selection: ReturnType<typeof createViewerSelection> | undefined
@@ -116,9 +127,15 @@ async function start(): Promise<void> {
       })
     })
     renderLegend(scene)
-    const issues = runtime.getIssues()
-    statusElement.textContent = issues.length ? issues.map(issue => `${issue.path}: ${issue.message}`).join('\n') : '场景已加载'
-    if (!issues.length) window.setTimeout(() => statusElement.classList.add('scene-status--quiet'), 1800)
+    function refreshRuntimeStatus() {
+      const issues = runtime.getIssues()
+      const text = issues.length ? issues.map(issue => `${issue.path}: ${issue.message}`).join('\n') : renderer.value === 'webgl' ? '场景已加载 · WebGL' : '场景已加载'
+      if (statusElement.textContent !== text) statusElement.textContent = text
+      if (issues.length) statusElement.classList.remove('scene-status--quiet')
+    }
+    refreshRuntimeStatus()
+    map.on('postrender', refreshRuntimeStatus)
+    window.setTimeout(() => { if (!runtime.getIssues().length) statusElement.classList.add('scene-status--quiet') }, 1800)
   } catch (error) {
     showError(error instanceof Error ? error.message : String(error))
   }
@@ -194,6 +211,7 @@ function colorToCss(color: SceneColor | undefined, fallback = 'transparent'): st
 function renderLegend(manifest: SceneDocument): void {
   if (manifest.widgets?.legend === false) return
   const vectorLayers = mapNodes(manifest).filter((layer): layer is VectorNode => layer.type === 'vector')
+  const cartography = getSceneCartography(manifest)
   if (vectorLayers.length === 0) return
   legendPanel.hidden = false
   legendList.replaceChildren(
@@ -203,7 +221,17 @@ function renderLegend(manifest: SceneDocument): void {
       const title = document.createElement('h3')
       title.textContent = layer.name
       group.append(title)
-      for (const item of buildLegendItems(toOlLayerStyle(layer.style))) {
+      const drawingIds = new Set(cartography?.bindings.find(binding => binding.gisLayerId === layer.id)?.styleLayerIds)
+      let items: ReturnType<typeof buildLegendItems>
+      try {
+        items = cartography ? buildCartographyLegendItems(cartography.styleLayers.filter(style => drawingIds.has(style.id))) : buildLegendItems(toOlLayerStyle(layer.style))
+      } catch {
+        const notice = document.createElement('p')
+        notice.textContent = '当前样式无法用固定色块表示。'
+        group.append(notice)
+        return group
+      }
+      for (const item of items) {
         const row = document.createElement('div')
         row.className = 'legend-row'
         const symbol = document.createElement('span')

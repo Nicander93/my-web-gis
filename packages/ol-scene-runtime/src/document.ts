@@ -1,4 +1,8 @@
-import { getUnsupportedSceneExtensions, parseSceneDocument, type SceneDocument, type SceneFilterCondition, type SceneLayer, type SceneSource, type SceneResource } from '@desktop-webgis/scene-schema'
+import { CARTOGRAPHY_SCENE_EXTENSIONS, getSceneCartography, getUnsupportedSceneExtensions, parseSceneDocument, type SceneDocument, type SceneFilterCondition, type SceneLayer, type SceneSource, type SceneResource } from '@desktop-webgis/scene-schema'
+import { assembleCartographyStyle } from '@desktop-webgis/ol-style/cartography-model'
+import { createMapLibreCanvasBinding, createWebGLStylePlan, prepareCartographyResources } from '@desktop-webgis/ol-style/cartography'
+import { createWebGLLayerBinding, isWebGLAvailable, type WebGLLayerBinding } from './webgl-layer.js'
+import type { StyleFunction } from 'ol/style/Style.js'
 import type Feature from 'ol/Feature.js'
 import GeoJSON from 'ol/format/GeoJSON.js'
 import type Geometry from 'ol/geom/Geometry.js'
@@ -15,6 +19,8 @@ import { createOlStyleFunction } from './style.js'
 export interface OlDocumentIssue { path: string; code: string; message: string }
 export interface OlDocumentOptions extends Omit<CreateOlSceneLayerOptions, 'vectorSource'> {
   viewId?: string
+  /** Opt-in browsing backend; interactive, filtered and unsupported nodes retain Canvas. */
+  vectorRenderer?: 'canvas' | 'webgl'
   /** Sources already projected for the selected view, owned and synchronized by the host. */
   vectorSources?: Readonly<Record<string, VectorSource<Feature<Geometry>>>>
   /** Install host request handling without storing secret values in the document. Return request cleanup. */
@@ -64,7 +70,7 @@ function nativeNodes(document: SceneDocument): SceneDocument['nodes'] {
 }
 
 function documentIssues(document: SceneDocument): OlDocumentIssue[] {
-  const extensions = getUnsupportedSceneExtensions(document)
+  const extensions = getUnsupportedSceneExtensions(document, CARTOGRAPHY_SCENE_EXTENSIONS)
   const required = extensions.filter(issue => issue.code === 'extension.required')
   if (required.length) throw new Error(required.map(issue => issue.message).join('; '))
   const issues: OlDocumentIssue[] = extensions.map(({ path, code, message }) => ({ path, code, message }))
@@ -83,6 +89,10 @@ function documentIssues(document: SceneDocument): OlDocumentIssue[] {
 /** Shares resource sources without baking node filters into data. Reports unsupported content explicitly. */
 export async function createOlDocumentLayers(input: unknown, options: OlDocumentOptions = {}): Promise<OlDocumentLayers> {
   let document = parseSceneDocument(input)
+  const cartography = getSceneCartography(document)
+  const standardStyle = cartography ? assembleCartographyStyle(cartography, document.nodes.map(node => node.id).reverse()) : undefined
+  let drawingResources: Awaited<ReturnType<typeof prepareCartographyResources>> | undefined
+  const standardFunctions = new Map<string, StyleFunction>()
   const viewId = options.viewId ?? document.activeView
   const definition = document.views[viewId]
   if (!definition || definition.type !== '2d') throw new Error(`OL requires a two-dimensional view: ${viewId}`)
@@ -94,11 +104,17 @@ export async function createOlDocumentLayers(input: unknown, options: OlDocument
   const ownedSources = new Set<VectorSource<Feature<Geometry>>>()
   const requestCleanup: Array<() => void> = []
   const handles = new Map<string, OlLayerHandle>(), layers = new Map<string, BaseLayer>()
+  const gpuBindings = new Map<string, WebGLLayerBinding>()
+  const useWebGL = options.vectorRenderer === 'webgl' && isWebGLAvailable()
+  if (options.vectorRenderer === 'webgl' && !useWebGL) issues.push({ path: '$.views', code: 'webgl.unavailable', message: 'WebGL 不可用，已使用 Canvas' })
   const format = new GeoJSON({ featureProjection: view.getProjection() })
   let disposed = false
   function dispose(): void {
     if (disposed) return
     disposed = true
+    drawingResources?.dispose()
+    gpuBindings.forEach(binding => binding.dispose())
+    gpuBindings.clear()
     requestCleanup.forEach(cleanup => cleanup())
     requestCleanup.length = 0
     handles.forEach(handle => handle.dispose())
@@ -110,6 +126,9 @@ export async function createOlDocumentLayers(input: unknown, options: OlDocument
   const abortPreparation = (): void => dispose()
   options.signal?.addEventListener('abort', abortPreparation, { once: true })
   try {
+    drawingResources = cartography?.assets?.length ? await prepareCartographyResources(cartography.assets) : undefined
+    if (disposed) { drawingResources?.dispose(); throw new Error('Document preparation was cancelled') }
+    if (standardStyle && drawingResources?.sprite) standardStyle.sprite = drawingResources.sprite
     for (const node of document.nodes) {
       options.signal?.throwIfAborted()
       if (node.type === 'group') {
@@ -171,6 +190,29 @@ export async function createOlDocumentLayers(input: unknown, options: OlDocument
       const { resource: resourceId, parentId, locked, filter, ...presentation } = node
       const handle = await createOlLayerHandle({ ...presentation, source: resourceId } as SceneLayer, sources, view, { ...options, vectorSource: shared.get(resourceId) })
       handles.set(node.id, handle); layers.set(node.id, handle.layer)
+      if (node.type === 'vector' && useWebGL && !cartography) issues.push({ path: `$.nodes.${node.id}`, code: 'webgl.fallback', message: '旧式样式继续使用 Canvas；未转换标准样式不启用 GPU' })
+      if (node.type === 'vector' && cartography && standardStyle && handle.layer instanceof VectorLayer) {
+        const binding = cartography.bindings.find(binding => binding.gisLayerId === node.id)
+        if (!binding) throw new Error(`Missing cartography binding ${node.id}`)
+        await createMapLibreCanvasBinding(handle.layer, { sourceId: binding.styleSourceId, layerIds: binding.styleLayerIds,
+          resolutions: Array.from({ length: 25 }, (_, zoom) => view.getResolutionForZoom(zoom + 1)),
+          transformRequest: drawingResources?.transformRequest,
+        }).update(standardStyle)
+        standardFunctions.set(node.id, handle.layer.getStyleFunction()!)
+        if (useWebGL) {
+          const selected = standardStyle.layers.filter(layer => binding.styleLayerIds.includes(layer.id))
+          const plan = createWebGLStylePlan(selected)
+          const restriction = node.filter?.length || node.interaction?.selectable || node.interaction?.popup
+          if (restriction || !plan.supported) {
+            issues.push({ path: `$.nodes.${node.id}`, code: 'webgl.fallback', message: restriction ? '交互或节点过滤继续使用 Canvas' : plan.issues.map(issue => `${issue.path}: ${issue.reason}`).join('; ') })
+          } else {
+            const gpu = createWebGLLayerBinding(handle.layer, plan, () => issues.push({ path: `$.nodes.${node.id}`, code: 'webgl.context-lost', message: 'GPU 上下文丢失，已回退 Canvas' }))
+            gpu.sync()
+            gpuBindings.set(node.id, gpu)
+            layers.set(node.id, gpu.group)
+          }
+        }
+      }
       if (resource.type === 'wms' || resource.type === 'wmts') {
         const cleanup = options.configureServiceLayer?.(handle.layer, resource, resourceId)
         if (cleanup) requestCleanup.push(cleanup)
@@ -201,9 +243,14 @@ export async function createOlDocumentLayers(input: unknown, options: OlDocument
         if (disposed) throw new Error('Document layers have been disposed')
         const next = parseSceneDocument(input)
         const nextIssues = documentIssues(next)
+        nextIssues.push(...issues.filter(issue => issue.code.startsWith('webgl.')))
         const previousNodes = nativeNodes(document), nextNodes = nativeNodes(next)
+        if (gpuBindings.size && nextNodes.some(node => {
+          const previous = previousNodes.find(candidate => candidate.id === node.id)
+          return node.type === 'vector' && previous?.type === 'vector' && (JSON.stringify(node.filter) !== JSON.stringify(previous.filter) || JSON.stringify(node.interaction) !== JSON.stringify(previous.interaction))
+        })) return false
         const content = (input: SceneDocument) => ({ id: input.id, view: input.views[options.viewId ?? input.activeView], viewId: options.viewId ?? input.activeView,
-          credentials: input.credentials, resources: Object.fromEntries(nativeNodes(input).flatMap(node => 'resource' in node ? [[node.resource, input.resources[node.resource]]] : [])) })
+          credentials: input.credentials, cartography: getSceneCartography(input), resources: Object.fromEntries(nativeNodes(input).flatMap(node => 'resource' in node ? [[node.resource, input.resources[node.resource]]] : [])) })
         if (JSON.stringify(content(document)) !== JSON.stringify(content(next)) || previousNodes.length !== nextNodes.length) return false
         const identity = (node: SceneDocument['nodes'][number]): unknown => ({
           id: node.id, type: node.type, parentId: node.parentId,
@@ -221,17 +268,20 @@ export async function createOlDocumentLayers(input: unknown, options: OlDocument
           const handle = handles.get(node.id)
           if (!handle) throw new Error(`Missing layer handle ${node.id}`)
           handle.update({ ...presentation, source: resource } as SceneLayer)
+          const standardFunction = standardFunctions.get(node.id)
+          if (standardFunction && handle.layer instanceof VectorLayer) handle.layer.setStyle(standardFunction)
           if (node.type === 'vector' && node.filter?.length && handle.layer instanceof VectorLayer) {
             const style = handle.layer.getStyleFunction()!
             handle.layer.setStyle((feature, resolution) => node.filter!.every(condition => matches(feature.get(condition.field), condition)) ? style(feature, resolution) : undefined)
           }
+          gpuBindings.get(node.id)?.sync()
         })
         document = next
         issues.splice(0, issues.length, ...nextIssues)
         return true
       },
       getFilteredFeatures(id) {
-        const layer = layers.get(id), node = document.nodes.find(node => node.id === id)
+        const layer = handles.get(id)?.layer, node = document.nodes.find(node => node.id === id)
         if (!(layer instanceof VectorLayer) || node?.type !== 'vector') return []
         const source = layer.getSource() as VectorSource<Feature<Geometry>> | null
         return (source?.getFeatures() ?? []).filter(feature => node.filter?.every(condition => matches(feature.get(condition.field), condition)) ?? true)

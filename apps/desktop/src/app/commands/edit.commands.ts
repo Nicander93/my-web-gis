@@ -1,4 +1,5 @@
 import { emitCommandStatus } from './status'
+import { finishStyleInteraction } from '@/features/inspector/style-interaction'
 import { useProjectStore } from '@/stores/project.store'
 import { useWorkbenchStore } from '@/stores/workbench.store'
 import { capabilitiesForDataset, getEffectiveLocked } from '@desktop-webgis/gis-core'
@@ -39,6 +40,7 @@ export const editCommands = {
     emitCommandStatus('已结束编辑；修改已记录，可撤销，请保存项目')
   },
   undo(): void {
+    finishStyleInteraction()
     if (useProjectStore.getState().undoEdit()) {
       emitCommandStatus('已撤销')
       return
@@ -46,6 +48,7 @@ export const editCommands = {
     emitCommandStatus(useProjectStore.getState().getHistoryBlockReason('undo') ?? '撤销（无可撤销操作）')
   },
   redo(): void {
+    finishStyleInteraction()
     if (useProjectStore.getState().redoEdit()) {
       emitCommandStatus('已重做')
       return

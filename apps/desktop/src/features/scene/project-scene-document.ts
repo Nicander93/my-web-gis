@@ -1,6 +1,6 @@
-import { createProject, isLegacyStyle, migrateLegacyStyle, normalizeLayerTree, getLayerTreeChildren, type LayerTreeEntry, type BasemapConfig, type Dataset, type GisFeature, type ProjectSnapshot, type ServiceSource } from '@desktop-webgis/gis-core'
+import { createProject, isLegacyStyle, migrateLegacyStyle, prepareProjectContent, getLayerTreeChildren, type LayerTreeEntry, type BasemapConfig, type Dataset, type GisFeature, type ProjectSnapshot, type ServiceSource } from '@desktop-webgis/gis-core'
 import { createCesiumScene, parseCesiumScene, type CesiumSceneNode } from '@desktop-webgis/cesium-scene-schema'
-import { getUnsupportedSceneExtensions, migrateSceneDocument, parseSceneDocument, type GeoJsonFeatureCollection, type JsonValue, type SceneDocument, type SceneNode, type SceneResource, type SceneResourceMetadata } from '@desktop-webgis/scene-schema'
+import { CARTOGRAPHY_EXTENSION, CARTOGRAPHY_EXTENSION_VERSION, CARTOGRAPHY_SCENE_EXTENSIONS, getSceneCartography, getUnsupportedSceneExtensions, migrateSceneDocument, parseSceneDocument, type GeoJsonFeatureCollection, type JsonValue, type SceneDocument, type SceneNode, type SceneResource, type SceneResourceMetadata } from '@desktop-webgis/scene-schema'
 import { toWmsSceneSource, toWmtsSceneSource } from './compile-project'
 import { getProjectType } from '../../services/project-type'
 
@@ -67,7 +67,7 @@ export interface ProjectSceneProjection {
 
 /** Builds the document and its host identity mapping together, without changing the project. */
 export function createProjectSceneProjection(snapshot: ProjectSnapshot): ProjectSceneProjection {
-  const project = normalizeLayerTree(snapshot.project)
+  const project = prepareProjectContent(snapshot.project)
   const resources: Record<string, SceneResource> = Object.create(null)
   const credentials: NonNullable<SceneDocument['credentials']> = Object.create(null)
   for (const dataset of project.datasets) {
@@ -139,6 +139,9 @@ export function createProjectSceneProjection(snapshot: ProjectSnapshot): Project
     hostSceneNodeIds.set(documentId, node.id)
   })
   const document = parseSceneDocument({ version: 3, id: project.id, title: project.name, resources, nodes: [...nodes, ...city?.nodes ?? []],
+    ...(project.cartography?.bindings.length ? { extensions: { [CARTOGRAPHY_EXTENSION]: {
+      version: CARTOGRAPHY_EXTENSION_VERSION, required: true, data: omitUndefined(project.cartography),
+    } } } : {}),
     ...(project.description === undefined ? {} : { description: project.description }),
     ...(project.metadata === undefined ? {} : { metadata: structuredClone(project.metadata) }),
     ...structuredClone(project.sceneDisplay ?? {}),
@@ -185,7 +188,7 @@ function supportedProjectCoordinates(value: unknown): boolean {
 /** Restores supported project content atomically in memory; unsupported content fails before Store writes. */
 export function createProjectFromSceneDocument(input: unknown): ProjectSnapshot {
   const document = parseSceneDocument(input)
-  if (getUnsupportedSceneExtensions(document).length) throw new Error('当前工程尚不支持场景扩展，请保留原始文档')
+  if (getUnsupportedSceneExtensions(document, CARTOGRAPHY_SCENE_EXTENSIONS).length) throw new Error('当前工程尚不支持场景扩展，请保留原始文档')
   const mapViews = Object.values(document.views).filter(view => view.type === '2d')
   const cityViews = Object.values(document.views).filter(view => view.type === '3d')
   if (mapViews.length > 1 || cityViews.length > 1) throw new Error('当前工程只支持每种引擎一个初始视图')
@@ -290,5 +293,6 @@ export function createProjectFromSceneDocument(input: unknown): ProjectSnapshot 
     for (const [id, resource] of Object.entries(document.resources)) if (resource.type === '3dtiles' || resource.type === 'glb' || resource.type === 'geojson' && (resource.url || resource.reference) && !mapNodes.some(node => node.resource === id)) city.assets[id] = { type: resource.type, ...(resource.url === undefined ? {} : { url: resource.url }), ...(resource.reference ? { reference: structuredClone(resource.reference) } : {}), ...(resource.type === 'geojson' && resource.data ? { data: structuredClone(resource.data) } : {}) }
     project.city = parseCesiumScene(city)
   }
-  return { project, featuresByDataset }
+  project.cartography = getSceneCartography(document)
+  return { project: prepareProjectContent(project), featuresByDataset }
 }

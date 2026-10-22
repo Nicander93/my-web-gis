@@ -5,7 +5,9 @@ import LayerGroup from 'ol/layer/Group.js'
 import VectorSource from 'ol/source/Vector.js'
 import Feature from 'ol/Feature.js'
 import Point from 'ol/geom/Point.js'
+import CircleStyle from 'ol/style/Circle.js'
 import { createOlDocumentLayers, getSceneFeatureId } from './document.js'
+import { CARTOGRAPHY_EXTENSION, type JsonValue } from '@desktop-webgis/scene-schema'
 
 function document(): SceneDocument {
   const style = { mode: 'single' as const, symbol: { type: 'circle' as const, radius: 4, fill: { r: 255, g: 0, b: 0, a: 1 } } }
@@ -17,6 +19,94 @@ function document(): SceneDocument {
 }
 
 describe('v3 OL document factory', () => {
+  it('keeps host sources shared and alive across GPU presentation changes and disposal', async () => {
+    vi.stubGlobal('document', { createElement: () => ({ getContext: () => ({ getExtension: (name: string) => name === 'WEBGL_lose_context' ? null : {} }) }) })
+    const source = new VectorSource({ features: [new Feature(new Point([0, 0]))] })
+    const sourceDispose = vi.spyOn(source, 'dispose')
+    try {
+      const input = document()
+      input.nodes.forEach(node => { if (node.type === 'vector') delete node.filter })
+      input.extensions = { [CARTOGRAPHY_EXTENSION]: { version: 1, required: true, data: {
+        specVersion: 8, bindings: ['first', 'second'].map(id => ({ gisLayerId: id, datasetId: 'data', styleSourceId: 'data', styleLayerIds: [id] })),
+        styleLayers: ['first', 'second'].map(id => ({ id, source: 'data', type: 'circle', paint: { 'circle-radius': 5 } }))
+      } } }
+      const result = await createOlDocumentLayers(input, { vectorRenderer: 'webgl', vectorSources: { data: source } })
+      const group = result.getLayer('second') as LayerGroup
+      expect(group).toBeInstanceOf(LayerGroup)
+      expect(group.get('cartographyRenderer')).toBe('webgl')
+      const child = group.getLayers().item(0) as VectorLayer
+      expect(child.getSource()).toBe(source)
+      const next = structuredClone(input)
+      next.nodes[2].visible = false
+      expect(result.updatePresentation(next)).toBe(true)
+      expect(group.getVisible()).toBe(false)
+      expect(result.getFilteredFeatures('second')).toHaveLength(1)
+      result.dispose(); result.dispose()
+      expect(sourceDispose).not.toHaveBeenCalled()
+      expect(source.getFeatures()).toHaveLength(1)
+    } finally { vi.unstubAllGlobals(); source.dispose() }
+  })
+  it('falls back without GPU and keeps the diagnostic across presentation updates', async () => {
+    const input = document()
+    const result = await createOlDocumentLayers(input, { vectorRenderer: 'webgl' })
+    expect(result.getLayer('first')).toBeInstanceOf(VectorLayer)
+    expect(result.issues.some(issue => issue.code === 'webgl.unavailable')).toBe(true)
+    const next = structuredClone(input)
+    next.nodes[0].visible = true
+    expect(result.updatePresentation(next)).toBe(true)
+    expect(result.issues.some(issue => issue.code === 'webgl.unavailable')).toBe(true)
+    expect(result.getFilteredFeatures('first')).toHaveLength(2)
+    result.dispose()
+  })
+  it('evaluates standard zoom expressions in the geographic view resolution units', async () => {
+    const input = document()
+    if (input.views.map.type === '2d') input.views.map.projection = 'EPSG:4326'
+    input.extensions = { [CARTOGRAPHY_EXTENSION]: { version: 1, required: true, data: {
+      specVersion: 8,
+      bindings: ['first', 'second'].map(id => ({ gisLayerId: id, datasetId: 'data', styleSourceId: 'shared', styleLayerIds: [id] })),
+      styleLayers: ['first', 'second'].map(id => ({ id, source: 'shared', type: 'circle', paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 0, 2, 10, 12] } })),
+    } } }
+    const result = await createOlDocumentLayers(input)
+    const layer = result.getLayer('second') as VectorLayer<VectorSource<Feature<Point>>>
+    const feature = layer.getSource()!.getFeatures().find(feature => feature.get('value') === 0)!
+    const styles = layer.getStyleFunction()!(feature, result.view.getResolutionForZoom(6))
+    const image = (Array.isArray(styles) ? styles[0] : styles)?.getImage()
+    expect(image).toBeInstanceOf(CircleStyle)
+    if (image instanceof CircleStyle) expect(image.getRadius()).toBeCloseTo(7)
+    result.dispose()
+  })
+  it('renders bound subsets over one source, preserves standard paint on filter updates and requests rebuild for drawing changes', async () => {
+    const input = document()
+    input.extensions = { [CARTOGRAPHY_EXTENSION]: { version: 1, required: true, data: {
+      specVersion: 8,
+      bindings: ['first', 'second'].map(id => ({ gisLayerId: id, datasetId: 'data', styleSourceId: 'shared', styleLayerIds: [id] })),
+      styleLayers: ['first', 'second'].map((id, index) => ({ id, source: 'shared', type: 'circle', paint: { 'circle-radius': 4 + index * 4, 'circle-color': index ? '#0000ff' : '#ff0000' } })),
+    } } }
+    const result = await createOlDocumentLayers(input)
+    const first = result.getLayer('first') as VectorLayer<VectorSource<Feature<Point>>>
+    const second = result.getLayer('second') as VectorLayer<VectorSource<Feature<Point>>>
+    expect(first.getSource()).toBe(second.getSource())
+    const included = first.getSource()!.getFeatures().find(feature => feature.get('value') === 1)!
+    const excluded = first.getSource()!.getFeatures().find(feature => feature.get('value') === 0)!
+    const evaluate = (layer: typeof first, feature: Feature<Point>) => {
+      const styles = layer.getStyleFunction()!(feature, 1000)
+      return Array.isArray(styles) ? styles : styles ? [styles] : []
+    }
+    expect(evaluate(first, included)).toHaveLength(1)
+    expect(evaluate(first, excluded)).toHaveLength(0)
+    expect(evaluate(second, excluded)).toHaveLength(1)
+    expect(evaluate(first, included)[0].getImage()?.getOpacity()).toBe(1)
+    const updated = structuredClone(input)
+    const node = updated.nodes.find(node => node.id === 'first')!
+    if (node.type === 'vector') { node.filter = []; node.opacity = 0.4 }
+    expect(result.updatePresentation(updated)).toBe(true)
+    expect(first.getOpacity()).toBe(0.4)
+    expect(evaluate(first, excluded)).toHaveLength(1)
+    const data = updated.extensions![CARTOGRAPHY_EXTENSION].data as { styleLayers: Array<{ paint: Record<string, JsonValue> }> }
+    data.styleLayers[0].paint['circle-radius'] = 12
+    expect(result.updatePresentation(updated)).toBe(false)
+    result.dispose()
+  })
   it('projects geographic resources into a metre-based view without changing saved coordinates', async () => {
     const input = document()
     const resource = input.resources.data

@@ -1,0 +1,114 @@
+.cartography-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.cartography-rules__header,
+.cartography-rules__header > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cartography-rules__header {
+  justify-content: space-between;
+}
+
+.cartography-rules__toolbar {
+  width: 100%;
+}
+
+.cartography-rules__toolbar .ant-select {
+  width: 112px;
+}
+
+.cartography-rules__hint {
+  color: var(--color-text-muted, #75808a);
+  font-size: 11px;
+}
+
+.cartography-rules__filter {
+  display: block;
+  overflow: hidden;
+  min-width: 0;
+  color: var(--color-text-muted, #68727d);
+  font-family: var(--font-mono, Consolas, monospace);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cartography-rules__table,
+.cartography-rules__table .ant-table-wrapper,
+.cartography-rules__table .ant-table {
+  width: 100%;
+  min-width: 0;
+}
+
+.cartography-rules__table .ant-table-container {
+  overflow: hidden;
+}
+
+.cartography-rules__table .ant-table-cell {
+  min-width: 0;
+  padding: 7px 6px !important;
+}
+
+.cartography-rules__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.cartography-rules__summary-heading {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.cartography-rules__summary-heading .ant-tag {
+  flex: 0 0 auto;
+  margin: 0;
+  padding-inline: 4px;
+  font-size: 10px;
+  line-height: 17px;
+}
+
+.cartography-rules code {
+  display: block;
+  overflow: hidden;
+  min-width: 0;
+  color: inherit;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cartography-rules__zoom {
+  color: var(--color-text-muted, #75808a);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cartography-rules__actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0;
+  white-space: nowrap;
+}
+
+.cartography-rules__actions .ant-btn {
+  display: inline-flex;
+  flex: 0 0 27px;
+  align-items: center;
+  justify-content: center;
+  width: 27px;
+  min-width: 27px;
+  height: 26px;
+  padding: 0;
+}

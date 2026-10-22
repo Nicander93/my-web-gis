@@ -6,7 +6,6 @@ import type { Layer } from '@desktop-webgis/gis-core'
 import { cloneSymbolWithColor, colorToString, symbolPrimaryColor } from '@desktop-webgis/ol-style'
 import type { LayerStyle, Symbol } from '@desktop-webgis/ol-style'
 import { useProjectStore } from '@/stores/project.store'
-import { useSessionStore } from '@/stores/session.store'
 import { PropertyWindow } from '@/components/ui/PropertyWindow'
 import { propertyWindowEvent } from './property-window-request'
 import type { PropertyWindowRequest } from './property-window-request'
@@ -15,6 +14,7 @@ import { createMapPropertyPreview } from '@/features/map/map-runtime-host'
 import { PopupDraftFields } from './PopupDraftFields'
 import { CRS_PRESETS } from '@desktop-webgis/vector-io'
 import { assignSourceCrs } from './source-crs'
+import { useCartographyEditor } from './useCartographyEditor'
 
 /** Host captures a target and epoch at the explicit open action, never at selection changes. */
 export function LayerPropertyWindowHost() {
@@ -31,6 +31,7 @@ export function LayerPropertyWindowHost() {
 }
 
 function LayerPropertyWindow({ id, onClose }: { id: string; onClose(): void }) {
+  const cartographyEditor = useCartographyEditor(id)
   const project = useProjectStore(state => state.project)
   const epoch = useState(() => useProjectStore.getState().projectEpoch)[0]
   const current = project.layers.find(layer => layer.id === id)
@@ -67,7 +68,6 @@ function LayerPropertyWindow({ id, onClose }: { id: string; onClose(): void }) {
       if (!live) throw new Error('图层已删除。')
       if (JSON.stringify(live) !== JSON.stringify(base)) throw new Error('图层已被其他操作修改，请重新载入。')
       if (getLayerGroupState(snapshot.project, findGroupForLayer(snapshot.project, id)?.id).locked) throw new Error('所属文件夹已锁定。')
-      if (useSessionStore.getState().sessions[id]?.styleDraft?.dirty) throw new Error('请先应用或放弃检查器中的样式草稿。')
       if (!draft?.name.trim()) throw new Error('请输入图层名称。')
       if (!Number.isFinite(draft.opacity) || draft.opacity < 0 || draft.opacity > 1) throw new Error('不透明度必须在 0–100% 之间。')
       if (draft.minZoom !== undefined && draft.maxZoom !== undefined && draft.minZoom > draft.maxZoom) throw new Error('最小缩放不能大于最大缩放。')
@@ -94,7 +94,7 @@ function LayerPropertyWindow({ id, onClose }: { id: string; onClose(): void }) {
       {field('最大缩放', 'maxZoom', <InputNumber aria-label="最大缩放" value={draft.maxZoom} min={0} max={30} onChange={value => patch({ maxZoom: value ?? undefined })} />)}
       {vector && field('地图可选择', 'interaction.selectable', <Switch aria-label="地图可选择" checked={draft.interaction?.selectable !== false} onChange={selectable => patch({ interaction: { ...draft.interaction, selectable } })} />)}
     </>}
-    {section === 'style' && (vector ? <>
+    {section === 'style' && (vector ? !cartographyEditor.editable ? <Alert type="info" message={cartographyEditor.locked ? '图层已锁定' : '高级标准样式为只读'} description="当前配置已保留，可继续编辑其他图层属性。" /> : <>
       <p>当前模式：{style.mode === 'single' ? '单一符号' : style.mode === 'categorized' ? '分类' : '分级'}；专题配置随图层保留。</p>
       {field(style.mode === 'single' ? '符号颜色' : '默认符号颜色', 'symbol.color', <ColorPicker aria-label="符号颜色" value={colorToString(symbolPrimaryColor(symbol))} showText onChange={color => { const rgb = color.toRgb(); setSymbol(cloneSymbolWithColor(symbol, { r: rgb.r, g: rgb.g, b: rgb.b, a: rgb.a })) }} />)}
       {symbol.type === 'circle' && field('点半径（px）', 'symbol.radius', <InputNumber min={1} max={128} value={symbol.radius} onChange={radius => { if (radius !== null) setSymbol({ ...symbol, radius }) }} />)}
@@ -102,7 +102,7 @@ function LayerPropertyWindow({ id, onClose }: { id: string; onClose(): void }) {
       {style.mode === 'categorized' && style.categories.map((category, index) => field(category.label ?? String(category.value), `categories[${index}].symbol`, <ColorPicker value={colorToString(symbolPrimaryColor(category.symbol))} showText onChange={color => { const rgb = color.toRgb(); setStyle({ ...style, categories: style.categories.map((item, i) => i === index ? { ...item, symbol: cloneSymbolWithColor(item.symbol, { r: rgb.r, g: rgb.g, b: rgb.b, a: rgb.a }) } : item) }) }} />))}
       {style.mode === 'graduated' && style.breaks.map((item, index) => field(item.label ?? String(item.value), `breaks[${index}].symbol`, <ColorPicker value={colorToString(symbolPrimaryColor(item.symbol))} showText onChange={color => { const rgb = color.toRgb(); setStyle({ ...style, breaks: style.breaks.map((item, i) => i === index ? { ...item, symbol: cloneSymbolWithColor(item.symbol, { r: rgb.r, g: rgb.g, b: rgb.b, a: rgb.a }) } : item) }) }} />))}
     </> : <p>服务影像使用服务端样式，可在常规页调整不透明度。</p>)}
-    {section === 'label' && (vector ? <>
+    {section === 'label' && (vector ? !cartographyEditor.editable ? <Alert type="info" message={cartographyEditor.locked ? '图层已锁定' : '高级标准样式为只读'} description="当前配置已保留，可继续编辑其他图层属性。" /> : <>
       {field('标注字段', 'label.field', <Select aria-label="标注字段" value={style.label?.field} allowClear options={(dataset?.fields ?? []).map(field => ({ value: field.name, label: field.name }))} onChange={field => setStyle({ ...style, label: field ? { fontSize: 12, ...style.label, field } : undefined })} />)}
       {style.label && field('字号（px）', 'label.fontSize', <InputNumber min={6} max={72} value={style.label.fontSize ?? 12} onChange={fontSize => { if (fontSize !== null && style.label) setStyle({ ...style, label: { ...style.label, fontSize } }) }} />)}
     </> : <p>服务影像的标注由服务端提供。</p>)}

@@ -23,16 +23,18 @@ import {
   moveLayerTreeEntry,
   dissolveLayerGroup,
   SetLayerStyleCommand,
+  SetLayerCartographyCommand,
   SetLayerFilterCommand,
   SetLayerOpacityCommand,
   SetLayerTreeCommand,
-  SetDatasetContentCommand,
   ReplaceProjectSnapshotCommand,
   ApplyProjectSnapshotEditCommand,
   getProjectSnapshotChanges,
   AddLocalLayerCommand,
   snapshotLayerTree,
-  capabilitiesForDataset
+  capabilitiesForDataset,
+  reconcileProjectCartography,
+  getLayerCartography
 } from '@desktop-webgis/gis-core'
 import type {
   Project,
@@ -47,6 +49,7 @@ import type {
   DatasetKind,
   ProjectSnapshot,
   ProjectEditContext,
+  CartographyState,
   EditCommand,
   ProcessingRecord
 } from '@desktop-webgis/gis-core'
@@ -99,7 +102,8 @@ interface ProjectState {
   /** Same-project API edit; retains unaffected selection, table targets and drafts. */
   applySnapshotAsEdit(snapshot: ProjectSnapshot, label: string): boolean
   getSnapshot(): ProjectSnapshot
-  setLayerStyle(layerId: string, style: LayerStyle): void
+  setLayerStyle(layerId: string, style: LayerStyle, transactionId?: string): void
+  setLayerCartography(layerId: string, styleLayers: CartographyState['styleLayers'], transactionId?: string): void
   getNormalizedLayerStyle(layerId: string): LayerStyle | null
 
   getLayerFeatures(layerId: string): GisFeature[]
@@ -176,21 +180,21 @@ function syncStoreFromState(featuresByDataset: Record<string, GisFeature[]>): vo
   }
 }
 
-export const useProjectStore = create<ProjectState>((set, get) => {
+export const useProjectStore = create<ProjectState>((rawSet, get) => {
+  // All project writes maintain standard bindings, including non-history layer operations.
+  function set(update: Partial<ProjectState> | ((state: ProjectState) => Partial<ProjectState>)): void {
+    rawSet(state => {
+      const next = typeof update === 'function' ? update(state) : update
+      return next.project && next.project !== state.project
+        ? { ...next, project: reconcileProjectCartography(next.project, state.project) }
+        : next
+    })
+  }
   function projectEditContext(): ProjectEditContext {
     return {
       featureStore: attributeFeatureStore,
       getProject: () => get().project,
       replaceProject: (project) => {
-        const previous = get().project
-        for (const layer of project.layers) {
-          if (JSON.stringify(layer.style) === JSON.stringify(previous.layers.find((item) => item.id === layer.id)?.style)) continue
-          const session = useSessionStore.getState().sessions[layer.id]
-          if (session?.styleDraft && !session.styleDraft.dirty) {
-            const { styleDraft: _draft, ...retained } = session
-            useSessionStore.setState((state) => ({ sessions: { ...state.sessions, [layer.id]: retained } }))
-          }
-        }
         set({ project: normalizeLayerTree(project), dirty: true })
       },
       onDatasetFieldChange: (datasetId, from, to) => {
@@ -213,19 +217,12 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         }
       },
       applySnapshotEdit: (snapshot) => {
-        const project = normalizeLayerTree(cloneValue(snapshot.project)), featuresByDataset = cloneValue(snapshot.featuresByDataset)
+        const project = reconcileProjectCartography(normalizeLayerTree(cloneValue(snapshot.project)), get().project), featuresByDataset = cloneValue(snapshot.featuresByDataset)
         const state = get(), changes = getProjectSnapshotChanges(state.getSnapshot(), snapshot)
         const session = useSessionStore.getState(), workbench = useWorkbenchStore.getState()
         const stale = new Set([...changes.removedLayers, ...changes.dataChangedLayers])
-        const guarded = new Set([...stale, ...changes.styleChangedLayers])
-        if ([...guarded].some(id => session.sessions[id]?.styleDraft?.dirty)) throw new Error('请先应用或放弃受影响图层的样式草稿')
         const sessions = { ...session.sessions }
         for (const id of stale) { session.abortWfsLoad(id); delete sessions[id] }
-        for (const id of changes.styleChangedLayers) {
-          if (!sessions[id]) continue
-          const { styleDraft: _draft, ...retained } = sessions[id]
-          sessions[id] = retained
-        }
         if (workbench.editLayerId && stale.has(workbench.editLayerId)) { workbench.setEditLayer(null); workbench.setActiveTool('none') }
         for (const id of changes.removedLayers) workbench.clearLayer(id)
         useSessionStore.setState({ sessions })
@@ -236,7 +233,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         set({ project, featuresByDataset, selectedLayerId, selection, dirty: true, lastSelectionCountAfterFilter: selected ? selection.featureIds.length : null })
       },
       replaceSnapshot: (snapshot) => {
-        const project = normalizeLayerTree(cloneValue(snapshot.project))
+        const project = reconcileProjectCartography(normalizeLayerTree(cloneValue(snapshot.project)))
         const featuresByDataset = cloneValue(snapshot.featuresByDataset)
         useSessionStore.getState().bumpWfsLoadGeneration()
         useWorkbenchStore.getState().reset()
@@ -412,7 +409,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   setDirty: (dirty) => set({ dirty }),
 
   loadSnapshot: (snapshot) => {
-    const project = normalizeLayerTree(cloneValue(snapshot.project))
+    const project = reconcileProjectCartography(normalizeLayerTree(cloneValue(snapshot.project)))
     const featuresByDataset = cloneValue(snapshot.featuresByDataset ?? {})
     useSessionStore.setState({ inspectorTab: 'layer' })
     useWorkbenchStore.getState().reset()
@@ -436,28 +433,40 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   }),
   applySnapshotAsEdit: (snapshot, label) => {
     const before = get().getSnapshot()
-    if (JSON.stringify(before) === JSON.stringify(snapshot)) return false
-    const command = new ApplyProjectSnapshotEditCommand(createId('cmd'), label, before, snapshot)
-    if (command.guardedLayerIds.some(id => useSessionStore.getState().sessions[id]?.styleDraft?.dirty)) throw new Error('请先应用或放弃受影响图层的样式草稿')
+    const after = { ...snapshot, project: reconcileProjectCartography(snapshot.project, before.project) }
+    if (JSON.stringify(before) === JSON.stringify(after)) return false
+    const command = new ApplyProjectSnapshotEditCommand(createId('cmd'), label, before, after)
     return get().executeEditCommand(command)
   },
   replaceSnapshotAsEdit: (snapshot, label) => {
-    if (Object.values(useSessionStore.getState().sessions).some(session => session.styleDraft?.dirty)) throw new Error('请先应用或放弃样式草稿，再替换场景')
     const before = get().getSnapshot()
     if (JSON.stringify(before) === JSON.stringify(snapshot)) return false
     return get().executeEditCommand(new ReplaceProjectSnapshotCommand(createId('cmd'), label, before, snapshot))
   },
 
-  setLayerStyle: (layerId, style) => {
+  setLayerStyle: (layerId, style, transactionId) => {
     const state = get()
+    if (getEffectiveLocked(state.project, layerId)) throw new Error('图层或所属文件夹已锁定')
     const layer = state.project.layers.find((item) => item.id === layerId)
     if (!layer) return
     const before = isLegacyStyle(layer.style) ? migrateLegacyStyle(layer.style) : cloneValue(layer.style)
     const after = cloneValue(style)
-    editHistory.execute(
-      new SetLayerStyleCommand(createId('cmd'), layerId, before, after),
-      projectEditContext()
-    )
+    if (JSON.stringify(before) === JSON.stringify(after)) return
+    get().executeEditCommand(new SetLayerStyleCommand(createId('cmd'), layerId, before, after, transactionId))
+  },
+
+  setLayerCartography: (layerId, styleLayers, transactionId) => {
+    const project = get().project
+    if (getEffectiveLocked(project, layerId)) throw new Error('图层或所属文件夹已锁定')
+    const before = getLayerCartography(project, layerId)
+    if (!before) return
+    const layers = cloneValue(styleLayers)
+    const after = {
+      binding: { ...before.binding, styleLayerIds: layers.map(layer => layer.id) },
+      styleLayers: layers
+    }
+    if (JSON.stringify(before) === JSON.stringify(after)) return
+    get().executeEditCommand(new SetLayerCartographyCommand(createId('cmd'), layerId, before, after, transactionId))
   },
 
   getNormalizedLayerStyle: (layerId) => {
@@ -611,20 +620,10 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   },
 
   canUndoEdit: () => editHistory.canUndo,
-  getHistoryBlockReason: (direction) => {
-    const command = direction === 'undo' ? editHistory.peekUndo() : editHistory.peekRedo()
-    if (command instanceof SetDatasetContentCommand && command.guardedLayerIds.some(id => useSessionStore.getState().sessions[id]?.styleDraft?.dirty))
-      return '请先应用或放弃受影响图层的样式草稿，再恢复字段编辑'
-    if (command instanceof ApplyProjectSnapshotEditCommand) return command.guardedLayerIds.some(id => useSessionStore.getState().sessions[id]?.styleDraft?.dirty)
-      ? '请先应用或放弃受影响图层的样式草稿，再恢复内容编辑' : null
-    return command instanceof ReplaceProjectSnapshotCommand && Object.values(useSessionStore.getState().sessions).some(session => session.styleDraft?.dirty)
-      ? '请先应用或放弃样式草稿，再恢复场景内容' : null
-  },
+  getHistoryBlockReason: () => null,
   canRedoEdit: () => editHistory.canRedo,
 
   executeEditCommand: (command) => {
-    if (command instanceof SetDatasetContentCommand && command.guardedLayerIds.some(id => useSessionStore.getState().sessions[id]?.styleDraft?.dirty))
-      throw new Error('请先应用或放弃受影响图层的样式草稿，再修改字段')
     const state = get()
     syncStoreFromState(state.featuresByDataset)
     editHistory.execute(command, projectEditContext())

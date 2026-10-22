@@ -6,9 +6,9 @@ import { EditorDialog } from '@/components/ui/EditorDialog'
 import { Button as DialogButton } from '@/components/ui/Button'
 import { useProjectStore, getProjectContentVersion } from '@/stores/project.store'
 import { hasPendingPropertyEdits } from '@/services/pending-property-edits'
-import { useSessionStore } from '@/stores/session.store'
 import { projectCommands } from '@/app/commands/project.commands'
 import { resolveSceneDrafts } from '@/features/inspector/scene-draft-guard'
+import { finishStyleInteraction } from '@/features/inspector/style-interaction'
 import { createSnapshotFromState } from '@/services/project-io'
 import { projectRecovery, recoveryOwner } from '@/services/project-recovery'
 import { allowWindowClose, createCloseSession, subscribeMaximized, type UnsavedCloseChoice } from './native-window'
@@ -38,7 +38,7 @@ export function WindowControls() {
     const session = createCloseSession(() => allowWindowClose({
       projectEpoch: () => useProjectStore.getState().projectEpoch,
       contentVersion: getProjectContentVersion,
-      hasDirtyDrafts: () => hasPendingPropertyEdits() || Object.values(useSessionStore.getState().sessions).some(item => item.styleDraft?.dirty),
+      hasDirtyDrafts: hasPendingPropertyEdits,
       resolveDrafts: async () => {
         if (hasPendingPropertyEdits()) throw new Error('请先应用或取消完整属性窗口中的编辑，再关闭项目。')
         return resolveSceneDrafts()
@@ -58,6 +58,7 @@ export function WindowControls() {
     }))
     const listener = appWindow.onCloseRequested(async (event) => {
       event.preventDefault()
+      finishStyleInteraction()
       if (disposed) return
       try {
         if (await session.request() && !disposed && !destroying) {

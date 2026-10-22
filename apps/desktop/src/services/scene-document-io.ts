@@ -1,6 +1,7 @@
 import { isTauri, invoke, convertFileSrc } from '@tauri-apps/api/core'
 import { findSecretLeaks } from '@desktop-webgis/gis-core'
-import { parseSceneDocument, migrateSceneDocument, type SceneDocument } from '@desktop-webgis/scene-schema'
+import { parseSceneDocument, migrateSceneDocument, getSceneCartography, type SceneDocument } from '@desktop-webgis/scene-schema'
+import { verifyStyleAssets } from '@desktop-webgis/ol-style/style-assets'
 import { decodeSceneArchiveZip, normalizeSceneArchivePath, prepareSceneGeoJsonResources, resolveSceneResourceReferences, serializeSceneDocument } from '@desktop-webgis/scene-core'
 import { createProjectFromSceneDocument } from '@/features/scene/project-scene-document'
 import { pickFile, pickSaveFile, readBinaryFile, readTextFile, writeTextFile } from './files'
@@ -35,6 +36,7 @@ export async function openSceneDocument(signal?: AbortSignal): Promise<OpenedSce
   signal?.throwIfAborted()
   const input: unknown = JSON.parse(text)
   let document = input && typeof input === 'object' && 'version' in input && input.version === 3 ? parseSceneDocument(input) : migrateSceneDocument(input)
+  await verifyStyleAssets(getSceneCartography(document)?.assets ?? [])
   assertNoSceneSecrets(document)
   const resourceIds = document.nodes.filter(node => node.type === 'vector').map(node => node.resource)
   document = await prepareSceneGeoJsonResources(document, { resourceIds, signal, loadGeoJson: async (url, context) => {
@@ -54,6 +56,7 @@ export async function openSceneDocument(signal?: AbortSignal): Promise<OpenedSce
 /** Validates all package content before persisting assets or returning a replacement document. */
 export async function openSceneArchiveBytes(bytes: Uint8Array, path: string, signal?: AbortSignal): Promise<OpenedSceneDocument> {
   const archive = await decodeSceneArchiveZip(bytes, { signal })
+  await verifyStyleAssets(getSceneCartography(archive.document)?.assets ?? [])
   assertNoSceneSecrets(archive.document)
   const resourceIds = archive.document.nodes.filter(node => node.type === 'vector').map(node => node.resource)
   let document = await prepareSceneGeoJsonResources(archive.document, { resourceIds, signal, loadGeoJson: async (url, context) => {

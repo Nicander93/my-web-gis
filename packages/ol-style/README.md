@@ -15,6 +15,12 @@ OpenLayers 样式工具包：JSON 可序列化的样式契约、分类/分级算
 
 公开 API 仅使用样式领域术语（样式、符号、分类、分级、图例），不暴露 Desktop / 项目文件路径等应用内部概念。
 
+### 标准二维制图入口
+
+`@desktop-webgis/ol-style/cartography-model` 提供纯数据的 Style Layer 绑定、旧样式迁移、标准校验、组装与图例。`@desktop-webgis/ol-style/cartography` 提供 `createMapLibreCanvasBinding`，按 GIS 图层的子集绑定标准 v8 样式，使用已有 OL VectorSource 和 `updateSource:false`；共享数据集不重复创建要素。旧主入口继续兼容原有调用方。
+
+Desktop/Viewer 的场景文档路径已接入标准制图，当前迁移范围与边界见[实施记录](../../docs/plans/2d-cartography-implementation.md)。固定场景的适配能力、复跑命令和限制见 [P0 验收报告](../../docs/design/2d-cartography-p0/README.md)。
+
 ## 安装
 
 ```bash

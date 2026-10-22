@@ -7,9 +7,25 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./geoserver-client": {
+      "types": "./dist/geoserver-client.d.ts",
+      "import": "./dist/geoserver-client.js"
+    },
+    "./sld-package": {
+      "types": "./dist/sld-package.d.ts",
+      "import": "./dist/sld-package.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./sld-export": {
+      "types": "./dist/sld-export.d.ts",
+      "import": "./dist/sld-export.js"
+    },
+    "./mbstyle-export": {
+      "types": "./dist/mbstyle-export.d.ts",
+      "import": "./dist/mbstyle-export.js"
     }
   },
   "files": ["dist", "fixtures", "README.md"],
@@ -22,5 +38,11 @@
   "devDependencies": {
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "@desktop-webgis/ol-style": "workspace:*",
+    "fflate": "0.8.3",
+    "@maplibre/maplibre-gl-style-spec": "26.4.1",
+    "@xmldom/xmldom": "0.9.12"
   }
 }

@@ -5,7 +5,7 @@
  * or in platform secure store when available (Tauri → OS keychain).
  */
 
-export type CredentialKind = 'query-token' | 'bearer'
+export type CredentialKind = 'query-token' | 'bearer' | 'http-authorization'
 
 export interface StoredCredential {
   key: string
@@ -97,8 +97,9 @@ function serializePayload(cred: StoredCredential): string {
 function parsePayload(key: string, raw: string): StoredCredential | undefined {
   try {
     const parsed = JSON.parse(raw) as PersistedCredentialPayload
-    if (parsed.kind !== 'query-token' && parsed.kind !== 'bearer') return undefined
+    if (parsed.kind !== 'query-token' && parsed.kind !== 'bearer' && parsed.kind !== 'http-authorization') return undefined
     if (typeof parsed.value !== 'string' || !parsed.value) return undefined
+    if (parsed.kind === 'http-authorization' && !/^(Basic|Bearer) [^\r\n]+$/.test(parsed.value)) return undefined
     if (parsed.param !== undefined && typeof parsed.param !== 'string') return undefined
     return {
       key,
@@ -140,6 +141,13 @@ export function putSessionCredential(input: {
 
 export function getSessionCredential(key: string): StoredCredential | undefined {
   return memory.get(key)
+}
+
+/** Existing bearer records contain the token; explicit HTTP records contain the complete header. */
+export function credentialAuthorization(credential: StoredCredential): string | undefined {
+  if (credential.kind === 'bearer') return `Bearer ${credential.value}`
+  if (credential.kind === 'http-authorization' && /^(Basic|Bearer) [^\r\n]+$/.test(credential.value)) return credential.value
+  return undefined
 }
 
 /**

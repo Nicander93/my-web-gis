@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createDefaultLayerStyle, createProject, parseProjectSnapshot, serializeProjectSnapshot } from '@desktop-webgis/gis-core'
+import { createDefaultLayerStyle, createProject, prepareProjectContent, parseProjectSnapshot, serializeProjectSnapshot } from '@desktop-webgis/gis-core'
 import type { ProjectSnapshot, VectorDataset } from '@desktop-webgis/gis-core'
 import { createProjectFromSceneDocument, createProjectSceneDocument } from '@/features/scene/project-scene-document'
 import { assignSourceCrs } from './source-crs'
@@ -11,7 +11,10 @@ function fixture(): { snapshot: ProjectSnapshot; dataset: VectorDataset } {
   project.datasets = [dataset]
   project.layers = ['a', 'b'].map(id => ({ id, name: id, datasetId: dataset.id, editable: true, visible: true, opacity: 1, style: createDefaultLayerStyle('point') }))
   project.rootOrder = project.layers.map(layer => ({ type: 'layer', id: layer.id }))
-  return { dataset, snapshot: { project, featuresByDataset: { data: [{ id: 'point', geometry: { type: 'Point', coordinates: [116, 39, 12] }, properties: { code: '001' }, metadata: { sourceCrs: 'EPSG:4326' } }] } } }
+  const normalized = prepareProjectContent(project)
+  const normalizedDataset = normalized.datasets[0]
+  if (normalizedDataset.kind !== 'vector') throw new Error('Expected vector fixture')
+  return { dataset: normalizedDataset, snapshot: { project: normalized, featuresByDataset: { data: [{ id: 'point', geometry: { type: 'Point', coordinates: [116, 39, 12] }, properties: { code: '001' }, metadata: { sourceCrs: 'EPSG:4326' } }] } } }
 }
 
 describe('source CRS assignment', () => {

@@ -1,5 +1,5 @@
 /**
- * 样式草稿辅助：字段枚举、重新分类、色带应用。
+ * 样式编辑辅助：字段枚举、重新分类、色带应用。
  * 重新分类是明确动作；属性编辑沿用现有断点，不在此重算。
  */
 
@@ -59,8 +59,17 @@ function baseSymbolFromStyle(style: LayerStyle): Symbol {
   return cloneValue(style.fallback)
 }
 
-function rampColors(rampId: string, count: number): Color[] {
+function rampColors(rampId: string, count: number, customColors?: string[]): Color[] {
   if (count < 1) return []
+  if (customColors && customColors.length >= 2) {
+    const stops = customColors.map(hexToColor)
+    return Array.from({ length: count }, (_, index) => {
+      const position = count === 1 ? 0 : index / (count - 1) * (stops.length - 1)
+      const lower = Math.floor(position), upper = Math.min(lower + 1, stops.length - 1), ratio = position - lower
+      const a = stops[lower], b = stops[upper]
+      return { r: Math.round(a.r + (b.r - a.r) * ratio), g: Math.round(a.g + (b.g - a.g) * ratio), b: Math.round(a.b + (b.b - a.b) * ratio), a: 1 }
+    })
+  }
   if (rampId === 'Rainbow') {
     const stops = ColorRamps.Rainbow.colors
     if (count === 1) return [stops[0]]
@@ -166,7 +175,7 @@ export function withLabel(style: LayerStyle, label: LabelConfig | undefined): La
 export function reclassifyStyle(
   style: LayerStyle,
   features: GisFeature[],
-  options: { classCount: number; colorRampId: string }
+  options: { classCount: number; colorRampId: string; customColors?: string[] }
 ): { style: LayerStyle; error?: string } {
   const label = style.label
   const base = baseSymbolFromStyle(style)
@@ -189,7 +198,7 @@ export function reclassifyStyle(
     if (values.length === 0) {
       return { style, error: '字段没有可用于分类的值' }
     }
-    const colors = rampColors(options.colorRampId, values.length)
+    const colors = rampColors(options.colorRampId, values.length, options.customColors)
     const categories: CategoryItem[] = values.map((value, index) => ({
       value,
       label: String(value),
@@ -212,7 +221,7 @@ export function reclassifyStyle(
     return { style, error: result.error ?? '分级失败' }
   }
 
-  const colors = rampColors(options.colorRampId, result.breaks.length)
+  const colors = rampColors(options.colorRampId, result.breaks.length, options.customColors)
   const breaks: GraduatedBreak[] = result.breaks.map((value, index) => ({
     value,
     symbol: cloneSymbolWithColor(base, colors[index] ?? colors[colors.length - 1] ?? rgb(128, 128, 128))

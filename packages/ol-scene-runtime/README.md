@@ -2,6 +2,8 @@
 
 An editor-independent OpenLayers runtime for `SceneManifest` JSON documents.
 
+For v3 browsing, `new OlDocumentRuntime({ target, vectorRenderer: 'webgl' })` opts into the conservative standard-style GPU adapter. Canvas remains the default. Unsupported styles, node filters and interactive nodes fall back to Canvas with `getIssues()` diagnostics; unavailable required GL extensions and context loss also retain Canvas rendering. GPU nodes expose a `LayerGroup` from `getLayer`, not a Canvas VectorLayer. Use `getFilteredFeatures` for source records, and remove layers before idempotent disposal. Host-owned sources are never disposed. See the [P6 compatibility and benchmark record](../../docs/design/2d-cartography-p6/README.md).
+
 ```ts
 import { createSceneRuntime } from '@desktop-webgis/ol-scene-runtime'
 

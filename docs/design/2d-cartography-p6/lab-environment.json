@@ -1,0 +1,11 @@
+{
+  "geoserverVersion": "2.28.2",
+  "geoserverUrl": "https://downloads.sourceforge.net/project/geoserver/GeoServer/2.28.2/geoserver-2.28.2-bin.zip",
+  "geoserverSha256": "1a9dfc36e1bdd88e1117ef552f96e64b4b88514f7f2006f0e45a8b9223b170b4",
+  "mbstylePluginUrl": "https://downloads.sourceforge.net/project/geoserver/GeoServer/2.28.2/extensions/geoserver-2.28.2-mbstyle-plugin.zip",
+  "mbstylePluginSha256": "c32dc49664b45ad295bde9b3af3d91272f8b5986cca5c2630d70f128ec4d437d",
+  "javaVersion": "Temurin 17.0.20.1+1 JRE x64",
+  "javaUrl": "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jre_x64_windows_hotspot_17.0.20.1_1.zip",
+  "javaSha256": "bc21a93923103cdaac93ee337b0ae4365e739fde36df823dd456bc67c8a9d352",
+  "port": 18085
+}

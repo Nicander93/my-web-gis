@@ -1,0 +1,25 @@
+{
+  "version": 8,
+  "name": "mbstyle-migrated-line-stroke-1792632218558",
+  "layers": [
+    {
+      "id": "gis-c03c19715b52cb08-single-0-line-0-0",
+      "type": "line",
+      "filter": [
+        "==",
+        [
+          "geometry-type"
+        ],
+        "LineString"
+      ],
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round"
+      },
+      "paint": {
+        "line-color": "rgba(36, 117, 166, 1)",
+        "line-width": 3.5
+      }
+    }
+  ]
+}

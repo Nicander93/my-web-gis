@@ -1,0 +1,246 @@
+{
+  "generatedAt": "2026-10-22T01:15:01.152Z",
+  "note": "Browser measurements, not native GPU acceptance or a universal speed guarantee. Five warm pan frames measure rendercomplete scheduling; initial pixel readback is excluded from warm frames.",
+  "results": [
+    {
+      "requested": "canvas",
+      "actual": "canvas",
+      "count": 1000,
+      "mode": "circle",
+      "coloredPixels": 180805,
+      "gpuRenderer": "",
+      "prepareMs": 15.599999999627471,
+      "firstRenderMs": 16.09999999962747,
+      "frames": [
+        4.599999999627471,
+        5.7999999998137355,
+        4.7999999998137355,
+        4.2000000001862645,
+        3.7999999998137355
+      ],
+      "issues": [],
+      "revision": 1,
+      "nativeFeatureCount": 1000
+    },
+    {
+      "requested": "webgl",
+      "actual": "webgl",
+      "count": 1000,
+      "mode": "circle",
+      "coloredPixels": 44457,
+      "gpuRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "prepareMs": 10.299999999813735,
+      "firstRenderMs": 66.70000000018626,
+      "frames": [
+        0.39999999944120646,
+        69.20000000018626,
+        46.299999999813735,
+        50.40000000037253,
+        50.5
+      ],
+      "issues": [],
+      "revision": 2,
+      "nativeFeatureCount": 1000
+    },
+    {
+      "requested": "canvas",
+      "actual": "canvas",
+      "count": 1000,
+      "mode": "line",
+      "coloredPixels": 59346,
+      "gpuRenderer": "",
+      "prepareMs": 7.3999999994412065,
+      "firstRenderMs": 7.7999999998137355,
+      "frames": [
+        1.300000000745058,
+        3.699999999254942,
+        2.400000000372529,
+        2.2000000001862645,
+        2
+      ],
+      "issues": [],
+      "revision": 3,
+      "nativeFeatureCount": 1000
+    },
+    {
+      "requested": "webgl",
+      "actual": "webgl",
+      "count": 1000,
+      "mode": "line",
+      "coloredPixels": 12900,
+      "gpuRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "prepareMs": 9.200000000186265,
+      "firstRenderMs": 75.09999999962747,
+      "frames": [
+        0.40000000037252903,
+        52.700000000186265,
+        53.5,
+        48,
+        47
+      ],
+      "issues": [],
+      "revision": 4,
+      "nativeFeatureCount": 1000
+    },
+    {
+      "requested": "canvas",
+      "actual": "canvas",
+      "count": 1000,
+      "mode": "fill",
+      "coloredPixels": 140729,
+      "gpuRenderer": "",
+      "prepareMs": 10.399999999441206,
+      "firstRenderMs": 11,
+      "frames": [
+        2.400000000372529,
+        5.2000000001862645,
+        5.599999999627471,
+        5.400000000372529,
+        3.2999999998137355
+      ],
+      "issues": [],
+      "revision": 5,
+      "nativeFeatureCount": 1000
+    },
+    {
+      "requested": "webgl",
+      "actual": "webgl",
+      "count": 1000,
+      "mode": "fill",
+      "coloredPixels": 34658,
+      "gpuRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "prepareMs": 11.299999999813735,
+      "firstRenderMs": 132.59999999962747,
+      "frames": [
+        0.2999999998137355,
+        200,
+        137.80000000074506,
+        135.19999999925494,
+        135.20000000018626
+      ],
+      "issues": [],
+      "revision": 6,
+      "nativeFeatureCount": 1000
+    },
+    {
+      "requested": "canvas",
+      "actual": "canvas",
+      "count": 1000,
+      "mode": "road",
+      "coloredPixels": 180360,
+      "gpuRenderer": "",
+      "prepareMs": 6.900000000372529,
+      "firstRenderMs": 8.599999999627471,
+      "frames": [
+        3.900000000372529,
+        7.7000000001862645,
+        5.599999999627471,
+        5.400000000372529,
+        7.599999999627471
+      ],
+      "issues": [],
+      "revision": 7,
+      "nativeFeatureCount": 1000
+    },
+    {
+      "requested": "webgl",
+      "actual": "webgl",
+      "count": 1000,
+      "mode": "road",
+      "coloredPixels": 24378,
+      "gpuRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "prepareMs": 8.899999999441206,
+      "firstRenderMs": 117.90000000037253,
+      "frames": [
+        0.40000000037252903,
+        98.09999999962747,
+        72.90000000037253,
+        80.69999999925494,
+        83.20000000018626
+      ],
+      "issues": [],
+      "revision": 8,
+      "nativeFeatureCount": 1000
+    },
+    {
+      "requested": "canvas",
+      "actual": "canvas",
+      "count": 10000,
+      "mode": "circle",
+      "coloredPixels": 225587,
+      "gpuRenderer": "",
+      "prepareMs": 48.5,
+      "firstRenderMs": 45.700000000186265,
+      "frames": [
+        18.899999999441206,
+        39.299999999813735,
+        37.60000000055879,
+        36.5,
+        37.59999999962747
+      ],
+      "issues": [],
+      "revision": 12,
+      "nativeFeatureCount": 10000
+    },
+    {
+      "requested": "webgl",
+      "actual": "webgl",
+      "count": 10000,
+      "mode": "circle",
+      "coloredPixels": 55938,
+      "gpuRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "prepareMs": 52.89999999944121,
+      "firstRenderMs": 213.29999999981374,
+      "frames": [
+        0.20000000018626451,
+        487.40000000037253,
+        335.3999999994412,
+        331.5,
+        340
+      ],
+      "issues": [],
+      "revision": 13,
+      "nativeFeatureCount": 10000
+    },
+    {
+      "requested": "canvas",
+      "actual": "canvas",
+      "count": 50000,
+      "mode": "circle",
+      "coloredPixels": 225807,
+      "gpuRenderer": "",
+      "prepareMs": 279.40000000037253,
+      "firstRenderMs": 197,
+      "frames": [
+        96.19999999925494,
+        193.5,
+        214.30000000074506,
+        217.8999999994412,
+        201.29999999981374
+      ],
+      "issues": [],
+      "revision": 14,
+      "nativeFeatureCount": 50000
+    },
+    {
+      "requested": "webgl",
+      "actual": "webgl",
+      "count": 50000,
+      "mode": "circle",
+      "coloredPixels": 56233,
+      "gpuRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "prepareMs": 248.80000000074506,
+      "firstRenderMs": 864.2999999998137,
+      "frames": [
+        0.09999999962747097,
+        2375.7999999998137,
+        1578.300000000745,
+        1570,
+        1610.8999999994412
+      ],
+      "issues": [],
+      "revision": 15,
+      "nativeFeatureCount": 50000
+    }
+  ]
+}

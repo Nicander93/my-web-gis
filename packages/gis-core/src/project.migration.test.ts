@@ -99,7 +99,7 @@ describe('样式迁移', () => {
       version: 1,
       name: 'Test Project',
       crs: 'EPSG:3857',
-      datasets: [],
+      datasets: [{ id: 'dataset-1', name: 'Test', kind: 'vector', source: { type: 'memory', label: 'Test' } }],
       layers: [
         {
           id: 'layer-1',

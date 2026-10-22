@@ -16,27 +16,10 @@ import type { PopupDefinition } from '@desktop-webgis/scene-schema'
 import {
   capabilitiesForDataset,
   cloneValue,
-  isLegacyStyle,
-  migrateLegacyStyle,
   getEffectiveLocked
 } from '@desktop-webgis/gis-core'
 import type { LayerStyle } from '@desktop-webgis/ol-style'
-
-interface StyleConfigOp {
-  layerId: string
-  before: LayerStyle
-  after: LayerStyle
-}
-
-const styleUndoStack: StyleConfigOp[] = []
-const styleRedoStack: StyleConfigOp[] = []
-
-function normalizeStyle(style: LayerStyle | { kind: string }): LayerStyle {
-  if (isLegacyStyle(style as never)) {
-    return migrateLegacyStyle(style as never)
-  }
-  return cloneValue(style as LayerStyle)
-}
+import { finishStyleInteraction } from '@/features/inspector/style-interaction'
 
 function requireSelectedLayerId(): string | null {
   const layerId = useProjectStore.getState().selectedLayerId
@@ -121,16 +104,8 @@ export function getLayerCapabilities(layerId: string | null): {
 
 /** 配置目标变化前处理未应用草稿，浏览图层不触发配置切换。 */
 function openInspector(id: string, tab: 'layer' | 'style' | 'label'): void {
+  finishStyleInteraction()
   const workbench = useWorkbenchStore.getState()
-  const previous = workbench.inspectorLayerId
-  if (
-    previous &&
-    previous !== id &&
-    useSessionStore.getState().getLayerSession(previous).styleDraft?.dirty
-  ) {
-    workbench.setPendingInspector({ layerId: id, tab })
-    return
-  }
   workbench.bindInspector(id)
   useSessionStore.getState().setInspectorTab(id, tab)
   useWorkspaceStore.getState().setRightOpen(true)
@@ -363,7 +338,7 @@ export const layerCommands = {
 
   /**
    * 一次应用 = 一次可撤销配置操作。
-   * 草稿写入项目图层样式，并同步会话草稿为干净状态。
+   * 兼容命令入口；样式直接写入工程与统一历史。
    */
   applyStyle(layerId: string, style: LayerStyle): boolean {
     const projectState = useProjectStore.getState()
@@ -380,43 +355,12 @@ export const layerCommands = {
     // setLayerStyle records a SetLayerStyleCommand on the unified EditHistory.
     projectState.setLayerStyle(layerId, after)
 
-    useSessionStore.getState().setStyleDraft(layerId, {
-      style: cloneValue(after),
-      dirty: false,
-      classCount:
-        after.mode === 'graduated' ? Math.max(after.breaks.length, 1) : 5,
-      colorRampId:
-        useSessionStore.getState().getLayerSession(layerId).styleDraft
-          ?.colorRampId ?? 'BlueRed'
-    })
-
     emitCommandStatus('已应用样式')
     return true
   },
 
-  /** 重置草稿为当前已应用样式 */
-  resetStyleDraft(layerId: string): void {
-    const applied = useProjectStore.getState().getNormalizedLayerStyle(layerId)
-    if (!applied) {
-      emitCommandStatus('图层不存在')
-      return
-    }
-    const existing = useSessionStore
-      .getState()
-      .getLayerSession(layerId).styleDraft
-    useSessionStore.getState().setStyleDraft(layerId, {
-      style: cloneValue(applied),
-      dirty: false,
-      classCount:
-        existing?.classCount ??
-        (applied.mode === 'graduated' ? Math.max(applied.breaks.length, 1) : 5),
-      colorRampId: existing?.colorRampId ?? 'BlueRed'
-    })
-    emitCommandStatus('已重置样式草稿')
-  },
-
   undoStyle(): boolean {
-    // Style shares the unified project EditHistory; prefer editCommands.undo.
+    finishStyleInteraction()
     if (!useProjectStore.getState().canUndoEdit()) return false
     const ok = useProjectStore.getState().undoEdit()
     if (ok) emitCommandStatus('已撤销')
@@ -425,6 +369,7 @@ export const layerCommands = {
   },
 
   redoStyle(): boolean {
+    finishStyleInteraction()
     if (!useProjectStore.getState().canRedoEdit()) return false
     const ok = useProjectStore.getState().redoEdit()
     if (ok) emitCommandStatus('已重做')
@@ -442,8 +387,6 @@ export const layerCommands = {
 
   /** 测试用：清空样式撤销栈 */
   _resetStyleHistoryForTests(): void {
-    styleUndoStack.length = 0
     useProjectStore.getState()._resetProjectHistoryForTests?.()
-    styleRedoStack.length = 0
   }
 }

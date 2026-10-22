@@ -68,6 +68,11 @@ body {
   line-height: 1.55;
 }
 
+.scene-header label { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; }
+.scene-header label[hidden] { display: none; }
+.scene-header select { font: inherit; padding: 4px 6px; border: 1px solid #c9d2df; border-radius: 4px; color: inherit; background: transparent; }
+:root[data-color-scheme="dark"] .scene-header select { color-scheme: dark; }
+
 .scene-panel {
   width: 220px;
   padding: 14px;

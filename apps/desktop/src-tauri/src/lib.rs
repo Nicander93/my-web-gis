@@ -1,6 +1,7 @@
 mod atomic_file;
 mod recovery_cache;
 mod local_resources;
+mod geoserver_http;
 
 #[tauri::command]
 fn grant_local_resource_directory(resources: tauri::State<'_, local_resources::LocalResources>, directory: String) -> Result<local_resources::Grant, String> {
@@ -245,6 +246,7 @@ fn secure_credential_delete(key: String) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .manage(local_resources::LocalResources::default())
+        .manage(geoserver_http::GeoServerHttpRequests::default())
         .register_asynchronous_uri_scheme_protocol("webgis-resource", |context, request, responder| {
             use tauri::Manager;
             let app = context.app_handle();
@@ -269,6 +271,8 @@ pub fn run() {
             persist_scene_archive,
             read_cached_scene_resource,
             http_get_text,
+            geoserver_http::geoserver_http_request,
+            geoserver_http::cancel_geoserver_http_request,
             secure_credential_set,
             secure_credential_get,
             secure_credential_delete

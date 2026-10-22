@@ -83,19 +83,15 @@ describe('dataset field schema transactions', () => {
     expect(useProjectStore.getState().getSnapshot()).toEqual(before)
   })
 
-  it('protects unapplied style drafts during execution and history recovery', () => {
-    const edit = command({ type: 'rename', from: 'value', to: 'population' })
-    useSessionStore.getState().setStyleDraft('second', { style: { mode: 'single', symbol: { type: 'circle', radius: 10 } },
-      dirty: true, classCount: 5, colorRampId: 'BlueRed' })
+  it('keeps immediate style edits in the same history as field schema edits', () => {
+    useProjectStore.getState().setLayerStyle('second', { mode: 'single', symbol: { type: 'circle', radius: 10 } })
     const before = useProjectStore.getState().getSnapshot()
-    expect(() => useProjectStore.getState().executeEditCommand(edit)).toThrow(/样式草稿/)
+    useProjectStore.getState().executeEditCommand(command({ type: 'rename', from: 'value', to: 'population' }))
+    expect(useProjectStore.getState().getHistoryBlockReason('undo')).toBeNull()
+    expect(useProjectStore.getState().undoEdit()).toBe(true)
     expect(useProjectStore.getState().getSnapshot()).toEqual(before)
-    expect(useProjectStore.getState().canUndoEdit()).toBe(false)
-    useSessionStore.getState().patchStyleDraft('second', { dirty: false })
-    useProjectStore.getState().executeEditCommand(edit)
-    useSessionStore.getState().patchStyleDraft('second', { dirty: true })
-    expect(useProjectStore.getState().getHistoryBlockReason('undo')).toMatch(/字段编辑/)
-    expect(useProjectStore.getState().undoEdit()).toBe(false)
+    expect(useProjectStore.getState().undoEdit()).toBe(true)
+    expect(useProjectStore.getState().project.layers[1].style).not.toEqual(before.project.layers[1].style)
   })
 
   it('adds typed defaults to every feature and preserves the string value on undo/redo', () => {

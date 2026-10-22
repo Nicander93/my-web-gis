@@ -1,4 +1,4 @@
-import { parseSceneDocument, type SceneDocument, type SceneDocumentView, type SceneNode, type SceneResource } from '@desktop-webgis/scene-schema'
+import { reconcileSceneCartography, parseSceneDocument, type SceneDocument, type SceneDocumentView, type SceneNode, type SceneResource } from '@desktop-webgis/scene-schema'
 import { addSceneNode, addSceneResource, moveSceneNode, removeSceneNode, removeSceneResource, replaceSceneNode, replaceSceneResource, serializeSceneDocument, setSceneDocumentView, setSceneEnvironment } from './document.js'
 
 export interface SceneChange {
@@ -80,7 +80,7 @@ export class SceneController {
       }
     } finally { this.mutating = false }
     if (JSON.stringify(before) !== JSON.stringify(this.getDocument())) throw new Error('Host content changed during the scene transaction')
-    return this.commit(label, parseSceneDocument(draft))
+    return this.commit(label, parseSceneDocument(reconcileSceneCartography(draft, before)))
   }
   replaceDocument(input: unknown, label = 'Replace scene'): SceneCommitResult {
     this.requireActive()

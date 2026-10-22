@@ -1,0 +1,13 @@
+[
+  {
+    "path": "/layers",
+    "level": "approximated",
+    "reason": "CRS EPSG:26713 未指定目标地图宽度，比例尺按 EPSG:3857 512px 世界瓦片近似"
+  },
+  {
+    "path": "/layers/zoom-road/paint/line-width",
+    "level": "approximated",
+    "reason": "按固定 previewZoom=10 计算单一输出值，SLD 不包含原连续 Zoom 变化",
+    "proposedFallback": "调整目标预览 Zoom 或改用固定值"
+  }
+]

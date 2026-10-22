@@ -1,0 +1,282 @@
+{
+  "geoserverVersion": {
+    "about": {
+      "resource": [
+        {
+          "@name": "GeoServer",
+          "Build-Timestamp": "21-Jan-2026 14:18",
+          "Version": "2.28.2",
+          "Git-Revision": "a734dff4450bfceaabcd0366a8b4b948e0656861"
+        },
+        {
+          "@name": "GeoTools",
+          "Build-Timestamp": "21-Jan-2026 00:23",
+          "Version": 34.2,
+          "Git-Revision": "d43e0c0bc071f7f427c961f540cfb35a60895800"
+        },
+        {
+          "@name": "GeoWebCache",
+          "Version": "1.28.2",
+          "Git-Revision": "1.28.x/ad2f2a10ac01c2af718ca2a7bb13d30d672ce3bb"
+        }
+      ]
+    }
+  },
+  "generatedAt": "2026-10-21T14:37:02.312Z",
+  "endpoint": "http://127.0.0.1:18085/geoserver",
+  "workspace": "sf",
+  "dimensions": {
+    "width": 256,
+    "height": 256,
+    "pixelRatio": 1
+  },
+  "renderingPath": "GeoServer WFS GeoJSON -> OpenLayers EPSG:3857 VectorSource -> createMapLibreCanvasBinding; same WFS FeatureCollection -> SLD 1.0 exporter -> REST temporary named-style upload -> GeoServer WMS GetMap with STYLES -> temporary-style cleanup",
+  "cases": [
+    {
+      "id": "roads-solid-stroke",
+      "target": "sf:roads",
+      "temporarySldResource": "uploaded for WMS render and deleted after response",
+      "store": "sf",
+      "crs": "EPSG:3857",
+      "extent": [
+        -11564149.114313936,
+        5518327.170062022,
+        -11534615.276310688,
+        5547861.00806527
+      ],
+      "width": 256,
+      "height": 256,
+      "pixelRatio": 1,
+      "wfsFeatureCount": 825,
+      "wfsFeatureCollectionSha256": "8d6aa88fc0f6f9fb4bd5e41cb8637ef388cae2fb0677293f3f42f204ffed6e0a",
+      "mapLibreStyleLayers": [
+        {
+          "id": "solid",
+          "source": "wfs-fixture",
+          "type": "line",
+          "paint": {
+            "line-color": "#cc563f",
+            "line-width": 4.5
+          },
+          "layout": {
+            "line-cap": "round",
+            "line-join": "round"
+          }
+        }
+      ],
+      "sldCompatibility": "supported",
+      "issues": [],
+      "openLayersPng": "roads-solid-stroke.openlayers.png",
+      "geoServerWmsPng": "roads-solid-stroke.geoserver-wms.png",
+      "differencePng": "roads-solid-stroke.difference.png",
+      "differenceMetrics": {
+        "meanAbsoluteChannelDifference": 3.5914344787597656,
+        "pixelsOverThreshold": 5760
+      },
+      "note": "Difference metrics record renderer divergence; they are not a pixel-equivalence acceptance threshold."
+    },
+    {
+      "id": "roads-dashed-stroke",
+      "target": "sf:roads",
+      "temporarySldResource": "uploaded for WMS render and deleted after response",
+      "store": "sf",
+      "crs": "EPSG:3857",
+      "extent": [
+        -11564149.114313936,
+        5518327.170062022,
+        -11534615.276310688,
+        5547861.00806527
+      ],
+      "width": 256,
+      "height": 256,
+      "pixelRatio": 1,
+      "wfsFeatureCount": 825,
+      "wfsFeatureCollectionSha256": "8d6aa88fc0f6f9fb4bd5e41cb8637ef388cae2fb0677293f3f42f204ffed6e0a",
+      "mapLibreStyleLayers": [
+        {
+          "id": "dashed",
+          "source": "wfs-fixture",
+          "type": "line",
+          "paint": {
+            "line-color": "#59477c",
+            "line-width": 3.5,
+            "line-dasharray": [
+              5,
+              2
+            ]
+          },
+          "layout": {
+            "line-cap": "butt",
+            "line-join": "round"
+          }
+        }
+      ],
+      "sldCompatibility": "supported",
+      "issues": [],
+      "openLayersPng": "roads-dashed-stroke.openlayers.png",
+      "geoServerWmsPng": "roads-dashed-stroke.geoserver-wms.png",
+      "differencePng": "roads-dashed-stroke.difference.png",
+      "differenceMetrics": {
+        "meanAbsoluteChannelDifference": 3.1728897094726562,
+        "pixelsOverThreshold": 5817
+      },
+      "note": "Difference metrics record renderer divergence; they are not a pixel-equivalence acceptance threshold."
+    },
+    {
+      "id": "restricted-transparent-fill",
+      "target": "sf:restricted",
+      "temporarySldResource": "uploaded for WMS render and deleted after response",
+      "store": "sf",
+      "crs": "EPSG:3857",
+      "extent": [
+        -11561968.728251126,
+        5526401.357413456,
+        -11547733.438424308,
+        5540636.647240274
+      ],
+      "width": 256,
+      "height": 256,
+      "pixelRatio": 1,
+      "wfsFeatureCount": 4,
+      "wfsFeatureCollectionSha256": "c754e0eb5015addcadb7ebb0c6debdb4060ddbeb049dacf8f7f99190919a2493",
+      "mapLibreStyleLayers": [
+        {
+          "id": "transparent-fill",
+          "source": "wfs-fixture",
+          "type": "fill",
+          "paint": {
+            "fill-color": "#36a978",
+            "fill-opacity": 0.34,
+            "fill-outline-color": "#146647"
+          }
+        }
+      ],
+      "sldCompatibility": "supported",
+      "issues": [],
+      "openLayersPng": "restricted-transparent-fill.openlayers.png",
+      "geoServerWmsPng": "restricted-transparent-fill.geoserver-wms.png",
+      "differencePng": "restricted-transparent-fill.difference.png",
+      "differenceMetrics": {
+        "meanAbsoluteChannelDifference": 0.5544471740722656,
+        "pixelsOverThreshold": 1541
+      },
+      "note": "Difference metrics record renderer divergence; they are not a pixel-equivalence acceptance threshold."
+    },
+    {
+      "id": "roads-text-halo",
+      "target": "sf:roads",
+      "temporarySldResource": "uploaded for WMS render and deleted after response",
+      "store": "sf",
+      "crs": "EPSG:3857",
+      "extent": [
+        -11564149.114313936,
+        5518327.170062022,
+        -11534615.276310688,
+        5547861.00806527
+      ],
+      "width": 256,
+      "height": 256,
+      "pixelRatio": 1,
+      "wfsFeatureCount": 825,
+      "wfsFeatureCollectionSha256": "8d6aa88fc0f6f9fb4bd5e41cb8637ef388cae2fb0677293f3f42f204ffed6e0a",
+      "mapLibreStyleLayers": [
+        {
+          "id": "text-halo",
+          "type": "symbol",
+          "source": "wfs-fixture",
+          "layout": {
+            "text-field": [
+              "get",
+              "label"
+            ],
+            "text-font": [
+              "SansSerif"
+            ],
+            "text-size": 13,
+            "symbol-placement": "line"
+          },
+          "paint": {
+            "text-color": "#25221f",
+            "text-halo-color": "#fffdf7",
+            "text-halo-width": 2.25
+          }
+        }
+      ],
+      "sldCompatibility": "supported",
+      "issues": [],
+      "openLayersPng": "roads-text-halo.openlayers.png",
+      "geoServerWmsPng": "roads-text-halo.geoserver-wms.png",
+      "differencePng": "roads-text-halo.difference.png",
+      "differenceMetrics": {
+        "meanAbsoluteChannelDifference": 44.168514251708984,
+        "pixelsOverThreshold": 13813
+      },
+      "note": "Difference metrics record renderer divergence; they are not a pixel-equivalence acceptance threshold."
+    },
+    {
+      "id": "roads-builtin-primary-casing-order",
+      "target": "sf:roads",
+      "temporarySldResource": "uploaded for WMS render and deleted after response",
+      "store": "sf",
+      "crs": "EPSG:3857",
+      "extent": [
+        -11564149.114313936,
+        5518327.170062022,
+        -11534615.276310688,
+        5547861.00806527
+      ],
+      "width": 256,
+      "height": 256,
+      "pixelRatio": 1,
+      "wfsFeatureCount": 825,
+      "wfsFeatureCollectionSha256": "8d6aa88fc0f6f9fb4bd5e41cb8637ef388cae2fb0677293f3f42f204ffed6e0a",
+      "mapLibreStyleLayers": [
+        {
+          "id": "casing",
+          "source": "wfs-fixture",
+          "type": "line",
+          "paint": {
+            "line-color": "#ad7c55",
+            "line-width": 8
+          },
+          "layout": {
+            "line-cap": "round",
+            "line-join": "round"
+          }
+        },
+        {
+          "id": "surface",
+          "source": "wfs-fixture",
+          "type": "line",
+          "paint": {
+            "line-color": "#ffe6a3",
+            "line-width": 5
+          },
+          "layout": {
+            "line-cap": "round",
+            "line-join": "round"
+          }
+        }
+      ],
+      "featureTypeStyleOrder": [
+        "casing",
+        "surface"
+      ],
+      "sldCompatibility": "supported",
+      "issues": [],
+      "openLayersPng": "roads-builtin-primary-casing-order.openlayers.png",
+      "geoServerWmsPng": "roads-builtin-primary-casing-order.geoserver-wms.png",
+      "differencePng": "roads-builtin-primary-casing-order.difference.png",
+      "differenceMetrics": {
+        "meanAbsoluteChannelDifference": 4.090126037597656,
+        "pixelsOverThreshold": 8967
+      },
+      "note": "Difference metrics record renderer divergence; they are not a pixel-equivalence acceptance threshold."
+    }
+  ],
+  "caveats": [
+    "This is browser Chromium Canvas evidence, not native Tauri evidence.",
+    "The images share WFS data per target, projected extent, CRS, pixel dimensions, and pixel ratio; renderer/text/font and SLD semantics may differ.",
+    "No visual equivalence or acceptance threshold is claimed."
+  ]
+}

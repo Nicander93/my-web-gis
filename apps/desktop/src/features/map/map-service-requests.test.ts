@@ -7,7 +7,7 @@ import type { SceneResource } from '@desktop-webgis/scene-schema'
 import { ensureCredentialLoaded } from '@/services/credentials'
 import { configureMapServiceLayer } from './map-service-requests'
 
-vi.mock('@/services/credentials', () => ({ ensureCredentialLoaded: vi.fn() }))
+vi.mock('@/services/credentials', async importOriginal => ({ ...await importOriginal<typeof import('@/services/credentials')>(), ensureCredentialLoaded: vi.fn() }))
 vi.mock('ol/ImageTile', () => ({ default: class {
   image = Object.assign(new EventTarget(), { src: '' })
   state = TileState.IDLE
@@ -27,6 +27,21 @@ function setup(mode: 'bearer' | 'query-token' = 'bearer') {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.mocked(ensureCredentialLoaded).mockReset() })
 
 describe('map service request adapter', () => {
+  it('loads a published GeoServer WMS using Basic authentication without adding a Bearer prefix', async () => {
+    const { source, layer, resource, tile } = setup()
+    vi.mocked(ensureCredentialLoaded).mockResolvedValue({ key: 'ref', kind: 'http-authorization', value: 'Basic dGVzdDpwdw==' })
+    const fetcher = vi.fn(async () => new Response(new Blob(['image'])))
+    vi.stubGlobal('fetch', fetcher)
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:tile')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const cleanup = configureMapServiceLayer(layer, resource)!
+    source.getTileLoadFunction()(tile, 'https://example.test/wms?LAYERS=roads')
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce())
+    const [url, request] = fetcher.mock.calls[0] as unknown as [string, RequestInit]
+    expect(new Headers(request.headers).get('Authorization')).toBe('Basic dGVzdDpwdw==')
+    expect(url).not.toContain('dGVzdDpwdw==')
+    cleanup()
+  })
   it.each(['bearer', 'query-token'] as const)('injects %s at request time and releases image URLs', async mode => {
     const { source, layer, resource, tile } = setup(mode), before = structuredClone(resource)
     vi.mocked(ensureCredentialLoaded).mockResolvedValue({ key: 'ref', kind: mode, value: 'secret' })

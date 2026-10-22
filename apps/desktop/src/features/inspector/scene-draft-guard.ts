@@ -1,11 +1,7 @@
-import { useSessionStore } from '@/stores/session.store'
+import { finishStyleInteraction } from './style-interaction'
 
-let guard: (() => Promise<boolean>) | null = null
-
-/** Register the application decision UI; absent UI never silently discards drafts. */
-export function registerSceneDraftGuard(callback: (() => Promise<boolean>) | null): void { guard = callback }
-
+/** Compatibility entry for scene replacement; all style values already belong to Project. */
 export async function resolveSceneDrafts(): Promise<boolean> {
-  if (!Object.values(useSessionStore.getState().sessions).some(session => session.styleDraft?.dirty)) return true
-  return guard ? guard() : false
+  finishStyleInteraction()
+  return true
 }

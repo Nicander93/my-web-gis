@@ -4,6 +4,7 @@ import desktop from './playwright.config'
 export default defineConfig({
   ...desktop,
   testMatch: '**/viewer-document.e2e.ts',
+  outputDir: './test-results/viewer-document',
   testIgnore: [],
   use: { ...desktop.use, baseURL: 'http://127.0.0.1:5174' },
   webServer: {

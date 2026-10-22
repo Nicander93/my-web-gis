@@ -1,0 +1,223 @@
+{
+  "scope": "browser Canvas timing; local fixtures; includes style apply Promise, excludes startup and native/GPU claims",
+  "browserVersion": "153.0.8010.12",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+  "compileUpdatesMs": [
+    8.400000000372529,
+    1.5,
+    1.800000000745058,
+    2,
+    2.100000001490116,
+    2.599999999627471
+  ],
+  "compileMedianMs": 2.100000001490116,
+  "fixedFeatureRender": {
+    "count": 1000,
+    "visibleFeatureCount": 1000,
+    "renderPixels": 7070,
+    "compileMs": 2.099999999627471,
+    "renderMs": 23.899999998509884
+  },
+  "zoomConvention": "OL default 256 px view resolution: zOL = zMapLibre + 1; resolution = 156543.03392804097 / 2^(zMapLibre+1)",
+  "pixelResults": {
+    "classification": {
+      "drawn": 9364,
+      "orangeRoad": 2368,
+      "clinicMagenta": 0,
+      "hatchGreen": 0,
+      "darkText": 0
+    },
+    "casing": {
+      "drawn": 9364,
+      "orangeRoad": 2368,
+      "clinicMagenta": 0,
+      "hatchGreen": 0,
+      "darkText": 0
+    },
+    "icon": {
+      "drawn": 1661,
+      "orangeRoad": 0,
+      "clinicMagenta": 36,
+      "hatchGreen": 0,
+      "darkText": 0
+    },
+    "labels": {
+      "drawn": 1277,
+      "orangeRoad": 0,
+      "clinicMagenta": 0,
+      "hatchGreen": 0,
+      "darkText": 83
+    },
+    "pattern": {
+      "drawn": 586,
+      "orangeRoad": 0,
+      "clinicMagenta": 0,
+      "hatchGreen": 0,
+      "darkText": 0
+    }
+  },
+  "referencePixelResults": {
+    "classification": {
+      "drawn": 9682,
+      "orangeRoad": 1992,
+      "clinicMagenta": 0,
+      "hatchGreen": 0,
+      "darkText": 87
+    },
+    "casing": {
+      "drawn": 9682,
+      "orangeRoad": 1992,
+      "clinicMagenta": 0,
+      "hatchGreen": 0,
+      "darkText": 87
+    },
+    "icon": {
+      "drawn": 1689,
+      "orangeRoad": 0,
+      "clinicMagenta": 81,
+      "hatchGreen": 0,
+      "darkText": 0
+    },
+    "labels": {
+      "drawn": 9682,
+      "orangeRoad": 1992,
+      "clinicMagenta": 0,
+      "hatchGreen": 0,
+      "darkText": 87
+    },
+    "pattern": {
+      "drawn": 583,
+      "orangeRoad": 0,
+      "clinicMagenta": 0,
+      "hatchGreen": 0,
+      "darkText": 0
+    }
+  },
+  "referenceSources": {
+    "classification": {
+      "sourceId": "roads",
+      "sameSource": true,
+      "visible": true
+    },
+    "casing": {
+      "sourceId": "roads",
+      "sameSource": true,
+      "visible": true
+    },
+    "icon": {
+      "sourceId": "places",
+      "sameSource": true,
+      "visible": true
+    },
+    "labels": {
+      "sourceId": "roads",
+      "sameSource": true,
+      "visible": true
+    },
+    "pattern": {
+      "sourceId": "parcels",
+      "sameSource": true,
+      "visible": true
+    }
+  },
+  "offsiteRequests": [],
+  "pageErrors": [],
+  "failedRequests": [],
+  "localAssetResponses": [
+    {
+      "url": "http://127.0.0.1:5173/cartography-assets/clinic.svg",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5173/cartography-assets/sprite.png",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5173/cartography-assets/sprite.json",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5173/cartography-assets/sprite.png",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5173/cartography-assets/fonts/segoe-ui/400.css",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5173/cartography-assets/sprite.json",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5173/cartography-assets/sprite.json",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5173/cartography-assets/sprite.json",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5173/cartography-assets/sprite.json",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5173/cartography-assets/sprite.json",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5173/cartography-assets/sprite.json",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5173/cartography-assets/sprite.json",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5173/cartography-assets/sprite.json",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5173/cartography-assets/sprite.json",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5173/cartography-assets/sprite.json",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5173/cartography-assets/sprite.png",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5173/cartography-assets/sprite.json",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5173/cartography-assets/sprite.json",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5173/cartography-assets/sprite.json",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5173/cartography-assets/sprite.json",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5173/cartography-assets/sprite.json",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5173/cartography-assets/sprite.json",
+      "status": 200
+    }
+  ],
+  "screenshots": [
+    "classification.png",
+    "casing.png",
+    "icon.png",
+    "labels.png",
+    "pattern.png"
+  ]
+}

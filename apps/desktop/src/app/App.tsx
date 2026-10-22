@@ -31,8 +31,6 @@ import { NewProjectDialog } from '@/features/project/NewProjectDialog'
 import { getProjectType } from '@/services/project-type'
 import { ProjectStartScreen } from '@/features/project/ProjectStartScreen'
 import { UnsavedProjectDialog } from '@/features/project/UnsavedProjectDialog'
-import { StyleDraftDialog } from '@/features/inspector/StyleDraftDialog'
-import { SceneDraftDialog } from '@/features/inspector/SceneDraftDialog'
 import { HelpDialog } from '@/features/help/HelpDialog'
 import { registerHelpDialog, type HelpDialogPage } from './commands/help.commands'
 import { viewCommands } from './commands/view.commands'
@@ -254,9 +252,7 @@ export default function App() {
           }}
         />
       )}
-      <StyleDraftDialog />
       <RecoveryDraftHost />
-      <SceneDraftDialog />
       {helpPage && <HelpDialog page={helpPage} onClose={() => setHelpPage(null)} />}
       <AddDataDialog
         open={addDataOpen}

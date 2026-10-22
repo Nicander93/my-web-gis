@@ -7,6 +7,7 @@ import { cloneValue } from './clone'
 import type { EditCommand, EditContext } from './editHistory'
 import type { FieldFilterCondition } from './filter'
 import type { Dataset, DatasetField, GisFeature, Layer, LayerGroup, LayerTreeEntry, Project, ProjectSnapshot } from './types'
+import { getLayerCartography, reconcileProjectCartography, remapCartographyField, setLegacyLayerStyle, setLayerCartographyFragment } from './cartography'
 
 export interface ProjectEditContext extends EditContext {
   getProject(): Project
@@ -51,6 +52,8 @@ export class SetDatasetContentCommand implements EditCommand {
   readonly guardedLayerIds: string[]
   private readonly before: DatasetContent
   private readonly after: DatasetContent
+  private beforeCartography?: NonNullable<ReturnType<typeof getLayerCartography>>[]
+  private afterCartography?: NonNullable<ReturnType<typeof getLayerCartography>>[]
   constructor(readonly id: string, readonly label: string,
     private readonly datasetId: string, before: DatasetContent, after: DatasetContent,
     private readonly fieldChange?: { before?: string; after?: string }) {
@@ -59,14 +62,14 @@ export class SetDatasetContentCommand implements EditCommand {
     this.guardedLayerIds = [...new Set([...(before.layers ?? []), ...(after.layers ?? [])].map((layer) => layer.id))]
   }
   execute(context: EditContext): void {
-    this.apply(context, this.after)
+    this.apply(context, this.after, true)
     if (this.fieldChange) requireProjectContext(context).onDatasetFieldChange?.(this.datasetId, this.fieldChange.before, this.fieldChange.after)
   }
   undo(context: EditContext): void {
-    this.apply(context, this.before)
+    this.apply(context, this.before, false)
     if (this.fieldChange) requireProjectContext(context).onDatasetFieldChange?.(this.datasetId, this.fieldChange.after, this.fieldChange.before)
   }
-  private apply(context: EditContext, content: DatasetContent): void {
+  private apply(context: EditContext, content: DatasetContent, forward: boolean): void {
     const ctx = requireProjectContext(context)
     const project = ctx.getProject()
     if (!project.datasets.some((dataset) => dataset.id === this.datasetId)) {
@@ -78,12 +81,28 @@ export class SetDatasetContentCommand implements EditCommand {
         throw new Error('字段编辑的图层已不存在或已绑定其他数据集')
       }
     }
-    ctx.featureStore.setAll(this.datasetId, cloneValue(content.features))
-    ctx.replaceProject({ ...project, layers: project.layers.map((layer) => {
+    let next = { ...project, layers: project.layers.map((layer) => {
       const config = configs.get(layer.id)
       return config ? { ...layer, ...cloneValue(config) } : layer
     }), datasets: project.datasets.map((dataset) =>
-      dataset.id === this.datasetId ? { ...dataset, fields: cloneValue(content.fields) } : dataset) })
+      dataset.id === this.datasetId ? { ...dataset, fields: cloneValue(content.fields) } : dataset) }
+    if (this.fieldChange?.before) {
+      const fragments = (source: Project) => source.layers.filter(layer => layer.datasetId === this.datasetId)
+        .flatMap(layer => { const fragment = getLayerCartography(source, layer.id); return fragment ? [cloneValue(fragment)] : [] })
+      if (!this.beforeCartography) {
+        const normalized = reconcileProjectCartography(project)
+        const beforeCartography = fragments(normalized)
+        next = remapCartographyField(normalized, next, this.datasetId, this.fieldChange.before, this.fieldChange.after)
+        this.beforeCartography = beforeCartography
+        this.afterCartography = fragments(next)
+      } else {
+        for (const fragment of (forward ? this.afterCartography : this.beforeCartography) ?? []) next = setLayerCartographyFragment(next, fragment)
+      }
+    }
+    next = reconcileProjectCartography(next)
+    // Validate the complete content before writing rows, so a rejected expression edit is atomic.
+    ctx.replaceProject(next)
+    ctx.featureStore.setAll(this.datasetId, cloneValue(content.features))
   }
 }
 
@@ -119,7 +138,8 @@ export function getProjectSnapshotChanges(before: ProjectSnapshot, after: Projec
     if (!next) { removedLayers.push(layer.id); continue }
     if (layer.datasetId !== next.datasetId || JSON.stringify(previousDatasets.get(layer.datasetId)) !== JSON.stringify(nextDatasets.get(next.datasetId)) ||
         JSON.stringify(before.featuresByDataset[layer.datasetId] ?? []) !== JSON.stringify(after.featuresByDataset[next.datasetId] ?? [])) changedDatasets.push(layer.id)
-    if (JSON.stringify(layer.style) !== JSON.stringify(next.style)) changedStyles.push(layer.id)
+    if (JSON.stringify(layer.style) !== JSON.stringify(next.style) ||
+        JSON.stringify(getLayerCartography(before.project, layer.id)) !== JSON.stringify(getLayerCartography(after.project, layer.id))) changedStyles.push(layer.id)
   }
   return { removedLayers, dataChangedLayers: changedDatasets, styleChangedLayers: changedStyles }
 }
@@ -128,17 +148,21 @@ export function getProjectSnapshotChanges(before: ProjectSnapshot, after: Projec
 function patchSnapshotContent(current: unknown, before: unknown, after: unknown): unknown {
   if (JSON.stringify(before) === JSON.stringify(after)) return cloneValue(current)
   if (Array.isArray(current) && Array.isArray(before) && Array.isArray(after)) {
-    const keyed = (items: unknown[]): items is Array<Record<string, unknown> & { id: string }> => items.every(item =>
-      !!item && typeof item === 'object' && 'id' in item && typeof item.id === 'string') && new Set(items.map(item => (item as { id: string }).id)).size === items.length
+    const key = (item: unknown): string | undefined => {
+      if (!item || typeof item !== 'object') return undefined
+      const value = 'id' in item ? item.id : 'gisLayerId' in item ? item.gisLayerId : undefined
+      return typeof value === 'string' ? value : undefined
+    }
+    const keyed = (items: unknown[]) => items.every(item => key(item) !== undefined) && new Set(items.map(key)).size === items.length
     if (keyed(current) && keyed(before) && keyed(after)) {
-      const previous = new Map(before.map(item => [item.id, item])), next = new Map(after.map(item => [item.id, item]))
-      const retained = current.filter(item => !previous.has(item.id) || next.has(item.id)).map(item => next.has(item.id) && previous.has(item.id)
-        ? patchSnapshotContent(item, previous.get(item.id), next.get(item.id)) as typeof item : cloneValue(item))
-      const ids = new Set(retained.map(item => item.id))
-      after.forEach(item => { if (!ids.has(item.id) && !previous.has(item.id)) retained.push(cloneValue(item)) })
-      if (JSON.stringify(before.map(item => item.id)) !== JSON.stringify(after.map(item => item.id))) {
-        const rank = new Map(after.map((item, index) => [item.id, index]))
-        retained.sort((a, b) => (rank.get(a.id) ?? after.length) - (rank.get(b.id) ?? after.length))
+      const previous = new Map(before.map(item => [key(item), item])), next = new Map(after.map(item => [key(item), item]))
+      const retained = current.filter(item => !previous.has(key(item)) || next.has(key(item))).map(item => next.has(key(item)) && previous.has(key(item))
+        ? patchSnapshotContent(item, previous.get(key(item)), next.get(key(item))) : cloneValue(item))
+      const ids = new Set(retained.map(key))
+      after.forEach(item => { if (!ids.has(key(item)) && !previous.has(key(item))) retained.push(cloneValue(item)) })
+      if (JSON.stringify(before.map(key)) !== JSON.stringify(after.map(key))) {
+        const rank = new Map(after.map((item, index) => [key(item), index]))
+        retained.sort((a, b) => (rank.get(key(a)) ?? after.length) - (rank.get(key(b)) ?? after.length))
       }
       return retained
     }
@@ -210,26 +234,99 @@ export class AddLocalLayerCommand implements EditCommand {
   }
 }
 
-/** One style/label apply = one undoable config op. */
+/** Immediate style edits share one undo entry only within an explicit gesture. */
 export class SetLayerStyleCommand implements EditCommand {
-  readonly label = '应用样式'
-  readonly mergeable = false
+  readonly label = '编辑样式'
+  readonly mergeable: boolean
+  readonly mergeKey?: string
+  private captured = false
+  private beforeCartography?: ReturnType<typeof getLayerCartography>
+  private after: LayerStyle
+  private readonly before: LayerStyle
 
   constructor(
     readonly id: string,
     private readonly layerId: string,
-    private readonly before: LayerStyle,
-    private readonly after: LayerStyle
-  ) {}
+    before: LayerStyle,
+    after: LayerStyle,
+    transactionId?: string
+  ) {
+    this.before = cloneValue(before)
+    this.after = cloneValue(after)
+    this.mergeable = transactionId !== undefined
+    if (transactionId !== undefined) this.mergeKey = `style:${layerId}:${transactionId}`
+  }
+
+  absorb(next: EditCommand): void {
+    if (!(next instanceof SetLayerStyleCommand)) throw new Error('样式命令只能合并相同类型')
+    this.after = cloneValue(next.after)
+  }
 
   execute(context: EditContext): void {
     const ctx = requireProjectContext(context)
-    ctx.replaceProject(replaceLayer(ctx.getProject(), this.layerId, { style: cloneValue(this.after) }))
+    const project = ctx.getProject()
+    if (!this.captured) {
+      this.beforeCartography = cloneValue(getLayerCartography(project, this.layerId))
+      this.captured = true
+    }
+    ctx.replaceProject(setLegacyLayerStyle(project, this.layerId, this.after))
   }
 
   undo(context: EditContext): void {
     const ctx = requireProjectContext(context)
-    ctx.replaceProject(replaceLayer(ctx.getProject(), this.layerId, { style: cloneValue(this.before) }))
+    const project = replaceLayer(ctx.getProject(), this.layerId, { style: cloneValue(this.before) })
+    ctx.replaceProject(this.beforeCartography
+      ? setLayerCartographyFragment(project, this.beforeCartography)
+      : setLegacyLayerStyle(project, this.layerId, this.before))
+  }
+}
+
+type LayerCartographyFragment = NonNullable<ReturnType<typeof getLayerCartography>>
+
+/** Stores one standard Style Layer fragment without replacing other GIS layers. */
+export class SetLayerCartographyCommand implements EditCommand {
+  readonly label = '编辑标准样式'
+  readonly mergeable: boolean
+  readonly mergeKey?: string
+  private readonly before: LayerCartographyFragment
+  private after: LayerCartographyFragment
+
+  constructor(
+    readonly id: string,
+    private readonly layerId: string,
+    before: LayerCartographyFragment,
+    after: LayerCartographyFragment,
+    transactionId?: string
+  ) {
+    if (before.binding.gisLayerId !== layerId || after.binding.gisLayerId !== layerId) {
+      throw new Error(`标准样式fragment不属于图层 ${layerId}`)
+    }
+    if (
+      before.binding.datasetId !== after.binding.datasetId ||
+      before.binding.styleSourceId !== after.binding.styleSourceId
+    ) {
+      throw new Error(`标准样式编辑不能改变图层 ${layerId} 的数据绑定`)
+    }
+    this.before = cloneValue(before)
+    this.after = cloneValue(after)
+    this.mergeable = transactionId !== undefined
+    if (transactionId !== undefined) this.mergeKey = `cartography:${layerId}:${transactionId}`
+  }
+
+  absorb(next: EditCommand): void {
+    if (!(next instanceof SetLayerCartographyCommand)) throw new Error('标准样式命令只能合并相同类型')
+    this.after = cloneValue(next.after)
+  }
+
+  execute(context: EditContext): void {
+    const ctx = requireProjectContext(context)
+    if (!getLayerCartography(ctx.getProject(), this.layerId)) throw new Error(`图层 ${this.layerId} 不支持二维矢量样式`)
+    ctx.replaceProject(setLayerCartographyFragment(ctx.getProject(), this.after))
+  }
+
+  undo(context: EditContext): void {
+    const ctx = requireProjectContext(context)
+    ctx.replaceProject(setLayerCartographyFragment(ctx.getProject(), this.before))
   }
 }
 

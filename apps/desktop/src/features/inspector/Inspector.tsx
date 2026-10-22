@@ -20,11 +20,7 @@ export function Inspector() {
   const selection = useProjectStore((state) => state.selection)
   const project = useProjectStore((state) => state.project)
   const featuresByDataset = useProjectStore((state) => state.featuresByDataset)
-  const getNormalizedLayerStyle = useProjectStore(
-    (state) => state.getNormalizedLayerStyle
-  )
   const setLayerOpacity = useProjectStore((state) => state.setLayerOpacity)
-  const ensureStyleDraft = useSessionStore((state) => state.ensureStyleDraft)
   const setTab = useSessionStore((state) => state.setInspectorTab)
 
   const layerId = selectedLayerId || 'no-layer'
@@ -66,14 +62,6 @@ export function Inspector() {
         )
       : null
 
-  useEffect(() => {
-    if (!selectedLayerId) return
-    if (!flags.style) return
-    const applied = getNormalizedLayerStyle(selectedLayerId)
-    if (applied) {
-      ensureStyleDraft(selectedLayerId, applied)
-    }
-  }, [selectedLayerId, selectedLayer?.style, getNormalizedLayerStyle, ensureStyleDraft, flags.style])
 
   // Service tile layers have no local attributes — keep users on the layer tab.
   useEffect(() => {

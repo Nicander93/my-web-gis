@@ -61,7 +61,6 @@ describe('scene content import in shared project history', () => {
     const before = useProjectStore.getState().getSnapshot()
     const layer = before.project.layers[0]
     const session = useSessionStore.getState()
-    session.ensureStyleDraft(layer.id, { mode: 'single', symbol: { type: 'circle', radius: 4 } })
     session.setAttributeTableState(layer.id, { searchQuery: 'old-content', currentPage: 8, selectedOnly: true })
     const document = createProjectSceneDocument(before)
     const node = document.nodes.find(node => node.id === layer.id)
@@ -69,8 +68,6 @@ describe('scene content import in shared project history', () => {
     node.style = { mode: 'single', symbol: { type: 'circle', radius: 9 } }
     replaceSceneDocumentAsEdit(document)
     expect(useSessionStore.getState().sessions).toEqual({})
-    const draft = useSessionStore.getState().ensureStyleDraft(layer.id, node.style)
-    expect(draft.style).toEqual(node.style)
     useProjectStore.getState().undoEdit()
     expect(useProjectStore.getState().getSnapshot()).toEqual(before)
     expect(useSessionStore.getState().sessions).toEqual({})
@@ -78,30 +75,20 @@ describe('scene content import in shared project history', () => {
     useProjectStore.getState().loadSnapshot(before)
     expect(useSessionStore.getState().sessions).toEqual({})
   })
-  it('protects dirty drafts before full replacement, undo and redo without consuming history', () => {
+  it('restores immediate style edits after full replacement and through undo/redo', () => {
     useProjectStore.getState().addLayer('data', 'Layer', [], 'point')
     const id = useProjectStore.getState().project.layers[0].id
-    const document = createProjectSceneDocument(useProjectStore.getState().getSnapshot())
-    document.title = 'Next scene'
-    const draft = { style: { mode: 'single' as const, symbol: { type: 'circle' as const, radius: 7 } }, dirty: true, classCount: 5, colorRampId: 'BlueRed' }
-    useSessionStore.getState().setStyleDraft(id, draft)
+    useProjectStore.getState().setLayerStyle(id, { mode: 'single', symbol: { type: 'circle', radius: 7 } })
     const before = useProjectStore.getState().getSnapshot()
-    expect(() => replaceSceneDocumentAsEdit(document)).toThrow('样式草稿')
-    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
-    useSessionStore.getState().patchStyleDraft(id, { dirty: false })
-    replaceSceneDocumentAsEdit(document)
+    const document = createProjectSceneDocument(before)
+    document.title = 'Next scene'
+    expect(replaceSceneDocumentAsEdit(document)).toBe(true)
     const imported = useProjectStore.getState().getSnapshot()
-    useSessionStore.getState().setStyleDraft(id, draft)
-    expect(useProjectStore.getState().undoEdit()).toBe(false)
-    expect(useProjectStore.getState().getHistoryBlockReason('undo')).toContain('样式草稿')
-    expect(useProjectStore.getState().getSnapshot()).toEqual(imported)
-    expect(useSessionStore.getState().sessions[id].styleDraft).toEqual(draft)
-    useSessionStore.getState().patchStyleDraft(id, { dirty: false })
     expect(useProjectStore.getState().undoEdit()).toBe(true)
-    useSessionStore.getState().setStyleDraft(id, draft)
-    expect(useProjectStore.getState().redoEdit()).toBe(false)
     expect(useProjectStore.getState().getSnapshot()).toEqual(before)
-    useSessionStore.getState().patchStyleDraft(id, { dirty: false })
+    expect(useProjectStore.getState().undoEdit()).toBe(true)
+    expect(useProjectStore.getState().project.layers[0].style).not.toEqual(before.project.layers[0].style)
+    expect(useProjectStore.getState().redoEdit()).toBe(true)
     expect(useProjectStore.getState().redoEdit()).toBe(true)
     expect(useProjectStore.getState().getSnapshot()).toEqual(imported)
   })

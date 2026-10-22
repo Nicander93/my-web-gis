@@ -57,15 +57,13 @@ it('rejects empty selections before any command is created', () => {
   expect(useProjectStore.getState().canUndoEdit()).toBe(false)
 })
 
-it('blocks undo only for imported layers with dirty style drafts, preserving unrelated drafts', () => {
-  const state = useProjectStore.getState()
-  useSessionStore.getState().setStyleDraft('existing', { style: state.getNormalizedLayerStyle('existing')!,
-    dirty: true, classCount: 5, colorRampId: 'BlueRed' })
+it('keeps earlier immediate styles and table sessions when undoing an import', () => {
+  useProjectStore.getState().setLayerStyle('existing', { mode: 'single', symbol: { type: 'circle', radius: 12 } })
+  const before = useProjectStore.getState().getSnapshot()
+  const session = structuredClone(useSessionStore.getState().sessions.existing)
   commitLocalImport(result())
   expect(useProjectStore.getState().getHistoryBlockReason('undo')).toBeNull()
-  const imported = useProjectStore.getState().project.layers.at(-1)!
-  useSessionStore.getState().setStyleDraft(imported.id, { style: state.getNormalizedLayerStyle(imported.id)!, dirty: true, classCount: 5, colorRampId: 'BlueRed' })
-  const after = useProjectStore.getState().getSnapshot()
-  expect(useProjectStore.getState().undoEdit()).toBe(false)
-  expect(useProjectStore.getState().getSnapshot()).toEqual(after)
+  expect(useProjectStore.getState().undoEdit()).toBe(true)
+  expect(useProjectStore.getState().getSnapshot()).toEqual(before)
+  expect(useSessionStore.getState().sessions.existing).toEqual(session)
 })

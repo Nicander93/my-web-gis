@@ -1,0 +1,16 @@
+Noto Sans Latin WOFF2 fixture
+
+Purpose: local browser test fixture for cartography font asset import. This fixture is checked into the repository and does not require a runtime network request.
+
+Font: Noto Sans, normal, weight 400, Latin subset, Google Fonts build v42.
+Google Fonts CSS API: https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400&display=swap
+Direct WOFF2 source: https://fonts.gstatic.com/s/notosans/v42/o-0mIpQlx3QUlC5A4PNB6Ryti20_6n1iPHjcz6L1SoM-jCpoiyD9A-9a6VI.woff2
+Google Fonts metadata: https://github.com/google/fonts/blob/main/ofl/notosans/METADATA.pb
+Noto Sans upstream: https://github.com/notofonts/latin-greek-cyrillic
+Upstream license text (verbatim): cartography-font.OFL.txt
+License identifier: SIL Open Font License 1.1
+
+SHA-256 (cartography-font.woff2): 09AEE8065D25508F23A4C3D92CD777AC869C52D93FD868A88F025D888A7937D6
+WOFF2 signature: wOF2
+Size: 13,120 bytes
+SHA-256 (cartography-font.OFL.txt, downloaded verbatim): CEE9892F9F0CC8FE882C9E9537EE6A89621D86EE7CEAF70B02E2B2B1C25C061A

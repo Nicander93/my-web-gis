@@ -1,0 +1,146 @@
+.cartography-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.cartography-editor__heading {
+  color: var(--color-text, #20252a);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.cartography-editor__section {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
+}
+
+.cartography-editor__section + .cartography-editor__section {
+  padding-top: 11px;
+  border-top: 1px solid var(--color-border, #d7dce1);
+}
+
+.cartography-editor__section-title {
+  color: var(--color-text, #303740);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cartography-editor__controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(90px, 1.25fr);
+  gap: 8px 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.cartography-editor__controls > .ant-select,
+.cartography-editor__controls > .ant-btn {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.cartography-editor__field,
+.cartography-editor__compact-control,
+.cartography-editor__switch {
+  display: contents;
+  color: var(--color-text-muted, #68727d);
+  font-size: 12px;
+}
+
+.cartography-editor__field > span,
+.cartography-editor__compact-control > span,
+.cartography-editor__switch > span {
+  min-width: 0;
+}
+
+.cartography-editor .ant-input-number,
+.cartography-editor .ant-select {
+  max-width: 100%;
+  width: 100%;
+}
+
+.cartography-editor .ant-color-picker-trigger {
+  justify-self: start;
+  max-width: 100%;
+}
+
+.cartography-editor .ant-table-wrapper {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.cartography-editor .ant-table-cell {
+  padding-inline: 6px !important;
+}
+
+.cartography-editor .ant-table-cell .ant-input {
+  min-width: 0;
+  padding-inline: 4px;
+}
+
+.cartography-editor .cartography-editor__selected-row > td {
+  background: var(--color-selected, #e9f2fb) !important;
+}
+
+.cartography-editor__empty-classes,
+.cartography-editor__note {
+  color: var(--color-text-muted, #75808a);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.cartography-editor__message {
+  margin-block: 2px;
+}
+
+.cartography-symbol-parts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cartography-symbol-part {
+  min-width: 0;
+}
+
+.cartography-symbol-part + .cartography-symbol-part {
+  padding-top: 9px;
+  border-top: 1px solid var(--color-border, #d7dce1);
+}
+
+.cartography-symbol-title {
+  margin-bottom: 7px;
+  color: var(--color-text-muted, #68727d);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.cartography-control-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(90px, 1.1fr);
+  gap: 8px 10px;
+  align-items: center;
+  min-width: 0;
+  color: var(--color-text-muted, #68727d);
+  font-size: 12px;
+}
+
+.cartography-control-grid .ant-input-number {
+  width: 100%;
+}
+
+.cartography-editor__layer-rendering {
+  gap: 6px;
+}
+
+@media (max-width: 430px) {
+  .cartography-editor__controls,
+  .cartography-control-grid {
+    grid-template-columns: minmax(0, .8fr) minmax(84px, 1fr);
+    gap: 7px;
+  }
+}

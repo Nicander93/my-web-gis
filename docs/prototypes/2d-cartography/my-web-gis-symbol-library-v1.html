@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>my-web-gis · 符号库选择器 V1</title>
+<style>
+:root{color-scheme:light;--bg:#edf0f2;--surface:#fff;--sub:#f8f9fa;--edge:#d7dde2;--soft:#e8ecf0;--ink:#27313a;--muted:#6a7680;--blue:#3e77a8;--selection:#e6f0f8;font:12px/1.45 Inter,"Segoe UI","Microsoft YaHei",Arial,sans-serif;font-synthesis:none}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);display:flex;align-items:center;justify-content:center;padding:24px}
+button,input,select{font:inherit;color:inherit}button{cursor:pointer}button:disabled{opacity:.35;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible,.symbol-tile:focus-visible{outline:2px solid #79a8cd;outline-offset:1px}
+button{border:1px solid #cbd3d9;background:#fff;border-radius:3px;height:27px;padding:0 10px;white-space:nowrap}button:hover:not(:disabled){background:#f3f7fa;border-color:#a9bfcd}button.primary{background:#437ead;border-color:#437ead;color:#fff}button.primary:hover{background:#316d9f}button.plain{border-color:transparent;background:transparent}button.plain:hover{background:#eef3f7}button.active{color:#225d89;border-color:#a7c2d7;background:#e8f1f8}button.small{padding:0 7px;height:24px}
+.window{width:1015px;max-width:100%;height:min(735px,calc(100vh - 48px));min-height:520px;background:var(--surface);border:1px solid #c4cdd5;border-radius:5px;box-shadow:0 17px 45px #26364520;display:flex;flex-direction:column;overflow:hidden}
+.titlebar{height:43px;flex:none;padding:0 15px;display:flex;align-items:center;gap:9px;border-bottom:1px solid var(--edge);background:#f8f9fa}.titlebar strong{font-size:13px;font-weight:650}.titlebar .context{color:#8a929a;font-size:11px}.push{flex:1}
+.kindtabs{height:38px;flex:none;border-bottom:1px solid var(--edge);display:flex;gap:3px;padding-left:14px;align-items:stretch}.kindtab{height:100%;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;color:#64727d;padding:0 18px}.kindtab:hover{background:#f6f8fa}.kindtab.active{background:transparent;border:0;border-bottom:2px solid var(--blue);color:#285f8a;font-weight:650}.kindtab small{font-weight:400;color:#929ba4;margin-left:5px}
+.main{flex:1;min-height:0;display:grid;grid-template-columns:190px minmax(0,1fr)}.sidebar{background:#fbfcfd;border-right:1px solid var(--edge);overflow:auto;padding:10px 7px}.nav-section{font-size:11px;color:#9099a3;padding:12px 10px 5px}.nav-section:first-child{padding-top:3px}.nav-item{display:flex;align-items:center;justify-content:space-between;gap:7px;width:100%;border:0;border-radius:3px;background:transparent;text-align:left;height:30px;padding:0 11px;color:#46535f}.nav-item:hover{background:#eef3f6}.nav-item.active{background:#e5eff8;color:#255e8c;font-weight:600}.nav-count{font-size:11px;color:#9ba6af;font-variant-numeric:tabular-nums}.nav-item.active .nav-count{color:#537c99}.nav-divider{height:1px;background:#e6eaee;margin:8px 7px 0}
+.content{min-width:0;min-height:0;display:flex;flex-direction:column}.tools{height:47px;flex:none;padding:8px 12px;display:flex;align-items:center;gap:9px;border-bottom:1px solid var(--soft)}.search-wrap{position:relative;flex:1;max-width:330px;min-width:130px}.search-wrap input{width:100%;height:29px;border:1px solid #cbd3db;border-radius:3px;padding:0 30px 0 9px;background:#fff}.clear-search{position:absolute;right:4px;top:2px;padding:0 6px;height:24px;border:0;background:transparent;color:#9ca5ae;font-size:15px}.clear-search:hover{background:#eef2f5}.sort{height:29px;min-width:94px;padding:0 5px;border:1px solid #cbd3d9;border-radius:3px;background:#fff}.view-toggle{display:flex;gap:0}.view-toggle button{border-radius:0;padding:0 10px}.view-toggle button:first-child{border-radius:3px 0 0 3px}.view-toggle button:last-child{border-radius:0 3px 3px 0;margin-left:-1px}.result-count{font-size:11px;color:#88939c;white-space:nowrap;font-variant-numeric:tabular-nums}.content-heading{height:32px;flex:none;display:flex;align-items:center;padding:0 14px;gap:9px;border-bottom:1px solid var(--soft);background:#fff}.content-heading strong{font-weight:620}.content-heading .subhead{font-size:11px;color:#9099a0}
+.results{flex:1;min-height:0;overflow:auto;background:#fff;padding:11px 12px 16px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(127px,1fr));align-content:start;gap:9px}.symbol-tile{position:relative;min-height:91px;min-width:0;border:1px solid #e0e5e9;border-radius:3px;background:#fff;display:flex;flex-direction:column;align-items:stretch;padding:5px;cursor:pointer;outline:none}.symbol-tile:hover{border-color:#a7bdcf;background:#fafcfe}.symbol-tile.selected{border-color:#5b94bf;background:#f1f7fc;box-shadow:inset 0 0 0 1px #88b5d5}.thumb{height:57px;display:flex;justify-content:center;align-items:center;overflow:hidden}.thumb svg{width:100%;height:100%;max-width:148px}.tile-name{font-size:11px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:2px 2px 1px;color:#3b4650}.symbol-tile.selected .tile-name{color:#275e86;font-weight:600}.fav-hit{position:absolute;top:2px;right:3px;width:22px;height:22px;border:0;border-radius:2px;padding:0;background:transparent;opacity:0;font-size:15px;line-height:20px;color:#899aa7}.symbol-tile:hover .fav-hit,.symbol-tile:focus-within .fav-hit,.symbol-tile .fav-hit.is-fav{opacity:1}.symbol-tile .fav-hit.is-fav{color:#b7893b}.fav-hit:hover{background:#e9eef2}.source-mini{font-size:9px;color:#8b969f;position:absolute;left:5px;top:4px}
+.grid.list-view{display:block}.list-view .symbol-tile{min-height:47px;height:47px;flex-direction:row;align-items:center;gap:12px;border-width:0 0 1px 0;border-radius:0;padding:1px 30px 1px 8px}.list-view .thumb{width:105px;height:43px;flex:none}.list-view .tile-name{text-align:left;flex:1;font-size:12px}.list-view .source-mini{position:static;width:46px;order:3;font-size:11px}.list-view .fav-hit{opacity:1;right:7px;top:13px}
+.empty{height:100%;min-height:190px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:#858f97}.empty strong{font-weight:600;color:#66737d}
+.footer{height:108px;flex:none;border-top:1px solid var(--edge);background:#fafbfc;display:grid;grid-template-columns:150px minmax(0,1fr) auto;align-items:center;padding:9px 14px;gap:13px}.selected-preview{height:78px;background:#fff;border:1px solid #dfe4e8;display:flex;align-items:center;justify-content:center}.selected-preview svg{width:100%;height:72px}.selected-details{min-width:0;display:flex;flex-direction:column;gap:4px;align-self:center}.selected-name{font-size:13px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.selected-info{font-size:11px;color:#697783}.selected-tags{font-size:11px;color:#8b969f;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.details-actions{display:flex;gap:9px;margin-top:1px;align-items:center}.text-btn{color:#376e98;background:transparent;border:0;height:22px;padding:0;text-align:left}.text-btn:hover{background:transparent;text-decoration:underline}.text-btn:disabled{text-decoration:none;color:#999}.footer-actions{display:flex;align-items:flex-end;justify-content:flex-end;flex-direction:column;gap:12px;min-width:143px}.apply-row{display:flex;gap:7px}.status{color:#6c8495;font-size:11px;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:15px}
+@media(max-width:820px){body{padding:0;align-items:stretch}.window{height:100vh;max-height:none;min-height:0;border:0;border-radius:0}.main{grid-template-columns:155px minmax(0,1fr)}.sidebar{padding:8px 4px}.grid{grid-template-columns:repeat(auto-fill,minmax(113px,1fr));gap:6px}.tools{padding:7px;gap:5px}.sort{min-width:72px;max-width:97px}.result-count{display:none}.footer{grid-template-columns:115px minmax(0,1fr) auto;gap:10px}.selected-preview{height:65px}.selected-preview svg{height:59px}}
+@media(max-width:560px){.main{grid-template-columns:114px minmax(0,1fr)}.nav-item{padding:0 5px;font-size:11px}.nav-section{padding-left:5px}.nav-count{font-size:10px}.kindtab{padding:0 10px}.kindtab small{display:none}.sort{display:none}.grid{grid-template-columns:repeat(auto-fill,minmax(99px,1fr))}.symbol-tile{min-height:79px}.thumb{height:47px}.tools{gap:4px}.view-toggle button{padding:0 6px}.footer{height:auto;min-height:105px;grid-template-columns:95px minmax(0,1fr);padding:8px;gap:8px}.footer-actions{grid-column:1 / -1;flex-direction:row;align-items:center;justify-content:space-between}.status{max-width:130px}.selected-name{font-size:12px}.selected-preview{height:58px}.selected-preview svg{height:54px}}
+</style>
+</head>
+<body>
+<div class="window" role="application" aria-label="符号库">
+  <div class="titlebar"><strong>选择符号</strong><span class="context">my-web-gis · 系统符号库</span><div class="push"></div><span class="context" id="overallCount"></span></div>
+  <div class="kindtabs" id="kindTabs" role="tablist" aria-label="符号几何类型"></div>
+  <div class="main">
+    <nav class="sidebar" id="sidebar" aria-label="符号分类"></nav>
+    <section class="content" aria-label="符号浏览">
+      <div class="tools">
+        <div class="search-wrap"><input type="search" id="search" placeholder="搜索名称、用途或标签" aria-label="搜索符号" autocomplete="off"><button class="clear-search" id="clearSearch" title="清空搜索" aria-label="清空搜索">×</button></div>
+        <div class="push"></div>
+        <select class="sort" id="sort" aria-label="排序"><option value="default">默认排序</option><option value="name">名称排序</option><option value="recent">最近使用</option></select>
+        <div class="view-toggle" aria-label="显示方式"><button data-view="grid" class="active" aria-pressed="true">网格</button><button data-view="list" aria-pressed="false">列表</button></div>
+        <span class="result-count" id="resultCount"></span>
+      </div>
+      <div class="content-heading"><strong id="currentSection">全部符号</strong><span class="subhead" id="currentMeta"></span></div>
+      <div class="results" id="results"><div class="grid" id="cards"></div></div>
+    </section>
+  </div>
+  <div class="footer">
+    <div class="selected-preview" id="selectedPreview"></div>
+    <div class="selected-details">
+      <div class="selected-name" id="selectedName">—</div>
+      <div class="selected-info" id="selectedInfo"></div>
+      <div class="selected-tags" id="selectedTags"></div>
+      <div class="details-actions"><button class="text-btn" id="favoriteBtn">加入收藏</button><span style="color:#d2d8dc">·</span><button class="text-btn" id="saveMine">另存到我的符号…</button><button class="text-btn" id="removeMine" style="display:none;color:#b34e4a">删除</button></div>
+    </div>
+    <div class="footer-actions"><span class="status" id="status"></span><div class="apply-row"><button id="cancel">取消</button><button id="apply" class="primary">使用此符号</button></div></div>
+  </div>
+</div>
+<script>
+'use strict';
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const escapeHtml=s=>String(s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const groupSpecs={
+ line:[
+  ['基础线型','简单线,细实线,粗实线,点线,短虚线,长虚线,点划线,双点划线,双线,空心双线,箭头线,双色交替线'],
+  ['道路交通','高速公路,高速匝道,国道,省道,县道,乡村道路,城市主干道,城市次干道,支路,步行街,未铺装道路,规划道路'],
+  ['水系水利','一级河流,二级河流,三级河流,季节性河流,天然河道,人工渠道,排水沟,输水管渠,河堤,灌溉渠'],
+  ['轨道交通','普通铁路,高速铁路,复线铁路,单线铁路,城市地铁,有轨电车,轻轨,铁路在建,铁路专用线'],
+  ['行政边界','国界,省级边界,市级边界,县级边界,乡镇边界,街道边界,管理区界,规划边界,争议边界'],
+  ['地形测绘','首曲线,计曲线,间曲线,助曲线,山脊线,山谷线,地质断层,地质接触线'],
+  ['市政管网','供水管,雨水管,污水管,燃气管,热力管,电力线路,通信光缆,地下管线,排污干管']
+ ],
+ point:[
+  ['基础标记','实心圆,空心圆,方形,空心方形,菱形,实心三角,倒三角,五角星,十字,叉号,六边形,方向箭头'],
+  ['测绘控制','平面控制点,水准点,三角点,导线点,高程基点,GPS控制点,界址点,测量桩,地籍点'],
+  ['水文水利','水位站,雨量站,水质站,流量站,水文站,水闸,泵站,水库坝址,水文监测点,河道断面点'],
+  ['公共设施','学校,医院,消防站,派出所,停车场,体育场馆,公园入口,公共卫生间,文化场馆,政务中心'],
+  ['交通站点','公交站,轨道站,铁路车站,航空机场,港口码头,收费站,服务区,高速出入口,自行车站'],
+  ['能源工业','变电站,电力塔,风力机,光伏站,工厂,矿区,加油站,通信基站,环境监测站']
+ ],
+ polygon:[
+  ['基础填充','纯色填充,透明填充,轮廓填充,斜线填充,反向斜线,交叉网格,点状填充,密集点状,水平线填充,垂直线填充,方格填充,渐变填充'],
+  ['水域湿地','河流水面,湖泊水面,水库水面,湿地,滩涂,淹没范围,蓄滞洪区,水源保护区,河道管理区'],
+  ['植被耕地','乔木林地,灌木林地,天然草地,人工草地,耕地,园地,苗圃,稀疏植被,城市绿地,防护林'],
+  ['土地利用','居住用地,商业用地,工业用地,仓储用地,公共设施用地,教育用地,医疗用地,交通设施用地,市政用地,休闲用地,未利用地'],
+  ['规划地质','行政区域,城镇开发边界,自然保护地,生态红线,地质灾害区,滑坡危险区,地震断裂带,建设控制区,洪水风险区,景观保护区,工程施工区,规划保留地']
+ ]
+};
+const colors={
+ '基础线型':['#457ca3','#3f6f93','#315775'],'道路交通':['#c5a766','#d7b565','#956e46'],'水系水利':['#2e88bb','#53a6c8','#276f9b'],'轨道交通':['#41474d','#68656a','#a0544f'],'行政边界':['#9d5663','#805d8b','#bb7a63'],'地形测绘':['#9f8b65','#847356','#a99a82'],'市政管网':['#4c8988','#9372a0','#b17f50'],
+ '基础标记':['#3b729d','#4b83ab','#5b6772'],'测绘控制':['#263f52','#627689','#b8554a'],'水文水利':['#308caf','#559fbe','#256f9d'],'公共设施':['#5b8795','#ad6866','#7b8d63'],'交通站点':['#3f7596','#6a7c8e','#bb8848'],'能源工业':['#907248','#668d7b','#a46a54'],
+ '基础填充':['#a8b9c8','#d4dce2','#a1c7de'],'水域湿地':['#a1d3e8','#bcdfea','#81bdd4'],'植被耕地':['#b3caa6','#c9d6a3','#a1c49e'],'土地利用':['#d6bcb5','#dec8a8','#ceb8cc'],'规划地质':['#dbbaa5','#b8c3ca','#d6bdce']
+};
+const lineStyles=['simple','dash','dot','dashDot','double','cased','arrow','alternating','rail','contour','pipe','wave'];
+const pointStyles=['circle','ring','square','squareEmpty','diamond','triangle','triangleDown','star','cross','x','hex','arrow','pin','droplet','gauge','flag','shield','station','power'];
+const fillStyles=['solid','none','outline','diagonal','backward','cross','dots','denseDots','horizontal','vertical','grid','gradient'];
+function styleFor(kind,cat,name,i){
+ const cs=colors[cat]||['#688da7'];let color=cs[i%cs.length];let base={};
+ if(kind==='line'){
+  let pattern=lineStyles[i%lineStyles.length];
+  if(cat==='道路交通')pattern=['cased','cased','cased','cased','cased','dash','cased','cased','simple','double','dash','dash'][i%12];
+  if(cat==='轨道交通')pattern=i<4?'rail':i===7?'dash':'rail';
+  if(cat==='水系水利')pattern=i===3?'dash':i===8?'cased':i===7?'pipe':'wave';
+  if(cat==='行政边界')pattern=['dashDot','dash','dash','dash','dot','dot','dashDot','dash','alternating'][i%9];
+  if(cat==='地形测绘')pattern=i===6?'dashDot':i===7?'dash':'contour';
+  if(cat==='市政管网')pattern=['pipe','pipe','dash','pipe','pipe','dashDot','dot','dash','pipe'][i%9];
+  base={pattern,width:cat==='道路交通'?5-(i%3):cat==='水系水利'?3.5-(i%3)*.6:cat==='地形测绘'?1.25:2+(i%3)*.5,color,secondary:cat==='道路交通'?'#fff9e8':'#ffffff'};
+ } else if(kind==='point'){
+  let shape=pointStyles[i%pointStyles.length];
+  if(cat!=='基础标记')shape=[...pointStyles.slice(11),...pointStyles.slice(0,11)][(i+({ '测绘控制':0,'水文水利':4,'公共设施':8,'交通站点':11,'能源工业':14 }[cat]||0))%pointStyles.length];
+  if(/雨量|水位|水质|流量|水文|河道/.test(name))shape='droplet';
+  if(/学校|医院|派出所|停车场/.test(name))shape='shield';
+  if(/GPS|控制点/.test(name))shape='cross';
+  if(/水准|高程/.test(name))shape='ring';
+  if(/三角点/.test(name))shape='triangle';
+  if(/导线|地籍点/.test(name))shape='diamond';
+  if(/界址点/.test(name))shape='square';
+  if(/泵站|电力|变电|光伏|风力/.test(name))shape='power';
+  if(/铁路车站|轨道站|公交站/.test(name))shape='station';
+  if(/机场|方向|高速出入口/.test(name))shape='arrow';
+  if(/港口|坝址/.test(name))shape='flag';
+  base={shape,color,outline:'#365164',size:17+(i%3)*2,letter:/医院/.test(name)?'+':/停车场/.test(name)?'P':/学校/.test(name)?'S':/消防站/.test(name)?'F':/公共卫生间/.test(name)?'WC':''};
+ }else{
+  let pattern=fillStyles[i%fillStyles.length];
+  if(cat==='水域湿地')pattern=['solid','solid','solid','horizontal','dots','diagonal','horizontal','cross','outline'][i%9];
+  if(cat==='植被耕地')pattern=['dots','cross','horizontal','dots','diagonal','grid','cross','denseDots','solid','grid'][i%10];
+  if(cat==='土地利用')pattern=['solid','solid','solid','grid','solid','solid','dots','diagonal','solid','dots','outline'][i%11];
+  if(cat==='规划地质')pattern=['outline','dash','diagonal','cross','backward','cross','diagonal','grid','denseDots','outline','dots','outline'][i%12];
+  base={pattern,color,outline:cat==='基础填充'?'#728696':color,opacity:cat==='基础填充'?.65:.72};
+ }
+ return base;
+}
+let system=[];
+for(const kind of ['line','point','polygon'])for(const [category,joined] of groupSpecs[kind]){
+ const names=joined.split(',');names.forEach((name,i)=>{const id=`sys-${kind}-${system.filter(x=>x.kind===kind).length+1}`;system.push({id,kind,name,category,origin:'system',tags:[category,kind==='line'?'线符号':kind==='point'?'点符号':'面符号'],style:styleFor(kind,category,name,i)})});
+}
+const seedMine=[['line','我的道路','道路交通'],['point','常用测站','水文水利'],['polygon','我的规划区','规划地质']];
+const seedProject=[['line','项目排水渠','水系水利'],['point','项目控制点','测绘控制'],['polygon','项目水域','水域湿地']];
+function createSample(entry,prefix,i){const [kind,name,category]=entry;return {id:`${prefix}-${i}`,kind,name,category,origin:prefix,tags:['自定义',category],style:styleFor(kind,category,name,2+i)}}
+const seedCustom=[...seedMine.map((e,i)=>createSample(e,'mine',i+1)),...seedProject.map((e,i)=>createSample(e,'project',i+1))];
+const KEY='my-web-gis-symbol-library-prototype-v1';
+let store={favorites:['sys-line-14','sys-line-32','sys-line-45','sys-point-12','sys-polygon-16'],recent:['sys-line-14','sys-line-1'],custom:seedCustom};
+try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s&&Array.isArray(s.favorites)&&Array.isArray(s.recent)&&Array.isArray(s.custom))store=s}catch{}
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(store))}catch{}}
+let state={kind:'line',nav:'all',category:'',query:'',sort:'default',view:'grid',selected:'sys-line-14',applied:null};
+const kindNames={line:'线符号',point:'点符号',polygon:'面符号'};
+function allSymbols(){return [...system,...store.custom]};
+function kindSymbols(){return allSymbols().filter(x=>x.kind===state.kind)};
+function isFav(id){return store.favorites.includes(id)};
+function visible(){const q=state.query.trim().toLowerCase();let arr=kindSymbols().filter(x=>{
+ if(state.nav==='favorites'&&!isFav(x.id))return false;
+ if(state.nav==='recent'&&!store.recent.includes(x.id))return false;
+ if(state.nav==='mine'&&x.origin!=='mine')return false;
+ if(state.nav==='project'&&x.origin!=='project')return false;
+ if(state.nav==='system'&&x.origin!=='system')return false;
+ if(state.nav==='category'&&x.category!==state.category)return false;
+ return !q||[x.name,x.category,...x.tags].some(v=>v.toLowerCase().includes(q));
+ });
+ if(state.sort==='name')arr.sort((a,b)=>a.name.localeCompare(b.name,'zh-CN'));
+ else if(state.sort==='recent')arr.sort((a,b)=>{const ar=store.recent.indexOf(a.id),br=store.recent.indexOf(b.id);return (ar<0?999:ar)-(br<0?999:br)});
+ else if(state.nav==='recent')arr.sort((a,b)=>store.recent.indexOf(a.id)-store.recent.indexOf(b.id));
+ return arr;
+}
+function current(){return allSymbols().find(x=>x.id===state.selected)||null}
+function rgbFromHex(hex){const h=hex.slice(1);return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]}
+function faded(hex,alpha=.3){const [r,g,b]=rgbFromHex(hex);return `rgba(${r},${g},${b},${alpha})`}
+function lineSvg(sym,large=false){const s=sym.style, w=s.width*(large?1.15:1),p=s.pattern, col=s.color,sec=s.secondary, path=large?'M10 38 C40 10 85 60 136 30 S190 39 214 18':'M7 28 C27 9 52 45 83 22 S121 31 144 13';const vw=large?224:150,vh=large?76:53;let content='';
+ const primary=(width,dash='',color=col)=>`<path d="${path}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" ${dash?`stroke-dasharray="${dash}"`:''}/>`;
+ if(p==='cased'){content=primary(w+4,'','#6b7379')+primary(Math.max(w,1), '',sec)}
+ else if(p==='double'){content=primary(w+3,'',col)+primary(Math.max(.8,w-1),'','#fff')}
+ else if(p==='rail'){content=primary(w+2,'','#565a5d')+primary(Math.max(1,w),'','white')+primary(w+2,'3 7','#565a5d')}
+ else if(p==='alternating'){content=primary(w+1,'','#805e59')+primary(w+1,'11 11','#f3e7d0')}
+ else if(p==='contour'){content=primary(w,'',col)+`<text x="${large?107:72}" y="${large?29:17}" font-size="${large?11:8}" text-anchor="middle" fill="${col}" stroke="white" stroke-width="2" paint-order="stroke">120</text>`}
+ else if(p==='pipe'){content=primary(w+1,'',col)+primary(1,'4 7','#ffffff')}
+ else if(p==='wave'){content=primary(w,'',col)}
+ else if(p==='arrow'){content=primary(w,'',col)+`<path d="M${large?134:83} ${large?30:22} l-8 -3 l2 9 z" fill="${col}"/>`}
+ else if(p==='dash'){content=primary(w,'11 7')}
+ else if(p==='dot'){content=primary(w,'1 6')}
+ else if(p==='dashDot'){content=primary(w,'13 5 2 5')}
+ else content=primary(w);
+ return `<svg viewBox="0 0 ${vw} ${vh}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${content}</svg>`;
+}
+function pointSvg(sym,large=false){const s=sym.style,col=s.color,k=s.shape,size=large?22:16,CX=large?110:75,CY=large?37:26,vw=large?224:150,vh=large?76:53,r=size;const fill=col,stroke=s.outline||'#41596d';const p=(x,y)=>`${CX+x},${CY+y}`;let mark='';
+ if(k==='circle')mark=`<circle cx="${CX}" cy="${CY}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/>`;
+ else if(k==='ring')mark=`<circle cx="${CX}" cy="${CY}" r="${r}" fill="none" stroke="${fill}" stroke-width="${large?4:3}"/>`;
+ else if(k==='square'||k==='squareEmpty')mark=`<rect x="${CX-r}" y="${CY-r}" width="${2*r}" height="${2*r}" rx="${k==='square'?1:0}" fill="${k==='square'?fill:'white'}" stroke="${stroke}" stroke-width="2"/>`;
+ else if(k==='diamond')mark=`<path d="M${p(0,-r)} L${p(r,0)} L${p(0,r)} L${p(-r,0)}Z" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`;
+ else if(k==='triangle'||k==='triangleDown'){const a=k==='triangle'?-1:1;mark=`<path d="M${p(0,a*r)} L${p(-r*.9,-a*r*.75)} L${p(r*.9,-a*r*.75)}Z" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`}
+ else if(k==='star'){const pts=Array.from({length:10},(_,i)=>{const t=(i*36-90)*Math.PI/180,rr=i%2?r*.45:r;return p(Math.cos(t)*rr,Math.sin(t)*rr)}).join(' ');mark=`<polygon points="${pts}" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`}
+ else if(k==='cross'||k==='x'){const rot=k==='x'?45:0;mark=`<g transform="rotate(${rot} ${CX} ${CY})"><rect x="${CX-r*.23}" y="${CY-r}" width="${r*.46}" height="${r*2}" fill="${fill}"/><rect x="${CX-r}" y="${CY-r*.23}" width="${r*2}" height="${r*.46}" fill="${fill}"/></g>`}
+ else if(k==='hex'){const pts=Array.from({length:6},(_,i)=>{const t=(i*60-90)*Math.PI/180;return p(Math.cos(t)*r,Math.sin(t)*r)}).join(' ');mark=`<polygon points="${pts}" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`}
+ else if(k==='arrow'){mark=`<path d="M${p(0,-r)}L${p(-r*.75,r*.8)}L${p(0,r*.3)}L${p(r*.75,r*.8)}Z" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/>`}
+ else if(k==='pin'){mark=`<path d="M${p(0,r)} C${p(-r*.4,r*.25)} ${p(-r,-r*.2)} ${p(-r*.6,-r*.65)} A${r} ${r} 0 1 1 ${p(r*.6,-r*.65)} C${p(r,r*.1)} ${p(r*.4,r*.4)} ${p(0,r)}Z" fill="${fill}" stroke="${stroke}" stroke-width="1.4"/><circle cx="${CX}" cy="${CY-r*.4}" r="${r*.31}" fill="white"/>`}
+ else if(k==='droplet'){mark=`<path d="M${p(0,-r*1.3)} C${p(-r*.4,-r*.4)} ${p(-r,r*.25)} ${p(0,r)} C${p(r,r*.25)} ${p(r*.4,-r*.4)} ${p(0,-r*1.3)}Z" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/><path d="M${p(-r*.3,r*.25)} Q${p(0,r*.5)} ${p(r*.3,r*.25)}" stroke="white" stroke-width="1.6" fill="none"/>`}
+ else if(k==='gauge'){mark=`<circle cx="${CX}" cy="${CY}" r="${r}" fill="white" stroke="${fill}" stroke-width="3"/><path d="M${p(0,0)} L${p(r*.5,-r*.6)}" stroke="${stroke}" stroke-width="2.5"/>`}
+ else if(k==='flag'){mark=`<path d="M${p(-r*.5,-r)}V${CY+r*1.1} M${p(-r*.45,-r)}L${p(r*.8,-r*.6)}L${p(-r*.45,-r*.1)}" stroke="${stroke}" stroke-width="2" fill="${fill}"/>`}
+ else if(k==='shield'){mark=`<path d="M${p(-r*.8,-r)}H${CX+r*.8}V${CY+r*.1}Q${p(r*.6,r*.75)} ${p(0,r*1.15)}Q${p(-r*.7,r*.75)} ${p(-r*.8,r*.1)}Z" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`}
+ else if(k==='station'){mark=`<rect x="${CX-r*.8}" y="${CY-r*.7}" width="${r*1.6}" height="${r*1.4}" rx="3" fill="${fill}"/><rect x="${CX-r*.42}" y="${CY-r*.35}" width="${r*.84}" height="${r*.55}" fill="#fff"/><circle cx="${CX-r*.4}" cy="${CY+r*.75}" r="2.5" fill="${stroke}"/><circle cx="${CX+r*.4}" cy="${CY+r*.75}" r="2.5" fill="${stroke}"/>`}
+ else if(k==='power'){mark=`<circle cx="${CX}" cy="${CY}" r="${r}" fill="${fill}"/><path d="M${p(r*.1,-r*.8)}L${p(-r*.55,r*.12)}H${CX}L${p(-r*.13,r*.85)}L${p(r*.58,-r*.13)}H${CX}Z" fill="white"/>`}
+ else mark=`<circle cx="${CX}" cy="${CY}" r="${r}" fill="${fill}"/>`;
+ if(s.letter)mark+=`<text x="${CX}" y="${CY+5}" text-anchor="middle" font-family="Arial" font-size="${s.letter==='WC'?11:15}" font-weight="bold" fill="white">${s.letter}</text>`;
+ return `<svg viewBox="0 0 ${vw} ${vh}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${mark}</svg>`;
+}
+function polygonSvg(sym,large=false){const s=sym.style, id=`pat-${sym.id}`,v=large?224:150,h=large?76:53,x=large?24:21,y=large?10:8,w=large?176:107,hh=large?56:37,c=s.color,p=s.pattern;const ink=faded(c,.7);let defs='';
+ if(['diagonal','backward','cross','horizontal','vertical','grid','dots','denseDots'].includes(p)){
+  const slashes=p==='diagonal'||p==='backward'||p==='cross';
+  const spacing=p==='denseDots'?6:10;
+  let inside='';if(p==='diagonal'||p==='cross')inside+=`<path d="M-2 12L12 -2 M5 17L17 5" stroke="${c}" stroke-width="1.6"/>`;
+  if(p==='backward'||p==='cross')inside+=`<path d="M-2 -2L12 12 M5 -7L17 5" stroke="${c}" stroke-width="1.6"/>`;
+  if(p==='horizontal'||p==='grid')inside+=`<path d="M0 5H10" stroke="${c}" stroke-width="1.3"/>`;
+  if(p==='vertical'||p==='grid')inside+=`<path d="M5 0V10" stroke="${c}" stroke-width="1.3"/>`;
+  if(p==='dots'||p==='denseDots')inside+=`<circle cx="${spacing/2}" cy="${spacing/2}" r="${p==='denseDots'?1.4:1.25}" fill="${c}"/>`;
+  defs=`<defs><pattern id="${id}" patternUnits="userSpaceOnUse" width="${spacing}" height="${spacing}">${inside}</pattern></defs>`;
+ }
+ if(p==='gradient')defs=`<defs><linearGradient id="${id}"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="${c}"/></linearGradient></defs>`;
+ let fill=p==='none'||p==='outline'?'white':p==='solid'?faded(c,.85):p==='gradient'?`url(#${id})`:`url(#${id})`;
+ const stroke=p==='outline'||p==='none'?c:faded(c,.95);const dashed=p==='dash'?'stroke-dasharray="6 4"':'';
+ return `<svg viewBox="0 0 ${v} ${h}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${defs}<rect x="${x}" y="${y}" width="${w}" height="${hh}" rx="0" fill="${fill}" stroke="${stroke}" stroke-width="${p==='outline'?2:1.5}" ${dashed}/></svg>`;
+}
+function svgFor(s,large=false){return s.kind==='line'?lineSvg(s,large):s.kind==='point'?pointSvg(s,large):polygonSvg(s,large)}
+function renderTabs(){const count=kind=>allSymbols().filter(s=>s.kind===kind).length;$('#kindTabs').innerHTML=['point','line','polygon'].map(k=>`<button class="kindtab ${state.kind===k?'active':''}" data-kind="${k}" role="tab" aria-selected="${state.kind===k}">${kindNames[k]}<small>${count(k)}</small></button>`).join('')}
+function renderSidebar(){const arr=kindSymbols(),counts={all:arr.length,system:arr.filter(x=>x.origin==='system').length,favorites:arr.filter(x=>isFav(x.id)).length,recent:arr.filter(x=>store.recent.includes(x.id)).length,mine:arr.filter(x=>x.origin==='mine').length,project:arr.filter(x=>x.origin==='project').length};
+ const nav=(key,label,count,category='')=>`<button class="nav-item ${state.nav===key&&(key!=='category'||state.category===category)?'active':''}" data-nav="${key}" ${category?`data-category="${escapeHtml(category)}"`:''}><span>${escapeHtml(label)}</span><span class="nav-count">${count}</span></button>`;
+ const cats=groupSpecs[state.kind].map(([c])=>[c,arr.filter(x=>x.category===c).length]);
+ $('#sidebar').innerHTML=`<div class="nav-section">符号库</div>${nav('all','全部符号',counts.all)}${nav('favorites','收藏',counts.favorites)}${nav('recent','最近使用',counts.recent)}<div class="nav-divider"></div><div class="nav-section">来源</div>${nav('system','系统内置',counts.system)}${nav('mine','我的符号',counts.mine)}${nav('project','项目符号',counts.project)}<div class="nav-divider"></div><div class="nav-section">分类</div>${cats.map(([c,n])=>nav('category',c,n,c)).join('')}`;
+}
+function renderCards(){const arr=visible();if(!arr.some(s=>s.id===state.selected))state.selected=arr[0]?.id||null;
+ const navName=state.nav==='category'?state.category:{all:'全部符号',system:'系统内置',favorites:'收藏',recent:'最近使用',mine:'我的符号',project:'项目符号'}[state.nav];
+ $('#currentSection').textContent=navName;$('#currentMeta').textContent=state.query?' · 搜索中':'';$('#resultCount').textContent=`${arr.length} 项`;$('#overallCount').textContent=`内置 ${system.length} 种`;
+ $('#cards').className=`grid ${state.view==='list'?'list-view':''}`;
+ $('#cards').innerHTML=arr.length?arr.map(s=>`<div class="symbol-tile ${s.id===state.selected?'selected':''}" data-id="${s.id}" role="option" tabindex="0" aria-selected="${s.id===state.selected}" aria-label="${escapeHtml(s.name)}" title="${escapeHtml(s.name)} · ${escapeHtml(s.category)}">
+  ${s.origin!=='system'?`<span class="source-mini">${s.origin==='mine'?'我的':'项目'}</span>`:''}<button class="fav-hit ${isFav(s.id)?'is-fav':''}" data-favorite="${s.id}" title="${isFav(s.id)?'移出收藏':'加入收藏'}" aria-label="${isFav(s.id)?'移出收藏':'加入收藏'}">${isFav(s.id)?'★':'☆'}</button><div class="thumb">${svgFor(s)}</div><div class="tile-name">${escapeHtml(s.name)}</div></div>`).join(''):`<div class="empty"><strong>没有符合条件的符号</strong><button id="resetFilters">清除筛选</button></div>`;
+ $$('.view-toggle button').forEach(b=>{b.classList.toggle('active',b.dataset.view===state.view);b.setAttribute('aria-pressed',b.dataset.view===state.view?'true':'false')});renderSelected();
+}
+function renderSelected(){const s=current();const dis=!s;$('#selectedPreview').innerHTML=s?svgFor(s,true):'';$('#selectedName').textContent=s?.name||'未选择符号';$('#selectedInfo').textContent=s?`${kindNames[s.kind]}  ·  ${s.category}  ·  ${s.origin==='system'?'系统内置':s.origin==='mine'?'我的符号':'项目符号'}`:'';$('#selectedTags').textContent=s?`${s.tags.join(' · ')}`:'';$('#favoriteBtn').disabled=dis;$('#favoriteBtn').textContent=s&&isFav(s.id)?'取消收藏':'加入收藏';$('#saveMine').disabled=dis;$('#removeMine').style.display=s&&s.origin==='mine'?'inline-block':'none';$('#apply').disabled=dis;}
+function renderAll(){renderTabs();renderSidebar();renderCards()}
+function setNav(nav,category=''){state.nav=nav;state.category=category;$('#results').scrollTop=0;renderAll()}
+function setKind(k){if(k===state.kind)return;state.kind=k;state.nav='all';state.category='';state.query='';$('#search').value='';state.selected=null;$('#results').scrollTop=0;renderAll()}
+function showStatus(t){$('#status').textContent=t;}
+function toggleFavorite(id){if(!id)return;store.favorites=isFav(id)?store.favorites.filter(x=>x!==id):[id,...store.favorites];persist();renderSidebar();renderCards()}
+function useSymbol(){const s=current();if(!s)return;store.recent=[s.id,...store.recent.filter(x=>x!==s.id)].slice(0,30);persist();state.applied=s.id;showStatus(`已选用：${s.name}`);renderSidebar();renderSelected()}
+function saveMySymbol(){const s=current();if(!s)return;const name=prompt('保存到「我的符号」\n符号名称：',s.name+' 副本');if(name===null)return;const n=name.trim().slice(0,60);if(!n){showStatus('名称不能为空');return}const item={...JSON.parse(JSON.stringify(s)),id:'mine-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),name:n,origin:'mine',tags:['自定义',s.category]};store.custom.push(item);persist();state.selected=item.id;state.nav='mine';state.query='';$('#search').value='';renderAll();showStatus('已保存到我的符号')}
+function removeMy(){const s=current();if(!s||s.origin!=='mine')return;if(!confirm(`删除「${s.name}」？`))return;store.custom=store.custom.filter(x=>x.id!==s.id);store.favorites=store.favorites.filter(x=>x!==s.id);store.recent=store.recent.filter(x=>x!==s.id);persist();state.selected=null;renderAll();showStatus('已删除')}
+$('#kindTabs').addEventListener('click',e=>{const b=e.target.closest('[data-kind]');if(b)setKind(b.dataset.kind)});
+$('#sidebar').addEventListener('click',e=>{const b=e.target.closest('[data-nav]');if(b)setNav(b.dataset.nav,b.dataset.category||'')});
+$('#cards').addEventListener('click',e=>{const fav=e.target.closest('[data-favorite]');if(fav){e.stopPropagation();toggleFavorite(fav.dataset.favorite);return}const el=e.target.closest('[data-id]');if(el){state.selected=el.dataset.id;$$('.symbol-tile').forEach(c=>{const on=c.dataset.id===state.selected;c.classList.toggle('selected',on);c.setAttribute('aria-selected',on?'true':'false')});renderSelected()}});
+$('#cards').addEventListener('dblclick',e=>{const el=e.target.closest('[data-id]');if(el&&!e.target.closest('[data-favorite]')){state.selected=el.dataset.id;useSymbol()}});
+$('#cards').addEventListener('keydown',e=>{const el=e.target.closest('[data-id]');if(!el)return;if(e.key==='Enter'){e.preventDefault();state.selected=el.dataset.id;useSymbol();return}if(e.key===' '){e.preventDefault();state.selected=el.dataset.id;renderCards();return}const dir={'ArrowRight':1,'ArrowLeft':-1,'ArrowDown':state.view==='grid'?5:1,'ArrowUp':state.view==='grid'?-5:-1}[e.key];if(dir){e.preventDefault();const arr=visible();const index=arr.findIndex(x=>x.id===el.dataset.id);const next=arr[Math.max(0,Math.min(arr.length-1,index+dir))];if(next){state.selected=next.id;renderCards();const tile=$$('.symbol-tile').find(x=>x.dataset.id===next.id);tile?.focus();tile?.scrollIntoView({block:'nearest'})}}});
+$('#search').addEventListener('input',e=>{state.query=e.target.value;$('#results').scrollTop=0;renderCards()});$('#clearSearch').onclick=()=>{state.query='';$('#search').value='';renderCards();$('#search').focus()};$('#sort').addEventListener('change',e=>{state.sort=e.target.value;renderCards()});
+$('.view-toggle').addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(b){state.view=b.dataset.view;renderCards()}});
+$('#results').addEventListener('click',e=>{if(e.target.id==='resetFilters'){state.query='';$('#search').value='';setNav('all')}});
+$('#favoriteBtn').onclick=()=>toggleFavorite(state.selected);$('#saveMine').onclick=saveMySymbol;$('#removeMine').onclick=removeMy;$('#apply').onclick=useSymbol;$('#cancel').onclick=()=>{showStatus('已取消选择（原型）')};
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='f'){e.preventDefault();$('#search').focus();$('#search').select()}else if(e.key==='Escape'&&document.activeElement===$('#search')){$('#search').value='';state.query='';renderCards()}});
+renderAll();
+</script>
+</body>
+</html>
