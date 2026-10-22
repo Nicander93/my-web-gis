@@ -25,7 +25,10 @@ export async function createCartographyPreview(canvas: HTMLCanvasElement, option
   const context = canvas.getContext('2d')
   if (!context) { resources?.dispose(); throw new Error('无法创建符号预览 Canvas') }
   const renderer = toContext(context, { size: [width, height], pixelRatio: 1 })
+  let ready = false
   function draw() {
+    // applyStyle emits changes before installing its expression/feature-state metadata.
+    if (!ready) return
     context!.clearRect(0, 0, width, height)
     const result = layer.getStyleFunction()?.(feature, 78271.51696402048 / 2 ** (options.zoom ?? 10))
     for (const style of result ? Array.isArray(result) ? result : [result] : []) {
@@ -33,13 +36,14 @@ export async function createCartographyPreview(canvas: HTMLCanvasElement, option
     }
   }
   const listener = layer.on('change', draw)
-  const dispose = () => { unByKey(listener); layer.dispose(); source.dispose(); resources?.dispose() }
+  const dispose = () => { ready = false; unByKey(listener); layer.dispose(); source.dispose(); resources?.dispose() }
   try {
     await createMapLibreCanvasBinding(layer, { sourceId: 'preview', transformRequest: resources?.transformRequest }).update({ version: 8,
       sources: { preview: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } } },
       layers: options.layers.map(drawing => ({ ...structuredClone(drawing), ...('source' in drawing ? { source: 'preview' } : {}) })),
       ...(resources?.sprite ? { sprite: resources.sprite } : {}),
     })
+    ready = true
     draw()
     return dispose
   } catch (error) { dispose(); throw error }

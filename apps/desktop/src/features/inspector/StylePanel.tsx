@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, ColorPicker, Input, InputNumber, Select, Table } from 'antd'
+import { Alert, Button, ColorPicker, Dropdown, Input, InputNumber, Select, Table } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { Color, LayerStyle, Symbol } from '@desktop-webgis/ol-style'
 import { cloneSymbolWithColor, colorToString, rgb, symbolPrimaryColor } from '@desktop-webgis/ol-style'
@@ -19,8 +19,10 @@ import { SymbolLibrary } from './SymbolLibrary'
 import { readPersonalSymbolLibrary } from './symbol-library-store'
 import { SldExportDialog } from './SldExportDialog'
 import { GeoServerPublishDialog, type GeoServerLoadWmsRequest } from './GeoServerPublishDialog'
-import { useProjectStore } from '@/stores/project.store'
 import { CartographyRulesPanel } from './CartographyRulesPanel'
+import { StandardStyleControls } from './StandardStyleControls'
+import { LayerSymbolPreview } from './LayerSymbolPreview'
+import { addPublishedWmsLayer } from './published-wms'
 
 interface StylePanelProps {
   layerId: string
@@ -155,14 +157,11 @@ export function StylePanel({ layerId }: StylePanelProps) {
   const editor = useCartographyEditor(layerId)
   useEffect(() => { setDialog(undefined); setRules(false); setDrawingLayerId(undefined) }, [layerId])
   function loadPublishedWms(request: GeoServerLoadWmsRequest) {
-    const state = useProjectStore.getState()
-    if (state.projectEpoch !== request.epoch) return
-    state.addServiceLayer({ name: `${request.workspace}:${request.layerName}（已发布）`, kind: 'wms', source: { type: 'wms', url: `${request.baseUrl.replace(/\/$/, '')}/wms`, version: '1.1.1', layerNames: [`${request.workspace}:${request.layerName}`], styleNames: [`${request.workspace}:${request.styleName}`], format: 'image/png', transparent: true, crs: 'EPSG:4326', ...(request.bbox ? { bboxWgs84: request.bbox } : {}), authMode: request.credentialRef ? 'bearer' : 'none', ...(request.credentialRef ? { credentialRef: { key: request.credentialRef } } : {}) } })
-    setDialog(undefined)
+    if (addPublishedWmsLayer(request)) setDialog(undefined)
   }
   return <>
-    {editor.fragment && <div className="cartography-editor__actions"><Button size="small" disabled={editor.locked} onClick={() => setDialog('editor')}>专业符号编辑…</Button><Button size="small" disabled={editor.locked} onClick={() => setDialog('library')}>选择符号…</Button><Button size="small" onClick={() => setDialog('sld')}>导出 SLD…</Button><Button size="small" disabled={editor.locked} onClick={() => setDialog('publish')}>发布到 GeoServer…</Button></div>}
-    {rules ? <CartographyRulesPanel layerId={layerId} onEdit={id => { setDrawingLayerId(id); setDialog('editor') }} onBack={editor.editable ? () => setRules(false) : undefined} /> : <StylePanelBody layerId={layerId} onShowRules={() => setRules(true)} />}
+    {editor.fragment && <div className="style-symbol-summary"><LayerSymbolPreview layerId={layerId} /><div className="style-symbol-summary__actions"><Button type="link" size="small" disabled={editor.locked} onClick={() => setDialog('library')}>选择符号…</Button><Button type="link" size="small" disabled={editor.locked} onClick={() => setDialog('editor')}>专业符号编辑…</Button></div><Dropdown trigger={['click']} menu={{ items: [{ key: 'sld', label: '导出 SLD…' }, { key: 'publish', label: '发布到 GeoServer…', disabled: editor.locked }], onClick: ({ key }) => setDialog(key as 'sld' | 'publish') }}><Button size="small" aria-label="样式菜单">更多</Button></Dropdown></div>}
+    {rules ? <CartographyRulesPanel layerId={layerId} onEdit={id => { setDrawingLayerId(id); setDialog('editor') }} onBack={() => setRules(false)} /> : <StylePanelBody layerId={layerId} onShowRules={() => setRules(true)} onEdit={id => { setDrawingLayerId(id); setDialog('editor') }} />}
     {!rules && editor.fragment && !editor.editable && <Button size="small" onClick={() => setRules(true)}>查看与编辑规则列表</Button>}
     {dialog === 'editor' && <SymbolEditor layerId={layerId} initialDrawingLayerId={drawingLayerId} onClose={() => { setDialog(undefined); setDrawingLayerId(undefined) }} />}
     {dialog === 'library' && <SymbolLibrary layerId={layerId} onClose={() => setDialog(undefined)} />}
@@ -171,7 +170,7 @@ export function StylePanel({ layerId }: StylePanelProps) {
   </>
 }
 
-function StylePanelBody({ layerId, onShowRules }: StylePanelProps & { onShowRules: () => void }) {
+function StylePanelBody({ layerId, onShowRules, onEdit }: StylePanelProps & { onShowRules(): void; onEdit(id: string): void }) {
   const editor = useCartographyEditor(layerId)
   const [selected, setSelected] = useState(0)
   const [classCount, setClassCount] = useState(5)
@@ -191,6 +190,7 @@ function StylePanelBody({ layerId, onShowRules }: StylePanelProps & { onShowRule
 
   if (!editor.layer || !editor.style) return <div className="empty-state empty-state-box">请选择一个图层</div>
   const style = editor.style
+  if (!editor.editable && editor.fragment) return <StandardStyleControls layerId={layerId} onEdit={onEdit} />
   if (!editor.editable) {
     return (
       <div className="inspector-card cartography-editor style-panel">

@@ -11,7 +11,8 @@ import {
   Type,
   RefreshCw,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Upload
 } from 'lucide-react'
 import { LayerPopupMenu } from './LayerPopupMenu'
 import { MenuItem } from '@/app/header/menus/MenuItem'
@@ -97,6 +98,8 @@ export function LayerContextMenu({
         disabled={!caps.canExport}
         onClick={() => run(() => layerCommands.export(layerId))}
       />
+      <MenuItem icon={Download} label="导出 SLD…" disabled={!caps.canStyle} onClick={() => run(() => layerCommands.openStyleDialog(layerId, 'sld'))} />
+      <MenuItem icon={Upload} label="发布到 GeoServer…" disabled={!caps.canStyle} onClick={() => run(() => layerCommands.openStyleDialog(layerId, 'publish'))} />
       <MenuItem
         icon={Copy}
         label="复制"

@@ -10,6 +10,8 @@ interface WorkbenchState {
   activeTool: EditTool
   rightTask: 'inspector' | 'information' | 'processing'
   identifyActive: boolean
+  cartographyDialog: { layerId: string; kind: 'sld' | 'publish'; epoch: number } | null
+  setCartographyDialog(request: WorkbenchState['cartographyDialog']): void
   setIdentifyActive(active: boolean): void
   pendingInspector: { layerId: string; tab: 'layer' | 'style' | 'label' } | null
   setPendingInspector(request: WorkbenchState['pendingInspector']): void
@@ -33,12 +35,14 @@ const initial = {
   activeTool: 'none' as EditTool,
   rightTask: 'inspector' as const,
   identifyActive: false,
+  cartographyDialog: null,
   pendingInspector: null,
   mapReadout: ''
 }
 
 export const useWorkbenchStore = create<WorkbenchState>((set) => ({
   ...initial,
+  setCartographyDialog: cartographyDialog => set({ cartographyDialog }),
   setIdentifyActive: identifyActive => set({ identifyActive }),
   setPendingInspector: (pendingInspector) => set({ pendingInspector }),
   setMapReadout: (mapReadout) => set({ mapReadout }),
@@ -64,6 +68,7 @@ export const useWorkbenchStore = create<WorkbenchState>((set) => ({
   setActiveTool: (activeTool) => set({ activeTool }),
   clearLayer: (layerId) =>
     set((state) => ({
+      cartographyDialog: state.cartographyDialog?.layerId === layerId ? null : state.cartographyDialog,
       editLayerId: state.editLayerId === layerId ? null : state.editLayerId,
       inspectorLayerId:
         state.inspectorLayerId === layerId ? null : state.inspectorLayerId,

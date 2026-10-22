@@ -27,6 +27,7 @@ export function MapPopup() {
   const project = useProjectStore(state => state.project)
   const features = useProjectStore(state => state.featuresByDataset)
   const activeTool = useWorkbenchStore(state => state.activeTool)
+  const identifyActive = useWorkbenchStore(state => state.identifyActive)
   const layer = project.layers.find(item => item.id === target?.layerId)
   const feature = layer && features[layer.datasetId]?.find(item => item.id === target?.featureId)
   const definition = layer?.interaction?.popup
@@ -75,8 +76,8 @@ export function MapPopup() {
   useEffect(() => { overlay.current?.setPosition(target?.coordinate) }, [target])
   useEffect(() => { close() }, [project.crs, close])
   useEffect(() => {
-    if (!feature || !definition?.fields.length || !['select', 'pan'].includes(activeTool)) close()
-  }, [feature, definition, activeTool, close])
+    if (identifyActive || !feature || !definition?.fields.length || !['select', 'pan'].includes(activeTool)) close()
+  }, [feature, definition, activeTool, identifyActive, close])
 
   return createPortal(<div className="map-popup" role="dialog" aria-label="要素属性弹窗" hidden={!target || !feature || !definition}
     onPointerDown={event => event.stopPropagation()}

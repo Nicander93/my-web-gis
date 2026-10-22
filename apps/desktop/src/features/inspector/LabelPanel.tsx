@@ -6,6 +6,7 @@ import { listAttributeFields, withLabel } from './style-draft'
 import { useCartographyEditor } from './useCartographyEditor'
 import './cartography-editor.css'
 import { SymbolEditor } from './SymbolEditor'
+import { StandardStyleControls } from './StandardStyleControls'
 
 interface LabelPanelProps {
   layerId: string
@@ -29,20 +30,22 @@ function pickerColor(color: { toRgb(): { r: number; g: number; b: number; a: num
 
 export function LabelPanel({ layerId }: LabelPanelProps) {
   const [open, setOpen] = useState(false)
+  const [drawingId, setDrawingId] = useState<string>()
   const editor = useCartographyEditor(layerId)
   useEffect(() => { setOpen(false) }, [layerId])
   return <>
     {editor.fragment && <Button size="small" disabled={editor.locked} onClick={() => setOpen(true)}>专业标注编辑…</Button>}
-    <LabelPanelBody layerId={layerId} />
-    {open && <SymbolEditor layerId={layerId} initialType="symbol" onClose={() => setOpen(false)} />}
+    <LabelPanelBody layerId={layerId} onEdit={id => { setDrawingId(id); setOpen(true) }} />
+    {open && <SymbolEditor layerId={layerId} initialType="symbol" initialDrawingLayerId={drawingId} onClose={() => setOpen(false)} />}
   </>
 }
 
-function LabelPanelBody({ layerId }: LabelPanelProps) {
+function LabelPanelBody({ layerId, onEdit }: LabelPanelProps & { onEdit(id: string): void }) {
   const editor = useCartographyEditor(layerId)
   const fields = useMemo(() => listAttributeFields(editor.features), [editor.features])
 
   if (!editor.layer || !editor.style) return <div className="empty-state empty-state-box">请选择一个图层</div>
+  if (!editor.editable && editor.fragment) return <StandardStyleControls layerId={layerId} labels onEdit={onEdit} />
   if (!editor.editable) {
     return (
       <div className="inspector-card cartography-editor label-panel">

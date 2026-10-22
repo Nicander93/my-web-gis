@@ -116,7 +116,8 @@ test(`${format} GeoServer wizard publishes against the isolated real server and 
     await route.fulfill({ response: await route.fetch() })
   })
   await start(page, '道路')
-  await page.getByRole('button', { name: '发布到 GeoServer…', exact: true }).click()
+  await page.getByRole('button', { name: '样式菜单', exact: true }).click()
+  await page.getByRole('menuitem', { name: '发布到 GeoServer…', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: /发布“道路”到 GeoServer/ })
   await dialog.getByRole('textbox', { name: '连接名称', exact: true }).fill('Local acceptance')
   await dialog.getByRole('textbox', { name: 'GeoServer 根地址', exact: true }).fill('http://127.0.0.1:18085/geoserver')
@@ -187,7 +188,8 @@ test('embedded WOFF2 installs before label compilation and survives project hist
 
 test('offline SLD export requires an explicit geometry field and exports real XML', async ({ page }, info) => {
   await start(page, '道路')
-  await page.getByRole('button', { name: '导出 SLD…', exact: true }).click()
+  await page.getByRole('button', { name: '样式菜单', exact: true }).click()
+  await page.getByRole('menuitem', { name: '导出 SLD…', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '导出 SLD', exact: true })
   await expect(dialog.getByRole('button', { name: '仅导出 XML', exact: true })).toBeDisabled()
   await dialog.getByRole('textbox', { name: 'SLD几何字段', exact: true }).fill('the_geom')

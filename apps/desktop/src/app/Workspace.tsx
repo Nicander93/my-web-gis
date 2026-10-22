@@ -17,6 +17,7 @@ import { useProjectStore } from '@/stores/project.store'
 import { AttributeTableHost } from '@/features/attribute-table/AttributeTableHost'
 import { Inspector } from '@/features/inspector/Inspector'
 import { InformationPanel } from '@/features/inspector/InformationPanel'
+import { CartographyWindowHost } from '@/features/inspector/CartographyWindowHost'
 import { LayerPropertyWindowHost } from '@/features/inspector/LayerPropertyWindow'
 import { LayerPanel } from '@/features/layers/LayerPanel'
 import { LayerFilterWindowHost } from '@/features/layers/LayerFilterWindow'
@@ -178,6 +179,7 @@ export function Workspace({
         <AttributeTableHost />
       </BottomPanel>
       <LayerPropertyWindowHost />
+      <CartographyWindowHost />
       <LayerFilterWindowHost />
     </main>
   )

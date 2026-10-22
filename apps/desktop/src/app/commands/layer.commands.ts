@@ -114,6 +114,10 @@ function openInspector(id: string, tab: 'layer' | 'style' | 'label'): void {
 
 /** 图层相关命令，供 Header 按钮与 Layer Context Menu 共用。 */
 export const layerCommands = {
+  openStyleDialog(layerId: string, kind: 'sld' | 'publish'): void {
+    if (!getLayerCapabilities(layerId).canStyle) return
+    useWorkbenchStore.getState().setCartographyDialog({ layerId, kind, epoch: useProjectStore.getState().projectEpoch })
+  },
   setPopup(layerId: string, popup?: PopupDefinition): void {
     if (!getLayerCapabilities(layerId).canAttributeTable) return
     const controller = createProjectSceneController()

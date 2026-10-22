@@ -100,14 +100,20 @@ test('switching layers preserves immediate edits without a draft dialog', async 
   await firstInput.fill('23')
   await firstInput.blur()
   const firstLayer = await cartographyState(page)
-  await page.getByLabel('配置图层').selectOption(firstLayer.layerIds.find(id => id !== firstLayer.selectedLayerId)!)
+  const names = await page.evaluate(async () => {
+    const { useProjectStore } = await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/stores/project.store.ts') ?? '/src/stores/project.store.ts')
+    return useProjectStore.getState().project.layers.map(layer => ({ id: layer.id, name: layer.name }))
+  })
+  await page.getByLabel('配置图层').click()
+  await page.locator('.ant-select-dropdown:visible .ant-select-item-option').nth(names.findIndex(layer => layer.id !== firstLayer.selectedLayerId)).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect.poll(async () => (await cartographyState(page)).selectedLayerId).not.toBe(firstLayer.selectedLayerId)
-  await page.getByLabel('配置图层').selectOption(firstLayer.selectedLayerId)
+  await page.getByLabel('配置图层').click()
+  await page.locator('.ant-select-dropdown:visible .ant-select-item-option').nth(names.findIndex(layer => layer.id === firstLayer.selectedLayerId)).click()
   await expect.poll(async () => (await cartographyState(page)).radius).toBe(23)
 })
 
-test('advanced standard expressions remain intact when compatibility controls are read-only', async ({ page }) => {
+test('advanced expressions remain intact while safe sibling parameters stay editable', async ({ page }) => {
   const scene = {
     version: 3,
     id: 'advanced-style-readonly',
@@ -137,15 +143,22 @@ test('advanced standard expressions remain intact when compatibility controls ar
   await page.locator('.layer-name-button').click()
   await page.getByRole('region', { name: '二维功能区' }).getByRole('button', { name: '样式', exact: true }).click()
   const panel = page.locator('.style-panel')
-  await expect(panel).toContainText('高级标准样式为只读')
+  await expect(panel.getByRole('button', { name: '半径表达式', exact: true })).toBeVisible()
+  await expect(page.getByRole('img', { name: 'Points符号预览', exact: true }).locator('..')).not.toHaveAttribute('title')
   const before = await page.evaluate(async () => {
     const loaded = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
     const { useProjectStore } = await import(loaded('/src/stores/project.store.ts')) as typeof import('../src/stores/project.store')
     return structuredClone(useProjectStore.getState().project.cartography)
   })
   await expect(panel.getByLabel('渲染方式')).toHaveCount(0)
+  await panel.getByLabel('标准描边宽度', { exact: true }).fill('3')
+  await panel.getByLabel('标准描边宽度', { exact: true }).blur()
+  const edited = await page.evaluate(async () => (await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/stores/project.store.ts') ?? '/src/stores/project.store.ts')).useProjectStore.getState().project.cartography)
+  expect(edited!.styleLayers[0]!.paint!['circle-radius']).toEqual(before!.styleLayers[0]!.paint!['circle-radius'])
+  expect(edited!.styleLayers[0]!.paint!['circle-stroke-width']).toBe(3)
+  await page.getByRole('button', { name: '撤销', exact: true }).click()
   await page.getByRole('tab', { name: '标注', exact: true }).click()
-  await expect(page.locator('.label-panel')).toContainText('高级标准样式为只读')
+  await expect(page.getByText('当前没有文字样式，可在专业标注编辑中添加。', { exact: true })).toBeVisible()
   const after = await page.evaluate(async () => {
     const loaded = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
     const { useProjectStore } = await import(loaded('/src/stores/project.store.ts')) as typeof import('../src/stores/project.store')
