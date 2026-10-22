@@ -20,6 +20,7 @@ import {
 } from '@desktop-webgis/gis-core'
 import type { LayerStyle } from '@desktop-webgis/ol-style'
 import { finishStyleInteraction } from '@/features/inspector/style-interaction'
+import { openLayerFilterWindow } from '@/features/layers/layer-filter-request'
 
 function requireSelectedLayerId(): string | null {
   const layerId = useProjectStore.getState().selectedLayerId
@@ -303,10 +304,8 @@ export const layerCommands = {
       return
     }
     useProjectStore.getState().setSelectedLayer(id)
-    openActivityPanel('attributes')
-    emitCommandStatus('已打开属性表过滤')
-    useWorkbenchStore.getState().bindTable(id)
-    useSessionStore.getState().setAttributeTableState(id, { filterOpen: true })
+    openLayerFilterWindow(id)
+    emitCommandStatus('已打开图层过滤')
   },
 
   /** Open export dialog in export mode (no copy primary). */

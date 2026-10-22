@@ -35,6 +35,7 @@ import { HelpDialog } from '@/features/help/HelpDialog'
 import { registerHelpDialog, type HelpDialogPage } from './commands/help.commands'
 import { viewCommands } from './commands/view.commands'
 import { RecoveryDraftHost } from '@/features/project/RecoveryDraftHost'
+import { SoftwareSettings } from '@/features/settings/SoftwareSettings'
 
 const SceneWorkspace = lazy(() =>
   import('@/features/scene3d/SceneWorkspace').then((module) => ({
@@ -64,9 +65,6 @@ export default function App() {
     setAddDataOpen(true)
   })
   const [exportOpen, setExportOpen] = useState(false)
-  const processingOpen = useWorkbenchStore(
-    (state) => state.rightTask === 'processing'
-  )
   const closeProcessing = () =>
     useWorkbenchStore.getState().setRightTask('inspector')
   const [exportLayerId, setExportLayerId] = useState<string | null>(null)
@@ -224,13 +222,13 @@ export default function App() {
         <Workspace
           key={project.id}
           processing={
-            processingOpen ? (
+            (
               <ProcessingDialog
                 key={project.id}
                 docked
                 onClose={closeProcessing}
               />
-            ) : undefined
+            )
           }
           onCloseProcessing={closeProcessing}
         />
@@ -253,6 +251,7 @@ export default function App() {
         />
       )}
       <RecoveryDraftHost />
+      <SoftwareSettings />
       {helpPage && <HelpDialog page={helpPage} onClose={() => setHelpPage(null)} />}
       <AddDataDialog
         open={addDataOpen}

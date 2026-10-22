@@ -371,6 +371,7 @@ export function setActiveEditTool(tool: EditTool): boolean {
   if (!isMapRuntimeMounted() || !selectionRuntime || !toolRuntime) return false
 
   activeTool = tool
+  useWorkbenchStore.getState().setIdentifyActive(false)
   useWorkbenchStore.getState().setActiveTool(tool)
 
   if (tool === 'none' || tool === 'pan') {

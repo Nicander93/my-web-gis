@@ -9,11 +9,13 @@ import { HelpMenu } from './menus/HelpMenu'
 import { SceneMenu } from '@/features/scene3d/SceneMenu'
 import { useProjectStore } from '@/stores/project.store'
 import { getProjectType } from '@/services/project-type'
+import { usePreferencesStore } from '@/stores/preferences.store'
 
-export type MenuId = 'project' | 'view' | 'settings' | 'help'
+export type MenuId = 'project' | 'operations' | 'view' | 'settings' | 'help'
 
 const menus: Array<{ id: MenuId; label: string }> = [
   { id: 'project', label: '文件' },
+  { id: 'operations', label: '操作' },
   { id: 'view', label: '窗口' },
   { id: 'settings', label: '设置' },
   { id: 'help', label: '帮助' }
@@ -22,7 +24,8 @@ const menus: Array<{ id: MenuId; label: string }> = [
 const menuComponents: Record<MenuId, ComponentType<{ onClose(): void }>> = {
   project: ProjectMenu,
   view: ViewMenu,
-  settings: SettingsMenu,
+  operations: OperationsMenu,
+  settings: () => null,
   help: HelpMenu
 }
 
@@ -35,8 +38,8 @@ function menuButtons(label: string): HTMLButtonElement[] {
   return Array.from(menu?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])
 }
 
-/** 原有低频命令保留在设置分类中，避免重组 Shell 时丢失入口。 */
-function SettingsMenu({ onClose }: { onClose(): void }) {
+/** Low-frequency data and editing commands remain accessible from a business menu. */
+function OperationsMenu({ onClose }: { onClose(): void }) {
   const city = useProjectStore(state => getProjectType(state.project) === '3d')
   const sections = [
     { label: '数据操作', node: city ? <SceneMenu section="data" onClose={onClose} /> : <DataMenu onClose={onClose} /> },
@@ -70,6 +73,12 @@ export function MenuBar() {
   }
 
   function openAt(id: MenuId) {
+    if (id === 'settings') {
+      closeMenu(false)
+      triggers.current.settings?.focus()
+      usePreferencesStore.getState().setSettingsOpen(true)
+      return
+    }
     openRef.current = id
     setOpenMenu(id)
   }
@@ -168,6 +177,7 @@ export function MenuBar() {
   return (
     <nav className="menu-bar" aria-label="应用程序菜单">
       {menus.map((menu) => {
+        if (menu.id === 'settings') return <button key={menu.id} ref={node => { triggers.current.settings = node }} className="menu-trigger" type="button" aria-haspopup="dialog" onClick={() => openAt('settings')} onKeyDown={event => onTriggerKey(event, 'settings')}>设置</button>
         const isOpen = openMenu === menu.id
         const MenuComponent = menuComponents[menu.id]
         return (

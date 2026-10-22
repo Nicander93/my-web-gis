@@ -46,10 +46,10 @@ export function EditorDialog({ title, children, onClose, busy = false, className
       first?.focus()
     }}
     styles={{ wrapper: { position: 'fixed', inset: 0 },
-      container: { padding: 0, border: '1px solid #cfdcd2', borderRadius: 7,
+      container: { padding: 0, border: '1px solid var(--color-border-strong)', borderRadius: 7,
         overflow: 'hidden', boxShadow: '0 22px 55px #0c221e35' },
       header: { height: 41, padding: '0 42px 0 13px', display: 'flex', alignItems: 'center',
-        marginBottom: 0, borderBottom: '1px solid #dfe6e0' },
+        marginBottom: 0, borderBottom: '1px solid var(--color-border)' },
       body: { maxHeight: 'calc(100dvh - 110px)', overflow: 'auto' } }}>
     <div ref={body}>{children}</div>
   </Modal>

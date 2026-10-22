@@ -8,12 +8,14 @@ interface WorkbenchState {
   tableLayerId: string | null
   tableLayerIds: string[]
   activeTool: EditTool
-  rightTask: 'inspector' | 'processing'
+  rightTask: 'inspector' | 'information' | 'processing'
+  identifyActive: boolean
+  setIdentifyActive(active: boolean): void
   pendingInspector: { layerId: string; tab: 'layer' | 'style' | 'label' } | null
   setPendingInspector(request: WorkbenchState['pendingInspector']): void
   mapReadout: string
   setMapReadout(value: string): void
-  setRightTask(task: 'inspector' | 'processing'): void
+  setRightTask(task: WorkbenchState['rightTask']): void
   setEditLayer(layerId: string | null): void
   bindInspector(layerId: string | null): void
   bindTable(layerId: string | null): void
@@ -30,12 +32,14 @@ const initial = {
   tableLayerIds: [] as string[],
   activeTool: 'none' as EditTool,
   rightTask: 'inspector' as const,
+  identifyActive: false,
   pendingInspector: null,
   mapReadout: ''
 }
 
 export const useWorkbenchStore = create<WorkbenchState>((set) => ({
   ...initial,
+  setIdentifyActive: identifyActive => set({ identifyActive }),
   setPendingInspector: (pendingInspector) => set({ pendingInspector }),
   setMapReadout: (mapReadout) => set({ mapReadout }),
   setRightTask: (rightTask) => set({ rightTask }),

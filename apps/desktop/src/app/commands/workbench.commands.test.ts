@@ -44,15 +44,19 @@ it('does not accept a tile service as an editing target and clears the target wh
   expect(useWorkbenchStore.getState().editLayerId).toBeNull()
 })
 
-it('explicit table and filter commands switch away from diagnostics without changing the project', () => {
+it('table and map filtering have separate windows without changing data on open', () => {
   const id = add('本地图层'), before = useProjectStore.getState().getSnapshot()
   openActivityPanel('diagnostics')
   layerCommands.openAttributeTable(id)
   expect(useActivityPanelStore.getState().tab).toBe('attributes')
   expect(useWorkbenchStore.getState().tableLayerId).toBe(id)
   openActivityPanel('tasks')
+  const listener = vi.fn()
+  window.addEventListener('desktop-webgis:layer-filter', listener)
   layerCommands.openFilter(id)
-  expect(useActivityPanelStore.getState().tab).toBe('attributes')
-  expect(useSessionStore.getState().getLayerSession(id).attributeTable?.filterOpen).toBe(true)
+  window.removeEventListener('desktop-webgis:layer-filter', listener)
+  expect(listener).toHaveBeenCalledOnce()
+  expect(useActivityPanelStore.getState().tasksOpen).toBe(true)
+  expect(useSessionStore.getState().getLayerSession(id).attributeTable?.filterOpen ?? false).toBe(false)
   expect(useProjectStore.getState().getSnapshot()).toEqual(before)
 })

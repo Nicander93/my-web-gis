@@ -40,7 +40,7 @@ export function DockWindow({ id, title, label, actions, children, footer, onClos
     ? { left: bounds.x, top: bounds.y, width: bounds.width, height: bounds.height }
     : current.dock === 'bottom'
       ? { left: 0, right: 0, bottom: 0, height: Math.min(!draft && current.dock === id && 'height' in panel ? panel.height : bounds.height, area.height) }
-      : { top: 0, bottom: 0, [current.dock]: 0, width: Math.min(!draft && current.dock === id && 'width' in panel ? panel.width : bounds.width, area.width) }
+      : { top: 0, bottom: 0, [current.dock]: current.dock === 'right' ? 'var(--workspace-right-offset, 0px)' : 0, width: Math.min(!draft && current.dock === id && 'width' in panel ? panel.width : bounds.width, area.width) }
   style.display = panel.open ? undefined : 'none'
   style.zIndex = 5 + order.indexOf(id)
 

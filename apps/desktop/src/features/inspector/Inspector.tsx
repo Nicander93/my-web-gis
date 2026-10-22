@@ -13,11 +13,10 @@ import { getLayerCapabilities } from '@/app/commands/layer.commands'
 import { processingToolName } from '@/features/processing/processing-tools'
 import { PopupFields } from './PopupFields'
 
-type InspectorTab = 'layer' | 'feature' | 'style' | 'label'
+type InspectorTab = 'layer' | 'style' | 'label'
 
 export function Inspector() {
   const selectedLayerId = useWorkbenchStore((state) => state.inspectorLayerId)
-  const selection = useProjectStore((state) => state.selection)
   const project = useProjectStore((state) => state.project)
   const featuresByDataset = useProjectStore((state) => state.featuresByDataset)
   const setLayerOpacity = useProjectStore((state) => state.setLayerOpacity)
@@ -25,7 +24,7 @@ export function Inspector() {
 
   const layerId = selectedLayerId || 'no-layer'
   const session = useSessionStore((state) => state.sessions[layerId])
-  const tab: InspectorTab = session?.inspector?.activeTab ?? 'layer'
+  const tab: InspectorTab = session?.inspector?.activeTab === 'feature' ? 'layer' : session?.inspector?.activeTab ?? 'layer'
 
   const selectedLayer = selectedLayerId
     ? project.layers.find((layer) => layer.id === selectedLayerId)
@@ -53,21 +52,13 @@ export function Inspector() {
         ? 'Mixed'
         : '—'
   const flags = capabilitiesForDataset(dataset)
-  const selectedFeature =
-    selectedLayer &&
-    selection.layerId === selectedLayerId &&
-    selection.featureIds.length === 1
-      ? featuresByDataset[selectedLayer.datasetId]?.find(
-          (feature) => feature.id === selection.featureIds[0]
-        )
-      : null
 
 
   // Service tile layers have no local attributes — keep users on the layer tab.
   useEffect(() => {
     if (!selectedLayerId) return
     if (flags.queryAttributes) return
-    if (tab === 'feature' || tab === 'style' || tab === 'label') {
+    if (tab === 'style' || tab === 'label') {
       setTab(selectedLayerId, 'layer')
     }
   }, [selectedLayerId, flags.queryAttributes, tab, setTab])
@@ -100,15 +91,6 @@ export function Inspector() {
           disabled={!caps.canLabel}
         >
           标注
-        </Button>
-        <Button
-          variant={tab === 'feature' ? 'tab' : 'ghost'}
-          onClick={() => setTab(layerId, 'feature')}
-          role="tab"
-          aria-selected={tab === 'feature'}
-          disabled={!caps.canAttributeTable}
-        >
-          要素
         </Button>
       </div>
 
@@ -482,41 +464,7 @@ export function Inspector() {
         )
       ) : null}
 
-      {tab === 'feature' ? (
-        <section className="inspector-card">
-          {selectedFeature ? (
-            <>
-              <div className="card-title">要素 {selectedFeature.id}</div>
-              <dl className="feature-properties">
-                {Object.entries(selectedFeature.properties).map(
-                  ([key, value]) => (
-                    <div key={key}>
-                      <dt>{key}</dt>
-                      <dd>
-                        {value == null
-                          ? '—'
-                          : typeof value === 'object'
-                            ? JSON.stringify(value)
-                            : String(value)}
-                      </dd>
-                    </div>
-                  )
-                )}
-              </dl>
-            </>
-          ) : (
-            <p>在此图层中选择一个要素，查看属性。</p>
-          )}
-          {caps.canAttributeTable && (
-            <Button
-              variant="ghost"
-              onClick={() => layerCommands.openAttributeTable(selectedLayerId)}
-            >
-              打开此图层属性表
-            </Button>
-          )}
-        </section>
-      ) : null}
     </div>
   )
 }
+

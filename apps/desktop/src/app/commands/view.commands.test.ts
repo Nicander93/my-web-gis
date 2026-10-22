@@ -3,10 +3,14 @@ import { useWorkspaceStore } from '@/stores/workspace.store'
 import { viewCommands } from './view.commands'
 import { useActivityPanelStore } from '@/stores/activity-panel.store'
 import { useDockingStore } from '@/stores/docking.store'
+import { useWorkbenchStore } from '@/stores/workbench.store'
+import { getActiveEditTool } from '@/features/map/map-runtime-host'
 
 describe('view commands', () => {
   beforeEach(() => {
     useActivityPanelStore.getState().setTab('attributes')
+    useActivityPanelStore.setState({ tasksOpen: false, diagnosticsOpen: false })
+    useWorkbenchStore.getState().reset()
     const storage = {
       getItem: () => null,
       setItem: () => undefined,
@@ -30,12 +34,15 @@ describe('view commands', () => {
     })
   })
 
-  it('opens log and diagnostic tabs and switches back to the attribute table without closing the dock', () => {
+  it('opens tasks and diagnostics independently without changing the attribute dock', () => {
     viewCommands.openTaskLog()
     expect(useActivityPanelStore.getState().tab).toBe('tasks')
-    expect(useWorkspaceStore.getState().bottom.open).toBe(true)
+    expect(useWorkspaceStore.getState().bottom.open).toBe(false)
+    expect(useActivityPanelStore.getState().tasksOpen).toBe(true)
     viewCommands.openDiagnostics()
     expect(useActivityPanelStore.getState().tab).toBe('diagnostics')
+    expect(useActivityPanelStore.getState().diagnosticsOpen).toBe(true)
+    expect(useActivityPanelStore.getState().tasksOpen).toBe(true)
     viewCommands.toggleAttributeTable()
     expect(useWorkspaceStore.getState().bottom.open).toBe(true)
     expect(useActivityPanelStore.getState().tab).toBe('attributes')
@@ -56,16 +63,34 @@ describe('view commands', () => {
     expect(messages.at(-1)).toBe('图层面板已打开')
   })
 
-  it('raises an already open bottom window when opening logs, diagnostics or attributes', () => {
+  it('does not move or close the attribute dock when opening task and diagnostic windows', () => {
     useWorkspaceStore.getState().setBottomOpen(true)
     const layout = structuredClone(useDockingStore.getState().layout)
-    for (const command of [viewCommands.openTaskLog, viewCommands.openDiagnostics, viewCommands.toggleAttributeTable, viewCommands.openAttributeTable]) {
+    for (const command of [viewCommands.openTaskLog, viewCommands.openDiagnostics]) {
       useDockingStore.getState().activate('left')
       command()
-      expect(useDockingStore.getState().order.at(-1)).toBe('bottom')
+      expect(useDockingStore.getState().order.at(-1)).toBe('left')
       expect(useWorkspaceStore.getState().bottom.open).toBe(true)
       expect(useDockingStore.getState().layout).toEqual(layout)
     }
+    viewCommands.openAttributeTable()
+    expect(useDockingStore.getState().order.at(-1)).toBe('bottom')
+  })
+
+  it('switches right work panels without changing the map tool or editing target', () => {
+    useWorkbenchStore.getState().setActiveTool('modify')
+    useWorkbenchStore.getState().setEditLayer('editing-target')
+    const tool = getActiveEditTool()
+    viewCommands.toggleRightPanel('information')
+    expect(useWorkspaceStore.getState().right.open).toBe(true)
+    expect(useWorkbenchStore.getState().rightTask).toBe('information')
+    expect(useWorkbenchStore.getState().activeTool).toBe('modify')
+    expect(getActiveEditTool()).toBe(tool)
+    expect(useWorkbenchStore.getState().editLayerId).toBe('editing-target')
+    viewCommands.toggleRightPanel('processing')
+    expect(useWorkspaceStore.getState().right.open).toBe(true)
+    viewCommands.toggleRightPanel('processing')
+    expect(useWorkspaceStore.getState().right.open).toBe(false)
   })
 
   it('keeps the last panel size when restoring it', () => {

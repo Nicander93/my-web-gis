@@ -41,6 +41,7 @@ export function MapPopup() {
     overlay.current = mounted
     map.addOverlay(mounted)
     const click = (event: { pixel: number[]; coordinate: number[] }) => {
+      if (useWorkbenchStore.getState().identifyActive) return
       if (!['select', 'pan'].includes(getActiveEditTool())) return
       const hit = map.forEachFeatureAtPixel(event.pixel, (native, nativeLayer) => {
         if (!(native instanceof Feature)) return undefined

@@ -6,10 +6,19 @@ import { emitCommandStatus } from './status'
 import { getMapRuntime } from '@/features/map/map-runtime-host'
 import { projectedMapView } from '@/features/map/map-projections'
 import { createProjectSceneController } from '@/features/scene/project-scene-controller'
-import { openActivityPanel, useActivityPanelStore } from '@/stores/activity-panel.store'
+import { openActivityPanel } from '@/stores/activity-panel.store'
 
 /** 视图命令直接操作 Workspace Store，供 Header、快捷键和菜单复用。 */
 export const viewCommands = {
+  toggleRightPanel(task: 'inspector' | 'information' | 'processing'): void {
+    const workspace = useWorkspaceStore.getState()
+    const workbench = useWorkbenchStore.getState()
+    const open = !workspace.right.open || workbench.rightTask !== task
+    if (task === 'inspector' && !workbench.inspectorLayerId) workbench.bindInspector(useProjectStore.getState().selectedLayerId)
+    workbench.setRightTask(task)
+    workspace.setRightOpen(open)
+    if (open && typeof window !== 'undefined' && window.innerWidth < workspace.left.width + workspace.right.width + 300) workspace.setLeftOpen(false)
+  },
   openTaskLog(): void { openActivityPanel('tasks') },
   openDiagnostics(): void { openActivityPanel('diagnostics') },
   setMapProjection(code: string): void {
@@ -34,18 +43,18 @@ export const viewCommands = {
   },
   toggleInspector(): void {
     const state = useWorkspaceStore.getState()
-    const open = !state.right.open
+    const open = !state.right.open || useWorkbenchStore.getState().rightTask !== 'inspector'
     if (open && !useWorkbenchStore.getState().inspectorLayerId)
       useWorkbenchStore
         .getState()
         .bindInspector(useProjectStore.getState().selectedLayerId)
+    if (open) useWorkbenchStore.getState().setRightTask('inspector')
     state.setRightOpen(open)
     emitCommandStatus(open ? '检查器已打开' : '检查器已收起')
   },
   toggleAttributeTable(): void {
     const state = useWorkspaceStore.getState()
-    const open = !state.bottom.open || useActivityPanelStore.getState().tab !== 'attributes'
-    useActivityPanelStore.getState().setTab('attributes')
+    const open = !state.bottom.open
     if (open && !useWorkbenchStore.getState().tableLayerId)
       useWorkbenchStore
         .getState()
@@ -55,7 +64,6 @@ export const viewCommands = {
     emitCommandStatus(open ? '属性表已打开' : '属性表已收起')
   },
   openAttributeTable(): void {
-    useActivityPanelStore.getState().setTab('attributes')
     if (!useWorkbenchStore.getState().tableLayerId)
       useWorkbenchStore
         .getState()

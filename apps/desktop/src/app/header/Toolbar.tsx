@@ -4,6 +4,7 @@ import {
   Check,
   Download,
   Filter,
+  Info,
   MapPinned,
   MousePointer2,
   Move,
@@ -63,6 +64,7 @@ export function Toolbar() {
   useProjectStore((state) => state.featuresByDataset)
   const editLayerId = useWorkbenchStore((state) => state.editLayerId)
   const active = useWorkbenchStore((state) => state.activeTool)
+  const identifying = useWorkbenchStore(state => state.identifyActive)
   const browsed = project.layers.find((layer) => layer.id === browsedId)
   const target = project.layers.find((layer) => layer.id === editLayerId)
   const caps = getLayerCapabilities(browsedId)
@@ -166,9 +168,10 @@ export function Toolbar() {
               <ToolbarButton
                 icon={Move}
                 label="平移"
-                active={active === 'pan'}
+                active={active === 'pan' && !identifying}
                 onClick={mapCommands.pan}
               />
+              <ToolbarButton icon={Info} label="识别" active={identifying} onClick={mapCommands.identify} />
               <ToolbarButton
                 icon={ZoomIn}
                 label="放大"

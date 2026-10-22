@@ -13,7 +13,8 @@ interface ViewMenuProps {
 
 export function ViewMenu({ onClose }: ViewMenuProps) {
   const layout = useWorkspaceStore()
-  const tab = useActivityPanelStore(state => state.tab)
+  const tasksOpen = useActivityPanelStore(state => state.tasksOpen)
+  const diagnosticsOpen = useActivityPanelStore(state => state.diagnosticsOpen)
   const city = useProjectStore(state => getProjectType(state.project) === '3d')
   function handleAction(action: () => void) {
     action()
@@ -30,19 +31,19 @@ export function ViewMenu({ onClose }: ViewMenuProps) {
       />
       <MenuItem
         icon={Eye}
-        label="检查器"
+        label="属性"
         checked={layout.right.open}
         onClick={() => handleAction(viewCommands.toggleInspector)}
       />
       <MenuItem
         icon={FileText}
         label="属性表"
-        checked={layout.bottom.open && tab === 'attributes'}
+        checked={layout.bottom.open}
         disabled={city}
         onClick={() => handleAction(viewCommands.toggleAttributeTable)}
       />
-      <MenuItem icon={FileText} label="任务日志" checked={layout.bottom.open && tab === 'tasks'} onClick={() => handleAction(viewCommands.openTaskLog)} />
-      <MenuItem icon={Eye} label="诊断" checked={layout.bottom.open && tab === 'diagnostics'} onClick={() => handleAction(viewCommands.openDiagnostics)} />
+      <MenuItem icon={FileText} label="任务中心" checked={tasksOpen} onClick={() => handleAction(viewCommands.openTaskLog)} />
+      <MenuItem icon={Eye} label="诊断中心" checked={diagnosticsOpen} onClick={() => handleAction(viewCommands.openDiagnostics)} />
       <MenuSeparator />
       <MenuItem
         icon={Maximize2}

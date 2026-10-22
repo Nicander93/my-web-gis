@@ -1,4 +1,5 @@
 import { emitCommandStatus } from './status'
+import { useWorkbenchStore } from '@/stores/workbench.store'
 import {
   clearMapSelection,
   isMapRuntimeMounted,
@@ -10,6 +11,11 @@ import {
 
 /** 地图操作命令：接入 OlMapRuntime / OlSelectionRuntime 后驱动真实视图与选择。 */
 export const mapCommands = {
+  identify(): void {
+    if (!setActiveEditTool('pan')) { emitCommandStatus('地图尚未就绪'); return }
+    useWorkbenchStore.getState().setIdentifyActive(true)
+    emitCommandStatus('点击要素查看信息')
+  },
   pan(): void {
     if (setActiveEditTool('pan')) {
       emitCommandStatus('平移地图')
