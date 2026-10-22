@@ -1,0 +1,8 @@
+.software-settings__layout { display: flex; min-height: 100%; }
+.software-settings__layout > .ant-menu { flex: 0 0 140px; border-inline-end: 1px solid var(--color-border-subtle); background: var(--color-panel); }
+.software-settings__content { flex: 1; min-width: 0; padding: 16px; }
+.software-settings__content h3 { margin: 0 0 18px; font-size: calc(var(--font-size-ui) + 1px); font-weight: 600; }
+.software-settings__content p { margin: 10px 0 20px; color: var(--color-text-secondary); line-height: 1.6; }
+.software-settings__content dl { display: grid; grid-template-columns: 80px 1fr; gap: 10px; margin-bottom: 20px; }
+.software-settings__content dd { margin: 0; }
+.software-settings__content .ant-alert { margin-bottom: 16px; }

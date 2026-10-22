@@ -1,0 +1,141 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>my-web-gis | 右侧竖向面板切换 UX V1</title>
+<style>
+:root{font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif;color:#23332e;background:#e4ece7;font-size:12px;--border:#d7dfda;--fg:#24332c;--muted:#667670;--ink:#176c5c;--sel:#e7f2eb;--height:27px}body{margin:0}*{box-sizing:border-box}button,select,input{font:inherit}button{cursor:pointer}button:disabled{cursor:default;opacity:.45}button:focus-visible,select:focus-visible{outline:2px solid #298a77;outline-offset:1px}.app{height:100dvh;min-height:460px;display:flex;flex-direction:column;overflow:hidden;background:#fff}.titlebar{height:36px;flex:0 0 auto;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;padding:0 12px;background:#f9fbf9}.brand{font-weight:750;letter-spacing:-.3px}.menuitem{background:none;border:0;color:#42534c;padding:5px 4px}.project{color:#8a9690;margin-left:auto}.ribbon{height:39px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 9px;gap:6px;background:#fff}.divider{width:1px;height:19px;background:#dce3de;margin:0 4px}.tool{height:27px;min-width:27px;border:1px solid transparent;background:transparent;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;color:#3d4d46}.tool:hover{background:#edf3ee}.tool.active{color:#155d4c;background:#e4f0ea;border-color:#bad8c8}.tool svg{width:15px;height:15px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}.ribbon-caption{margin-left:10px;color:#6a7771}.work{flex:1;display:flex;min-height:0;overflow:hidden}.pane{background:#fff;min-width:0;flex:0 0 auto;display:flex;flex-direction:column}.left{width:216px;border-right:1px solid var(--border)}.right{width:328px;border-left:1px solid var(--border)}.pane-head{height:31px;flex:0 0 auto;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 9px;gap:8px;font-weight:650;background:#f7f9f7}.head-actions{display:flex;align-items:center;gap:2px}.tiny{width:23px;height:23px;padding:0;border:0;background:transparent;color:#6a7870;border-radius:3px;font-size:16px}.tiny:hover{background:#e7eee8}.layer-item{padding:7px 10px;display:flex;align-items:center;gap:7px;border-bottom:1px solid #f0f3f0}.layer-item.active{background:#edf6ef;color:#155a49}.check{accent-color:#236d57}.swatch{height:11px;width:18px;border-radius:2px;display:inline-block;box-shadow:inset 0 0 0 1px #0002}.layer-name{flex:1}.layer-small{padding:8px 11px;color:#84908b}.map{position:relative;min-width:240px;flex:1;overflow:hidden;background-color:#edf3ed;background-image:linear-gradient(30deg,transparent 45%,#d8e6dc 46%,#d8e6dc 47%,transparent 48%),linear-gradient(120deg,transparent 45%,#e2ebe3 46%,#e2ebe3 47%,transparent 48%);background-size:170px 185px,250px 180px}.map-header{position:absolute;top:12px;left:12px;z-index:2;background:#fff;border:1px solid var(--border);padding:6px 9px;border-radius:4px;box-shadow:0 2px 7px #243b3010;color:#66766d}.map-hint{position:absolute;bottom:12px;left:12px;z-index:2;background:#fff;border:1px solid var(--border);padding:7px 9px;border-radius:4px;max-width:calc(100% - 24px);color:#495a51;box-shadow:0 2px 7px #243b3010}.map-svg{width:100%;height:100%;display:block}.road{fill:none;stroke:#fff;stroke-width:16;stroke-linecap:round}.road-mid{fill:none;stroke:#bec9c0;stroke-width:2;stroke-linecap:round}.river{fill:none;stroke:#79acc9;stroke-width:8;stroke-linecap:round}.basin{fill:#c8e4cd;stroke:#91ba9c;stroke-width:2}.station{cursor:crosshair;stroke:#fff;stroke-width:3;fill:#2e83a6;transition:r .1s,fill .1s}.station:hover{r:13}.station.identified{fill:#f0a23c;stroke:#fff;stroke-width:4}.station.selected{fill:#d25557}.dot-label{font-size:16px;font-weight:550;fill:#567066;pointer-events:none}.result-main{flex:1;min-height:0;overflow:auto}.inspector-tabs{height:31px;display:flex;flex:0 0 auto;border-bottom:1px solid var(--border)}.inspector-tabs button{border:0;border-right:1px solid var(--border);background:#fff;flex:1;color:#586b61}.inspector-tabs button.on{border-bottom:2px solid #3d8c72;color:#175c46;background:#fbfdfb}.group{border-bottom:1px solid var(--border);padding:10px 11px}.group-title{font-weight:650;margin-bottom:9px}.property{display:grid;grid-template-columns:92px 1fr;gap:4px 9px;align-items:center;margin:7px 0}.property label{color:#68786d}.property input,.property select{border:1px solid #ccd8d0;padding:0 6px;height:26px;border-radius:3px;min-width:0;max-width:100%;background:#fff;color:#30443b}.muted{color:#78877e}.thin{font-size:11px;color:#809088}.button{border:1px solid #cddbd0;background:#fff;color:#345345;border-radius:3px;padding:5px 9px;height:27px}.button:hover{background:#edf6ef}.button.primary{background:#e5f2e9;color:#175a46;border-color:#a9ccb6}.identify-tools{display:flex;align-items:center;gap:5px;padding:6px 9px;border-bottom:1px solid var(--border)}.identify-tools select{height:25px;border:1px solid #d2ded5;border-radius:3px;background:#fff;color:#46574d;min-width:0;flex:1}.results{margin:0;padding:0;list-style:none}.result-choice{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #eef1ec;background:#f9fbf8}.circle{width:9px;height:9px;background:#e8a83e;border-radius:50%}.result-title{font-weight:650}.result-tag{margin-left:auto;color:#658070;background:#e5f1e8;padding:2px 5px;border-radius:3px;font-size:11px}.detail-table{width:100%;border-collapse:collapse;font-size:12px}.detail-table td{padding:7px 10px;border-bottom:1px solid #eef1ed;vertical-align:top;overflow-wrap:anywhere}.detail-table td:first-child{color:#62756a;width:106px;background:#fafbf9}.footer-actions{flex:0 0 auto;padding:8px;border-top:1px solid var(--border);display:flex;gap:6px}.status{height:26px;flex:0 0 auto;border-top:1px solid var(--border);background:#fafbfa;color:#687970;display:flex;align-items:center;gap:16px;padding:0 10px}.status span:last-child{margin-left:auto}.empty{padding:20px 12px;color:#819086;line-height:1.8}.mini-button{display:none}.info{color:#166550}.nav-info{font-size:11px;margin-left:4px;color:#6b7f70}.left.collapsed{width:34px}.left.collapsed .layer-content{display:none}.left.collapsed .pane-head{padding:0;justify-content:center}.left.collapsed .pane-head b{display:none}.left.collapsed .head-actions button{display:none}.left.collapsed .head-actions .mini-button{display:block}.mobile-panel-control{display:none}.subhead{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);padding:7px 9px;color:#537065}.subhead b{font-weight:650}.subhead .tiny{margin-left:auto}.tooltip{position:absolute;top:12px;right:12px;z-index:2;font-size:11px;padding:7px 9px;background:#fff;border:1px solid var(--border);border-radius:4px;color:#708076}
+@media(max-width:1050px){.work.identify-visible .left:not(.manual-open){width:34px}.work.identify-visible .left:not(.manual-open) .layer-content{display:none}.work.identify-visible .left:not(.manual-open) .pane-head{padding:0;justify-content:center}.work.identify-visible .left:not(.manual-open) .pane-head b{display:none}.work.identify-visible .left:not(.manual-open) .head-actions button{display:none}.work.identify-visible .left:not(.manual-open) .head-actions .mini-button{display:block}.right{width:310px}}
+@media(max-width:760px){.left{width:34px}.left .layer-content,.left .pane-head b{display:none}.left .pane-head{padding:0}.left .head-actions button{display:none}.left .head-actions .mini-button{display:block}.right{width:min(43vw,295px)}.work .left.manual-open{width:175px;position:absolute;z-index:5;top:75px;bottom:26px;box-shadow:2px 3px 14px #0002}.work .left.manual-open .layer-content,.work .left.manual-open .pane-head b{display:block}.work .left.manual-open .head-actions button{display:block}.right .property{grid-template-columns:75px 1fr}.map-header{display:none}}
+
+/* V2: the permanent right tool-window rail is the only primary switcher. */
+:root{--rail:42px}
+.work{position:relative;}
+.right{width:322px;flex-shrink:0;transition:width .16s ease;border-left:1px solid var(--border);overflow:hidden;}
+.right.closed{width:0!important;border-left:0!important;}
+.right .pane-head{height:32px;}
+.right .pane-head b{white-space:nowrap;}
+.right .right-view{display:none;min-height:0;flex:1;flex-direction:column;}
+.right .right-view.active{display:flex;}
+.right-rail{width:var(--rail);flex:0 0 var(--rail);background:#f3f6f3;border-left:1px solid #cad6ce;display:flex;flex-direction:column;align-items:stretch;gap:3px;padding:6px 3px;z-index:3;}
+.rail-button{width:35px;height:59px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:#64766d;background:none;border:1px solid transparent;border-radius:4px;padding:4px 1px;position:relative;}
+.rail-button:hover{background:#e9f1eb;color:#2a624f;}
+.rail-button[aria-pressed="true"]{color:#145c48;background:#fff;border-color:#cfdfd4;box-shadow:0 1px 3px #143c2310;}
+.rail-button[aria-pressed="true"]::before{content:"";position:absolute;width:3px;left:-4px;top:8px;bottom:8px;background:#2d8a68;border-radius:3px;}
+.rail-button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+.rail-button span{font-size:11px;line-height:1;white-space:nowrap;}
+.rail-spacer{flex:1;}
+.rail-bottom{height:31px!important;}
+.pane-head .small-info{font-size:10px;color:#8b9890;font-weight:400;}
+.left.collapsed{width:34px!important;}
+.left.collapsed .layer-content{display:none;}
+.work.auto-collapse .left:not(.manual-open){width:34px!important;}
+.work.auto-collapse .left:not(.manual-open) .layer-content,.work.auto-collapse .left:not(.manual-open) .pane-head b{display:none;}
+.work.auto-collapse .left:not(.manual-open) .pane-head{padding:0;justify-content:center;}
+.work.auto-collapse .left:not(.manual-open) .head-actions button{display:none;}
+.work.auto-collapse .left:not(.manual-open) .head-actions .mini-button{display:block;}
+.work:not(.auto-collapse) .left.manual-open{position:relative;top:auto;bottom:auto;box-shadow:none;}
+.work .left.manual-open{position:relative;top:auto;bottom:auto;box-shadow:none;}
+.mini-button{font-size:16px;}
+.panel-subnav{height:31px;flex:0 0 auto;display:flex;border-bottom:1px solid var(--border)}
+.panel-subnav button{background:#fff;flex:1;border:0;border-right:1px solid var(--border);font-size:12px;color:#66796e;}
+.panel-subnav button.active{box-shadow:inset 0 -2px #35886e;background:#fbfdfb;color:#185d45;}
+.result-hint{padding:8px 11px;color:#84948a;font-size:11px;border-bottom:1px solid #ecf1eb;}
+.task-item{padding:11px;border-bottom:1px solid #e6ece7;display:flex;align-items:center;gap:9px;}
+.task-item strong{font-weight:600;}
+.task-item .muted{margin-left:auto;font-size:11px;white-space:nowrap;}
+.task-icon{width:26px;height:26px;background:#e8f2e9;border:1px solid #d6e4d7;border-radius:5px;display:grid;place-items:center;color:#4d785e;font-size:15px;}
+.right .footer-actions{margin-top:auto;}
+.map{min-width:260px;}
+@media(max-width:1050px){.right{width:315px}.left:not(.collapsed):not(.manual-open){width:216px}}
+@media(max-width:760px){.right{width:min(320px,48vw)}.map{min-width:200px}.left.manual-open{width:180px!important}.left{width:34px}.right-rail{width:40px;flex-basis:40px}.rail-button{width:33px}}
+@media(max-width:580px){.right{width:min(260px,52vw)}.map{min-width:170px}.ribbon-caption{display:none}}
+</style></head><body><div class="app"><div class="titlebar"><strong class="brand">my-web-gis</strong><button class="menuitem">文件</button><button class="menuitem">窗口</button><button class="menuitem">视图</button><span class="project">水文工作区 · UX 原型</span></div><div class="ribbon"><button class="tool active" id="modeSelect" title="选择要素：点击地图选择要素"><svg viewBox="0 0 24 24"><path d="M4 2 4 19 9 14 13 22 16 21 12 13 20 13Z"/></svg>选择</button><button class="tool" id="modeIdentify" title="识别信息：点击地图查看要素属性"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6 M12 7v.5"/></svg>识别信息</button><div class="divider"></div><div class="ribbon-caption" id="modeNote">选择模式 · 点击点位选择要素</div><button class="tool mobile-panel-control" id="expandLeft" style="display:none">图层</button></div>
+<div class="work" id="work"><aside class="pane left" id="left"><div class="pane-head"><b>图层</b><div class="head-actions"><button class="tiny mini-button" id="reopenLayers" title="展开图层">☰</button><button class="tiny" id="collapseLayers" title="收起图层">‹</button></div></div><div class="layer-content"><div class="layer-item active"><input type="checkbox" class="check" checked aria-label="显示水文站点"><span class="swatch" style="background:#2e83a6"></span><span class="layer-name">水文站点</span></div><div class="layer-item"><input type="checkbox" class="check" checked aria-label="显示河流水系"><span class="swatch" style="background:#8fb8cf"></span><span class="layer-name">河流水系</span></div><div class="layer-item"><input type="checkbox" class="check" checked aria-label="显示行政区划"><span class="swatch" style="background:#c8e4cd"></span><span class="layer-name">行政区划</span></div><div class="layer-small">3 个图层 · 当前图层：水文站点</div></div></aside>
+<main class="map"><span class="map-header">示意地图 · 点击蓝色站点</span><svg class="map-svg" viewBox="0 0 900 600" preserveAspectRatio="xMidYMid slice" aria-label="地图示意"><path class="basin" d="M-30 80Q150 65 200 123T350 180Q480 220 560 130T920 120L910 600H-20Z"/><path class="road" d="M-30 410Q150 370 220 420T480 330Q560 260 930 290"/><path class="road-mid" d="M-30 410Q150 370 220 420T480 330Q560 260 930 290"/><path class="river" d="M-50 280Q120 230 230 300T430 270Q620 210 670 300T960 350"/><text x="345" y="245" class="dot-label">主要河流</text><text x="535" y="388" class="dot-label">城区</text><circle tabindex="0" role="button" aria-label="站点 A" data-station="a" class="station" cx="230" cy="300" r="9"/><circle tabindex="0" role="button" aria-label="站点 B" data-station="b" class="station" cx="430" cy="270" r="9"/><circle tabindex="0" role="button" aria-label="站点 C" data-station="c" class="station" cx="670" cy="300" r="9"/><text x="245" y="286" class="dot-label">站点 A</text><text x="443" y="258" class="dot-label">站点 B</text><text x="688" y="289" class="dot-label">站点 C</text></svg><div class="map-hint" id="mapHint">当前：选择要素。点击任意站点，只会改变选择，不会打开信息面板。</div></main>
+<aside class="pane right" id="rightPane" aria-label="右侧工作窗格">
+  <div class="pane-head"><b id="rightTitle">图层属性</b><div class="head-actions"><span class="small-info" id="targetName">水文站点</span><button class="tiny" id="closeRight" title="收起右侧内容（保留竖向入口）" aria-label="收起右侧内容">×</button></div></div>
+  <div class="right-view active" id="properties">
+    <div class="panel-subnav" role="tablist" aria-label="图层属性栏目"><button class="active" data-tab="layer">图层</button><button data-tab="style">样式</button><button data-tab="label">标注</button></div>
+    <div class="result-main" id="propContent"><div class="group"><div class="group-title">水文站点</div><div class="property"><label>数据类型</label><span>点 · 本地矢量</span></div><div class="property"><label>要素数</label><span>3</span></div><div class="property"><label>不透明度</label><input type="range" min="0" max="100" value="100" aria-label="不透明度" /></div></div></div>
+  </div>
+  <div class="right-view" id="identifyPane">
+    <div class="identify-tools"><span class="muted">识别范围</span><select id="identifyScope"><option value="active">当前图层</option><option value="visible">所有可见图层</option></select><button class="tiny" id="clearInfo" title="清空识别结果" aria-label="清空识别结果">↺</button></div>
+    <div class="result-main" id="results"><div class="empty">选择「识别信息」工具，然后点击地图中的要素。</div></div>
+    <div class="footer-actions"><button class="button" id="copyResult">复制属性</button><button class="button" id="openTable">打开属性表</button></div>
+  </div>
+  <div class="right-view" id="processingPane">
+    <div class="result-hint">空间处理工具（示意）</div>
+    <div class="task-item"><span class="task-icon">▤</span><strong>缓冲区</strong><span class="muted">常用</span></div>
+    <div class="task-item"><span class="task-icon">◫</span><strong>裁剪</strong></div>
+    <div class="task-item"><span class="task-icon">⌗</span><strong>融合</strong></div>
+    <div class="group" style="margin-top:auto;border-bottom:0"><span class="muted">任务进度仍在独立任务中心查看。</span></div>
+  </div>
+</aside>
+<nav class="right-rail" aria-label="右侧面板切换">
+  <button class="rail-button" data-pane="properties" aria-pressed="true" title="图层属性" aria-label="图层属性"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8 M8 12h8 M8 16h5"/></svg><span>属性</span></button>
+  <button class="rail-button" data-pane="identify" aria-pressed="false" title="识别信息（点击地图查看）" aria-label="识别信息"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6 M12 7v.5"/></svg><span>信息</span></button>
+  <button class="rail-button" data-pane="processing" aria-pressed="false" title="空间处理" aria-label="空间处理"><svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 14h6v6h-6zM7 10v5h10v-1"/><path d="M14 4h6M17 1v6"/></svg><span>处理</span></button>
+  <div class="rail-spacer"></div>
+  <button class="rail-button rail-bottom" id="toggleRight" title="收起 / 展开右侧内容" aria-label="收起或展开右侧面板"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+</nav></div>
+<div class="status"><span>模式：<b id="bottomMode">选择</b></span><span id="selectionStatus">已选 0</span><span id="widthStatus">地图可用空间优先 · 独立右侧窗格</span><span>EPSG:3857</span></div></div>
+<script>
+const rows={a:{名称:'水文站 A',编号:'STA-001',类型:'水位站',所属河流:'主要河流',水位:'12.4 m',采集时间:'2026-10-22 15:00',状态:'正常'},b:{名称:'水文站 B',编号:'STA-002',类型:'流量站',所属河流:'主要河流',流量:'836 m³/s',采集时间:'2026-10-22 15:00',状态:'正常'},c:{名称:'水文站 C',编号:'STA-003',类型:'雨量站',所属河流:'主要河流',降雨量:'18.5 mm',采集时间:'2026-10-22 15:00',状态:'正常'}};
+let mode='select',choice=null,selected=null,right='properties',previousRight='properties',leftManual=false,manuallyCollapsedLeft=false;
+const $=id=>document.getElementById(id);
+function narrow(){return window.innerWidth<1050}
+function openPane(name){
+  if(name==='closed'){if(right!=='closed')previousRight=right;right='closed'}
+  else {right=name;previousRight=name;if(narrow())leftManual=false;}
+  refresh();
+}
+function refresh(){
+  const compact=narrow()&&right!=='closed'&&!leftManual;
+  $('work').classList.toggle('auto-collapse',compact);
+  $('left').classList.toggle('manual-open',leftManual);
+  $('left').classList.toggle('collapsed',manuallyCollapsedLeft||compact);
+  $('rightPane').classList.toggle('closed',right==='closed');
+  $('properties').classList.toggle('active',right==='properties');
+  $('identifyPane').classList.toggle('active',right==='identify');
+  $('processingPane').classList.toggle('active',right==='processing');
+  $('rightTitle').textContent={properties:'图层属性',identify:'识别信息',processing:'空间处理'}[right]??'图层属性';
+  $('targetName').textContent=right==='properties'?'水文站点':'';
+  document.querySelectorAll('[data-pane]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.pane===right)));
+  $('toggleRight').title=right==='closed'?'展开右侧内容':'收起右侧内容';
+  $('toggleRight').querySelector('path').setAttribute('d',right==='closed'?'M9 5l7 7-7 7':'M15 5l-7 7 7 7');
+  for(const c of document.querySelectorAll('[data-station]')){
+    c.classList.toggle('identified',choice===c.dataset.station&&right==='identify');
+    c.classList.toggle('selected',selected===c.dataset.station&&!(choice===c.dataset.station&&right==='identify'));
+  }
+  for(const [a,m] of [['modeSelect','select'],['modeIdentify','identify']])$(a).classList.toggle('active',mode===m);
+  $('modeNote').textContent=mode==='select'?'选择模式 · 点击站点选择要素':'识别模式 · 点击站点查看信息';
+  $('bottomMode').textContent=mode==='select'?'选择':'识别信息';
+  $('selectionStatus').textContent='已选 '+(selected?1:0);
+  $('mapHint').textContent=mode==='select'?'选择模式：点击站点只会改变选择，不会弹出识别信息。':'识别模式：点击站点，在右侧「信息」显示属性；不会改变选择。';
+  $('widthStatus').textContent=compact?'窄窗口：右侧展开时自动收起左侧图层':'右侧竖栏：只展开一个工作面板';
+  if(right==='identify')renderResult();
+}
+function renderResult(){
+  if(!choice){$('results').innerHTML='<div class="empty">尚无识别结果。选择顶部「识别信息」，点击地图上的点位。</div>';return}
+  const r=rows[choice];
+  $('results').innerHTML=`<div class="result-choice"><span class="circle"></span><span class="result-title">水文站点 / ${r.名称}</span><span class="result-tag">点</span></div><table class="detail-table"><tbody>${Object.entries(r).map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join('')}</tbody></table>`;
+}
+$('modeSelect').onclick=()=>{mode='select';refresh()};
+$('modeIdentify').onclick=()=>{mode='identify';openPane('identify')};
+function hitStation(id){if(mode==='identify'){choice=id;openPane('identify')}else{selected=selected===id?null:id;refresh()}}
+document.querySelectorAll('[data-station]').forEach(el=>{el.onclick=()=>hitStation(el.dataset.station);el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();hitStation(el.dataset.station)}}});
+document.querySelectorAll('[data-pane]').forEach(el=>{el.onclick=()=>openPane(el.dataset.pane===right?'closed':el.dataset.pane)});
+$('closeRight').onclick=()=>openPane('closed');
+$('toggleRight').onclick=()=>openPane(right==='closed'?previousRight:'closed');
+$('clearInfo').onclick=()=>{choice=null;refresh()};
+$('copyResult').onclick=()=>{if(choice){navigator.clipboard?.writeText(JSON.stringify(rows[choice],null,2)).then(()=>{$('mapHint').textContent='已复制当前要素属性'}).catch(()=>{$('mapHint').textContent='浏览器禁止剪贴板操作'})}};
+$('openTable').onclick=()=>{$('mapHint').textContent=choice?`已从「${rows[choice].名称}」识别结果打开属性表（原型示意）`:'请先识别要素'};
+$('collapseLayers').onclick=()=>{leftManual=false;manuallyCollapsedLeft=true;refresh()};
+$('reopenLayers').onclick=()=>{manuallyCollapsedLeft=false;leftManual=true;if(narrow()&&right!=='closed'){previousRight=right;right='closed'}refresh()};
+$('identifyScope').onchange=()=>{$('mapHint').textContent='识别范围已切换（原型仅模拟站点）'};
+document.querySelectorAll('[data-tab]').forEach(tab=>tab.onclick=()=>{
+  document.querySelectorAll('[data-tab]').forEach(e=>e.classList.toggle('active',e===tab));
+  const name={layer:'图层',style:'样式',label:'标注'}[tab.dataset.tab];
+  $('propContent').innerHTML=tab.dataset.tab==='layer'?'<div class="group"><div class="group-title">水文站点</div><div class="property"><label>数据类型</label><span>点 · 本地矢量</span></div><div class="property"><label>要素数</label><span>3</span></div><div class="property"><label>不透明度</label><input type="range" value="100" aria-label="不透明度" /></div></div>':`<div class="group"><div class="group-title">${name}</div><div class="property"><label>${name==='样式'?'当前符号':'标注字段'}</label><span>${name==='样式'?'圆形 · 蓝色 · 6px':'名称'}</span></div></div>`;
+});
+window.addEventListener('resize',()=>{if(narrow()&&right!=='closed')leftManual=false;refresh()});
+window.addEventListener('keydown',e=>{if(e.key==='Escape'&&mode==='identify'){mode='select';refresh()}});
+refresh();
+</script></body></html>

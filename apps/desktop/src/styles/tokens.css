@@ -18,15 +18,38 @@
   --color-danger: #a64c47;
   --color-warning: #9a742f;
   --color-success: #56835b;
-  --control-height: 30px;
-  --control-icon-height: 24px;
-  --ribbon-tool-height: 34px;
+  --font-size-ui: 12px;
+  --control-height: 28px;
+  --control-icon-height: 26px;
+  --ribbon-tool-height: 28px;
+  --menu-height: 34px;
   --desktop-row-height: 28px;
+  --tab-height: 30px;
+  --status-height: 24px;
+  --toolrail-width: 36px;
+  --space-group: 8px;
+  --space-field: 6px;
+  --icon-size: 15px;
+  --z-workspace-window: 5;
+  --z-toolrail: 15;
+  --z-floating-window: 20;
   --font-ui:
     'Segoe UI', 'Microsoft YaHei UI', system-ui, 'Noto Sans SC', sans-serif;
   --font-mono:
     'Maple Mono', 'JetBrains Mono', Consolas, 'Microsoft YaHei UI',
     'Noto Sans SC', monospace;
+}
+
+:root[data-density='standard'] {
+  --control-height: 30px;
+  --control-icon-height: 28px;
+  --desktop-row-height: 30px;
+  --tab-height: 32px;
+  --ribbon-tool-height: 30px;
+  --menu-height: 36px;
+  --status-height: 26px;
+  --space-group: 10px;
+  --space-field: 8px;
 }
 
 :root[data-theme='dark'] {

@@ -22,6 +22,8 @@
 
 ### 阶段计划与验收
 
+- [二维工作区 UX 产品化执行计划与记录](plans/2d-ux-productization-implementation.md)：2026-10-22 交接资料、设计系统代码构造、P0–P5 实施与验证；[交接计划](ux/my-web-gis-ux-productization-plan-v1.md)、[原型索引](ux/prototype-index-v1.md)。
+
 - [二维制图实施记录](plans/2d-cartography-implementation.md)：P0–P6 的实现、测试及原生/浏览器边界；[GeoServer 验收证据](design/2d-cartography-geoserver/README.md)、[P6 MBStyle 与 WebGL](design/2d-cartography-p6/README.md)。
 - [2026-10-13 Desktop 产品化实施记录](plans/desktop-productization-implementation.md)：采用用户交付包的 M0–M9 方案，首批 Shell/Docking 改动、回归基线及尚未实施的范围。
 - [实施补充细则](design/desktop-productization/implementation-addendum.md)：已确认原型直接实施、明确采用 Ant Design、组件迁移顺序与最终 PR 验收要求。

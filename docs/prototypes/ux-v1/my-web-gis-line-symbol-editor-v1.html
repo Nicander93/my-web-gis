@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>my-web-gis · 线符号编辑器 V1</title>
+<style>
+:root{color-scheme:light;--bg:#edf0f2;--panel:#fff;--panel2:#f8f9fa;--edge:#d8dde2;--softedge:#e8ebee;--fg:#282f36;--muted:#65717e;--light:#8a949e;--blue:#3e75a5;--sel:#e7f0f8;--hover:#f4f7fa;font-family:Inter,"Segoe UI","Microsoft YaHei",Arial,sans-serif;font-size:12px;font-synthesis:none}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:var(--bg);color:var(--fg);display:flex;justify-content:center;align-items:center;padding:30px}button,input,select{font:inherit;color:inherit}button{cursor:pointer}button:disabled{opacity:.36;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #77a2c8;outline-offset:1px}
+.window{width:870px;max-width:100%;height:min(760px,calc(100vh - 60px));min-height:585px;background:#fff;border:1px solid #c9d0d7;border-radius:5px;box-shadow:0 16px 45px #2532421a;display:flex;flex-direction:column;overflow:hidden}
+.titlebar{flex:none;height:43px;padding:0 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--edge);background:var(--panel2)}.titlebar strong{font-size:13px;font-weight:650}.subname{font-size:11px;color:var(--light)}.push{flex:1}.separator{height:17px;width:1px;background:#dce1e6;margin:0 2px}.btn{border:1px solid #cbd2d9;background:#fff;border-radius:3px;height:27px;line-height:25px;padding:0 10px;white-space:nowrap}.btn:hover:not(:disabled){border-color:#a6b9c9;background:#f4f7f9}.btn:active:not(:disabled){background:#e9f0f5}.btn.ghost{border-color:transparent;background:transparent;color:#576475}.btn.ghost:hover:not(:disabled){background:#eaf0f5}.btn.primary{background:#447cae;color:#fff;border-color:#447cae}.btn.primary:hover{background:#336d9f}.btn.small{height:24px;line-height:22px;padding:0 8px}.btn.square{min-width:27px;padding:0 7px}.btn.danger:hover:not(:disabled){color:#a9453c;border-color:#d3aaa6}
+.preview{flex:none;border-bottom:1px solid var(--edge);padding:10px 16px 11px}.preview-h{display:flex;align-items:center;gap:10px;margin-bottom:7px}.section-title{font-weight:650;color:#3c4651}.meta{font-size:11px;color:var(--light)}.zoom-slider{width:125px;accent-color:#4a7eab;height:13px}.zoom-number{width:35px;font-variant-numeric:tabular-nums;text-align:right;color:#596775}.preview-canvas{height:110px;background:#fcfdfe;border:1px solid #dfe4e9;border-radius:3px;overflow:hidden}.preview-canvas svg{display:block;width:100%;height:100%}
+.work{display:grid;grid-template-columns:264px minmax(0,1fr);min-height:0;flex:1}.layer-panel{min-width:0;border-right:1px solid var(--edge);display:flex;flex-direction:column;background:#fbfcfd}.pane-heading{height:36px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-bottom:1px solid var(--softedge);font-weight:650}.pane-heading span:last-child{font-size:11px;color:var(--light);font-weight:400}.layer-list{min-height:0;flex:1;overflow:auto;padding:5px 5px 8px}.layer-row{height:51px;display:flex;align-items:center;gap:7px;padding:0 7px;cursor:pointer;border:1px solid transparent;border-radius:3px;margin-bottom:2px}.layer-row:hover{background:#f0f4f7}.layer-row.selected{border-color:#c9dfef;background:var(--sel)}.layer-row input[type=checkbox]{width:14px;height:14px;margin:0;accent-color:#4a7daa;cursor:pointer}.layer-swatch{width:35px;flex:none;height:24px;display:flex;align-items:center;justify-content:center}.layer-swatch svg{width:35px;height:24px}.layer-content{min-width:0;flex:1}.layer-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:550}.layer-details{font-size:11px;color:#81909b;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.layer-buttons{flex:none;border-top:1px solid var(--softedge);padding:8px 9px;display:flex;gap:5px;flex-wrap:wrap;background:#fbfcfd}.add-menu{height:27px;border:1px solid #ccd2d9;border-radius:3px;background:white;padding:0 5px;min-width:0;max-width:96px}
+.property-panel{min-width:0;display:flex;flex-direction:column}.property-scroll{min-height:0;overflow:auto;padding:12px 18px 22px}.form-group{border:0;padding:0;margin:0 0 12px}.form-group legend{padding:0;margin-bottom:9px;font-weight:650;color:#47535f}.form-row{display:grid;grid-template-columns:85px minmax(0,1fr);column-gap:12px;align-items:center;min-height:33px}.form-row label{color:#5e6974;white-space:nowrap}.form-control{min-height:27px;display:flex;align-items:center;min-width:0;gap:7px}.textin,.numin,.sel{height:27px;padding:3px 7px;background:#fff;border:1px solid #cbd2da;border-radius:3px;min-width:0}.textin{width:100%}.numin{width:95px}.sel{width:100%}.color-control{display:flex;align-items:center;gap:7px;min-width:0}.color-control input[type=color]{width:35px;height:27px;padding:2px;border:1px solid #cbd2d9;border-radius:3px;background:#fff;cursor:pointer}.hex{width:105px;text-transform:uppercase}.percent-slider{accent-color:#477bab;min-width:50px;flex:1}.inline-unit{font-size:11px;color:var(--light)}.dynamic{height:27px;border:1px solid #cbd2d9;border-radius:3px;background:#fff;padding:0 8px;color:#425f79;white-space:nowrap}.dynamic:hover{background:#f0f5fa}.dynamic.active{color:#245c8f;border-color:#a4c4df;background:#edf5fb}.minor-divider{height:1px;background:var(--softedge);margin:14px 0}.control-description{font-size:11px;color:var(--light)}.bottom{flex:none;height:40px;border-top:1px solid var(--edge);background:#fafbfc;display:flex;align-items:center;padding:0 15px;gap:10px}.bottom .right{margin-left:auto;display:flex;gap:7px}.status{font-size:11px;color:#7a8792}.status.dirty{color:#ad762b}
+.modal-overlay{position:fixed;inset:0;z-index:10;background:#13263755;display:flex;justify-content:center;align-items:center;padding:16px}.modal{width:590px;max-width:100%;max-height:calc(100vh - 32px);display:flex;flex-direction:column;border-radius:5px;background:#fff;border:1px solid #bfc9d1;box-shadow:0 20px 52px #152c4050}.modal-title{height:43px;display:flex;align-items:center;gap:8px;flex:none;background:#f9fafb;padding:0 15px;border-bottom:1px solid var(--edge);font-size:13px;font-weight:650}.modal-title button{margin-left:auto;font-size:19px;line-height:25px}.modal-content{overflow:auto;padding:15px 17px}.modal-footer{border-top:1px solid var(--edge);background:#fafbfc;padding:9px 15px;display:flex;align-items:center;justify-content:flex-end;gap:8px}.tabs{display:flex;border-bottom:1px solid #d5dce2;margin-bottom:14px;gap:2px}.tabs button{border:0;border-bottom:2px solid transparent;padding:7px 17px;background:transparent;color:#65727e}.tabs button.active{color:#2e6897;border-bottom-color:#4880af;font-weight:650}.modal .form-row{grid-template-columns:110px minmax(0,1fr);min-height:38px}.stop-table{width:100%;border-collapse:collapse;margin:8px 0}.stop-table th{background:#f6f7f9;font-size:11px;color:#6c7883;font-weight:500;text-align:left;height:30px;padding:0 9px;border-bottom:1px solid var(--edge)}.stop-table td{height:40px;padding:4px 9px;border-bottom:1px solid #e9edf0}.stop-table td input{height:27px;width:100%;border:1px solid #ccd3d9;border-radius:3px;padding:3px 7px}.modal-preview{border:1px solid #dce2e7;border-radius:3px;padding:10px 14px;margin-top:15px;background:#fafcfe}.modal-preview-top{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#6a7782;margin-bottom:7px}.modal-preview svg{width:100%;height:36px}.stop-actions{margin-top:8px;display:flex;gap:7px}.field-note{font-size:11px;color:#84909c}.empty{color:#919ba5;padding:20px 14px}.kbd{color:#87929b;font-size:11px}
+@media(max-width:760px){body{padding:0;align-items:stretch}.window{width:100%;height:100vh;max-height:none;min-height:0;border:0;border-radius:0}.work{grid-template-columns:210px minmax(0,1fr)}.property-scroll{padding:10px}.form-row{grid-template-columns:68px minmax(0,1fr);column-gap:6px}.preview{padding:8px 10px}.layer-buttons{padding:6px}.layer-list{padding:4px}.pane-heading{padding:0 8px}.numin{width:75px}.dynamic{padding:0 5px}}
+@media(max-width:535px){.work{grid-template-columns:160px minmax(0,1fr)}.layer-row{padding:0 4px;gap:3px}.layer-swatch{width:25px}.layer-swatch svg{width:25px}.layer-details{font-size:10px}.layer-buttons{gap:3px}.layer-buttons .btn{padding:0 5px}.add-menu{width:100%;max-width:none}.property-scroll{padding:8px}.form-row{display:block;margin-bottom:8px}.form-row>label{display:block;margin-bottom:3px}.form-control{flex-wrap:wrap}.hex{width:90px}.preview-canvas{height:85px}.titlebar{padding:0 9px}.titlebar .subname{display:none}}
+</style>
+</head>
+<body>
+<div class="window" role="application" aria-label="线符号编辑器">
+  <header class="titlebar">
+    <strong>线符号</strong><span class="subname">· 双层道路</span>
+    <div class="push"></div>
+    <button id="undo" class="btn ghost" title="Ctrl+Z">撤销</button>
+    <button id="redo" class="btn ghost" title="Ctrl+Y">重做</button>
+    <div class="separator"></div>
+    <button id="save" class="btn primary" title="Ctrl+S">保存</button>
+  </header>
+  <div class="preview">
+    <div class="preview-h"><span class="section-title">符号预览</span><span class="meta" id="visibleSummary"></span><div class="push"></div><label for="zoomSlider" class="meta">Zoom</label><input id="zoomSlider" class="zoom-slider" type="range" min="4" max="20" step="0.5" value="12"><span id="zoomValue" class="zoom-number">12</span></div>
+    <div id="previewCanvas" class="preview-canvas"></div>
+  </div>
+  <div class="work">
+    <section class="layer-panel" aria-label="符号图层">
+      <div class="pane-heading"><span>符号图层</span><span id="layerCount">2 层</span></div>
+      <div id="layerList" class="layer-list"></div>
+      <div class="layer-buttons">
+        <select id="addLayer" class="add-menu" title="添加符号图层"><option value="">+ 添加图层</option><option value="simple">简单线</option><option value="outline">外描边</option><option value="dashed">虚线</option></select>
+        <button id="duplicate" class="btn square" title="复制选中的符号图层">复制</button>
+        <button id="remove" class="btn square danger" title="删除选中的符号图层">删除</button>
+        <button id="up" class="btn square" title="向上移动图层">上移</button>
+        <button id="down" class="btn square" title="向下移动图层">下移</button>
+      </div>
+    </section>
+    <section class="property-panel" aria-label="符号图层参数">
+      <div class="pane-heading"><span id="selectedTitle">图层属性</span><span>简单线</span></div>
+      <div id="property" class="property-scroll"></div>
+    </section>
+  </div>
+  <footer class="bottom"><span id="status" class="status">已保存</span><span class="push"></span><span class="kbd">Ctrl+Z 撤销 · Ctrl+S 保存</span></footer>
+</div>
+<div id="modalRoot"></div>
+<script>
+(()=>{'use strict';
+const $=s=>document.querySelector(s), $all=s=>[...document.querySelectorAll(s)];
+const clone=x=>JSON.parse(JSON.stringify(x));
+const escapeHtml=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clamp=(n,a,b)=>Math.min(b,Math.max(a,n));
+let idCounter=10;
+const nextId=()=>++idCounter;
+const zoomWidth=(stops,z,mode)=>{
+  if(!stops.length)return 1;
+  const pts=[...stops].sort((a,b)=>a.z-b.z);
+  if(z<=pts[0].z)return pts[0].v;
+  for(let i=1;i<pts.length;i++){
+    if(z<=pts[i].z){if(mode==='step')return z===pts[i].z?pts[i].v:pts[i-1].v;const t=(z-pts[i-1].z)/(pts[i].z-pts[i-1].z||1);return pts[i-1].v+(pts[i].v-pts[i-1].v)*t;}
+  }
+  return pts[pts.length-1].v;
+};
+const initial={selected:2,layers:[
+ {id:2,name:'内部线',enabled:true,color:'#efd39b',opacity:100,width:{mode:'fixed',fixed:7.5,interp:'linear',stops:[{z:8,v:3},{z:12,v:7.5},{z:16,v:12}]},lineStyle:'solid',dash:'8,4',cap:'round',join:'round',offset:0},
+ {id:1,name:'外描边',enabled:true,color:'#535f6a',opacity:100,width:{mode:'zoom',fixed:10.5,interp:'linear',stops:[{z:8,v:5},{z:12,v:10.5},{z:16,v:15.5}]},lineStyle:'solid',dash:'8,4',cap:'round',join:'round',offset:0}
+]};
+let state=clone(initial),saved=JSON.stringify(initial),undoStack=[],redoStack=[],previewZoom=12,modalOpen=false,activeGroup=null;
+try{const raw=localStorage.getItem('my-web-gis-line-symbol-v1');if(raw){const p=JSON.parse(raw);if(Array.isArray(p.layers)&&p.layers.length){state=p;saved=JSON.stringify(p);idCounter=Math.max(idCounter,...p.layers.map(x=>x.id))}}}catch{}
+function selected(){return state.layers.find(x=>x.id===state.selected)||state.layers[0]}
+function selectedIndex(){return state.layers.findIndex(x=>x.id===state.selected)}
+function widthAt(layer,z=previewZoom){const a=layer.width;return a.mode==='zoom'?zoomWidth(a.stops,z,a.interp):a.fixed}
+function mark(){const dirty=JSON.stringify(state)!==saved;$('#status').textContent=dirty?'未保存的更改':'已保存';$('#status').classList.toggle('dirty',dirty);$('#undo').disabled=undoStack.length===0;$('#redo').disabled=redoStack.length===0;$('#remove').disabled=state.layers.length===1;$('#up').disabled=selectedIndex()===0;$('#down').disabled=selectedIndex()===state.layers.length-1}
+function apply(fn,group){const before=JSON.stringify(state);if(group===undefined||activeGroup!==group){undoStack.push(before);if(undoStack.length>100)undoStack.shift();redoStack=[];}activeGroup=group??null;fn(state);render();}
+function live(fn,group){const before=JSON.stringify(state);if(activeGroup!==group){undoStack.push(before);if(undoStack.length>100)undoStack.shift();redoStack=[];activeGroup=group}fn(state);refreshVisualOnly()}
+function endGroup(){activeGroup=null}
+function undo(){if(!undoStack.length)return;redoStack.push(JSON.stringify(state));state=JSON.parse(undoStack.pop());activeGroup=null;render()}
+function redo(){if(!redoStack.length)return;undoStack.push(JSON.stringify(state));state=JSON.parse(redoStack.pop());activeGroup=null;render()}
+function svgLine(layer,scale=1){const w=clamp(widthAt(layer)*scale,.15,90),dash=layer.lineStyle==='dash'?'14 9':layer.lineStyle==='dot'?'1 8':layer.lineStyle==='custom'?layer.dash.replace(/,/g,' '):'';return `<path d="M-25 74 C90 0 150 114 280 51 S500 16 840 75" fill="none" stroke="${layer.color}" stroke-width="${w.toFixed(2)}" opacity="${layer.opacity/100}" stroke-linecap="${layer.cap}" stroke-linejoin="${layer.join}" ${dash?`stroke-dasharray="${escapeHtml(dash)}"`:''} transform="translate(0 ${Number(layer.offset)*scale})"/>`}
+function refreshPreview(){const visible=state.layers.filter(x=>x.enabled);$('#visibleSummary').textContent=`${visible.length} / ${state.layers.length} 层显示`;
+ const bg='<path d="M0 28 H840 M0 84 H840" stroke="#eef1f3" stroke-width="1"/><path d="M140 0 V110 M280 0 V110 M420 0 V110 M560 0 V110 M700 0 V110" stroke="#eef1f3" stroke-width="1"/>';
+ $('#previewCanvas').innerHTML=`<svg viewBox="0 0 840 110" preserveAspectRatio="none" aria-label="符号预览">${bg}${[...visible].reverse().map(l=>svgLine(l,1.85)).join('')}</svg>`;
+ $('#zoomValue').textContent=String(previewZoom).replace('.0','')}
+function miniature(l){const w=clamp(widthAt(l,12)*.7,1,12),dash=l.lineStyle==='dash'?'7 4':l.lineStyle==='dot'?'1 4':l.lineStyle==='custom'?l.dash.replace(/,/g,' '):'';return `<svg viewBox="0 0 36 24"><line x1="2" y1="12" x2="34" y2="12" stroke="${l.color}" stroke-width="${w}" stroke-linecap="${l.cap}" opacity="${l.opacity/100}" ${dash?`stroke-dasharray="${escapeHtml(dash)}"`:''}/></svg>`}
+function refreshList(){const container=$('#layerList');container.innerHTML=state.layers.map(l=>`<div class="layer-row ${l.id===state.selected?'selected':''}" data-id="${l.id}" role="button" tabindex="0" aria-selected="${l.id===state.selected}"><input type="checkbox" data-enabled="${l.id}" ${l.enabled?'checked':''} aria-label="显示${escapeHtml(l.name)}"><div class="layer-swatch">${miniature(l)}</div><div class="layer-content"><div class="layer-name">${escapeHtml(l.name)}</div><div class="layer-details">${widthAt(l,12).toFixed(1)} px${l.width.mode==='zoom'?' · Zoom':''} · ${l.lineStyle==='solid'?'实线':l.lineStyle==='dash'?'虚线':l.lineStyle==='dot'?'点线':'自定义'}</div></div></div>`).join('');
+ $all('.layer-row').forEach(row=>{row.onclick=e=>{if(e.target.matches('input'))return;state.selected=+row.dataset.id;render()};row.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();state.selected=+row.dataset.id;render()}}});
+ $all('[data-enabled]').forEach(el=>el.onchange=e=>{e.stopPropagation();apply(s=>{s.layers.find(l=>l.id===+el.dataset.enabled).enabled=el.checked})})}
+function opts(arr,val){return arr.map(([value,label])=>`<option value="${escapeHtml(value)}" ${value===val?'selected':''}>${escapeHtml(label)}</option>`).join('')}
+function paramRow(name,inside){return `<div class="form-row"><label>${name}</label><div class="form-control">${inside}</div></div>`}
+function renderProperty(){const l=selected();if(!l){$('#property').innerHTML='<div class="empty">暂无符号图层</div>';return}
+ $('#selectedTitle').textContent=l.name;
+ $('#property').innerHTML=`<fieldset class="form-group"><legend>基本属性</legend>
+ ${paramRow('名称',`<input id="layerName" class="textin" value="${escapeHtml(l.name)}" maxlength="40">`)}
+ ${paramRow('颜色',`<div class="color-control"><input id="lineColor" type="color" value="${escapeHtml(l.color)}" aria-label="线条颜色"><input id="lineHex" class="textin hex" value="${escapeHtml(l.color)}" maxlength="7"></div>`)}
+ ${paramRow('线宽',`<input id="lineWidth" class="numin" type="number" min="0.1" max="80" step="0.5" value="${widthAt(l).toFixed(2)}" ${l.width.mode==='zoom'?'disabled':''}><span class="inline-unit">px</span><button id="widthDynamic" class="dynamic ${l.width.mode==='zoom'?'active':''}">${l.width.mode==='zoom'?'随 Zoom…':'数据定义…'}</button>`)}
+ ${paramRow('透明度',`<input id="opacity" class="percent-slider" type="range" min="0" max="100" value="${l.opacity}"><input id="opacityNumber" class="numin" type="number" min="0" max="100" value="${l.opacity}" style="width:60px"><span class="inline-unit">%</span>`)}
+ ${paramRow('线型',`<select id="lineStyle" class="sel">${opts([['solid','实线'],['dash','虚线'],['dot','点线'],['custom','自定义']],l.lineStyle)}</select>`)}
+ ${l.lineStyle==='custom'?paramRow('虚线间隔',`<input id="dash" class="textin" placeholder="8, 4" value="${escapeHtml(l.dash)}">`):''}
+ </fieldset><div class="minor-divider"></div><fieldset class="form-group"><legend>线条参数</legend>
+ ${paramRow('端点样式',`<select id="cap" class="sel">${opts([['round','圆形'],['butt','平直'],['square','方形']],l.cap)}</select>`)}
+ ${paramRow('连接样式',`<select id="join" class="sel">${opts([['round','圆角'],['bevel','斜角'],['miter','尖角']],l.join)}</select>`)}
+ ${paramRow('线偏移',`<input id="offset" class="numin" type="number" min="-30" max="30" step="0.5" value="${l.offset}"><span class="inline-unit">px</span>`)}
+ </fieldset>`;
+ const update=(key,val)=>apply(s=>{s.layers.find(q=>q.id===l.id)[key]=val});
+ $('#layerName').onchange=e=>update('name',e.target.value.trim()||'未命名线层');
+ $('#lineColor').oninput=e=>{live(s=>s.layers.find(q=>q.id===l.id).color=e.target.value,'color'+l.id);$('#lineHex').value=e.target.value};
+ $('#lineColor').onchange=()=>{endGroup();render()};
+ $('#lineHex').onchange=e=>{if(/^#[0-9a-f]{6}$/i.test(e.target.value))update('color',e.target.value);else render()};
+ $('#lineWidth').onchange=e=>{const v=+e.target.value;if(Number.isFinite(v))apply(s=>s.layers.find(q=>q.id===l.id).width.fixed=clamp(v,.1,80));else render()};
+ $('#widthDynamic').onclick=()=>openWidthDialog(l.id);
+ $('#opacity').oninput=e=>{live(s=>s.layers.find(q=>q.id===l.id).opacity=+e.target.value,'opacity'+l.id);$('#opacityNumber').value=e.target.value};
+ $('#opacity').onchange=()=>{endGroup();render()};
+ $('#opacityNumber').onchange=e=>update('opacity',clamp(+e.target.value||0,0,100));
+ ['lineStyle','cap','join'].forEach(id=>$('#'+id).onchange=e=>update(id,e.target.value));
+ $('#offset').onchange=e=>update('offset',clamp(+e.target.value||0,-30,30));
+ if($('#dash'))$('#dash').onchange=e=>{const v=e.target.value;if(/^\s*\d+(?:\.\d+)?(?:\s*,\s*\d+(?:\.\d+)?)*\s*$/.test(v))update('dash',v);else render()}
+}
+function refreshVisualOnly(){refreshPreview();refreshList();mark()}
+function render(){refreshPreview();refreshList();renderProperty();mark();if(modalOpen)renderWidthDialog()}
+$('#zoomSlider').oninput=e=>{previewZoom=+e.target.value;refreshPreview();refreshList();const s=selected();if(s?.width.mode==='zoom'){$('#lineWidth').value=widthAt(s).toFixed(2)}};
+$('#addLayer').onchange=e=>{const kind=e.target.value;if(!kind)return;const id=nextId();const newLayer={id,name:kind==='outline'?'外描边':kind==='dashed'?'虚线':'简单线',enabled:true,color:kind==='outline'?'#657383':kind==='dashed'?'#2c78b6':'#3d88c3',opacity:100,width:{mode:'fixed',fixed:kind==='outline'?12:kind==='dashed'?3:4,interp:'linear',stops:[{z:8,v:1},{z:12,v:4},{z:16,v:8}]},lineStyle:kind==='dashed'?'dash':'solid',dash:'8,4',cap:'round',join:'round',offset:0};apply(s=>{s.layers.unshift(newLayer);s.selected=id});e.target.value=''};
+$('#duplicate').onclick=()=>{const l=selected(),idx=selectedIndex(),newLayer=clone(l);newLayer.id=nextId();newLayer.name=l.name+' 副本';apply(s=>{s.layers.splice(idx,0,newLayer);s.selected=newLayer.id})};
+$('#remove').onclick=()=>{if(state.layers.length<=1)return;apply(s=>{const idx=s.layers.findIndex(l=>l.id===s.selected);s.layers.splice(idx,1);s.selected=s.layers[Math.min(idx,s.layers.length-1)].id})};
+$('#up').onclick=()=>{const i=selectedIndex();if(i<=0)return;apply(s=>{[s.layers[i-1],s.layers[i]]=[s.layers[i],s.layers[i-1]]})};
+$('#down').onclick=()=>{const i=selectedIndex();if(i<0||i>=state.layers.length-1)return;apply(s=>{[s.layers[i],s.layers[i+1]]=[s.layers[i+1],s.layers[i]]})};
+$('#undo').onclick=undo;$('#redo').onclick=redo;$('#save').onclick=()=>{saved=JSON.stringify(state);try{localStorage.setItem('my-web-gis-line-symbol-v1',saved)}catch{}mark()};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modalOpen){closeWidthDialog();return}if(!(e.ctrlKey||e.metaKey))return;const k=e.key.toLowerCase();if(k==='s'){e.preventDefault();$('#save').click()}else if(k==='z'&&!e.target.matches('input,textarea')){e.preventDefault();if(e.shiftKey)redo();else undo()}else if(k==='y'&&!e.target.matches('input,textarea')){e.preventDefault();redo()}});
+let dialogLayerId=null,dialogZoom=12;
+function openWidthDialog(id){modalOpen=true;dialogLayerId=id;dialogZoom=previewZoom;renderWidthDialog()}
+function closeWidthDialog(){modalOpen=false;dialogLayerId=null;$('#modalRoot').innerHTML=''}
+function renderWidthDialog(){const l=state.layers.find(x=>x.id===dialogLayerId);if(!l){closeWidthDialog();return};const w=l.width;const isZoom=w.mode==='zoom';const val=isZoom?zoomWidth(w.stops,dialogZoom,w.interp):w.fixed;
+ $('#modalRoot').innerHTML=`<div class="modal-overlay" id="modalOverlay"><div class="modal" role="dialog" aria-modal="true" aria-label="线宽数据定义"><div class="modal-title">线宽 · 数据定义<button class="btn ghost square" id="modalClose" aria-label="关闭">×</button></div><div class="modal-content">
+ <div class="tabs"><button class="${!isZoom?'active':''}" data-mode="fixed">固定值</button><button class="${isZoom?'active':''}" data-mode="zoom">按 Zoom</button></div>
+ ${isZoom?`<div class="form-row"><label>变化方式</label><div class="form-control"><select id="interp" class="sel">${opts([['linear','线性插值'],['step','阶梯变化']],w.interp)}</select></div></div>
+ <table class="stop-table"><thead><tr><th style="width:38%">Zoom</th><th>线宽（px）</th><th style="width:62px"></th></tr></thead><tbody>${w.stops.map((s,i)=>`<tr><td><input type="number" min="0" max="24" step="0.5" data-stopz="${i}" value="${s.z}"></td><td><input type="number" min="0.1" max="80" step="0.1" data-stopv="${i}" value="${s.v}"></td><td><button class="btn ghost small danger" data-removestop="${i}" ${w.stops.length<=2?'disabled':''}>删除</button></td></tr>`).join('')}</tbody></table>
+ <div class="stop-actions"><button class="btn" id="addStop">添加节点</button><button class="btn ghost" id="resetStops">恢复默认</button></div>
+ `:`<div class="form-row"><label>线宽</label><div class="form-control"><input id="fixedWidth" class="numin" type="number" min="0.1" max="80" step="0.5" value="${w.fixed}"><span class="inline-unit">px</span></div></div>`}
+ <div class="modal-preview"><div class="modal-preview-top"><span>符号预览</span><span id="modalWidthText">Z${dialogZoom} · ${val.toFixed(2)} px</span></div><input type="range" id="modalZoom" style="width:100%;accent-color:#4d7fae" min="4" max="20" step=".5" value="${dialogZoom}"><svg id="widthPreview" viewBox="0 0 500 36"><line x1="18" x2="482" y1="18" y2="18" stroke="${l.color}" stroke-width="${clamp(val*1.4,.5,30)}" stroke-linecap="round"/></svg></div>
+ </div><div class="modal-footer"><button class="btn primary" id="modalDone">关闭</button></div></div></div>`;
+ $('#modalClose').onclick=closeWidthDialog;$('#modalDone').onclick=closeWidthDialog;$('#modalOverlay').onmousedown=e=>{if(e.target.id==='modalOverlay')closeWidthDialog()};
+ $all('[data-mode]').forEach(b=>b.onclick=()=>apply(s=>s.layers.find(q=>q.id===l.id).width.mode=b.dataset.mode));
+ if($('#interp'))$('#interp').onchange=e=>apply(s=>s.layers.find(q=>q.id===l.id).width.interp=e.target.value);
+ $all('[data-stopz]').forEach(el=>el.onchange=e=>{const x=+e.target.value;const i=+e.target.dataset.stopz;if(!Number.isFinite(x))return renderWidthDialog();const arr=w.stops;if(arr.some((p,idx)=>idx!==i&&p.z===x))return renderWidthDialog();apply(s=>{s.layers.find(q=>q.id===l.id).width.stops[i].z=clamp(x,0,24)})});
+ $all('[data-stopv]').forEach(el=>el.onchange=e=>{const x=+e.target.value;const i=+e.target.dataset.stopv;if(!Number.isFinite(x))return renderWidthDialog();apply(s=>{s.layers.find(q=>q.id===l.id).width.stops[i].v=clamp(x,.1,80)})});
+ $all('[data-removestop]').forEach(b=>b.onclick=()=>apply(s=>s.layers.find(q=>q.id===l.id).width.stops.splice(+b.dataset.removestop,1)));
+ if($('#addStop'))$('#addStop').onclick=()=>{const zz=[...w.stops].sort((a,b)=>a.z-b.z);const last=zz[zz.length-1];let z=last.z<24?last.z+1:Math.max(0,zz[0].z-1);while(zz.some(p=>p.z===z)&&z<24)z+=.5;if(zz.some(p=>p.z===z))return;apply(s=>s.layers.find(q=>q.id===l.id).width.stops.push({z,v:last.v}))};
+ if($('#resetStops'))$('#resetStops').onclick=()=>apply(s=>s.layers.find(q=>q.id===l.id).width.stops=[{z:8,v:2},{z:12,v:5},{z:16,v:10}]);
+ if($('#fixedWidth'))$('#fixedWidth').onchange=e=>{const x=+e.target.value;if(!Number.isFinite(x))return;apply(s=>s.layers.find(q=>q.id===l.id).width.fixed=clamp(x,.1,80))};
+ $('#modalZoom').oninput=e=>{dialogZoom=+e.target.value;const vv=isZoom?zoomWidth(w.stops,dialogZoom,w.interp):w.fixed;$('#modalWidthText').textContent=`Z${dialogZoom} · ${vv.toFixed(2)} px`;$('#widthPreview line').setAttribute('stroke-width',clamp(vv*1.4,.5,30))};
+}
+render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+.modeless-window { position: fixed; z-index: var(--z-floating-window); display: flex; flex-direction: column; min-width: 0; color: var(--color-text-primary); background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: 5px; box-shadow: 0 12px 38px rgb(36 59 46 / 18%); outline: none; overflow: hidden; font-size: var(--font-size-ui); }
+.modeless-window:focus-within { z-index: calc(var(--z-floating-window) + 1); }
+.modeless-window__header { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: 0 0 32px; padding: 0 5px 0 10px; border-bottom: 1px solid var(--color-border); background: var(--color-panel); cursor: grab; touch-action: none; }
+.modeless-window__header h2 { margin: 0; font-size: var(--font-size-ui); font-weight: 600; }
+.modeless-window__body { flex: 1; min-height: 0; overflow: auto; }
+.modeless-window__resize { position: absolute; right: 0; bottom: 0; width: 14px; height: 14px; border-right: 3px solid var(--color-border-strong); border-bottom: 3px solid var(--color-border-strong); cursor: nwse-resize; touch-action: none; }
+.modeless-window__header:focus-visible, .modeless-window__resize:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }

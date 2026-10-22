@@ -6,6 +6,7 @@ import './styles/app.css'
 import './styles/antd-workbench.css'
 import App from './app/App'
 import { DesktopUiProvider } from './components/ui/DesktopUiProvider'
+import './styles/desktop-ux.css'
 
 createRoot(document.getElementById('app')!).render(
   <StrictMode>
