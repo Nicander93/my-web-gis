@@ -6,6 +6,8 @@
 
 ### 规范与设计
 
+- [Desktop 设计系统 V1](design/desktop-design-system-v1.md)：本轮 Token、Ant Design 适配、交互组件、密度与状态边界的代码契约。
+
 位于 [`specs/`](specs/)：
 
 - [产品需求 V0.1](specs/01-PRD-V0.1.md)

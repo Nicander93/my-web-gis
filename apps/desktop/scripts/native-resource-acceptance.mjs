@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { createServer } from 'node:net'
 import { mkdir, readFile, writeFile, copyFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -6,43 +7,65 @@ import assert from 'node:assert/strict'
 import { chromium, expect } from '@playwright/test'
 import { verifyNativeLayout, verifyNativeSimplification } from './native-layout-checks.mjs'
 import { verifyNativeTitlebar } from './native-titlebar-checks.mjs'
+import { verifyNativeUx } from './native-ux-checks.mjs'
 
 const desktop = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const tauri = join(desktop, 'src-tauri')
 const runId = Date.now().toString()
-const identifier = `com.desktop-webgis.resource-acceptance-${runId}`
+const uxOnly = process.argv.includes('--ux')
+const identifier = `com.desktop-webgis.${uxOnly ? 'native-ux' : 'resource-acceptance'}-${runId}`
 // Playwright clears test-results before each run; native fixtures must live elsewhere.
 const output = resolve(desktop, '../../.artifacts', `native-resources-${runId}`)
-const serverPort = 5197, debugPort = 9229
+async function nextPort() {
+  const listener = createServer()
+  await new Promise((resolve, reject) => listener.once('error', reject).listen(0, '127.0.0.1', resolve))
+  const { port } = listener.address()
+  await new Promise((resolve, reject) => listener.close(error => error ? reject(error) : resolve()))
+  return port
+}
+const serverPort = await nextPort()
+let debugPort = await nextPort()
+while (debugPort === serverPort) debugPort = await nextPort()
 const url = `http://127.0.0.1:${serverPort}`
 const layoutOnly = process.argv.includes('--layout125')
 const simplifyOnly = process.argv.includes('--simplify')
 const titlebarOnly = process.argv.includes('--titlebar')
 const wide = process.argv.includes('--wide')
 const report = { identifier, output, scenarios: [], screenshots: false,
-  nativeFileChooser: 'Not verified: fixture working paths assigned; native filesystem and resource protocol used',
+  nativeFileChooser: uxOnly ? 'Not verified: UX fixture imported through the WebView file input; OS picker not exercised'
+    : 'Not verified: fixture working paths assigned; native filesystem and resource protocol used',
   windowsScale125: 'Not verified', resourceResponses: [] }
 let server, application, browser, page
 let oldResourceUrl
 
 function start(args, cwd, env = process.env) {
-  const child = spawn('rtk', args, { cwd, env, windowsHide: true, stdio: 'inherit' })
+  const [command, ...commandArgs] = args
+  const executable = command === 'pnpm' ? process.execPath : command
+  const argumentsList = command === 'pnpm'
+    ? [process.env.npm_execpath, ...commandArgs]
+    : commandArgs
+  if (command === 'pnpm') assert.ok(process.env.npm_execpath, 'pnpm must expose npm_execpath when running this native harness')
+  const child = spawn(executable, argumentsList, { cwd, env, windowsHide: true, stdio: 'inherit' })
   child.on('error', (error) => console.error(error))
   return child
 }
-function finished(child) {
+function finished(child, timeoutMs = 900_000) {
   if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve(child.exitCode)
-  return new Promise((resolve, reject) => { child.once('exit', resolve); child.once('error', reject) })
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Owned process ${child.pid} did not exit within ${timeoutMs}ms`)), timeoutMs)
+    child.once('exit', code => { clearTimeout(timer); resolve(code) })
+    child.once('error', error => { clearTimeout(timer); reject(error) })
+  })
 }
 async function forceStop(child) {
   if (!child || child.exitCode !== null || child.signalCode !== null) return
   // Only the process tree created and still tracked by this harness is terminated.
-  const killer = spawn('rtk', ['proxy', 'taskkill', '/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'pipe' })
+  const killer = spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] })
   let detail = ''
   killer.stderr.on('data', (chunk) => { detail += chunk })
-  const code = await finished(killer)
+  const code = await finished(killer, 15_000)
   if (code !== 0 && child.exitCode === null) throw new Error(`Cannot stop owned process ${child.pid}: ${detail}`)
-  await finished(child)
+  await finished(child, 15_000)
 }
 async function available(port) {
   try { await fetch(`http://127.0.0.1:${port}`, { signal: AbortSignal.timeout(1000) }); return true } catch { return false }
@@ -97,7 +120,7 @@ async function launch() {
     const window = (await import('/node_modules/@tauri-apps/api/window.js')).getCurrentWindow()
     return { scaleFactor: await window.scaleFactor(), innerSize: await window.innerSize(), outerSize: await window.outerSize() }
   })
-  console.log(`[native-resources] launched owned PID ${application.pid}, ${identity.identifier}`)
+  console.log(`[native-resources] launched owned PID ${application.pid}, ${identity.identifier}, viewport ${report.viewport.width}x${report.viewport.height}, window ${JSON.stringify(report.nativeWindow)}`)
 }
 async function crash() {
   await forceStop(application)
@@ -165,7 +188,7 @@ try {
   assert.equal(await available(serverPort), false, 'Owned server port is occupied')
   assert.equal(await available(debugPort), false, 'Owned debugging port is occupied')
   const baseConfig = JSON.parse(await readFile(join(tauri, 'tauri.conf.json'), 'utf8'))
-  const config = { identifier, build: { devUrl: url }, app: { windows: [{ ...baseConfig.app.windows[0], label: 'main', title: 'Desktop WebGIS · Resource acceptance', width: layoutOnly ? wide ? 1920 : 1366 : 1440, height: layoutOnly ? wide ? 1080 : 768 : 900, minWidth: 1024, minHeight: 680 }] } }
+  const config = { identifier, build: { devUrl: url }, app: { windows: [{ ...baseConfig.app.windows[0], label: 'main', title: uxOnly ? 'Desktop WebGIS · Native UX acceptance' : 'Desktop WebGIS · Resource acceptance', width: uxOnly ? 1024 : layoutOnly ? wide ? 1920 : 1366 : 1440, height: uxOnly ? 680 : layoutOnly ? wide ? 1080 : 768 : 900, minWidth: 1024, minHeight: 680 }] } }
   report.requestedWindow = config.app.windows[0]
   await writeFile(join(output, 'tauri-config.json'), JSON.stringify(config, null, 2))
   const build = start(['cargo', 'build', '--bin', 'desktop-webgis', '--locked'], tauri, { ...process.env, TAURI_CONFIG: JSON.stringify(config) })
@@ -215,7 +238,9 @@ try {
   server = start(['pnpm', 'dev', '--port', String(serverPort), '--strictPort'], desktop)
   await poll(() => available(serverPort), 'Owned Vite server did not start')
   await launch()
-  if (titlebarOnly) {
+  if (uxOnly) {
+    await verifyNativeUx(page, report)
+  } else if (titlebarOnly) {
     await verifyNativeTitlebar(page, report)
   } else if (simplifyOnly) {
     await verifyNativeSimplification(page, report, output, saveTo)

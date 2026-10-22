@@ -1,0 +1,56 @@
+{
+  "identifier": "com.desktop-webgis.native-ux-1792684104836",
+  "output": "D:\\my-code-repo\\my-web-gis\\.artifacts\\native-resources-1792684104836",
+  "scenarios": [
+    {
+      "name": "Native WebView maximizes and restores the measured initial client viewport; Tauri was configured for 1024x680",
+      "passed": true
+    },
+    {
+      "name": "Native theme, font size and density persist across WebView reload; preferences leave project/history unchanged and reset action is reachable",
+      "passed": true
+    },
+    {
+      "name": "Native task and diagnostics windows coexist and close independently",
+      "passed": true
+    },
+    {
+      "name": "Native field calculator critical actions are unobstructed above the status bar in the measured initial viewport",
+      "passed": true
+    }
+  ],
+  "screenshots": false,
+  "nativeFileChooser": "Not verified: fixture working paths assigned; native filesystem and resource protocol used",
+  "windowsScale125": "Not verified",
+  "resourceResponses": [],
+  "requestedWindow": {
+    "title": "Desktop WebGIS · Native UX acceptance",
+    "decorations": false,
+    "width": 1024,
+    "height": 680,
+    "minWidth": 1024,
+    "minHeight": 680,
+    "label": "main"
+  },
+  "appData": "C:\\Users\\PC\\AppData\\Local\\Packages\\sandbox.{d228f49a-6fca-4808-9c7a-2cfc0a267261}\\AC\\com.desktop-webgis.native-ux-1792684104836",
+  "viewport": {
+    "width": 737,
+    "height": 490,
+    "devicePixelRatio": 1.5927083492279053
+  },
+  "nativeWindow": {
+    "scaleFactor": 1.1458333333333333,
+    "innerSize": {
+      "type": "Physical",
+      "width": 1173,
+      "height": 779
+    },
+    "outerSize": {
+      "type": "Physical",
+      "width": 1191,
+      "height": 789
+    }
+  },
+  "stopError": "Error: Cannot stop owned process 36920: ����: �û��������벻��ȷ��\r\r\n",
+  "serverStopError": "Error: Cannot stop owned process 34736: ����: �û��������벻��ȷ��\r\r\n"
+}
