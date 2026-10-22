@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from './Button'
 import { X } from 'lucide-react'
 import { constrainWindow, type WindowBounds } from '@/app/docking/docking-layout'
@@ -47,7 +48,7 @@ export function ModelessWindow({ title, children, onClose, width = 720, height =
       : { ...active.bounds, x: active.bounds.x + dx, y: active.bounds.y + dy }, windowArea()))
   }
 
-  return <section ref={frame} role="dialog" aria-modal="false" aria-label={title} tabIndex={-1}
+  return createPortal(<section ref={frame} role="dialog" aria-modal="false" aria-label={title} tabIndex={-1}
     className={`modeless-window ${className}`.trim()} style={{ left: bounds.x, top: bounds.y, width: bounds.width, height: bounds.height }}
     onPointerDownCapture={event => {
       const control = (event.target as HTMLElement).closest('button,input,textarea,select,[tabindex]')
@@ -79,9 +80,10 @@ export function ModelessWindow({ title, children, onClose, width = 720, height =
         event.preventDefault()
         setBounds(value => constrainWindow({ ...value, width: value.width + (event.key === 'ArrowRight' ? 10 : event.key === 'ArrowLeft' ? -10 : 0), height: value.height + (event.key === 'ArrowDown' ? 10 : event.key === 'ArrowUp' ? -10 : 0) }, windowArea()))
       }} />
-  </section>
+  </section>, document.body)
 }
 
 function windowArea() {
-  return { width: window.innerWidth, height: window.innerHeight }
+  const statusHeight = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--status-height')) || 0
+  return { width: window.innerWidth, height: Math.max(1, window.innerHeight - statusHeight) }
 }

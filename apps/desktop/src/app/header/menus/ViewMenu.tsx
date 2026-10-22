@@ -6,6 +6,7 @@ import { useWorkspaceStore } from '@/stores/workspace.store'
 import { useProjectStore } from '@/stores/project.store'
 import { getProjectType } from '@/services/project-type'
 import { useActivityPanelStore } from '@/stores/activity-panel.store'
+import { useWorkbenchStore } from '@/stores/workbench.store'
 
 interface ViewMenuProps {
   onClose(): void
@@ -16,6 +17,7 @@ export function ViewMenu({ onClose }: ViewMenuProps) {
   const tasksOpen = useActivityPanelStore(state => state.tasksOpen)
   const diagnosticsOpen = useActivityPanelStore(state => state.diagnosticsOpen)
   const city = useProjectStore(state => getProjectType(state.project) === '3d')
+  const rightTask = useWorkbenchStore(state => state.rightTask)
   function handleAction(action: () => void) {
     action()
     onClose()
@@ -32,7 +34,7 @@ export function ViewMenu({ onClose }: ViewMenuProps) {
       <MenuItem
         icon={Eye}
         label="属性"
-        checked={layout.right.open}
+        checked={layout.right.open && (city || rightTask === 'inspector')}
         onClick={() => handleAction(viewCommands.toggleInspector)}
       />
       <MenuItem

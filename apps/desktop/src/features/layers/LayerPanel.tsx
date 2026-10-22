@@ -40,6 +40,7 @@ import {
   type Symbol
 } from '@desktop-webgis/ol-style'
 import { LayerContextMenu } from './LayerContextMenu'
+import { Legend } from '@/features/inspector/Legend'
 import { LayerPopupMenu } from './LayerPopupMenu'
 import { MenuItem } from '@/app/header/menus/MenuItem'
 import { EditorDialog } from '@/components/ui/EditorDialog'
@@ -104,6 +105,7 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
   const [deletingGroup, setDeletingGroup] = useState<LayerGroup | null>(null)
   const [removeChildren, setRemoveChildren] = useState(false)
   const [query, setQuery] = useState('')
+  const [expandedLegends, setExpandedLegends] = useState<Record<string, boolean>>({})
   const searchInputRef = useRef<HTMLInputElement>(null)
   const project = useProjectStore((state) => state.project)
   const selectedLayerId = useProjectStore((state) => state.selectedLayerId)
@@ -225,8 +227,7 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
     const indent = options?.indent ? ' is-child' : ''
 
     return (
-      <div
-        key={layer.id}
+      <div key={layer.id} className="layer-entry"><div
         className={`layer-item${isActive ? ' is-active' : ''}${isLoading ? ' is-loading' : ''}${indent}`}
         draggable={!getEffectiveLocked(tree, layer.id)}
         onDragStart={event => { event.stopPropagation(); setDragLayerId(layer.id) }}
@@ -254,6 +255,9 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
         }}
       >
         <GripVertical className="drag-icon" size={13} />
+        <Button variant="icon" className="layer-legend-toggle" aria-label={`${expandedLegends[layer.id] ? '收起' : '展开'}${layer.name}图例`} aria-expanded={!!expandedLegends[layer.id]} onClick={() => setExpandedLegends(current => ({ ...current, [layer.id]: !current[layer.id] }))}>
+          {expandedLegends[layer.id] ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        </Button>
         <Button
           variant="icon"
           className="visibility-button"
@@ -320,7 +324,7 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
         >
           <MoreHorizontal size={14} />
         </Button>
-      </div>
+      </div>{expandedLegends[layer.id] && <div className="layer-tree-legend" aria-label={`${layer.name}图例`}><Legend layerId={layer.id} /></div>}</div>
     )
   }
 

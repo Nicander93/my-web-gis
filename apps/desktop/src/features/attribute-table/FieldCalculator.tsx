@@ -1,12 +1,18 @@
 import { useMemo, useRef, useState } from 'react'
-import { AutoComplete, Checkbox, Input, Radio, Select } from 'antd'
+import { AutoComplete, Checkbox, Input, Radio, Select, Table, Tag } from 'antd'
 import type { TextAreaRef } from 'antd/es/input/TextArea'
 import { Button } from '@/components/ui/Button'
 import { createId, SetDatasetContentCommand, type DatasetField, type FieldFilterCondition, type GisFeature } from '@desktop-webgis/gis-core'
 import { useProjectStore } from '@/stores/project.store'
 import { useWorkbenchStore } from '@/stores/workbench.store'
 import { capabilitiesForDataset, getEffectiveLocked } from '@desktop-webgis/gis-core'
-import { calculateTableField, previewTableField, resolveDatasetFields, resolveFieldCalculationTargets, type FieldCalculationScope } from './field-edits'
+import { calculateTableField, previewTableField, resolveDatasetFields, resolveFieldCalculationTargets, type FieldCalculationPreviewRow, type FieldCalculationScope } from './field-edits'
+
+function formatPreviewValue(value: unknown): string {
+  if (value == null) return '空值'
+  if (typeof value === 'object') return JSON.stringify(value) ?? '空值'
+  return String(value)
+}
 
 const FUNCTIONS = ['coalesce', 'round', 'concat', 'abs', 'min', 'max']
 
@@ -75,53 +81,66 @@ export function FieldCalculator({ layerId, tableFeatures, selectedIds, onClose }
 
   return <section className="attr-field-calculator" aria-label="字段计算器">
     <div className="attr-calculator-config">
-      <Radio.Group aria-label="字段操作" value={mode} onChange={(event) => {
-        setMode(event.target.value); setName(''); setMessage('')
-      }} optionType="button" buttonStyle="solid" options={[
-        { value: 'create', label: '新建字段' }, { value: 'update', label: '更新已有字段' }
-      ]} />
-      {mode === 'create' ? <label>字段名<AutoComplete value={name} onChange={setName} style={{ width: 150 }}
-        options={fields.map((field) => ({ value: field.name }))}>
-        <Input aria-label="计算字段名" />
-      </AutoComplete></label> : <label>目标字段<Select aria-label="更新字段" style={{ width: 150 }} value={name || undefined}
-        placeholder="选择已有字段" onChange={setName} options={fields.map((field) => ({ value: field.name, label: field.name }))} />
-      </label>}
-      {mode === 'create' && <>
-        <label>类型<Select aria-label="计算字段类型" style={{ width: 80 }} value={type} onChange={setType}
-          options={[{ value: 'number', label: '数值' }, { value: 'string', label: '文本' },
-            { value: 'boolean', label: '布尔' }, { value: 'json', label: 'JSON' }]} /></label>
-        <Checkbox checked={nullable} onChange={(event) => setNullable(event.target.checked)}>允许空值</Checkbox>
-      </>}
-      <label>范围<Select aria-label="计算范围" style={{ width: 145 }} value={scope} onChange={setScope}
-        options={[{ value: 'all', label: '全部记录' }, { value: 'table', label: '当前表格结果' },
-          { value: 'layer-filtered', label: '图层过滤后' }, { value: 'selected', label: '选中记录' }]} /></label>
-      <strong aria-label="目标记录数">{targets.length} 条</strong>
+      <div className="attr-calculator-config-row">
+        <span>操作模式</span>
+        <Radio.Group aria-label="字段操作" value={mode} onChange={(event) => {
+          setMode(event.target.value); setName(''); setMessage('')
+        }} optionType="button" buttonStyle="solid" options={[
+          { value: 'create', label: '新建字段' }, { value: 'update', label: '更新已有字段' }
+        ]} />
+      </div>
+      <div className="attr-calculator-config-row">
+        {mode === 'create' ? <label>字段名<AutoComplete className="attr-calculator-field-name" value={name} onChange={setName}
+          options={fields.map((field) => ({ value: field.name }))}>
+          <Input aria-label="计算字段名" />
+        </AutoComplete></label> : <label>目标字段<Select aria-label="更新字段" className="attr-calculator-field-name" value={name || undefined}
+          placeholder="选择已有字段" onChange={setName} options={fields.map((field) => ({ value: field.name, label: field.name }))} />
+        </label>}
+        {mode === 'create' && <>
+          <label>类型<Select aria-label="计算字段类型" className="attr-calculator-field-type" value={type} onChange={setType}
+            options={[{ value: 'number', label: '数值' }, { value: 'string', label: '文本' },
+              { value: 'boolean', label: '布尔' }, { value: 'json', label: 'JSON' }]} /></label>
+          <Checkbox checked={nullable} onChange={(event) => setNullable(event.target.checked)}>允许空值</Checkbox>
+        </>}
+      </div>
+      <div className="attr-calculator-config-row">
+        <label>计算范围<Select aria-label="计算范围" className="attr-calculator-field-scope" value={scope} onChange={setScope}
+          options={[{ value: 'all', label: '全部记录' }, { value: 'table', label: '当前表格结果' },
+            { value: 'layer-filtered', label: '图层过滤后' }, { value: 'selected', label: '选中记录' }]} /></label>
+        <strong className="attr-calculator-target-count" aria-label="目标记录数">目标记录：{targets.length} 条</strong>
+      </div>
     </div>
     <div className="attr-expression-tools">
-      <Select aria-label="插入字段" placeholder="插入字段…" style={{ width: 170 }} value={undefined}
+      <Select aria-label="插入字段" className="attr-calculator-insert-field" placeholder="插入字段…" value={undefined}
         options={fields.map((field) => ({ value: field.name, label: field.name }))}
         onChange={(field) => insertExpression(`field(${JSON.stringify(field)})`)} />
-      <Select aria-label="插入函数" placeholder="插入函数…" style={{ width: 130 }} value={undefined}
+      <Select aria-label="插入函数" className="attr-calculator-insert-function" placeholder="插入函数…" value={undefined}
         options={FUNCTIONS.map((name) => ({ value: name, label: name }))}
         onChange={(fn) => insertExpression(`${fn}()`)} />
     </div>
     <label className="attr-expression">表达式<Input.TextArea ref={expressionRef} aria-label="字段计算表达式" value={expression}
-      rows={5} placeholder={'例如 field("人口") * 2'} onChange={(event) => { setExpression(event.target.value); setMessage('') }} />
+      rows={3} placeholder={'例如 field("人口") * 2'} onChange={(event) => { setExpression(event.target.value); setMessage('') }} />
     </label>
     <div className="attr-calculator-preview" aria-label="计算预览">
       <strong>预览前 5 条目标记录</strong>
       {preview.error && <span role="alert">{preview.error}</span>}
-      {!preview.error && preview.rows.length === 0 && <span>当前范围没有可预览记录</span>}
-      {preview.rows.map((row) => <span key={row.index}>
-        第 {row.index} 条：{row.error ? <em role="alert">{row.error}</em> : row.value == null ? '空值' : String(row.value)}
-      </span>)}
-    </div>
-    <div className="attr-calculator-actions">
-      <Button variant="primary" onClick={apply} disabled={!canEdit}>应用计算</Button>
-      <Button onClick={onClose}>关闭计算器</Button>
+      <Table<FieldCalculationPreviewRow> size="small" rowKey="index" dataSource={preview.rows} pagination={false}
+        locale={{ emptyText: '当前范围没有可预览记录' }} columns={[
+          { title: '记录', dataIndex: 'index', width: 86, render: (index: number) => `第 ${index} 条` },
+          { title: '结果', key: 'result', render: (_, row) => row.error
+            ? <span className="attr-calculator-preview__error" role="alert">{row.error}</span>
+            : <span className="attr-calculator-preview__result">{formatPreviewValue(row.value)}</span> },
+          { title: '状态', key: 'status', width: 76, render: (_, row) => <Tag color={row.error ? 'error' : row.value == null ? 'default' : 'success'}>
+            {row.error ? '错误' : row.value == null ? '空值' : '正常'}
+          </Tag> }
+        ]} />
     </div>
     <small>支持 field、coalesce、round、concat、abs、min、max、算术与三元表达式。表格结果含当前搜索、筛选和仅选中条件；表内计算不改变地图过滤。</small>
     {!canEdit && <span>只读：请设置当前图层为编辑目标</span>}
     {message && <span role={failed ? 'alert' : 'status'}>{message}</span>}
+    <div className="attr-calculator-actions">
+      <Button variant="primary" onClick={apply} disabled={!canEdit}>应用计算</Button>
+      <Button onClick={onClose}>关闭计算器</Button>
+    </div>
   </section>
 }

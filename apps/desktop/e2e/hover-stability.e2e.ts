@@ -52,3 +52,19 @@ test('shared start-screen buttons reserve the same border on hover and press', a
     finally { await page.mouse.move(5, 5); await page.mouse.up() }
   }
 })
+
+test('right work-panel rail keeps button and label geometry on hover and press', async ({ page }) => {
+  await page.route('**/*tile.openstreetmap.org/**', route => route.abort())
+  await page.goto('/')
+  await page.getByRole('button', { name: /^二维地图/ }).click()
+  const selector = '.workspace-toolrail button, .workspace-toolrail button > span, .workspace-toolrail button > svg'
+  const before = await geometry(page, selector)
+  const buttons = page.getByRole('navigation', { name: '右侧工作面板' }).getByRole('button')
+  for (let index = 0; index < await buttons.count(); index++) {
+    await buttons.nth(index).hover()
+    expect(await geometry(page, selector)).toEqual(before)
+    await page.mouse.down()
+    try { expect(await geometry(page, selector)).toEqual(before) }
+    finally { await page.mouse.move(700, 400); await page.mouse.up() }
+  }
+})

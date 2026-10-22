@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { constrainWindow, createDockLayout, parseDockLayout } from './docking-layout'
+import { constrainWindow, createDockLayout, getDockedSideInsets, parseDockLayout } from './docking-layout'
 
 describe('local docking layout', () => {
+  it('keeps side docks out of the bottom table while floating and closed panels take no space', () => {
+    const layout = createDockLayout()
+    const panels = { left: { open: true, width: 260 }, right: { open: true, width: 320 } }
+    expect(getDockedSideInsets(layout, panels)).toEqual({ left: 260, right: 320 })
+    layout.left.dock = 'floating'
+    expect(getDockedSideInsets(layout, panels)).toEqual({ left: 0, right: 320 })
+    layout.left.dock = 'right'
+    layout.left.bounds.width = 370
+    expect(getDockedSideInsets(layout, panels)).toEqual({ left: 0, right: 370 })
+    panels.left.open = false
+    panels.right.open = false
+    expect(getDockedSideInsets(layout, panels)).toEqual({ left: 0, right: 0 })
+  })
   it('keeps a complete window accessible after resolution changes', () => {
     expect(constrainWindow({ x: 1700, y: 900, width: 800, height: 700 }, { width: 1024, height: 540 }))
       .toEqual({ x: 224, y: 0, width: 800, height: 540 })

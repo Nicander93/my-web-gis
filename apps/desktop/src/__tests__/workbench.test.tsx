@@ -134,11 +134,16 @@ describe('workbench task targets', () => {
       useSessionStore.getState().getLayerSession(first).attributeTable
         ?.filterOpen ?? false
     ).toBe(false)
+    const opened: string[] = []
+    const onFilter = (event: Event) => opened.push((event as CustomEvent<string>).detail)
+    window.addEventListener('desktop-webgis:layer-filter', onFilter)
     layerCommands.openFilter(first)
+    window.removeEventListener('desktop-webgis:layer-filter', onFilter)
+    expect(opened).toEqual([first])
     expect(
       useSessionStore.getState().getLayerSession(first).attributeTable
-        ?.filterOpen
-    ).toBe(true)
+        ?.filterOpen ?? false
+    ).toBe(false)
     expect(useWorkbenchStore.getState().tableLayerId).toBe(first)
   })
 

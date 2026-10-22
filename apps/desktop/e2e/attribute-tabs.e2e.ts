@@ -5,7 +5,9 @@ async function importRows(page: Page, name: string) {
   await page.getByRole('region', { name: '二维功能区' }).getByRole('button', { name: '添加数据', exact: true }).click()
   await page.locator('input[type=file]').setInputFiles({ name: `${name}.geojson`, mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify({ type: 'FeatureCollection', features: [2, 0, 4].map((value, index) => ({
-      type: 'Feature', id: `${name}-${index}`, properties: { value, code: '001' },
+      type: 'Feature', id: `${name}-${index}`, properties: {
+        value, code: '001', nullable: index === 1 ? null : value, payload: { zone: 'north', index }
+      },
       geometry: { type: 'Point', coordinates: [116 + index, 39] }
     })) })) })
   await page.getByRole('button', { name: '确认导入', exact: true }).click()
@@ -46,18 +48,62 @@ test('table tabs retain drafts; typed field calculation rolls back and uses one 
   await expect(valueCell.locator('input')).toHaveCount(0)
   await panel().getByRole('button', { name: '字段计算器', exact: true }).click()
   const calculator = page.getByRole('dialog', { name: '字段计算器' })
+  const viewport = page.viewportSize()!
+  const calculatorBounds = (await calculator.boundingBox())!
+  expect(calculatorBounds.x).toBeGreaterThanOrEqual(0)
+  expect(calculatorBounds.y).toBeGreaterThanOrEqual(0)
+  expect(calculatorBounds.x + calculatorBounds.width).toBeLessThanOrEqual(viewport.width)
+  expect(calculatorBounds.y + calculatorBounds.height).toBeLessThanOrEqual(viewport.height)
+  await expect(calculator.getByLabel('字段操作')).toBeVisible()
+  await expect(calculator.getByLabel('计算字段名')).toBeVisible()
+  await expect(calculator.getByLabel('计算范围')).toBeVisible()
+  const applyButton = calculator.getByRole('button', { name: '应用计算', exact: true })
+  const closeButton = calculator.getByRole('button', { name: '关闭计算器', exact: true })
+  await expect(applyButton).toBeVisible()
+  await expect(closeButton).toBeVisible()
+  for (const button of [applyButton, closeButton]) {
+    await expect.poll(() => button.evaluate((element) => {
+      const bounds = element.getBoundingClientRect()
+      const hit = document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
+      return hit === element || element.contains(hit)
+    })).toBe(true)
+  }
+  const expressionInput = calculator.locator('textarea[aria-label="字段计算表达式"]')
   await calculator.getByLabel('计算字段名').fill('result')
-  await calculator.getByLabel('字段计算表达式').fill('10 / field("value")')
+  await expressionInput.fill('10 / field("value")')
   await calculator.getByLabel('计算范围').click()
   await page.locator('.ant-select-dropdown .ant-select-item-option-content').getByText('当前表格结果', { exact: true }).click()
-  await expect(calculator.getByLabel('目标记录数')).toHaveText('1 条')
+  await expect(calculator.getByLabel('目标记录数')).toContainText('1 条')
   await calculator.getByLabel('计算范围').click()
   await page.locator('.ant-select-dropdown .ant-select-item-option-content').getByText('全部记录', { exact: true }).click()
   await calculator.getByRole('button', { name: '应用计算', exact: true }).click()
   await expect(calculator.getByText('记录 first-1：除数不能为零。', { exact: true })).toBeVisible()
-  await expect(calculator.getByLabel('计算预览')).toContainText('第 1 条')
+  const preview = calculator.getByLabel('计算预览')
+  await expect(preview.getByRole('columnheader', { name: '记录' })).toBeVisible()
+  await expect(preview.getByRole('columnheader', { name: '结果' })).toBeVisible()
+  await expect(preview.getByRole('columnheader', { name: '状态' })).toBeVisible()
+  await expect(preview.getByRole('row').filter({ hasText: '第 2 条' })).toContainText('除数不能为零')
+  await expect(preview.getByRole('row').filter({ hasText: '第 2 条' })).toContainText('错误')
+  await expect(preview.getByText('first-1', { exact: true })).toHaveCount(0)
+  const applyBounds = (await calculator.getByRole('button', { name: '应用计算', exact: true }).boundingBox())!
+  expect(applyBounds.y + applyBounds.height).toBeLessThanOrEqual(calculatorBounds.y + calculatorBounds.height)
+  expect(applyBounds.y).toBeGreaterThanOrEqual(calculatorBounds.y + calculatorBounds.height - 72)
   await expect(panel().getByRole('columnheader', { name: 'result', exact: true })).toHaveCount(0)
-  await calculator.getByLabel('字段计算表达式').fill('field("value") * 3')
+  await expressionInput.fill('field("payload")')
+  await calculator.getByLabel('计算字段类型').click()
+  await page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').getByText('JSON', { exact: true }).click()
+  const objectRow = preview.getByRole('row').filter({ hasText: '第 1 条' })
+  await expect(objectRow).toContainText('字段或运算结果必须是有限数字、文本、布尔值或空值')
+  await calculator.getByRole('button', { name: '应用计算', exact: true }).click()
+  await expect(calculator.getByRole('alert').filter({ hasText: '记录 first-0' })).toContainText('字段或运算结果')
+  await expect(panel().getByRole('columnheader', { name: 'result', exact: true })).toHaveCount(0)
+  await expressionInput.fill(JSON.stringify(JSON.stringify({ zone: 'north', index: 0 })))
+  await expect(objectRow).toContainText('{"zone":"north","index":0}')
+  await expressionInput.fill('field("nullable")')
+  await calculator.getByLabel('计算字段类型').click()
+  await page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').getByText('数值', { exact: true }).click()
+  await expect(preview.getByRole('row').filter({ hasText: '第 2 条' })).toContainText('空值')
+  await expressionInput.fill('field("value") * 3')
   await calculator.getByRole('button', { name: '应用计算', exact: true }).click()
   await expect(calculator.getByRole('status')).toContainText('3 条')
   await expect(panel().getByRole('columnheader', { name: 'result', exact: true })).toBeVisible()

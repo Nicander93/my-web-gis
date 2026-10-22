@@ -23,13 +23,16 @@ test('2D windows cover a stable full canvas and retain geometry outside project 
   const tools = await page.locator('.workbench-ribbon-commands').boundingBox()
   expect(root!.y - (tools!.y + tools!.height)).toBeLessThanOrEqual(2)
   const before = await page.evaluate(async () => {
-    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const { useProjectStore } = await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/stores/project.store.ts') ?? '/src/stores/project.store.ts')
     return { snapshot: useProjectStore.getState().getSnapshot(), dirty: useProjectStore.getState().dirty, undo: useProjectStore.getState().canUndoEdit() }
   })
-  await windowMenu(page, '检查器')
+  await windowMenu(page, '属性')
   await windowMenu(page, '属性表')
   const bottom = page.getByRole('complementary', { name: '属性表面板' })
-  expect((await bottom.boundingBox())!.width).toBe(original!.width)
+  const left = (await page.getByRole('complementary', { name: '图层面板' }).boundingBox())!
+  const right = (await page.getByRole('complementary', { name: '检查器面板' }).boundingBox())!
+  const rail = (await page.getByRole('navigation', { name: '右侧工作面板' }).boundingBox())!
+  expect((await bottom.boundingBox())!.width).toBe(original!.width - left.width - right.width - rail.width)
   expect(await viewport.boundingBox()).toEqual(original)
   await page.getByRole('button', { name: '浮动属性表', exact: true }).click()
   const title = page.getByLabel('移动属性表窗口', { exact: true })
@@ -50,7 +53,7 @@ test('2D windows cover a stable full canvas and retain geometry outside project 
   await page.keyboard.press('ArrowRight')
   await expect.poll(async () => (await bottom.boundingBox())!.width).toBe(moved.width + 10)
   await page.getByRole('button', { name: '最大化属性表', exact: true }).click()
-  expect((await bottom.boundingBox())!.width).toBe(root!.width)
+  expect((await bottom.boundingBox())!.width).toBe(root!.width - rail.width)
   expect((await bottom.boundingBox())!.height).toBe(root!.height)
   await page.getByRole('button', { name: '还原属性表', exact: true }).click()
   await page.getByRole('button', { name: '关闭属性表窗口', exact: true }).click()
@@ -59,7 +62,7 @@ test('2D windows cover a stable full canvas and retain geometry outside project 
   await windowMenu(page, '属性表')
   expect(await viewport.boundingBox()).toEqual(original)
   const after = await page.evaluate(async () => {
-    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const { useProjectStore } = await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/stores/project.store.ts') ?? '/src/stores/project.store.ts')
     return { snapshot: useProjectStore.getState().getSnapshot(), dirty: useProjectStore.getState().dirty, undo: useProjectStore.getState().canUndoEdit() }
   })
   expect(after).toEqual(before)
@@ -108,7 +111,7 @@ test('3D uses the same menus and docking without resizing or recreating Cesium',
   await expect(page.getByRole('tab')).toHaveText(['场景', '标绘', '编辑', '瓦片', '分析'])
   const original = await canvas.boundingBox()
   const identity = await canvas.evaluate(element => { element.setAttribute('data-identity', 'original'); return 'original' })
-  await windowMenu(page, '检查器')
+  await windowMenu(page, '属性')
   await page.getByRole('button', { name: '浮动图层属性', exact: true }).click()
   await page.keyboard.press('Control+Shift+F')
   await expect(page.getByRole('complementary', { name: '检查器面板' })).toBeHidden()

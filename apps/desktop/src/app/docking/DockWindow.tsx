@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, typ
 import { Maximize2, Minimize2, PanelsTopLeft, X } from 'lucide-react'
 import { useDockingStore } from '@/stores/docking.store'
 import { useWorkspaceStore } from '@/stores/workspace.store'
-import { constrainWindow, panelDefinitions, type DockPanelId, type DockPosition, type WindowBounds, type WindowPlacement } from './docking-layout'
+import { constrainWindow, getDockedSideInsets, panelDefinitions, type DockPanelId, type DockPosition, type WindowBounds, type WindowPlacement } from './docking-layout'
 import './docking.css'
 
 interface DockWindowProps {
@@ -29,17 +29,21 @@ interface Gesture {
 export function DockWindow({ id, title, label, actions, children, footer, onClose, titleContent }: DockWindowProps) {
   const ref = useRef<HTMLElement>(null)
   const gesture = useRef<Gesture | null>(null)
-  const placement = useDockingStore(state => state.layout[id])
+  const layout = useDockingStore(state => state.layout)
+  const placement = layout[id]
   const order = useDockingStore(state => state.order)
   const panel = useWorkspaceStore(state => state[id])
+  const left = useWorkspaceStore(state => state.left)
+  const right = useWorkspaceStore(state => state.right)
   const [draft, setDraft] = useState<WindowPlacement | null>(null)
   const [area, setArea] = useState({ width: 1000, height: 600 })
   const current = draft ?? placement
   const bounds = constrainWindow(current.bounds, area)
-  const style: CSSProperties = current.maximized ? { inset: 0 } : current.dock === 'floating'
+  const sideInsets = getDockedSideInsets(layout, { left, right })
+  const style: CSSProperties = current.maximized ? { top: 0, left: 0, bottom: 0, right: 'var(--workspace-right-offset, 0px)' } : current.dock === 'floating'
     ? { left: bounds.x, top: bounds.y, width: bounds.width, height: bounds.height }
     : current.dock === 'bottom'
-      ? { left: 0, right: 0, bottom: 0, height: Math.min(!draft && current.dock === id && 'height' in panel ? panel.height : bounds.height, area.height) }
+      ? { left: sideInsets.left, right: `calc(var(--workspace-right-offset, 0px) + ${sideInsets.right}px)`, bottom: 0, height: Math.min(!draft && current.dock === id && 'height' in panel ? panel.height : bounds.height, area.height) }
       : { top: 0, bottom: 0, [current.dock]: current.dock === 'right' ? 'var(--workspace-right-offset, 0px)' : 0, width: Math.min(!draft && current.dock === id && 'width' in panel ? panel.width : bounds.width, area.width) }
   style.display = panel.open ? undefined : 'none'
   style.zIndex = 5 + order.indexOf(id)
@@ -51,7 +55,10 @@ export function DockWindow({ id, title, label, actions, children, footer, onClos
   useEffect(() => {
     const root = ref.current?.parentElement
     if (!root) return
-    const measure = () => setArea({ width: root.clientWidth, height: root.clientHeight })
+    const measure = () => {
+      const railWidth = Number.parseFloat(getComputedStyle(root).getPropertyValue('--workspace-right-offset')) || 0
+      setArea({ width: Math.max(1, root.clientWidth - railWidth), height: root.clientHeight })
+    }
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(root)

@@ -30,7 +30,7 @@ test('3D workspace shares the header and truncates long names without overlappin
   await page.evaluate(async () => {
     // Exercise the shared shell with a real project state, independently of Cesium tile loading.
     // @ts-expect-error Vite source module is resolved by the browser.
-    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const { useProjectStore } = await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/stores/project.store.ts') ?? '/src/stores/project.store.ts')
     useProjectStore.setState((state: { project: object }) => ({ project: { ...state.project, name: '项目名称'.repeat(40) }, dirty: true }))
   })
   await expect(page.locator('.project-dirty')).toBeVisible()

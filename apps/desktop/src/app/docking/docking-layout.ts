@@ -18,6 +18,18 @@ export function createDockLayout(): DockLayout {
   ])) as DockLayout
 }
 
+/** Docked side panels and the attribute table share visible workspace space without resizing the map. */
+export function getDockedSideInsets(layout: DockLayout, panels: Record<'left' | 'right', { open: boolean; width: number }>): { left: number; right: number } {
+  const result = { left: 0, right: 0 }
+  for (const id of ['left', 'right'] as const) {
+    const placement = layout[id]
+    if (!panels[id].open || placement.maximized || placement.dock !== 'left' && placement.dock !== 'right') continue
+    const width = placement.dock === id ? panels[id].width : placement.bounds.width
+    result[placement.dock] = Math.max(result[placement.dock], width)
+  }
+  return result
+}
+
 /** 即使窗口比屏幕小，也让标题栏、关闭按钮和整个窗体保持可访问。 */
 export function constrainWindow(bounds: WindowBounds, area: { width: number; height: number }): WindowBounds {
   const limitWidth = Math.max(1, area.width)

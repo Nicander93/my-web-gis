@@ -522,7 +522,7 @@ export function AttributeTable({
       </div>
 
       </Popover>
-      {selectedLayerId && calculatorOpen && <ModelessWindow title="字段计算器" width={760} height={520} className="attribute-field-calculator-window"
+      {selectedLayerId && calculatorOpen && <ModelessWindow title="字段计算器" width={760} height={580} className="attribute-field-calculator-window"
         onClose={() => setCalculatorOpen(false)}>
         <FieldCalculator layerId={selectedLayerId} tableFeatures={viewFeatures} selectedIds={selectionIds} onClose={() => setCalculatorOpen(false)} />
       </ModelessWindow>}

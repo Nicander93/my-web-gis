@@ -467,4 +467,3 @@ export function Inspector() {
     </div>
   )
 }
-
