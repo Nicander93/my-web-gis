@@ -1,3 +1,12 @@
+.attribute-table-content .attr-toolbar { overflow-x: auto; scrollbar-width: thin; }
+.attr-edit-toggle { flex: 0 0 auto; }
+.attr-edit-tooltip, .attr-edit-tooltip .ant-tooltip-container { pointer-events: none; }
+
+@media (max-width: 1100px) {
+  .attr-edit-toggle__label { display: none; }
+  .attribute-table-content .attr-toolbar .attr-edit-toggle__button { width: var(--control-height); padding: 0; }
+}
+
 .attribute-field-calculator-window .attr-field-calculator {
   display: flex;
   flex-direction: column;

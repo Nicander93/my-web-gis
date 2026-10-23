@@ -11,14 +11,23 @@ import {
 /** 编辑命令：撤销/重做走 EditHistory；绘制/修改/删除接入 OlToolRuntime。 */
 export const editCommands = {
   begin(): void {
-    const state = useProjectStore.getState()
-    const locked = useWorkbenchStore.getState().editLayerId
-    if (locked) {
-      emitCommandStatus('请先结束当前图层编辑，再切换编辑目标')
+    const layerId = useProjectStore.getState().selectedLayerId
+    if (!layerId) {
+      emitCommandStatus('请选择可编辑的本地矢量图层')
       return
     }
+    editCommands.beginLayer(layerId)
+  },
+  /** Tables have their own target, independent of the layer selected in the tree. */
+  beginLayer(layerId: string): boolean {
+    const state = useProjectStore.getState()
+    const current = useWorkbenchStore.getState().editLayerId
+    if (current && current !== layerId) {
+      emitCommandStatus('请先结束当前图层编辑，再切换编辑目标')
+      return false
+    }
     const layer = state.project.layers.find(
-      (item) => item.id === state.selectedLayerId
+      (item) => item.id === layerId
     )
     if (
       !layer ||
@@ -28,16 +37,23 @@ export const editCommands = {
       ).editGeometry
     ) {
       emitCommandStatus('请选择可编辑的本地矢量图层')
-      return
+      return false
     }
+    if (current === layerId) return true
     useWorkbenchStore.getState().setEditLayer(layer.id)
     setActiveEditTool('pan')
     emitCommandStatus(`编辑目标已锁定：${layer.name}`)
+    return true
   },
   end(): void {
     setActiveEditTool('select')
     useWorkbenchStore.getState().setEditLayer(null)
     emitCommandStatus('已结束编辑；修改已记录，可撤销，请保存项目')
+  },
+  endLayer(layerId: string): boolean {
+    if (useWorkbenchStore.getState().editLayerId !== layerId) return false
+    editCommands.end()
+    return true
   },
   undo(): void {
     finishStyleInteraction()

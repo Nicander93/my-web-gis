@@ -1,4 +1,16 @@
 import { test, expect, type Page } from '@playwright/test'
+test.use({ actionTimeout: 15_000, screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
+
+async function editingState(page: Page) {
+  return page.evaluate(async () => {
+    const currentModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
+      .findLast(url => new URL(url).pathname === path) ?? path
+    const project = (await import(currentModule('/src/stores/project.store.ts'))).useProjectStore.getState()
+    const workbench = (await import(currentModule('/src/stores/workbench.store.ts'))).useWorkbenchStore.getState()
+    return { snapshot: project.getSnapshot(), dirty: project.dirty, undo: project.canUndoEdit(), redo: project.canRedoEdit(),
+      selectedLayerId: project.selectedLayerId, selection: project.selection, editLayerId: workbench.editLayerId, tableLayerId: workbench.tableLayerId }
+  })
+}
 
 async function importRows(page: Page, name: string) {
   await page.getByRole('tab', { name: '数据', exact: true }).click()
@@ -34,9 +46,10 @@ test('table tabs retain drafts; typed field calculation rolls back and uses one 
   await page.getByRole('tab', { name: 'first', exact: true }).click()
   await expect(panel().getByLabel('表内搜索')).toHaveValue('001')
   await expect(panel().getByLabel('表格筛选').getByText('value eq 2')).toBeVisible()
-  await page.locator('.layer-name-button').filter({ hasText: 'first' }).click()
-  await page.getByRole('tab', { name: '编辑', exact: true }).click()
-  await page.getByRole('button', { name: '开始编辑', exact: true }).click()
+  const beforeEditing = await editingState(page)
+  expect(beforeEditing.selectedLayerId).not.toBe(beforeEditing.tableLayerId)
+  await panel().getByRole('button', { name: '开始属性编辑', exact: true }).click()
+  expect(await editingState(page)).toEqual({ ...beforeEditing, editLayerId: beforeEditing.tableLayerId })
   const valueCell = panel().locator('[data-feature-id="first-0"] td').nth(2)
   await valueCell.dblclick()
   const cellEditor = valueCell.locator('input')
@@ -44,8 +57,19 @@ test('table tabs retain drafts; typed field calculation rolls back and uses one 
   await cellEditor.press('Enter')
   await expect(cellEditor).toHaveValue('not-a-number')
   await expect(panel().getByRole('alert')).toContainText('value 必须为有限数值')
+  await panel().getByRole('button', { name: '结束属性编辑', exact: true }).click()
+  await expect(cellEditor).toHaveValue('not-a-number')
+  expect((await editingState(page)).editLayerId).toBe(beforeEditing.tableLayerId)
   await cellEditor.press('Escape')
   await expect(valueCell.locator('input')).toHaveCount(0)
+  await valueCell.dblclick()
+  await valueCell.locator('input').fill('6')
+  await valueCell.locator('input').press('Enter')
+  await expect(panel().locator('[data-feature-id="first-0"]')).toHaveCount(0)
+  const editedRows = Object.values((await editingState(page)).snapshot.featuresByDataset).flat() as { id: string; properties: Record<string, unknown> }[]
+  expect(editedRows.find(feature => feature.id === 'first-0')?.properties.value).toBe(6)
+  await page.getByRole('button', { name: '撤销', exact: true }).click()
+  await expect(valueCell).toHaveText('2')
   await panel().getByRole('button', { name: '字段计算器', exact: true }).click()
   const calculator = page.getByRole('dialog', { name: '字段计算器' })
   const viewport = page.viewportSize()!
@@ -129,4 +153,58 @@ test('table tabs retain drafts; typed field calculation rolls back and uses one 
   await page.locator('.ant-tabs-tab').filter({ has: page.getByRole('tab', { name: 'second', exact: true }) })
     .locator('.ant-tabs-tab-remove').click()
   await expect(page.getByRole('tab', { name: 'first', exact: true })).toHaveAttribute('aria-selected', 'true')
+  const beforeEnd = await editingState(page)
+  await panel().getByRole('button', { name: '结束属性编辑', exact: true }).click()
+  expect(await editingState(page)).toEqual({ ...beforeEnd, editLayerId: null })
+  const readOnlyCell = panel().locator('[data-feature-id="first-0"] td[title="双击或按 Enter 定位"]').first()
+  await readOnlyCell.dblclick()
+  await expect(readOnlyCell.locator('input')).toHaveCount(0)
+})
+
+test('table editing respects another tab, parent locks and remote read-only snapshots', async ({ page }) => {
+  await page.route('**/*tile.openstreetmap.org/**', route => route.abort())
+  await page.route('https://example.invalid/**', route => route.abort())
+  await page.goto('/')
+  await page.getByRole('button', { name: /^二维地图/ }).click()
+  await importRows(page, 'editable-first')
+  await page.getByRole('button', { name: '属性表', exact: true }).click()
+  await importRows(page, 'editable-second')
+  await page.getByRole('button', { name: '属性表', exact: true }).click()
+  const panel = () => page.locator('.attribute-table-tab-panel:visible')
+  await page.getByRole('tab', { name: 'editable-first', exact: true }).click()
+  await panel().getByRole('button', { name: '开始属性编辑', exact: true }).click()
+  const firstId = (await editingState(page)).editLayerId
+  await page.getByRole('tab', { name: 'editable-second', exact: true }).click()
+  await expect(panel().getByRole('button', { name: '开始属性编辑', exact: true })).toBeDisabled()
+  await panel().locator('.attr-edit-toggle').hover()
+  await expect(page.getByRole('tooltip')).toContainText('正在编辑「editable-first」')
+  expect((await editingState(page)).editLayerId).toBe(firstId)
+  await page.getByRole('tab', { name: 'editable-first', exact: true }).click()
+  await panel().getByRole('button', { name: '结束属性编辑', exact: true }).click()
+  await page.getByRole('tab', { name: 'editable-second', exact: true }).click()
+  const secondId = (await editingState(page)).tableLayerId
+  await page.evaluate(async id => {
+    const moduleUrl = performance.getEntriesByType('resource').map(entry => entry.name)
+      .findLast(url => new URL(url).pathname === '/src/stores/project.store.ts') ?? '/src/stores/project.store.ts'
+    const state = (await import(moduleUrl)).useProjectStore.getState()
+    const group = state.createGroup('locked group', [id])
+    state.setGroupLocked(group, true)
+  }, secondId)
+  await expect(panel().getByRole('button', { name: '开始属性编辑', exact: true })).toBeDisabled()
+  await panel().locator('.attr-edit-toggle').hover()
+  await expect(page.getByRole('tooltip')).toContainText('图层或父文件夹已锁定')
+  expect((await editingState(page)).editLayerId).toBeNull()
+  await page.evaluate(async () => {
+    const currentModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
+      .findLast(url => new URL(url).pathname === path) ?? path
+    const state = (await import(currentModule('/src/stores/project.store.ts'))).useProjectStore.getState()
+    const service = state.addServiceLayer({ name: '只读 WFS', kind: 'wfs', source: { type: 'wfs',
+      url: 'https://example.invalid/wfs', version: '2.0.0', typeName: 'stations', outputFormat: 'application/json', authMode: 'none' } })
+    const { layerCommands } = await import(currentModule('/src/app/commands/layer.commands.ts'))
+    layerCommands.openAttributeTable(service.layerId)
+  })
+  await expect(panel().getByRole('button', { name: '开始属性编辑', exact: true })).toBeDisabled()
+  await panel().locator('.attr-edit-toggle').hover()
+  await expect(page.getByRole('tooltip')).toContainText('此数据源只读')
+  expect((await editingState(page)).editLayerId).toBeNull()
 })

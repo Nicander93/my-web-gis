@@ -10,8 +10,8 @@ import { StylePanel } from './StylePanel'
 import { LabelPanel } from './LabelPanel'
 import { Legend } from './Legend'
 import { getLayerCapabilities } from '@/app/commands/layer.commands'
-import { processingToolName } from '@/features/processing/processing-tools'
 import { PopupFields } from './PopupFields'
+import { openPropertyWindow } from './property-window-request'
 
 type InspectorTab = 'layer' | 'style' | 'label'
 
@@ -38,19 +38,6 @@ export function Inspector() {
     ? (featuresByDataset[selectedLayer.datasetId]?.length ?? 0)
     : 0
 
-  const geometryTypes = new Set(
-    selectedLayer
-      ? (featuresByDataset[selectedLayer.datasetId] ?? []).map(
-          (feature) => feature.geometry.type
-        )
-      : []
-  )
-  const geometryType =
-    geometryTypes.size === 1
-      ? [...geometryTypes][0]
-      : geometryTypes.size > 1
-        ? 'Mixed'
-        : '—'
   const flags = capabilitiesForDataset(dataset)
 
 
@@ -116,261 +103,7 @@ export function Inspector() {
                     : '—'}
                 </strong>
               </div>
-              {dataset?.kind === 'vector' && dataset.processing && (
-                <details className="processing-provenance">
-                  <summary>处理来源</summary>
-                  <p>输入图层：{dataset.processing.sourceLayerName}</p>
-                  <p>
-                    工具：{processingToolName(dataset.processing.options.tool)}
-                  </p>
-                  <p>
-                    范围：
-                    {
-                      {
-                        all: '全部要素',
-                        filtered: '图层筛选结果',
-                        selected: '当前选中要素'
-                      }[dataset.processing.scope]
-                    }
-                  </p>
-                  {dataset.processing.options.tool === 'buffer' && (
-                    <p>
-                      距离：{dataset.processing.options.distance}{' '}
-                      {dataset.processing.options.unit === 'meters'
-                        ? '米'
-                        : '千米'}
-                    </p>
-                  )}
-                  <p>
-                    {dataset.processing.inputCount} 个输入 →{' '}
-                    {dataset.processing.outputCount} 个结果
-                  </p>
-                  {dataset.processing.options.tool === 'dissolve' && (
-                    <p>分组：{dataset.processing.options.field || '不分组'}</p>
-                  )}
-                  {dataset.processing.options.tool === 'extract-location' && (
-                    <p>
-                      关系：
-                      {
-                        {
-                          intersects: '相交（包括边界）',
-                          within: '完全位于其中',
-                          disjoint: '不相交'
-                        }[dataset.processing.options.predicate]
-                      }
-                    </p>
-                  )}
-                  {dataset.processing.options.tool === 'summarize-location' && (
-                    <p>
-                      统计：
-                      {dataset.processing.options.predicate === 'within'
-                        ? '完全位于区域内'
-                        : '相交（含边界）'}
-                      ；{dataset.processing.options.field || '仅数量'}；前缀{' '}
-                      {dataset.processing.options.prefix || '无'}
-                    </p>
-                  )}
-                  {dataset.processing.options.tool === 'attribute-join' && (
-                    <p>
-                      连接：{dataset.processing.options.inputKey} →{' '}
-                      {dataset.processing.options.joinKey}；
-                      {dataset.processing.options.mode === 'left'
-                        ? '保留全部输入'
-                        : '仅匹配输入'}
-                      ；带入 {dataset.processing.options.fields.join('、')}
-                      ；前缀 {dataset.processing.options.prefix || '无'}
-                    </p>
-                  )}
-                  {dataset.processing.options.tool === 'spatial-join' && (
-                    <p>
-                      空间连接：
-                      {dataset.processing.options.predicate === 'within'
-                        ? '完整位于其中'
-                        : '相交（含边界）'}
-                      ；
-                      {dataset.processing.options.mode === 'left'
-                        ? '保留全部输入'
-                        : '仅匹配输入'}
-                      ；带入 {dataset.processing.options.fields.join('、')}
-                      ；前缀 {dataset.processing.options.prefix || '无'}
-                    </p>
-                  )}
-                  {dataset.processing.options.tool === 'spatial-join' && (
-                    <p>
-                      结果数量上限：
-                      {dataset.processing.options.maxResults ??
-                        '未记录（旧任务）'}
-                    </p>
-                  )}
-                  {(dataset.processing.options.tool === 'measure-area' ||
-                    dataset.processing.options.tool === 'measure-length' ||
-                    dataset.processing.options.tool ===
-                      'measure-perimeter') && (
-                    <p>
-                      测量字段：{dataset.processing.options.field}；单位：
-                      {dataset.processing.options.unit}；WGS84 球面 XY
-                      模型，不含高程。
-                    </p>
-                  )}
-                  {dataset.processing.options.tool === 'calculate-field' && (
-                    <p>
-                      字段：{dataset.processing.options.field}；表达式：
-                      {dataset.processing.options.expression}
-                    </p>
-                  )}
-                  {dataset.processing.overlay && (
-                    <>
-                      <p>第二输入：{dataset.processing.overlay.layerName}</p>
-                      <p>
-                        第二范围：
-                        {
-                          {
-                            all: '全部要素',
-                            filtered: '图层筛选结果',
-                            selected: '当前选中要素'
-                          }[dataset.processing.overlay.scope]
-                        }
-                        （{dataset.processing.overlay.inputCount} 个要素）
-                      </p>
-                    </>
-                  )}
-                  <p>
-                    完成时间：
-                    {new Date(dataset.processing.completedAt).toLocaleString()}
-                  </p>
-                </details>
-              )}
-              <details className="property-section">
-                <summary>数据源与几何信息</summary>
-                {dataset?.kind === 'wms' ? (
-                  <>
-                    <div className="inspector-row">
-                      <span>WMS 版本</span>
-                      <strong>{dataset.source.version}</strong>
-                    </div>
-                    <div className="inspector-row">
-                      <span>图层名</span>
-                      <strong>{dataset.source.layerNames.join(', ')}</strong>
-                    </div>
-                    <div className="inspector-row">
-                      <span>CRS</span>
-                      <strong>{dataset.source.crs || '视图默认'}</strong>
-                    </div>
-                    <div className="inspector-row">
-                      <span>范围</span>
-                      <strong>
-                        {dataset.source.bboxWgs84
-                          ? dataset.source.bboxWgs84
-                              .map((n) => n.toFixed(2))
-                              .join(', ')
-                          : '—'}
-                      </strong>
-                    </div>
-                  </>
-                ) : dataset?.kind === 'wmts' ? (
-                  <>
-                    <div className="inspector-row">
-                      <span>WMTS 版本</span>
-                      <strong>{dataset.source.version}</strong>
-                    </div>
-                    <div className="inspector-row">
-                      <span>图层</span>
-                      <strong>{dataset.source.layer}</strong>
-                    </div>
-                    <div className="inspector-row">
-                      <span>TileMatrixSet</span>
-                      <strong>{dataset.source.tileMatrixSet}</strong>
-                    </div>
-                    <div className="inspector-row">
-                      <span>投影</span>
-                      <strong>
-                        {dataset.source.projection ||
-                          dataset.source.supportedCrs ||
-                          '—'}
-                      </strong>
-                    </div>
-                    <div className="inspector-row">
-                      <span>编码</span>
-                      <strong>{dataset.source.requestEncoding}</strong>
-                    </div>
-                    <div className="inspector-row">
-                      <span>矩阵级数</span>
-                      <strong>
-                        {dataset.source.tileMatrices?.length ?? 0}
-                      </strong>
-                    </div>
-                    <div className="inspector-row">
-                      <span>范围</span>
-                      <strong>
-                        {dataset.source.bboxWgs84
-                          ? dataset.source.bboxWgs84
-                              .map((n) => n.toFixed(2))
-                              .join(', ')
-                          : '—'}
-                      </strong>
-                    </div>
-                  </>
-                ) : dataset?.kind === 'wfs' ? (
-                  <>
-                    <div className="inspector-row">
-                      <span>WFS 版本</span>
-                      <strong>{dataset.source.version}</strong>
-                    </div>
-                    <div className="inspector-row">
-                      <span>要素类型</span>
-                      <strong>{dataset.source.typeName}</strong>
-                    </div>
-                    <div className="inspector-row">
-                      <span>快照要素</span>
-                      <strong>
-                        {dataset.source.loadedCount ?? featureCount}
-                        {dataset.source.complete === false
-                          ? dataset.source.truncatedByLimit
-                            ? '（截断，不完整）'
-                            : '（不完整）'
-                          : dataset.source.complete === true
-                            ? '（完整）'
-                            : ''}
-                      </strong>
-                    </div>
-                    <div className="inspector-row">
-                      <span>查询范围</span>
-                      <strong>
-                        {dataset.source.queryExtentWgs84
-                          ? dataset.source.queryExtentWgs84
-                              .map((n) => n.toFixed(2))
-                              .join(', ')
-                          : dataset.source.extentMode === 'full'
-                            ? '全范围'
-                            : '—'}
-                      </strong>
-                    </div>
-                    <div className="inspector-row">
-                      <span>来源</span>
-                      <strong title={dataset.source.url}>
-                        {dataset.source.url}
-                      </strong>
-                    </div>
-                    <div className="inspector-row">
-                      <span>只读快照</span>
-                      <strong>
-                        是（复制为本地图层后可编辑；不触发 WFS-T）
-                      </strong>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="inspector-row">
-                      <span>几何类型</span>
-                      <strong>{geometryType}</strong>
-                    </div>
-                    <div className="inspector-row">
-                      <span>要素数量</span>
-                      <strong>{featureCount}</strong>
-                    </div>
-                  </>
-                )}
-              </details>
+              {dataset && <div className="inspector-row"><span>状态</span><strong>{dataset.kind === 'wms' || dataset.kind === 'wmts' ? '服务影像' : dataset.kind === 'wfs' ? `只读快照 · ${featureCount} 条` : `本地要素 · ${featureCount} 条`}</strong></div>}
               {flags.queryAttributes && (
                 <label className="inspector-row" title="限制地图点击与框选；属性表仍可选择记录和定位。">
                   <span>地图可选择</span>
@@ -380,6 +113,7 @@ export function Inspector() {
               )}
               {flags.queryAttributes && <PopupFields layerId={selectedLayer.id} popup={selectedLayer.interaction?.popup}
                 fields={[...new Set([...(dataset?.fields?.map(field => field.name) ?? []), ...(featuresByDataset[selectedLayer.datasetId] ?? []).slice(0, 100).flatMap(feature => Object.keys(feature.properties))])]} />}
+              <Button variant="ghost" onClick={() => openPropertyWindow({ kind: 'layer', id: selectedLayer.id })}>完整属性…</Button>
               <div className="inspector-row inspector-opacity-row">
                 <span>不透明度</span>
                 <label className="inspector-opacity">
@@ -404,21 +138,6 @@ export function Inspector() {
                 <summary>图例预览</summary>
                 <Legend layerId={selectedLayerId} />
               </details>
-            ) : null}
-            {dataset?.kind === 'wms' ? (
-              <p className="config-hint">
-                WMS 影像图层支持显示与透明度设置，没有本地要素属性。
-              </p>
-            ) : null}
-            {dataset?.kind === 'wmts' ? (
-              <p className="config-hint">
-                WMTS 瓦片图层支持显示与透明度设置，没有本地要素属性。
-              </p>
-            ) : null}
-            {dataset?.kind === 'wfs' ? (
-              <p className="config-hint">
-                此图层是只读服务快照。要编辑，请从图层菜单复制为本地图层；需要最新数据时手动刷新。
-              </p>
             ) : null}
           </>
         ) : (

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentRef, type KeyboardEvent, type ReactNode } from 'react'
 import { Checkbox, ConfigProvider, Dropdown, Input, Popover, Select, Table, Tooltip, type TableColumnsType } from 'antd'
-import { Calculator, ChevronLeft, ChevronRight, Columns3, Filter, PanelBottomClose, LocateFixed, MousePointer2, Sigma } from 'lucide-react'
+import { Calculator, ChevronLeft, ChevronRight, Columns3, Filter, PanelBottomClose, LocateFixed, MousePointer2, Pencil, Square, Sigma } from 'lucide-react'
 import {
   applyFieldFilter,
   computeFieldStats,
@@ -21,6 +21,7 @@ import './attribute-table.css'
 import { parseCellValue, resolveDatasetFields } from './field-edits'
 import { FieldSchemaDialog } from './FieldSchemaDialog'
 import { ColumnResizeHandle } from './ColumnResizeHandle'
+import { editCommands } from '@/app/commands/edit.commands'
 
 const PAGE_SIZE = 100
 // A stored marker keeps the technical ID hidden by default while allowing per-tab restoration.
@@ -122,19 +123,16 @@ export function AttributeTable({
   const selectedLayer = selectedLayerId
     ? project.layers.find((layer) => layer.id === selectedLayerId)
     : null
-  const canEditCells =
-    !!selectedLayerId && !getEffectiveLocked(project, selectedLayerId) &&
-    editLayerId === selectedLayerId &&
-    capabilitiesForDataset(
-      project.datasets.find(
-        (dataset) => dataset.id === selectedLayer?.datasetId
-      )
-    ).editGeometry
-
   const allFeatures = selectedLayer
     ? (featuresByDataset[selectedLayer.datasetId] ?? [])
     : []
   const dataset = project.datasets.find((item) => item.id === selectedLayer?.datasetId)
+  const editingThisLayer = !!selectedLayerId && editLayerId === selectedLayerId
+  const readOnlyReason = !capabilitiesForDataset(dataset).editGeometry ? '此数据源只读，可先复制为本地图层'
+    : selectedLayerId && getEffectiveLocked(project, selectedLayerId) ? '图层或父文件夹已锁定，请先解锁'
+    : editLayerId && !editingThisLayer ? `正在编辑「${project.layers.find(layer => layer.id === editLayerId)?.name ?? '其他图层'}」，请先结束该图层编辑`
+    : ''
+  const canEditCells = editingThisLayer && !readOnlyReason
   const filterDraft = tableState?.filterDraft ?? []
   function setFilterDraft(draft: FieldFilterCondition[]): void { patchTable({ filterDraft: draft }) }
 
@@ -244,20 +242,20 @@ export function AttributeTable({
     setEditValue(current == null ? '' : typeof current === 'object' ? JSON.stringify(current) : String(current))
   }
 
-  function commitEdit(): void {
+  function commitEdit(): boolean {
+    if (!editing) return true
     if (
       !selectedLayerId ||
-      !editing ||
       cancelledEdit.current ||
       !canEditCells
     ) {
       setEditing(null)
-      return
+      return false
     }
     const feature = allFeatures.find((item) => item.id === editing.featureId)
     if (!feature) {
       setEditing(null)
-      return
+      return false
     }
     try {
       const field = fields.find((item) => item.name === editing.field)
@@ -266,9 +264,23 @@ export function AttributeTable({
       if (!updateFeatureProperties(selectedLayerId, editing.featureId, next)) throw new Error('当前记录未能写入')
       setCellError('')
       setEditing(null)
+      return true
     } catch (error) {
       setCellError(error instanceof Error ? error.message : String(error))
+      return false
     }
+  }
+
+  function toggleAttributeEditing(): void {
+    if (!selectedLayerId) return
+    if (editingThisLayer) {
+      if (!commitEdit()) return
+      if (!editCommands.endLayer(selectedLayerId)) return
+    } else {
+      if (!editCommands.beginLayer(selectedLayerId)) return
+    }
+    setColumnsOpen(false)
+    patchTable({ filterOpen: false, statisticsOpen: false })
   }
 
   function columnWidth(field: string): number {
@@ -456,6 +468,13 @@ export function AttributeTable({
       <div className="attr-toolbar" aria-label="属性表工具">
         {targetPicker}
         {selectedLayer && <>
+          <Tooltip classNames={{ root: 'attr-edit-tooltip' }} title={editingThisLayer ? '结束当前图层编辑；修改已记录，可撤销，请保存项目' : readOnlyReason || '编辑当前属性表对应的图层，不切换图层树选择'}>
+            <span className="attr-edit-toggle"><Button className="attr-edit-toggle__button" aria-label={editingThisLayer ? '结束属性编辑' : '开始属性编辑'}
+              variant={editingThisLayer ? 'primary' : 'default'}
+              disabled={!editingThisLayer && !!readOnlyReason} onClick={toggleAttributeEditing}>
+              {editingThisLayer ? <Square size={14} /> : <Pencil size={14} />}<span className="attr-edit-toggle__label">{editingThisLayer ? '结束编辑' : '开始编辑'}</span>
+            </Button></span>
+          </Tooltip>
           <label className="attr-search">
             <Input
               type="search"
@@ -569,7 +588,7 @@ export function AttributeTable({
       {selectedLayer && (
         <div className="attr-pagination" aria-label="表格状态与分页">
           <span className="attr-record-count" title={recordStatus}>{recordStatus}</span>
-          <span title={canEditCells ? '双击单元格编辑' : '当前表格只读；从图层菜单开始编辑'}>
+          <span title={canEditCells ? '双击单元格编辑；修改立即记录，可撤销，请保存项目' : readOnlyReason || '点击属性表工具栏的“开始编辑”'}>
             {canEditCells ? '可编辑' : '只读'}
           </span>
           <Button
