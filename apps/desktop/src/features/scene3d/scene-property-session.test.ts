@@ -1,10 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { createCesiumScene } from '@desktop-webgis/cesium-scene-schema'
+import { createCesiumScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
 import type { GraphicNode } from '@desktop-webgis/cesium-scene-schema'
 import { applyScenePropertyDraft } from './scene-property-session'
 
 const point: GraphicNode = { id: 'a', type: 'graphic', name: 'A', visible: true, geometry: { type: 'point', heightMode: 'ground', positions: [[116, 39, 0]] }, properties: {}, style: { color: '#336699', width: 3, pointSize: 8 } }
 describe('object-bound property draft', () => {
+  it('rejects invalid native style atomically and preserves complex legal style fields', () => {
+    const scene = createCesiumScene()
+    const base = { id: 'tiles', type: '3dtiles' as const, name: 'Tiles', visible: true, asset: 'tiles', transform: createTransform(), style: { color: 'color("white")' } }
+    scene.nodes = [base]
+    expect(() => applyScenePropertyDraft(scene, base, { ...base, style: { color: 'color(' } })).toThrow()
+    expect(scene.nodes[0]).toEqual(base)
+    const style = { defines: { height: '${Height}' }, color: { conditions: [['${height} > 10', 'color("red")'], ['true', 'color("white")']] }, meta: { name: '${name}' } }
+    const next = applyScenePropertyDraft(scene, base, { ...base, style })
+    expect(next.nodes[0]).toMatchObject({ style })
+    expect(scene.nodes[0]).toEqual(base)
+  })
   it('changes only the bound ID and preserves unrelated newer objects', () => {
     const scene = createCesiumScene(); scene.nodes = [structuredClone(point), { ...structuredClone(point), id: 'b', name: 'New B' }]
     const result = applyScenePropertyDraft(scene, point, { ...point, name: 'Applied A' })

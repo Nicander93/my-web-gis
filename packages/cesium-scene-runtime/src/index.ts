@@ -1,11 +1,11 @@
-import { Cartesian3, Cartographic, Matrix4, CesiumTerrainProvider, EllipsoidTerrainProvider, ImageryLayer, JulianDate, Math as CesiumMath, Resource, TileMapServiceImageryProvider, UrlTemplateImageryProvider, Viewer, buildModuleUrl } from 'cesium'
+import { Cartesian3, Cartographic, Cesium3DTileStyle, Matrix4, CesiumTerrainProvider, EllipsoidTerrainProvider, ImageryLayer, JulianDate, Math as CesiumMath, Resource, TileMapServiceImageryProvider, UrlTemplateImageryProvider, Viewer, buildModuleUrl } from 'cesium'
 import { BaseLayer, DrawSession, GeoJsonLayer, GraphicLayer, ImageryTemplateLayer, LayerCollection, ModelLayer, TilesetLayer } from '@desktop-webgis/cesium-layer'
 import type { DrawOptions, EditSession, GraphicEditOptions } from '@desktop-webgis/cesium-layer'
 import { TilesetEditor } from '@desktop-webgis/cesium-tileset-edit'
 import type { EditMode, TransformEditEvent } from '@desktop-webgis/cesium-tileset-edit'
 import { assertTilesetEffectsSupported, TilesetEffectManager } from '@desktop-webgis/cesium-tileset-effects'
 import { SceneEffects, WaterLayer } from '@desktop-webgis/cesium-effects'
-import { getCesiumSceneNodeState, parseCesiumScene } from '@desktop-webgis/cesium-scene-schema'
+import { getCesiumSceneNodeState, parseCesiumScene, validateTilesetStyle } from '@desktop-webgis/cesium-scene-schema'
 import type { CesiumSceneCamera, CesiumSceneNode, CesiumScene, GraphicNode, GeoPosition, Transform } from '@desktop-webgis/cesium-scene-schema'
 import { applyRenderQuality, defaultRenderQuality } from './render-quality.js'
 import type { RenderQuality } from './render-quality.js'
@@ -15,12 +15,24 @@ import { resolveSceneResourceReferences, type ResourceReferenceResolver } from '
 export type { ResourceReferenceResolver } from './resource-references.js'
 import type { ImageryProvider, TerrainProvider } from 'cesium'
 export { defaultRenderQuality, isRenderQuality } from './render-quality.js'
+export { TILESET_PARAMETER_DESCRIPTORS, validateTilesetStyle } from '@desktop-webgis/cesium-scene-schema'
 export type { RenderQuality } from './render-quality.js'
 export type { EditMode, TransformEditEvent } from '@desktop-webgis/cesium-tileset-edit'
 export type { CesiumScene, CesiumSceneNode, Transform } from '@desktop-webgis/cesium-scene-schema'
 export type { DrawOptions, DrawResult } from '@desktop-webgis/cesium-layer'
 export type { EditState, GraphicEditOptions, GraphicEditResult } from '@desktop-webgis/cesium-layer'
 export * from './document.js'
+
+/** Checks JSON shape and Cesium's native style parser before a draft is submitted. */
+export function validateCesiumTilesetStyle(value: unknown): { valid: true } | { valid: false; error: string } {
+  if (!validateTilesetStyle(value)) return { valid: false, error: 'Style 必须是可序列化 JSON 对象' }
+  try {
+    new Cesium3DTileStyle(structuredClone(value) as ConstructorParameters<typeof Cesium3DTileStyle>[0])
+    return { valid: true }
+  } catch (error) {
+    return { valid: false, error: error instanceof Error ? error.message : String(error) }
+  }
+}
 
 export interface CesiumSceneRuntimeOptions {
   target?: HTMLElement | string
@@ -46,7 +58,7 @@ export interface SceneRuntimeDiagnostics {
   managedLayers: number
   dataSources: number
   primitives: number
-  presentation?: { id: string; visible: boolean; transform?: Transform; position?: GeoPosition; graphic?: ReturnType<GraphicLayer['getGraphicPresentation']>; water?: { height: number; amplitude: number; frequency: number; speed: number } }
+  presentation?: { id: string; visible: boolean; transform?: Transform; position?: GeoPosition; tileset?: ReturnType<TilesetLayer['getPresentation']>; graphic?: ReturnType<GraphicLayer['getGraphicPresentation']>; water?: { height: number; amplitude: number; frequency: number; speed: number } }
 }
 
 interface PreparedEnvironment { key: string; imagery: ImageryProvider; terrain: TerrainProvider }
@@ -136,6 +148,8 @@ export class CesiumSceneRuntime {
         if ((layer instanceof TilesetLayer || layer instanceof ModelLayer) && (node.type === '3dtiles' || node.type === 'model')) layer.setTransform(node.transform)
         if (layer instanceof TilesetLayer && node.type === '3dtiles') {
           layer.setQuality(node.maximumScreenSpaceError, node.cacheBytes)
+          layer.setRuntimeParameters(node)
+          layer.setStyle(node.style)
           if (layer.tileset) this.tilesetEffects.setEffects(node.id, layer.tileset, node.effects ?? [], this.viewer.scene)
         }
         if (layer instanceof GraphicLayer && node.type === 'graphic') layer.getGraphic(node.id)?.setOptions(node)
@@ -159,6 +173,8 @@ export class CesiumSceneRuntime {
         if (latest && (latest.type === '3dtiles' || latest.type === 'model') && (mounted instanceof TilesetLayer || mounted instanceof ModelLayer)) mounted.setTransform(latest.transform)
         if (latest?.type === '3dtiles' && mounted instanceof TilesetLayer) {
           mounted.setQuality(latest.maximumScreenSpaceError, latest.cacheBytes)
+          mounted.setRuntimeParameters(latest)
+          mounted.setStyle(latest.style)
           if (mounted.tileset) this.tilesetEffects.setEffects(latest.id, mounted.tileset, latest.effects ?? [], this.viewer.scene)
         }
         if (latest?.type === 'geojson' && mounted instanceof GeoJsonLayer) mounted.setColor(latest.color ?? '#55a6ff')
@@ -287,6 +303,8 @@ export class CesiumSceneRuntime {
       if ((layer instanceof TilesetLayer || layer instanceof ModelLayer) && (node.type === '3dtiles' || node.type === 'model')) layer.setTransform(node.transform)
       if (layer instanceof TilesetLayer && node.type === '3dtiles') {
         layer.setQuality(node.maximumScreenSpaceError, node.cacheBytes)
+        layer.setRuntimeParameters(node)
+        layer.setStyle(node.style)
         if (layer.tileset) this.tilesetEffects.setEffects(node.id, layer.tileset, node.effects ?? [], this.viewer.scene)
       }
       if (layer instanceof GraphicLayer && node.type === 'graphic') layer.getGraphic(node.id)?.setOptions(node)
@@ -317,16 +335,20 @@ export class CesiumSceneRuntime {
     if (draft && getCesiumSceneNodeState(this.scene, current).locked) throw new Error('对象或所属文件夹已锁定，无法预览')
     if (draft && draft.type !== current.type) throw new Error('预览对象类型不匹配')
     // Resource identity remains authoritative; previews never fetch replacement assets.
-    const properties = draft ? Object.fromEntries(Object.entries(draft).filter(([key]) => ['name', 'visible', 'position', 'height', 'amplitude', 'frequency', 'speed', 'transform', 'style', 'color', 'effects', 'popup', 'maximumScreenSpaceError', 'cacheBytes', 'opacity'].includes(key))) : {}
+    const properties = draft ? Object.fromEntries(Object.entries(draft).filter(([key]) => ['name', 'visible', 'position', 'height', 'amplitude', 'frequency', 'speed', 'transform', 'style', 'color', 'effects', 'popup', 'maximumScreenSpaceError', 'cacheBytes', 'dynamicScreenSpaceError', 'dynamicScreenSpaceErrorDensity', 'dynamicScreenSpaceErrorFactor', 'skipLevelOfDetail', 'opacity'].includes(key))) : {}
     const candidate = { ...current, ...properties, id } as CesiumSceneNode
+    if (draft?.type === '3dtiles' && candidate.type === '3dtiles' && draft.style === undefined) delete candidate.style
     const scene = parseCesiumScene({ ...this.scene, nodes: this.scene.nodes.map(node => node.id === id ? candidate : node) })
     this.assertTilesetEffects(scene)
     const node = { ...candidate, ...getCesiumSceneNodeState(scene, candidate) }
+    if (layer instanceof TilesetLayer && node.type === '3dtiles') layer.validateStyle(node.style)
     layer.name = node.name; layer.show = node.visible
     if (layer instanceof ModelLayer && node.type === 'model') layer.setPosition(node.position)
     if ((layer instanceof TilesetLayer || layer instanceof ModelLayer) && (node.type === '3dtiles' || node.type === 'model')) layer.setTransform(node.transform)
     if (layer instanceof TilesetLayer && node.type === '3dtiles') {
       layer.setQuality(node.maximumScreenSpaceError, node.cacheBytes)
+      layer.setRuntimeParameters(node)
+      layer.setStyle(node.style)
       if (layer.tileset) this.tilesetEffects.setEffects(id, layer.tileset, node.effects ?? [], this.viewer.scene)
     }
     if (layer instanceof GraphicLayer && node.type === 'graphic') layer.getGraphic(id)?.setOptions(node)
@@ -407,6 +429,23 @@ export class CesiumSceneRuntime {
     const camera = this.viewer.camera, p = camera.positionCartographic
     return { position: [CesiumMath.toDegrees(p.longitude), CesiumMath.toDegrees(p.latitude), p.height], heading: CesiumMath.toDegrees(camera.heading), pitch: CesiumMath.toDegrees(camera.pitch), roll: CesiumMath.toDegrees(camera.roll) }
   }
+  /** Preflight a draft against the actual loaded metadata before committing its project command. */
+  validateTilesetStyle(id: string, style?: unknown): void {
+    const layer = this.layers.getLayer(id)
+    if (layer instanceof TilesetLayer) layer.validateStyle(style)
+    else if (style !== undefined) {
+      const result = validateCesiumTilesetStyle(style)
+      if (!result.valid) throw new Error(result.error)
+    }
+  }
+
+  /** Cache actions stay outside project configuration and history. */
+  trimTilesetCache(id: string): void {
+    const layer = this.layers.getLayer(id)
+    if (!(layer instanceof TilesetLayer) || layer.state !== 'ready') throw new Error('瓦片对象尚未加载成功')
+    layer.trimLoadedTiles()
+  }
+
   /** Reports engine-owned counts for diagnostics and performance acceptance. */
   getDiagnostics(id?: string): SceneRuntimeDiagnostics {
     const layer = id ? this.layers.getLayer(id) : undefined
@@ -419,6 +458,7 @@ export class CesiumSceneRuntime {
       primitives: this.viewer.scene.primitives.length,
       ...(layer ? { presentation: { id: layer.id, visible: layer.show,
         ...(layer instanceof ModelLayer || layer instanceof TilesetLayer ? { transform: layer.getTransform() } : {}),
+        ...(layer instanceof TilesetLayer ? { tileset: layer.getPresentation() } : {}),
         ...(modelPosition ? { position: [CesiumMath.toDegrees(modelPosition.longitude), CesiumMath.toDegrees(modelPosition.latitude), modelPosition.height] as GeoPosition } : {}),
           ...(layer instanceof WaterLayer ? { water: layer.getParameters() } : {}),
           ...(layer instanceof GraphicLayer && id ? { graphic: layer.getGraphicPresentation(id) } : {})
@@ -465,7 +505,7 @@ export class CesiumSceneRuntime {
     const asset = scene.assets[node.asset]
     const resourceUrl = asset.url ?? (asset.reference?.kind === 'url' ? asset.reference.url : undefined)
     if (!resourceUrl && !asset.data) throw new Error(`资源 ${node.asset} 的本地引用尚未由宿主解析`)
-    if (node.type === '3dtiles') return new TilesetLayer({ ...base, url: this.resource(resourceUrl!), transform: node.transform, maximumScreenSpaceError: node.maximumScreenSpaceError, cacheBytes: node.cacheBytes })
+    if (node.type === '3dtiles') return new TilesetLayer({ ...base, url: this.resource(resourceUrl!), transform: node.transform, style: node.style, maximumScreenSpaceError: node.maximumScreenSpaceError, cacheBytes: node.cacheBytes, dynamicScreenSpaceError: node.dynamicScreenSpaceError, dynamicScreenSpaceErrorDensity: node.dynamicScreenSpaceErrorDensity, dynamicScreenSpaceErrorFactor: node.dynamicScreenSpaceErrorFactor, skipLevelOfDetail: node.skipLevelOfDetail })
     if (node.type === 'model') return new ModelLayer({ ...base, url: this.resource(resourceUrl!), position: node.position, transform: node.transform })
     return new GeoJsonLayer({ ...base, data: asset.data ?? this.resource(resourceUrl!), color: node.color })
   }
@@ -505,7 +545,7 @@ function nativeKey(node: CesiumSceneNode, scene: CesiumScene): string {
   if (node.type === 'geojson') return JSON.stringify([node.asset, scene.assets[node.asset]])
   const { popup: _popup, visible: _visible, locked: _locked, name: _name, groupId: _groupId, ...rest } = node
   if (node.type === 'water') return JSON.stringify(rest)
-  const { transform: _transform, maximumScreenSpaceError: _error, cacheBytes: _cache, effects: _effects, ...assetNode } = rest as typeof rest & { transform?: unknown; maximumScreenSpaceError?: number; cacheBytes?: number; effects?: unknown }
+  const { transform: _transform, maximumScreenSpaceError: _error, cacheBytes: _cache, dynamicScreenSpaceError: _dynamic, dynamicScreenSpaceErrorDensity: _density, dynamicScreenSpaceErrorFactor: _factor, skipLevelOfDetail: _skip, style: _style, effects: _effects, ...assetNode } = rest as typeof rest & { transform?: unknown; maximumScreenSpaceError?: number; cacheBytes?: number; dynamicScreenSpaceError?: boolean; dynamicScreenSpaceErrorDensity?: number; dynamicScreenSpaceErrorFactor?: number; skipLevelOfDetail?: boolean; style?: unknown; effects?: unknown }
   return JSON.stringify([assetNode, scene.assets[node.asset]])
 }
 

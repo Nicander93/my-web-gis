@@ -1785,13 +1785,30 @@
         "transform": {
           "$ref": "#/$defs/cityTransform"
         },
+        "style": {
+          "type": "object"
+        },
         "maximumScreenSpaceError": {
           "type": "number",
-          "exclusiveMinimum": 0
+          "minimum": 0
         },
         "cacheBytes": {
           "type": "number",
-          "exclusiveMinimum": 0
+          "minimum": 0
+        },
+        "dynamicScreenSpaceError": {
+          "type": "boolean"
+        },
+        "dynamicScreenSpaceErrorDensity": {
+          "type": "number",
+          "minimum": 0
+        },
+        "dynamicScreenSpaceErrorFactor": {
+          "type": "number",
+          "minimum": 0
+        },
+        "skipLevelOfDetail": {
+          "type": "boolean"
         },
         "resource": {
           "type": "string"

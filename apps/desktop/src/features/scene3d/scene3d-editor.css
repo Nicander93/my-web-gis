@@ -1,4 +1,25 @@
 .scene3d-workspace { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.scene3d-workspace__body { --workspace-right-offset: var(--toolrail-width); }
+.scene3d-inspector-target { display: flex; align-items: center; gap: var(--space-field); padding: var(--space-group); border-bottom: 1px solid var(--color-border); }
+.scene3d-inspector-target > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scene3d-inspector-sections { padding: 0 var(--space-group); flex: 0 0 auto; }
+.scene3d-inspector-sections .ant-tabs-nav { margin-bottom: 0; min-height: var(--tab-height); }
+.scene3d-inspector-sections .ant-tabs-tab { padding-block: 5px; }
+.scene3d-workspace .scene3d-properties { font-size: var(--font-size-ui); }
+.scene3d-properties .ant-select, .scene3d-properties .ant-input-number { width: 100%; min-width: 0; }
+.scene3d-properties .editor-field { min-height: var(--desktop-row-height); }
+.scene3d-properties .scene3d-property-group > summary { min-height: var(--desktop-row-height); font-size: var(--font-size-ui); }
+.scene3d-footer { min-height: var(--status-height); }
+.tileset-parameters { min-width: 0; }
+.tileset-parameters__row { display: grid; grid-template-columns: minmax(0, 1fr) 86px 38px; align-items: center; gap: var(--space-field); min-height: var(--desktop-row-height); padding-block: 3px; }
+.tileset-parameters__row label { min-width: 0; overflow-wrap: anywhere; }
+.tileset-parameters__row small { display: block; color: var(--color-text-secondary); font-size: 10px; }
+.tileset-parameters__row .ant-switch { justify-self: start; }
+.tileset-style-draft { display: flex; flex-direction: column; gap: var(--space-group); min-width: 0; }
+.tileset-style-draft textarea, .tileset-style-summary { font: var(--font-size-ui)/1.6 Consolas, monospace; overflow-wrap: anywhere; white-space: pre-wrap; }
+.tileset-style-draft__rule { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) auto; gap: var(--space-field); }
+.tileset-style-draft__condition { display: flex; gap: var(--space-field); }
+.tileset-style-draft__condition > .ant-input { min-width: 50px; flex: 1; }
 .scene3d-folder-children { margin-left: 12px; border-left: 1px solid var(--color-border); }
 .scene3d-ribbon { background: var(--color-panel); flex: 0 0 auto; border-bottom: 1px solid var(--color-border); }
 .scene3d-ribbon__tabs { display: flex; align-items: center; gap: 2px; padding: 4px 10px; min-height: 39px; border-bottom: 1px solid var(--color-border); }
@@ -172,3 +193,10 @@
 .scene3d-ribbon__group { flex-direction: row; gap: 6px; flex-shrink: 0; }
 .scene3d-ribbon__command { flex-direction: row; gap: 5px; padding: 5px 8px; white-space: nowrap; }
 .scene3d-ribbon__group-label { order: -1; margin-top: 0; font-size: 10px; }
+
+.cesium-code-export { display: flex; flex-direction: column; gap: var(--space-group); padding: 12px; }
+.cesium-code-export p { margin: 0; }
+.cesium-code-export textarea { font: var(--font-size-ui)/1.5 Consolas, monospace; }
+.cesium-code-export footer { display: flex; justify-content: flex-end; gap: var(--space-field); padding-top: var(--space-group); }
+
+.tileset-parameters [hidden] { display: none; }

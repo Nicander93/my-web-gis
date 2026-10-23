@@ -1,0 +1,51 @@
+$ playwright test --config playwright.scene-editor.config.ts
+[WebServer] (node:42956) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] $ vite --host 127.0.0.1 --configLoader runner "--port" "5189" "--strictPort"
+[WebServer] (node:16556) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 28 tests using 1 worker
+
+(node:40508) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 [desktop] › e2e\cartography-editor.e2e.ts:44:1 › point radius edits coalesce by gesture, undo separately and save the focused value (26.7s)
+  ok  2 [desktop] › e2e\cartography-editor.e2e.ts:90:1 › switching layers preserves immediate edits without a draft dialog (2.5s)
+  ok  3 [desktop] › e2e\cartography-editor.e2e.ts:116:1 › advanced expressions remain intact while safe sibling parameters stay editable (2.0s)
+  ok  4 [desktop] › e2e\cesium-native-export.e2e.ts:6:1 › generated Cesium module mounts independently with native resources and cleans up (4.1s)
+  ok  5 [desktop] › e2e\scene3d-editor-v1.e2e.ts:24:1 › 3D workrail, searchable API parameters and runtime-only actions share the desktop interaction model (13.7s)
+  ok  6 [desktop] › e2e\scene3d-editor-v1.e2e.ts:56:1 › native style drafts preview safely, survive highlight, history, scene export and reopen (16.4s)
+  ok  7 [desktop] › e2e\scene3d-editor-v1.e2e.ts:123:1 › CesiumJS export is separate from scene JSON and reports unsupported capabilities (11.3s)
+  ok  8 [desktop] › e2e\scene3d-property-window.e2e.ts:16:1 › modeless properties bind an ID, apply atomically, cancel drafts and pin the inspector (15.6s)
+(node:4152) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  9 [desktop] › e2e\hover-stability.e2e.ts:14:3 › 二维地图 ribbon buttons and tabs keep geometry on hover (2.4s)
+  ok 10 [desktop] › e2e\hover-stability.e2e.ts:14:3 › 三维场景 ribbon buttons and tabs keep geometry on hover (18.1s)
+  ok 11 [desktop] › e2e\hover-stability.e2e.ts:40:1 › shared start-screen buttons reserve the same border on hover and press (1.3s)
+  ok 12 [desktop] › e2e\hover-stability.e2e.ts:56:1 › right work-panel rail keeps button and label geometry on hover and press (1.7s)
+(node:36476) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 13 [desktop] › e2e\inspector-ux-followup.e2e.ts:73:1 › right inspector keeps common layer actions while full properties retain local source and processing metadata (1.6s)
+  ok 14 [desktop] › e2e\inspector-ux-followup.e2e.ts:101:1 › WFS protocol and readonly snapshot details remain reachable without changing project history (1.5s)
+(node:30752) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 15 [compact] › e2e\cartography-editor.e2e.ts:44:1 › point radius edits coalesce by gesture, undo separately and save the focused value (3.1s)
+  ok 16 [compact] › e2e\cartography-editor.e2e.ts:90:1 › switching layers preserves immediate edits without a draft dialog (2.5s)
+  ok 17 [compact] › e2e\cartography-editor.e2e.ts:116:1 › advanced expressions remain intact while safe sibling parameters stay editable (1.8s)
+  ok 18 [compact] › e2e\cesium-native-export.e2e.ts:6:1 › generated Cesium module mounts independently with native resources and cleans up (2.6s)
+  ok 19 [compact] › e2e\scene3d-editor-v1.e2e.ts:24:1 › 3D workrail, searchable API parameters and runtime-only actions share the desktop interaction model (9.6s)
+  ok 20 [compact] › e2e\scene3d-editor-v1.e2e.ts:56:1 › native style drafts preview safely, survive highlight, history, scene export and reopen (12.0s)
+  ok 21 [compact] › e2e\scene3d-editor-v1.e2e.ts:123:1 › CesiumJS export is separate from scene JSON and reports unsupported capabilities (7.5s)
+  ok 22 [compact] › e2e\scene3d-property-window.e2e.ts:16:1 › modeless properties bind an ID, apply atomically, cancel drafts and pin the inspector (11.2s)
+(node:38284) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 23 [compact] › e2e\hover-stability.e2e.ts:14:3 › 二维地图 ribbon buttons and tabs keep geometry on hover (2.5s)
+  ok 24 [compact] › e2e\hover-stability.e2e.ts:14:3 › 三维场景 ribbon buttons and tabs keep geometry on hover (13.0s)
+  ok 25 [compact] › e2e\hover-stability.e2e.ts:40:1 › shared start-screen buttons reserve the same border on hover and press (1.3s)
+  ok 26 [compact] › e2e\hover-stability.e2e.ts:56:1 › right work-panel rail keeps button and label geometry on hover and press (1.7s)
+(node:41968) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 27 [compact] › e2e\inspector-ux-followup.e2e.ts:73:1 › right inspector keeps common layer actions while full properties retain local source and processing metadata (1.6s)
+  ok 28 [compact] › e2e\inspector-ux-followup.e2e.ts:101:1 › WFS protocol and readonly snapshot details remain reachable without changing project history (1.4s)
+
+  28 passed (7.2m)

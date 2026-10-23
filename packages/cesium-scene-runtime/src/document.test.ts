@@ -6,7 +6,7 @@ import { projectCesiumDocument } from './document.js'
 function document() {
   const city = createCesiumScene()
   city.assets.blocks = { type: '3dtiles', url: './city/tileset.json' }
-  city.nodes.push({ type: '3dtiles', id: 'blocks', name: 'Blocks', visible: true, asset: 'blocks', transform: createTransform(), maximumScreenSpaceError: 2, cacheBytes: 512 * 1024 * 1024 })
+  city.nodes.push({ type: '3dtiles', id: 'blocks', name: 'Blocks', visible: true, asset: 'blocks', transform: createTransform(), maximumScreenSpaceError: 2, cacheBytes: 512 * 1024 * 1024, style: { color: 'color("red")', future: { ruleSet: [1, true] } }, dynamicScreenSpaceError: false, skipLevelOfDetail: true })
   return migrateSceneDocument(city)
 }
 
@@ -25,7 +25,7 @@ describe('v3 Cesium projection', () => {
     input.nodes.unshift({ type: 'group', id: 'outer', name: 'Outer', visible: false, locked: true, scope: '3d' }, { type: 'group', id: 'inner', name: 'Inner', visible: true, parentId: 'outer', scope: '3d' })
     input.nodes[2].parentId = 'inner'
     const before = JSON.stringify(input), result = projectCesiumDocument(input)
-    expect(result.scene.nodes[0]).toMatchObject({ id: 'blocks', visible: false, locked: true, maximumScreenSpaceError: 2, cacheBytes: 512 * 1024 * 1024, asset: 'blocks' })
+    expect(result.scene.nodes[0]).toMatchObject({ id: 'blocks', visible: false, locked: true, maximumScreenSpaceError: 2, cacheBytes: 512 * 1024 * 1024, asset: 'blocks', style: { future: { ruleSet: [1, true] } }, dynamicScreenSpaceError: false, skipLevelOfDetail: true })
     expect(result.scene.camera).toEqual(input.views.city.type === '3d' ? input.views.city.camera : undefined)
     expect(result.document).toEqual(input)
     expect(JSON.stringify(input)).toBe(before)

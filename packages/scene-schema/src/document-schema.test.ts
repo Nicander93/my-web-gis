@@ -29,4 +29,7 @@ it('ships a self-contained v3 schema with resolvable references for both engines
     expect(schema.$defs[name].properties.source).toBeUndefined()
     expect(schema.$defs[name].properties.asset).toBeUndefined()
   }
+  expect(schema.$defs.cityTileset.properties.style).toEqual({ type: 'object' })
+  expect(schema.$defs.cityTileset.properties.dynamicScreenSpaceError).toEqual({ type: 'boolean' })
+  expect(schema.$defs.cityTileset.properties.skipLevelOfDetail).toEqual({ type: 'boolean' })
 })

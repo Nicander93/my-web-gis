@@ -24,6 +24,8 @@
 
 ### 阶段计划与验收
 
+- [三维场景编辑器 V1 实施记录](plans/3d-scene-editor-implementation.md)：[技术设计](design/3d-scene-editor-technical-design-v1.md)、P0 差异表、P1–P4 代码范围、参数覆盖和 P5 分级验收。
+
 - [二维工作区 UX 产品化执行计划与记录](plans/2d-ux-productization-implementation.md)：2026-10-22 交接资料、设计系统代码构造、P0–P5 实施与验证；[交接计划](ux/my-web-gis-ux-productization-plan-v1.md)、[原型索引](ux/prototype-index-v1.md)。
 
 - [二维制图实施记录](plans/2d-cartography-implementation.md)：P0–P6 的实现、测试及原生/浏览器边界；[GeoServer 验收证据](design/2d-cartography-geoserver/README.md)、[P6 MBStyle 与 WebGL](design/2d-cartography-p6/README.md)。

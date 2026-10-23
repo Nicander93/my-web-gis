@@ -25,10 +25,10 @@ describe('unified scene document', () => {
     const input = parseScene(legacy()), city = createCesiumScene()
     city.assets.shared = { type: '3dtiles', url: './tiles/tileset.json' }
     city.groups = [{ id: 'same', name: 'Buildings', visible: false, locked: true }]
-    city.nodes = [{ type: '3dtiles', id: 'same-2', name: 'Building', asset: 'shared', groupId: 'same', visible: true, transform: createTransform(), maximumScreenSpaceError: 8 }]
+    city.nodes = [{ type: '3dtiles', id: 'same-2', name: 'Building', asset: 'shared', groupId: 'same', visible: true, transform: createTransform(), maximumScreenSpaceError: 8, style: { color: { conditions: [['true', 'color("red")']] }, futureOption: { keep: true } }, dynamicScreenSpaceError: false, skipLevelOfDetail: true }]
     input.city = city
     const document = migrateSceneDocument(input)
-    expect(document.nodes).toMatchObject([{ id: 'same', resource: 'shared' }, { id: 'same-2', type: 'group', visible: false, locked: true }, { id: 'same-2-2', parentId: 'same-2', resource: 'shared-2', visible: true }])
+    expect(document.nodes).toMatchObject([{ id: 'same', resource: 'shared' }, { id: 'same-2', type: 'group', visible: false, locked: true }, { id: 'same-2-2', parentId: 'same-2', resource: 'shared-2', visible: true, style: { futureOption: { keep: true } }, dynamicScreenSpaceError: false, skipLevelOfDetail: true }])
     expect(document.resources['shared-2']).toEqual(city.assets.shared)
     expect(document.views.city).toEqual({ type: '3d', camera: city.camera, heightReference: 'ellipsoid' })
     expect(document.environment?.effects).toEqual(city.effects)

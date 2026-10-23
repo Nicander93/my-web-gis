@@ -4,6 +4,15 @@ async function names(page: Page) {
   return page.evaluate(async () => (await import('/src/stores/project.store.ts')).useProjectStore.getState().project.city?.nodes.map(node => node.name))
 }
 
+async function moveProperties(page: Page, dialog: import('@playwright/test').Locator, dx: number) {
+  const header = await dialog.locator('header').boundingBox()
+  if (!header) throw new Error('Property window header is unavailable')
+  await page.mouse.move(header.x + 80, header.y + 16)
+  await page.mouse.down()
+  await page.mouse.move(header.x + 80 + dx, header.y + 16)
+  await page.mouse.up()
+}
+
 test('modeless properties bind an ID, apply atomically, cancel drafts and pin the inspector', async ({ page }, testInfo) => {
   test.setTimeout(90_000)
   await page.route('**/*tile.openstreetmap.org/**', route => route.abort())
@@ -23,6 +32,7 @@ test('modeless properties bind an ID, apply atomically, cancel drafts and pin th
   const dialog = page.getByRole('dialog', { name: '完整属性：Alpha', exact: true })
   await dialog.getByRole('textbox', { name: '对象名称', exact: true }).fill('Applied Alpha')
   expect(await names(page)).toEqual(['Alpha', 'Beta'])
+  await moveProperties(page, dialog, 160)
   await rows.nth(1).click()
   await expect(dialog).toBeVisible()
   await dialog.getByRole('button', { name: '应用', exact: true }).click()
@@ -49,6 +59,7 @@ test('modeless properties bind an ID, apply atomically, cancel drafts and pin th
   await page.getByRole('menuitem', { name: '完整属性', exact: true }).click()
   const second = page.getByRole('dialog', { name: '完整属性：Pinned Alpha', exact: true })
   await second.getByRole('textbox', { name: '对象名称', exact: true }).fill('Stale draft')
+  await moveProperties(page, second, -160)
   await inspector.locator('input[name="object-name"]').fill('External Alpha')
   await inspector.locator('input[name="object-name"]').press('Tab')
   await second.getByRole('button', { name: '应用', exact: true }).click()
