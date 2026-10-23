@@ -8,6 +8,7 @@ import { chromium, expect } from '@playwright/test'
 import { verifyNativeLayout, verifyNativeSimplification } from './native-layout-checks.mjs'
 import { verifyNativeTitlebar } from './native-titlebar-checks.mjs'
 import { verifyNativeUx } from './native-ux-checks.mjs'
+import { verifyNativeSceneEditor, verifyNativeSceneEditorReopen } from './native-scene-editor-checks.mjs'
 
 const desktop = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const tauri = join(desktop, 'src-tauri')
@@ -189,6 +190,7 @@ try {
   assert.equal(await available(debugPort), false, 'Owned debugging port is occupied')
   const baseConfig = JSON.parse(await readFile(join(tauri, 'tauri.conf.json'), 'utf8'))
   const config = { identifier, build: { devUrl: url }, app: { windows: [{ ...baseConfig.app.windows[0], label: 'main', title: uxOnly ? 'Desktop WebGIS · Native UX acceptance' : 'Desktop WebGIS · Resource acceptance', width: uxOnly ? 1024 : layoutOnly ? wide ? 1920 : 1366 : 1440, height: uxOnly ? 680 : layoutOnly ? wide ? 1080 : 768 : 900, minWidth: 1024, minHeight: 680 }] } }
+  if (process.argv.includes('--scene-editor')) config.app.security = { capabilities: ['default', { identifier: 'scene-editor-acceptance', windows: ['main'], permissions: ['core:window:allow-set-size'] }] }
   report.requestedWindow = config.app.windows[0]
   await writeFile(join(output, 'tauri-config.json'), JSON.stringify(config, null, 2))
   const build = start(['cargo', 'build', '--bin', 'desktop-webgis', '--locked'], tauri, { ...process.env, TAURI_CONFIG: JSON.stringify(config) })
@@ -249,6 +251,7 @@ try {
   } else {
   await page.getByRole('button', { name: /^三维场景/ }).click()
   await expect(page.locator('.scene3d-footer__state')).toHaveText('就绪', { timeout: 60_000 })
+  await page.getByRole('tab', { name: '场景', exact: true }).click()
   await page.getByRole('button', { name: '添加数据', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '添加三维资源', exact: true })
   await dialog.getByRole('radio', { name: 'GLB 模型', exact: true }).check()
@@ -275,6 +278,7 @@ try {
   await poll(async () => report.resourceResponses.some(item => item.path.includes('原始资源 #%/几何.bin') && item.status === 200), 'External geometry must be requested by Cesium')
   await poll(async () => report.resourceResponses.some(item => item.path.includes('原始资源 #%/纹理.png') && item.status === 200), 'External texture must be requested by Cesium')
   report.scenarios.push({ name: 'Native GLTF external binary loading with Unicode and reserved path characters', passed: true })
+  if (process.argv.includes('--scene-editor')) await verifyNativeSceneEditor(page, report)
   const projectPath = join(output, '原生项目.webgis.json')
   await saveTo(projectPath)
   await expect(page.locator('.project-dirty')).toHaveCount(0)
@@ -297,6 +301,7 @@ try {
   await readyResources()
   await dependencies('原始资源 #%', reopenedResponses)
   report.scenarios.push({ name: 'Native save, relative reference persistence and reopen after process restart', passed: true })
+  if (process.argv.includes('--scene-editor')) await verifyNativeSceneEditorReopen(page, report)
   const row = page.locator('.scene3d-layer-row').filter({ hasText: 'Native external GLTF' })
   await row.locator('.scene3d-layer-row__select').click({ button: 'right' })
   await page.getByRole('menuitem', { name: '数据源', exact: true }).click()

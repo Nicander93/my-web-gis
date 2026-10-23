@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
-import { Button, Input, InputNumber, Select, Switch } from 'antd'
+import { Button, ConfigProvider, Input, InputNumber, Select, Switch } from 'antd'
 import { isSceneResourceUrl } from '@desktop-webgis/cesium-scene-schema'
 import type { CesiumSceneGroup, CesiumSceneNode, CesiumScene, GeoPosition, GraphicNode, PopupDefinition, TilesetClipEffect, TilesetFlattenEffect, TilesetNode, Transform, WaterNode } from '@desktop-webgis/cesium-scene-schema'
 import { GraphicAttributes } from './GraphicAttributes'
@@ -8,6 +8,8 @@ import { SceneRenderSettings } from './SceneRenderSettings'
 import { SceneInfo, ScenePropertyGroup } from './ScenePropertyGroup'
 import { LivePropertyInput } from './LivePropertyInput'
 import { BillboardDraftFields } from './BillboardDraftFields'
+import { TilesetParameterFields } from './TilesetParameterFields'
+import { TilesetDiagnostics } from './TilesetDiagnostics'
 
 export type SceneInspectorSection = 'object' | 'popup' | 'source' | 'style' | 'properties'
 
@@ -29,23 +31,24 @@ interface SceneInspectorProps {
   groups?: CesiumSceneGroup[]
   onMoveGroup(groupId?: string): void
   onDelete(): void
+  onFullProperties(): void
+  onTrimCache(): void
 }
 
-export function SceneInspector({ node, section = 'object', pickedProperties = {}, onRelocate, assetUrl, error, onPatch, onResource, onReload, onDrawBoundary, onDrawClip, onDrawFlatten, onEditGeometry, geometryDisabled, groups, onMoveGroup, onDelete }: SceneInspectorProps) {
+export function SceneInspector({ node, section = 'object', pickedProperties = {}, onRelocate, assetUrl, error, onPatch, onResource, onReload, onDrawBoundary, onDrawClip, onDrawFlatten, onEditGeometry, geometryDisabled, groups, onMoveGroup, onDelete, onFullProperties, onTrimCache }: SceneInspectorProps) {
   const properties = node.type === 'graphic' ? { name: node.name, ...node.properties } : pickedProperties
-  return <fieldset className="scene3d-properties scene3d-properties--fields" disabled={node.locked}>
+  return <ConfigProvider componentDisabled={!!node.locked}><fieldset className="scene3d-properties scene3d-properties--fields" disabled={node.locked}>
     <section className="scene3d-property-section">
-      <label className="editor-field">对象名称<input key={`${node.id}:${node.name}`} name="object-name" defaultValue={node.name} onBlur={event => { if (event.target.value.trim()) onPatch({ name: event.target.value.trim() }, '重命名三维对象'); else event.target.value = node.name }} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); if (event.key === 'Escape') { event.currentTarget.value = node.name; event.currentTarget.blur() } }} /></label>
+      <label className="editor-field">对象名称<Input key={`${node.id}:${node.name}`} name="object-name" defaultValue={node.name} onBlur={event => { if (event.target.value.trim() && event.target.value.trim() !== node.name) onPatch({ name: event.target.value.trim() }, '重命名三维对象'); else event.target.value = node.name }} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); if (event.key === 'Escape') { event.currentTarget.value = node.name; event.currentTarget.blur() } }} /></label>
       <span className="scene3d-type-label">{node.type === '3dtiles' ? '3D Tiles' : node.type === 'model' ? 'GLB 模型' : node.type === 'geojson' ? 'GeoJSON' : node.type === 'graphic' ? `标绘 · ${node.geometry.type}` : '水面'}{node.locked ? ' · 已锁定' : ''}</span>
     </section>
-    {section === 'object' && <section className="scene3d-property-section"><label className="editor-field">所属分组<select value={node.groupId ?? ''} onChange={event => onMoveGroup(event.target.value || undefined)}><option value="">未分组</option>{groups?.map(group => <option key={group.id} value={group.id} disabled={group.locked}>{group.name}{group.locked ? '（已锁定）' : ''}</option>)}</select></label></section>}
+    {section === 'object' && <section className="scene3d-property-section"><label className="editor-field">所属分组<Select aria-label="所属分组" value={node.groupId ?? ''} options={[{ value: '', label: '未分组' }, ...(groups ?? []).map(group => ({ value: group.id, label: group.name, disabled: group.locked }))]} onChange={value => onMoveGroup(value || undefined)} /></label></section>}
     {error && <section className="scene3d-property-section"><p className="editor-error" role="alert">{error}</p><button className="button-secondary" onClick={onReload}>重试加载</button></section>}
     {section === 'object' && node.type === 'model' && <PositionFields key={`${node.id}:${JSON.stringify(node.position)}`} position={node.position} onApply={position => onPatch({ position } as Partial<CesiumSceneNode>, '设置模型地理位置')} />}
     {section === 'object' && (node.type === 'model' || node.type === '3dtiles') && <TransformFields key={node.id} transform={node.transform} onApply={transform => onPatch({ transform } as Partial<CesiumSceneNode>, '输入模型变换')} />}
-    {section === 'object' && node.type === '3dtiles' && <ScenePropertyGroup title="瓦片质量" hint="屏幕误差越小，模型越精细，加载开销越大。缓存预算不是显存硬上限；可见瓦片可能超出预算。设置随项目保存，可撤销。">
-      <label className="editor-field">屏幕误差<select value={node.maximumScreenSpaceError ?? 16} onChange={event => onPatch({ maximumScreenSpaceError: Number(event.target.value) } as Partial<CesiumSceneNode>, '设置瓦片显示精度')}>{[1,2,4,8,16,32].map(value => <option key={value} value={value}>{value}{value === 1 ? ' · 最精细' : value === 16 ? ' · 默认' : value === 32 ? ' · 更流畅' : ''}</option>)}</select></label>
-      <label className="editor-field">缓存预算<select value={node.cacheBytes ?? 256 * 1024 * 1024} onChange={event => onPatch({ cacheBytes: Number(event.target.value) } as Partial<CesiumSceneNode>, '设置瓦片缓存预算')}>{[128,256,512,1024].map(value => <option key={value} value={value * 1024 * 1024}>{value} MB</option>)}</select></label>
-    </ScenePropertyGroup>}
+    {section === 'object' && node.type === '3dtiles' && <TilesetParameterFields node={node} onChange={patch => onPatch(patch, '设置瓦片参数')} />}
+    {section === 'object' && node.type === '3dtiles' && <TilesetDiagnostics key={`diagnostics:${node.id}`} id={node.id} onTrimCache={onTrimCache} />}
+    {section === 'style' && node.type === '3dtiles' && <ScenePropertyGroup title="Cesium3DTileStyle" hint="持久样式独立于选择高亮。完整属性窗支持原生 JSON 和属性条件规则的草稿、预览、应用及取消。"><p className="editor-help">{node.style ? '已配置原生瓦片样式。' : '使用资源原始外观。'}</p><Button onClick={onFullProperties}>编辑瓦片样式</Button><pre className="tileset-style-summary">{JSON.stringify(node.style ?? {}, null, 2)}</pre></ScenePropertyGroup>}
     {section === 'object' && node.type === '3dtiles' && <TilesetClippingFields key={`${node.id}:${JSON.stringify(node.effects)}`} node={node} disabled={!!node.locked} onPatch={onPatch} onDraw={onDrawClip} />}
     {section === 'object' && node.type === '3dtiles' && <TilesetFlattenFields key={`${node.id}:flatten:${JSON.stringify(node.effects)}`} node={node} disabled={!!node.locked} onPatch={onPatch} onDraw={onDrawFlatten} />}
     {section === 'object' && node.type === 'water' && <WaterFields key={`${node.id}:${JSON.stringify(node)}`} node={node} onApply={patch => onPatch(patch, '修改水面材质')} onDrawBoundary={onDrawBoundary} />}
@@ -58,7 +61,7 @@ export function SceneInspector({ node, section = 'object', pickedProperties = {}
     {onRelocate && <Button onClick={onRelocate}>重新定位本地资源</Button>}
     {assetUrl && <ResourceFields open={section === 'source'} key={`${node.id}:${assetUrl}`} url={assetUrl} onApply={onResource} onReload={onReload} />}
     <section className="scene3d-property-section scene3d-object-actions"><button className="scene3d-danger-action" onClick={onDelete}><Trash2 size={14} aria-hidden="true" />删除对象</button><SceneInfo label="删除对象">删除后可撤销恢复。</SceneInfo></section>
-  </fieldset>
+  </fieldset></ConfigProvider>
 }
 
 function TilesetClippingFields({ node, disabled, onPatch, onDraw }: { node: TilesetNode; disabled: boolean; onPatch: SceneInspectorProps['onPatch']; onDraw(effectId?: string): void }) {
@@ -148,7 +151,7 @@ function TransformFields({ transform, onApply }: { transform: Transform; onApply
     return Number(text)
   }
   return <section className="scene3d-property-section">
-    <h3>变换<SceneInfo label="模型变换">平移单位为米，相对模型原始位置；旋转单位为度。有效输入稍作停顿即生效，Enter 或离开输入框可立即确认；修改可撤销。</SceneInfo></h3>
+    <h3>变换<SceneInfo label="模型变换">平移单位为米，相对模型原始位置；旋转单位为度。Enter 或离开输入框确认，一次完整输入可一次撤销。</SceneInfo></h3>
     {(['translation','rotation'] as const).map(field => <div key={field} className="scene3d-axis-fields"><span className="scene3d-axis-title">{field === 'translation' ? '平移 (m)' : '旋转 (°)'}</span><div className="scene3d-triple">{(field === 'translation' ? ['东向','北向','高度'] : ['航向','俯仰','翻滚']).map((label, i) => <LivePropertyInput key={label} label={label[0]} aria-label={label} title={String(transform[field][i])} type="number" step="any" required value={String(transform[field][i])} onCommit={text => {
       const vector = [...transform[field]] as Transform['translation']
       vector[i] = number(text)
@@ -221,8 +224,8 @@ export function SceneSettings({ scene, onApply, onSaveCamera }: SceneSettingsPro
   }
   return <div className="scene3d-properties">
     <SceneRenderSettings />
-    <section className="scene3d-property-section scene3d-property-row"><span>初始视角</span><button className="button-secondary" onClick={onSaveCamera}>使用当前视角</button><SceneInfo label="初始视角">场景打开时使用保存的初始视角。</SceneInfo></section>
-    <ScenePropertyGroup title="光照与时间"><label className="scene3d-check">太阳光照<input type="checkbox" checked={lighting.sunlight} onChange={event => onApply({ lighting: { ...lighting, sunlight: event.target.checked } })} /></label><label className="scene3d-check">模型阴影<input type="checkbox" checked={lighting.shadows} onChange={event => onApply({ lighting: { ...lighting, shadows: event.target.checked } })} /></label><LivePropertyInput label="时间 (UTC)" aria-label="场景时间（UTC）" type="datetime-local" required value={new Date(lighting.time).toISOString().slice(0,16)} onCommit={text => {
+    <section className="scene3d-property-section scene3d-property-row"><span>初始视角</span><Button onClick={onSaveCamera}>使用当前视角</Button><SceneInfo label="初始视角">场景打开时使用保存的初始视角。</SceneInfo></section>
+    <ScenePropertyGroup title="光照与时间"><label className="scene3d-check">太阳光照<Switch aria-label="太阳光照" checked={lighting.sunlight} onChange={sunlight => onApply({ lighting: { ...lighting, sunlight } })} /></label><label className="scene3d-check">模型阴影<Switch aria-label="模型阴影" checked={lighting.shadows} onChange={shadows => onApply({ lighting: { ...lighting, shadows } })} /></label><LivePropertyInput label="时间 (UTC)" aria-label="场景时间（UTC）" type="datetime-local" required value={new Date(lighting.time).toISOString().slice(0,16)} onCommit={text => {
       const date = new Date(text + 'Z')
       if (!text || !Number.isFinite(date.getTime())) throw new Error('请输入完整有效的 UTC 时间。')
       onApply({ lighting: { ...lighting, time: date.toISOString() } })
@@ -231,7 +234,7 @@ export function SceneSettings({ scene, onApply, onSaveCamera }: SceneSettingsPro
       const fog = Number(text)
       if (!text.trim() || !Number.isFinite(fog) || fog < 0 || fog > 1) throw new Error('雾浓度必须在 0–1 之间。')
       onApply({ effects: { ...scene.effects, fog } })
-    }} /><label className="scene3d-check">辉光<input aria-label="启用辉光" type="checkbox" checked={scene.effects.bloom} onChange={event => onApply({ effects: { ...scene.effects, bloom: event.target.checked } })} /></label></ScenePropertyGroup>
+    }} /><label className="scene3d-check">辉光<Switch aria-label="启用辉光" checked={scene.effects.bloom} onChange={bloom => onApply({ effects: { ...scene.effects, bloom } })} /></label></ScenePropertyGroup>
     <ScenePropertyGroup title="底图与地形" open={false} hint="支持 HTTP(S) 服务或项目相对路径。影像留空使用内置世界影像，地形留空使用椭球地表。"><LivePropertyInput label="影像地址" aria-label="影像模板地址" value={scene.basemap?.url ?? ''} spellCheck={false} placeholder="内置世界影像" onCommit={text => resource('basemap', text)} /><LivePropertyInput label="地形地址" aria-label="地形服务地址" value={scene.terrain?.url ?? ''} spellCheck={false} placeholder="椭球地表" onCommit={text => resource('terrain', text)} /></ScenePropertyGroup>
   </div>
 }

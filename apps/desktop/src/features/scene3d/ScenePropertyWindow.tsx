@@ -7,6 +7,9 @@ import { attributeRows, parseAttributeRows } from './graphic-attributes'
 import type { AttributeRow, AttributeType } from './graphic-attributes'
 import { TilesetEffectsDraft } from './TilesetEffectsDraft'
 import { BillboardDraftFields } from './BillboardDraftFields'
+import { TilesetStyleDraft } from './TilesetStyleDraft'
+import { TilesetParameterFields } from './TilesetParameterFields'
+import { getCesiumSceneNodeState, TILESET_PARAMETER_DESCRIPTORS } from '@desktop-webgis/cesium-scene-schema'
 import type { CesiumScene, CesiumSceneNode, GeoPosition } from '@desktop-webgis/cesium-scene-schema'
 import '@/components/ui/property-window.css'
 
@@ -17,13 +20,15 @@ interface Props {
   onClose(): void
   onPreview?(draft: CesiumSceneNode | null): void
   previewReady?: boolean
+  initialSection?: string
+  pickedProperties?: Record<string, unknown>
 }
 
 /** A modeless, object-bound draft; browsing the scene never retargets it. */
-export function ScenePropertyWindow({ initial, scene, onApply, onClose, onPreview, previewReady = true }: Props) {
+export function ScenePropertyWindow({ initial, scene, onApply, onClose, onPreview, previewReady = true, initialSection = 'object', pickedProperties = {} }: Props) {
   const [base, setBase] = useState(() => structuredClone(initial))
   const [draft, setDraft] = useState(() => structuredClone(initial))
-  const [section, setSection] = useState('object')
+  const [section, setSection] = useState(initialSection)
   const [query, setQuery] = useState('')
   const [error, setError] = useState('')
   const [invalid, setInvalid] = useState<Record<string, boolean>>({})
@@ -32,14 +37,19 @@ export function ScenePropertyWindow({ initial, scene, onApply, onClose, onPrevie
   const [previewError, setPreviewError] = useState('')
   const previewHandler = useRef(onPreview)
   previewHandler.current = onPreview
-  const dirty = JSON.stringify(base) !== JSON.stringify(draft)
+  const hasInvalid = Object.values(invalid).some(Boolean)
+  const dirty = JSON.stringify(base) !== JSON.stringify(draft) || hasInvalid
   const current = scene.nodes.find(node => node.id === initial.id)
+  const currentLocked = current ? getCesiumSceneNodeState(scene, current).locked : false
   useEffect(() => {
-    if (!preview || !previewReady || !current || JSON.stringify(current) !== JSON.stringify(base)) return
+    if (!preview || hasInvalid || !previewReady || !current || currentLocked || JSON.stringify(current) !== JSON.stringify(base)) return
     try { previewHandler.current?.(draft); setPreviewError('') }
-    catch (reason) { setPreviewError(reason instanceof Error ? reason.message : '预览失败') }
+    catch (reason) {
+      previewHandler.current?.(null)
+      setPreviewError(reason instanceof Error ? reason.message : '预览失败')
+    }
     return () => { previewHandler.current?.(null) }
-  }, [preview, previewReady, draft, current, base])
+  }, [preview, previewReady, draft, current, base, hasInvalid, currentLocked])
   function patch(value: Partial<CesiumSceneNode>): void { setDraft(node => Object.fromEntries(Object.entries({ ...node, ...value }).filter(([, item]) => item !== undefined)) as unknown as CesiumSceneNode) }
   function apply(close = false): void {
     if (Object.values(invalid).some(Boolean)) { setError('请先修正无效的字段。'); return }
@@ -71,12 +81,13 @@ export function ScenePropertyWindow({ initial, scene, onApply, onClose, onPrevie
       effects: '裁剪 压平 clipping flatten effects enabled mode positions',
       popup: '弹窗 popup title titleField', properties: '数据 属性 properties', source: '数据源 asset url reference'
     }
+    if (draft.type === '3dtiles' && TILESET_PARAMETER_DESCRIPTORS.some(item => `${item.apiName} ${item.help} ${item.search}`.toLowerCase().includes(words))) { setSection('style'); return }
     const match = categories.find(item => terms[item.key]?.toLowerCase().includes(words))
     if (match) setSection(match.key)
   }
   return <PropertyWindow title={`完整属性：${initial.name}`} subtitle={`${initial.type} · ${initial.id}`} dirty={dirty}
     categories={categories} section={section} onSection={setSection} query={query} onQuery={search} onClose={onClose}
-    footer={<>{onPreview && <label><Switch aria-label="实时预览" checked={preview} onChange={setPreview} /> 实时预览</label>}<Button disabled={!current} onClick={() => { if (current) { setBase(structuredClone(current)); setDraft(structuredClone(current)); setError(''); setInvalid({}); setRevision(value => value + 1) } }}>重新载入</Button><span /><Button onClick={onClose}>取消</Button><Button disabled={!current || !dirty || Object.values(invalid).some(Boolean)} onClick={() => apply()}>应用</Button><Button type="primary" disabled={!current || Object.values(invalid).some(Boolean)} onClick={() => dirty ? apply(true) : onClose()}>确定</Button></>}>
+    footer={<>{onPreview && <label><Switch aria-label="实时预览" checked={preview} onChange={setPreview} /> 实时预览</label>}<Button disabled={!current} onClick={() => { if (current) { setBase(structuredClone(current)); setDraft(structuredClone(current)); setError(''); setInvalid({}); setRevision(value => value + 1) } }}>重新载入</Button><span /><Button onClick={onClose}>取消</Button><Button disabled={!current || currentLocked || !dirty || Object.values(invalid).some(Boolean)} onClick={() => apply()}>应用</Button><Button type="primary" disabled={!current || currentLocked || Object.values(invalid).some(Boolean)} onClick={() => dirty ? apply(true) : onClose()}>确定</Button></>}>
         {(!current || error) && <Alert type="error" showIcon title={error || '对象已删除，无法应用草稿。'} />}
         {previewError && <Alert type="warning" title={previewError} />}
         {preview && <p className="editor-help">位置、样式、变换、水面参数和瓦片效果正在预览；取消恢复已应用值。资源替换在应用后加载。</p>}
@@ -91,8 +102,8 @@ export function ScenePropertyWindow({ initial, scene, onApply, onClose, onPrevie
           </PropertyGroup>}
           {draft.type === 'graphic' && <p>几何类型：{draft.geometry.type} · {draft.geometry.positions.length} 个顶点。顶点编辑通过画布中的“编辑顶点”工具进行。</p>}
         </>}
-        {section === 'style' && <>
-          {draft.type === '3dtiles' && <>{numeric('屏幕误差（px）', 'maximumScreenSpaceError', draft.maximumScreenSpaceError ?? 16, maximumScreenSpaceError => patch({ maximumScreenSpaceError }), 1, 128)}{numeric('缓存预算（MB）', 'cacheBytes', (draft.cacheBytes ?? 268435456) / 1048576, value => patch({ cacheBytes: value * 1048576 }), 1, 4096)}</>}
+        <div hidden={section !== 'style'}>
+          {draft.type === '3dtiles' && <><TilesetParameterFields node={draft} query={query} onChange={patch} onValidity={(api, valid) => setInvalid(state => state[`parameter:${api}`] === !valid ? state : { ...state, [`parameter:${api}`]: !valid })} /><PropertyGroup title="原生瓦片样式"><TilesetStyleDraft key={`${revision}:style`} value={draft.style} fields={Object.keys(pickedProperties)} onChange={style => patch({ style })} onValidity={valid => setInvalid(state => ({ ...state, style: !valid }))} /></PropertyGroup></>}
           {draft.type === 'geojson' && field('颜色', 'color', <Input aria-label="颜色" value={draft.color ?? '#55a6ff'} onChange={event => patch({ color: event.target.value })} />)}
           {draft.type === 'graphic' && <>
             {draft.geometry.type === 'point' && <PropertyGroup title="POI 图标">{draft.style.billboard && <img className="property-icon-preview" src={draft.style.billboard.image} alt="当前 POI 图标" referrerPolicy="no-referrer" />}<BillboardDraftFields value={draft.style.billboard} onChange={billboard => { const { billboard: _previous, ...style } = draft.style; patch({ style: billboard ? { ...style, billboard } : style }) }} /></PropertyGroup>}
@@ -104,7 +115,7 @@ export function ScenePropertyWindow({ initial, scene, onApply, onClose, onPrevie
           </>}
           {draft.type === 'model' && <p>模型的材质与纹理由 GLB/GLTF 资源定义。</p>}
           {draft.type === 'water' && <>{numeric('水面高度（m）', 'height', draft.height, height => patch({ height }))}{numeric('波幅', 'amplitude', draft.amplitude, amplitude => patch({ amplitude }), 0)}{numeric('频率', 'frequency', draft.frequency, frequency => patch({ frequency }), 0)}{numeric('速度', 'speed', draft.speed, speed => patch({ speed }), 0)}</>}
-        </>}
+        </div>
         <div hidden={section !== 'properties'}>{draft.type === 'graphic' ? <AttributeDraft key={`${revision}:properties`} value={draft.properties} onValidity={valid => setInvalid(state => ({ ...state, properties: !valid }))} onChange={properties => patch({ properties } as Partial<CesiumSceneNode>)} /> : <p>此类对象的构件属性由资源提供；在画布中拾取后通过检查器查看。</p>}</div>
         {section === 'popup' && <>
           {field('弹窗标题', 'popup.title', <Input aria-label="弹窗标题" value={draft.popup?.title ?? ''} onChange={event => patch({ popup: { fields: [], ...draft.popup, title: event.target.value } })} />)}

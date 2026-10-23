@@ -1,6 +1,6 @@
 import { Cartesian2, Cartesian3, Cartographic, Cesium3DTileColorBlendMode, Cesium3DTileFeature, Cesium3DTileStyle, Cesium3DTileset, Color, ColorBlendMode, ColorMaterialProperty, ConstantProperty, Entity, GeoJsonDataSource, JulianDate, KeyboardEventModifier, Math as CesiumMath, Matrix4, Model, ScreenSpaceEventHandler, ScreenSpaceEventType, Transforms } from 'cesium'
 import type { BoundingSphere, Resource, Viewer } from 'cesium'
-import { createTransform, validateTransform } from '@desktop-webgis/cesium-scene-schema'
+import { createTransform, TILESET_RUNTIME_DEFAULTS, validateTilesetStyle, validateTransform } from '@desktop-webgis/cesium-scene-schema'
 import type { GeoPosition, Transform } from '@desktop-webgis/cesium-scene-schema'
 import { composeTransform } from './transform.js'
 export { composeTransform } from './transform.js'
@@ -54,39 +54,149 @@ abstract class AssetLayer extends BaseLayer implements TransformLayer {
 export interface TilesetLayerOptions extends LayerOptions {
   url: string | Resource
   transform?: Transform
+  style?: Record<string, unknown>
   maximumScreenSpaceError?: number
   cacheBytes?: number
+  dynamicScreenSpaceError?: boolean
+  dynamicScreenSpaceErrorDensity?: number
+  dynamicScreenSpaceErrorFactor?: number
+  skipLevelOfDetail?: boolean
+}
+export interface TilesetRuntimeParameters {
+  maximumScreenSpaceError?: number
+  cacheBytes?: number
+  dynamicScreenSpaceError?: boolean
+  dynamicScreenSpaceErrorDensity?: number
+  dynamicScreenSpaceErrorFactor?: number
+  skipLevelOfDetail?: boolean
 }
 export class TilesetLayer extends AssetLayer {
   tileset?: Cesium3DTileset
   private highlightTarget?: Cesium3DTileset
-  private previousStyle?: Cesium3DTileStyle
+  private persistentStyle: Cesium3DTileStyle | undefined
+  private previousPersistentStyle?: Cesium3DTileStyle
+  private pendingStyleSource?: Record<string, unknown>
+  private tileLoadCleanup?: () => void
+  private highlightStyle?: Cesium3DTileStyle
   private previousBlend?: { mode: Cesium3DTileset['colorBlendMode']; amount: number }
   constructor(private readonly options: TilesetLayerOptions) { super(options); this.transform = structuredClone(options.transform ?? createTransform()) }
   get native(): Cesium3DTileset | undefined { return this.tileset }
   get boundingSphere(): BoundingSphere | undefined { return this.tileset?.boundingSphere }
+  /** Read actual engine values without mixing diagnostics into persisted node options. */
+  getPresentation() {
+    const tileset = this.tileset
+    if (!tileset) return undefined
+    return {
+      maximumScreenSpaceError: tileset.maximumScreenSpaceError, cacheBytes: tileset.cacheBytes,
+      dynamicScreenSpaceError: tileset.dynamicScreenSpaceError, dynamicScreenSpaceErrorDensity: tileset.dynamicScreenSpaceErrorDensity,
+      dynamicScreenSpaceErrorFactor: tileset.dynamicScreenSpaceErrorFactor, skipLevelOfDetail: tileset.skipLevelOfDetail,
+      totalMemoryUsageInBytes: tileset.totalMemoryUsageInBytes, tilesLoaded: tileset.tilesLoaded,
+      highlighted: this.highlighted,
+      style: this.persistentStyle ? structuredClone(this.persistentStyle.style) : undefined,
+      nativeStyle: tileset.style ? structuredClone(tileset.style.style) : undefined
+    }
+  }
+  trimLoadedTiles(): void { this.tileset?.trimLoadedTiles(); this.viewer?.scene.requestRender() }
   /** Update LOD and cache without reloading the asset or interrupting editing. */
-  setQuality(maximumScreenSpaceError = 16, cacheBytes = 256 * 1024 * 1024): void {
+  setQuality(maximumScreenSpaceError: number = TILESET_RUNTIME_DEFAULTS.maximumScreenSpaceError, cacheBytes: number = TILESET_RUNTIME_DEFAULTS.cacheBytes): void {
     if (!this.tileset) return
     this.tileset.maximumScreenSpaceError = maximumScreenSpaceError
     this.tileset.cacheBytes = cacheBytes
     this.viewer?.scene.requestRender()
   }
+  /** Applies the explicitly supported writable Cesium properties without generic key assignment. */
+  setRuntimeParameters(parameters: TilesetRuntimeParameters): void {
+    const tileset = this.tileset
+    if (!tileset) return
+    if (parameters.maximumScreenSpaceError !== undefined) tileset.maximumScreenSpaceError = parameters.maximumScreenSpaceError
+    if (parameters.cacheBytes !== undefined) tileset.cacheBytes = parameters.cacheBytes
+    tileset.dynamicScreenSpaceError = parameters.dynamicScreenSpaceError ?? TILESET_RUNTIME_DEFAULTS.dynamicScreenSpaceError
+    tileset.dynamicScreenSpaceErrorDensity = parameters.dynamicScreenSpaceErrorDensity ?? TILESET_RUNTIME_DEFAULTS.dynamicScreenSpaceErrorDensity
+    tileset.dynamicScreenSpaceErrorFactor = parameters.dynamicScreenSpaceErrorFactor ?? TILESET_RUNTIME_DEFAULTS.dynamicScreenSpaceErrorFactor
+    tileset.skipLevelOfDetail = parameters.skipLevelOfDetail ?? TILESET_RUNTIME_DEFAULTS.skipLevelOfDetail
+    this.viewer?.scene.requestRender()
+  }
+  /** Checks a native style against every feature currently loaded by the tileset. */
+  validateStyle(style?: unknown): void {
+    if (style !== undefined && !validateTilesetStyle(style)) throw new Error('3D Tiles Style 必须是可序列化 JSON 对象')
+    const candidate = style === undefined ? undefined : new Cesium3DTileStyle(structuredClone(style) as ConstructorParameters<typeof Cesium3DTileStyle>[0])
+    if (candidate && this.tileset && !validateTilesetStyleFeatures(candidate, this.tileset.root)) throw new Error('3D Tiles Style 无法应用于当前已加载要素')
+  }
+  private watchTileLoads(tileset: Cesium3DTileset): void {
+    if (this.tileLoadCleanup || !tileset.tileLoad?.addEventListener) return
+    this.tileLoadCleanup = tileset.tileLoad.addEventListener((tile: { content?: unknown }) => {
+      const style = this.persistentStyle
+      if (!style || !this.pendingStyleSource || !tile.content) return
+      if (tileset.style !== style && tileset.style !== this.highlightStyle) return
+      if (validateTilesetStyleFeatures(style, tile.content)) return
+      const previous = this.previousPersistentStyle
+      const fallback = previous && validateTilesetStyleFeatures(previous, tile.content) && validateTilesetStyleFeatures(previous, tileset.root) ? previous : undefined
+      this.persistentStyle = fallback
+      this.pendingStyleSource = fallback ? structuredClone(fallback.style) : undefined
+      tileset.style = tileset.style === this.highlightStyle ? this.highlightStyle : fallback
+      this.emit('error', new Error(`新加载的 3D Tiles 要素不满足当前 Style；${fallback ? '已恢复上一有效样式' : '已恢复无样式状态'}`))
+    })
+  }
+  /** Applies a native style only after preflighting currently loaded features. */
+  setStyle(style?: unknown): void {
+    if (style !== undefined && !validateTilesetStyle(style)) throw new Error('3D Tiles Style 必须是可序列化 JSON 对象')
+    if (JSON.stringify(style) === JSON.stringify(this.pendingStyleSource)) return
+    this.validateStyle(style)
+    const candidate = style === undefined ? undefined : new Cesium3DTileStyle(structuredClone(style) as ConstructorParameters<typeof Cesium3DTileStyle>[0])
+    const tileset = this.tileset
+    if (tileset) {
+      this.watchTileLoads(tileset)
+      const previous = tileset.style
+      try {
+        tileset.style = candidate
+        if (this.highlightTarget === tileset) tileset.style = this.highlightStyle
+      }
+      catch (error) {
+        if (tileset.style !== previous) tileset.style = previous
+        throw new Error('应用 3D Tiles Style 失败', { cause: error })
+      }
+    }
+    this.previousPersistentStyle = this.persistentStyle
+    this.persistentStyle = candidate
+    this.pendingStyleSource = style === undefined ? undefined : structuredClone(style) as Record<string, unknown>
+    this.viewer?.scene.requestRender()
+  }
   contains(picked: unknown): boolean { return picked instanceof Cesium3DTileFeature ? picked.tileset === this.tileset : isPick(picked) && (picked.primitive === this.tileset || picked.tileset === this.tileset) }
   protected async createNative(viewer: Viewer, signal: AbortSignal): Promise<() => void> {
-    const tileset = await Cesium3DTileset.fromUrl(this.options.url, { maximumScreenSpaceError: this.options.maximumScreenSpaceError ?? 16, cacheBytes: this.options.cacheBytes ?? 256 * 1024 * 1024 })
+    // Parse native expressions before allocating a tileset candidate.
+    this.validateStyle(this.options.style)
+    const candidateStyle = this.options.style === undefined ? undefined : new Cesium3DTileStyle(structuredClone(this.options.style) as ConstructorParameters<typeof Cesium3DTileStyle>[0])
+    const tileset = await Cesium3DTileset.fromUrl(this.options.url, {
+      maximumScreenSpaceError: this.options.maximumScreenSpaceError ?? TILESET_RUNTIME_DEFAULTS.maximumScreenSpaceError,
+      cacheBytes: this.options.cacheBytes ?? TILESET_RUNTIME_DEFAULTS.cacheBytes,
+      dynamicScreenSpaceError: this.options.dynamicScreenSpaceError,
+      dynamicScreenSpaceErrorDensity: this.options.dynamicScreenSpaceErrorDensity,
+      dynamicScreenSpaceErrorFactor: this.options.dynamicScreenSpaceErrorFactor,
+      skipLevelOfDetail: this.options.skipLevelOfDetail
+    })
     if (signal.aborted || viewer.isDestroyed()) { tileset.destroy(); return () => {} }
     this.tileset = tileset
+    this.persistentStyle = candidateStyle ?? tileset.style
+    this.pendingStyleSource = this.options.style === undefined ? undefined : structuredClone(this.options.style)
+    if (candidateStyle && !validateTilesetStyleFeatures(candidateStyle, tileset.root)) {
+      tileset.destroy()
+      this.tileset = undefined
+      throw new Error('3D Tiles Style 无法应用于当前已加载要素')
+    }
+    if (this.options.style) tileset.style = this.persistentStyle
     this.originalMatrix = Matrix4.clone(tileset.modelMatrix)
     this.pivot = Cartesian3.clone(tileset.boundingSphere.center)
     tileset.show = this.show
+    this.watchTileLoads(tileset)
     viewer.scene.primitives.add(tileset)
     this.setTransform(this.transform)
     this.setHighlighted(this.highlighted)
     const removeFailed = tileset.tileFailed.addEventListener((failure: { message: string }) => this.emit('error',new Error(failure.message)))
     return () => {
+      this.tileLoadCleanup?.()
+      this.tileLoadCleanup = undefined
       removeFailed()
-      if (this.highlightTarget === tileset) { this.highlightTarget = undefined; this.previousStyle = undefined; this.previousBlend = undefined }
+      if (this.highlightTarget === tileset) { this.highlightTarget = undefined; this.highlightStyle = undefined; this.previousBlend = undefined }
       if (!viewer.isDestroyed() && !tileset.isDestroyed()) viewer.scene.primitives.remove(tileset); else if (!tileset.isDestroyed()) tileset.destroy()
       if (this.tileset === tileset) this.tileset = undefined
     }
@@ -95,15 +205,47 @@ export class TilesetLayer extends AssetLayer {
     if (!this.tileset) return
     if (value) {
       if (this.highlightTarget === this.tileset) return
-      this.highlightTarget = this.tileset; this.previousStyle = this.tileset.style
+      this.highlightTarget = this.tileset; this.persistentStyle = this.tileset.style
       this.previousBlend = { mode: this.tileset.colorBlendMode, amount: this.tileset.colorBlendAmount }
       this.tileset.colorBlendMode = Cesium3DTileColorBlendMode.MIX; this.tileset.colorBlendAmount = .2
-      this.tileset.style = new Cesium3DTileStyle({ color: 'color("#3984d7", 1)' })
+      this.highlightStyle = new Cesium3DTileStyle({ color: 'color("#3984d7", 1)' })
+      this.tileset.style = this.highlightStyle
     } else if (this.highlightTarget === this.tileset) {
-      this.tileset.style = this.previousStyle; this.highlightTarget = undefined; this.previousStyle = undefined
+      this.tileset.style = this.persistentStyle; this.highlightTarget = undefined; this.highlightStyle = undefined
       if (this.previousBlend) { this.tileset.colorBlendMode = this.previousBlend.mode; this.tileset.colorBlendAmount = this.previousBlend.amount; this.previousBlend = undefined }
     }
   }
+}
+
+function validateTilesetStyleFeatures(style: Cesium3DTileStyle, source: unknown): boolean {
+  const expressions = [style.show, style.color, style.pointSize, style.pointOutlineColor, style.pointOutlineWidth, style.labelColor, style.labelOutlineColor, style.labelOutlineWidth, style.labelText, style.backgroundColor, style.backgroundPadding, style.backgroundEnabled]
+    .filter((value): value is NonNullable<typeof value> => Boolean(value && typeof value === 'object'))
+  const inspectContent = (content: unknown, seen: Set<unknown>): boolean => {
+    if (!content || typeof content !== 'object' || seen.has(content)) return true
+    seen.add(content)
+    const candidate = content as { innerContents?: unknown[]; featuresLength?: number; getFeature?: (index: number) => unknown }
+    if (Array.isArray(candidate.innerContents)) return candidate.innerContents.every(inner => inspectContent(inner, seen))
+    if (typeof candidate.featuresLength !== 'number' || typeof candidate.getFeature !== 'function') return true
+    // Unbatched GLB content still evaluates style once, with no feature metadata.
+    for (let index = 0; index < Math.max(1, candidate.featuresLength); index++) {
+      try {
+        const feature = (candidate.featuresLength ? candidate.getFeature(index) : undefined) as Parameters<NonNullable<typeof style.show>['evaluate']>[0]
+        for (const expression of expressions) {
+          if (expression.evaluate) expression.evaluate(feature)
+          else expression.evaluateColor?.(feature)
+        }
+      } catch { return false }
+    }
+    return true
+  }
+  const walkTile = (tile: unknown, seen: Set<unknown>): boolean => {
+    if (!tile || typeof tile !== 'object' || seen.has(tile)) return true
+    seen.add(tile)
+    const candidate = tile as { content?: unknown; children?: unknown[] }
+    return inspectContent(candidate.content, new Set()) && (candidate.children ?? []).every(child => walkTile(child, seen))
+  }
+  if (source && typeof source === 'object' && 'children' in source) return walkTile(source, new Set())
+  return inspectContent(source, new Set())
 }
 
 export interface ModelLayerOptions extends LayerOptions { url: string | Resource; position: GeoPosition; transform?: Transform }

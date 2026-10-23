@@ -109,9 +109,65 @@ export interface TilesetNode extends NodeBase {
   type: '3dtiles'
   asset: string
   transform: Transform
+  /** Native Cesium3DTileStyle constructor JSON, kept intact for unsupported legal expressions. */
+  style?: Record<string, unknown>
   maximumScreenSpaceError?: number
   cacheBytes?: number
+  dynamicScreenSpaceError?: boolean
+  dynamicScreenSpaceErrorDensity?: number
+  dynamicScreenSpaceErrorFactor?: number
+  skipLevelOfDetail?: boolean
   effects?: TilesetEffect[]
+}
+
+export type ParameterKind = 'boolean' | 'number' | 'enum' | 'color' | 'vector' | 'json' | 'custom'
+export type ParameterLifecycle = 'runtime' | 'recreate' | 'readonly' | 'action'
+/** Defaults retained by the current Cesium scene runtime when a persisted field is absent. */
+export const TILESET_RUNTIME_DEFAULTS = {
+  maximumScreenSpaceError: 16,
+  cacheBytes: 256 * 1024 * 1024,
+  dynamicScreenSpaceError: true,
+  dynamicScreenSpaceErrorDensity: 2e-4,
+  dynamicScreenSpaceErrorFactor: 24,
+  skipLevelOfDetail: false
+} as const
+export interface ParameterDescriptor<T = unknown> {
+  id: string
+  owner: 'tileset'
+  apiName: string
+  group: string
+  help: string
+  kind: ParameterKind
+  lifecycle: ParameterLifecycle
+  search: string[]
+  defaultValue?: T
+  nativeDefaultValue?: T
+  min?: number
+  max?: number
+  step?: number
+  validate(value: unknown): value is T
+}
+
+function isFiniteNumber(value: unknown): value is number { return typeof value === 'number' && Number.isFinite(value) }
+function isNonNegativeNumber(value: unknown): value is number { return isFiniteNumber(value) && value >= 0 }
+function isBoolean(value: unknown): value is boolean { return typeof value === 'boolean' }
+
+/** Initial public writable Cesium3DTileset parameters confirmed against the locked Cesium 1.145.0 source. */
+export const TILESET_PARAMETER_DESCRIPTORS: readonly ParameterDescriptor[] = [
+  { id: 'tileset.maximumScreenSpaceError', owner: 'tileset', apiName: 'maximumScreenSpaceError', group: '细节与性能', help: '允许的最大屏幕空间误差，数值越小通常显示越精细。', kind: 'number', lifecycle: 'runtime', search: ['误差', '精细度', 'LOD'], defaultValue: TILESET_RUNTIME_DEFAULTS.maximumScreenSpaceError, min: 0, step: 1, validate: isNonNegativeNumber },
+  { id: 'tileset.cacheBytes', owner: 'tileset', apiName: 'cacheBytes', group: '细节与性能', help: '瓦片缓存目标字节数；兼容项目未填写时使用 256 MiB，Cesium 原生默认值为 512 MiB。', kind: 'number', lifecycle: 'runtime', search: ['缓存', '内存'], defaultValue: TILESET_RUNTIME_DEFAULTS.cacheBytes, nativeDefaultValue: 512 * 1024 * 1024, min: 0, step: 1048576, validate: isNonNegativeNumber },
+  { id: 'tileset.dynamicScreenSpaceError', owner: 'tileset', apiName: 'dynamicScreenSpaceError', group: '细节与性能', help: '按视距动态调整屏幕空间误差。', kind: 'boolean', lifecycle: 'runtime', search: ['动态', '远景'], defaultValue: TILESET_RUNTIME_DEFAULTS.dynamicScreenSpaceError, validate: isBoolean },
+  { id: 'tileset.dynamicScreenSpaceErrorDensity', owner: 'tileset', apiName: 'dynamicScreenSpaceErrorDensity', group: '细节与性能', help: '动态误差雾化密度。', kind: 'number', lifecycle: 'runtime', search: ['动态', '密度'], defaultValue: TILESET_RUNTIME_DEFAULTS.dynamicScreenSpaceErrorDensity, min: 0, step: 0.00001, validate: isNonNegativeNumber },
+  { id: 'tileset.dynamicScreenSpaceErrorFactor', owner: 'tileset', apiName: 'dynamicScreenSpaceErrorFactor', group: '细节与性能', help: '动态误差强度系数。', kind: 'number', lifecycle: 'runtime', search: ['动态', '强度'], defaultValue: TILESET_RUNTIME_DEFAULTS.dynamicScreenSpaceErrorFactor, min: 0, step: 1, validate: isNonNegativeNumber },
+  { id: 'tileset.skipLevelOfDetail', owner: 'tileset', apiName: 'skipLevelOfDetail', group: '细节与性能', help: '允许跳过中间细节层级以减少请求。', kind: 'boolean', lifecycle: 'runtime', search: ['跳级', 'LOD', '请求'], defaultValue: TILESET_RUNTIME_DEFAULTS.skipLevelOfDetail, validate: isBoolean },
+  { id: 'tileset.style', owner: 'tileset', apiName: 'style', group: '样式', help: 'Cesium 原生 Cesium3DTileStyle JSON 定义。', kind: 'json', lifecycle: 'runtime', search: ['颜色', '条件', '表达式', '原生 JSON'], validate: validateTilesetStyle },
+  { id: 'tileset.url', owner: 'tileset', apiName: 'url', group: '资源', help: '在数据源中修改资源地址；候选资源准备完成后替换现有实例，加载失败保留现有场景。地址归属资源定义。', kind: 'custom', lifecycle: 'recreate', search: ['地址', '重载', '数据源'], validate: isSceneResourceUrl },
+  { id: 'tileset.totalMemoryUsageInBytes', owner: 'tileset', apiName: 'totalMemoryUsageInBytes', group: '运行诊断', help: 'Cesium 当前统计的瓦片内存字节数，只读，不进入工程。', kind: 'number', lifecycle: 'readonly', search: ['内存', '诊断'], validate: isNonNegativeNumber },
+  { id: 'tileset.trimLoadedTiles', owner: 'tileset', apiName: 'trimLoadedTiles', group: '运行诊断', help: '卸载当前视图不需要的已缓存瓦片；不修改工程或历史。', kind: 'custom', lifecycle: 'action', search: ['缓存', '清理'], validate: (value): value is undefined => value === undefined }
+]
+
+export function validateTilesetStyle(value: unknown): value is Record<string, unknown> {
+  return record(value) && jsonValue(value)
 }
 
 export interface TilesetClipEffect {
@@ -311,8 +367,12 @@ export function validateCesiumScene(input: unknown, root = '$'): CesiumSceneVali
     if (node.type === 'model') check(position(node.position), `${path}.position`, '模型位置无效')
     if (node.type === 'geojson' && node.color !== undefined) check(typeof node.color === 'string' && /^#[\da-f]{6}$/i.test(node.color), `${path}.color`, '颜色必须是 #RRGGBB')
     if (node.type === '3dtiles') {
-      if (node.maximumScreenSpaceError !== undefined) check(finite(node.maximumScreenSpaceError) && node.maximumScreenSpaceError > 0, `${path}.maximumScreenSpaceError`, '屏幕误差必须为正数')
-      if (node.cacheBytes !== undefined) check(finite(node.cacheBytes) && node.cacheBytes > 0, `${path}.cacheBytes`, '缓存预算必须为正数')
+      if (node.maximumScreenSpaceError !== undefined) check(finite(node.maximumScreenSpaceError) && node.maximumScreenSpaceError >= 0, `${path}.maximumScreenSpaceError`, '屏幕误差必须为非负数')
+      if (node.cacheBytes !== undefined) check(finite(node.cacheBytes) && node.cacheBytes >= 0, `${path}.cacheBytes`, '缓存预算必须为非负数')
+      if (node.style !== undefined) check(validateTilesetStyle(node.style), `${path}.style`, '3D Tiles Style 必须是可序列化 JSON 对象')
+      if (node.dynamicScreenSpaceError !== undefined) check(typeof node.dynamicScreenSpaceError === 'boolean', `${path}.dynamicScreenSpaceError`, '动态屏幕空间误差必须是布尔值')
+      for (const key of ['dynamicScreenSpaceErrorDensity', 'dynamicScreenSpaceErrorFactor'] as const) if (node[key] !== undefined) check(finite(node[key]) && node[key] >= 0, `${path}.${key}`, '动态屏幕空间误差参数必须是非负有限数')
+      if (node.skipLevelOfDetail !== undefined) check(typeof node.skipLevelOfDetail === 'boolean', `${path}.skipLevelOfDetail`, '跳过细节层级必须是布尔值')
       if (node.effects !== undefined) {
         check(input.version === 2 && Array.isArray(node.effects), `${path}.effects`, '裁剪效果需要 version 2 和数组配置')
         const effectIds = new Set<string>()

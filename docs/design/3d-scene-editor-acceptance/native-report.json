@@ -1,0 +1,280 @@
+{
+  "identifier": "com.desktop-webgis.resource-acceptance-1792734093710",
+  "output": "D:\\my-code-repo\\my-web-gis\\.artifacts\\native-resources-1792734093710",
+  "scenarios": [
+    {
+      "name": "Native nested Tileset JSON/GLB dependencies and GeoJSON datasource load together",
+      "passed": true
+    },
+    {
+      "name": "Native GLTF external binary loading with Unicode and reserved path characters",
+      "passed": true
+    },
+    {
+      "name": "Native scene workrail, tileset style/history, parameters and property actions at exact 1440x900 and 1024x680 CSS viewports",
+      "passed": true
+    },
+    {
+      "name": "Native save, relative reference persistence and reopen after process restart",
+      "passed": true
+    },
+    {
+      "name": "Native persisted style and parameters restore on real local nested tileset after process restart",
+      "passed": true
+    },
+    {
+      "name": "Native relocation loads external binary from new directory and persists the new relative path",
+      "passed": true
+    },
+    {
+      "name": "Parent directory relocation updates exactly Tileset and GeoJSON; nested content actually reloads without duplicating datasource",
+      "passed": true
+    },
+    {
+      "name": "Cross-directory native snapshot save preserves working state, current file and original bytes; external reference rebased correctly",
+      "passed": true
+    },
+    {
+      "name": "Copied project rejects unauthorized external roots; explicit same-directory authorization reloads all resources without project/history changes",
+      "passed": true
+    }
+  ],
+  "screenshots": false,
+  "nativeFileChooser": "Not verified: fixture working paths assigned; native filesystem and resource protocol used",
+  "windowsScale125": "Not verified",
+  "resourceResponses": [
+    {
+      "path": "原始资源 #%/模型.gltf",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/要素.geojson",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/tileset.json",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/几何.bin",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/坐标-0.bin",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/纹理.png",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/子瓦片/tileset.json",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/子瓦片/内容/街区.glb",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/模型.gltf",
+      "status": 403
+    },
+    {
+      "path": "原始资源 #%/模型.gltf",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/tileset.json",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/要素.geojson",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/几何.bin",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/坐标-0.bin",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/纹理.png",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/子瓦片/tileset.json",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/子瓦片/内容/街区.glb",
+      "status": 200
+    },
+    {
+      "path": "迁移资源 #%/模型.gltf",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/要素.geojson",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/tileset.json",
+      "status": 200
+    },
+    {
+      "path": "迁移资源 #%/几何.bin",
+      "status": 200
+    },
+    {
+      "path": "迁移资源 #%/坐标-0.bin",
+      "status": 200
+    },
+    {
+      "path": "迁移资源 #%/纹理.png",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/子瓦片/tileset.json",
+      "status": 200
+    },
+    {
+      "path": "原始资源 #%/子瓦片/内容/街区.glb",
+      "status": 200
+    },
+    {
+      "path": "迁移资源 #%/tileset.json",
+      "status": 200
+    },
+    {
+      "path": "迁移资源 #%/要素.geojson",
+      "status": 200
+    },
+    {
+      "path": "迁移资源 #%/子瓦片/tileset.json",
+      "status": 200
+    },
+    {
+      "path": "迁移资源 #%/子瓦片/内容/街区.glb",
+      "status": 200
+    },
+    {
+      "path": "模型.gltf",
+      "status": 200
+    },
+    {
+      "path": "tileset.json",
+      "status": 200
+    },
+    {
+      "path": "要素.geojson",
+      "status": 200
+    },
+    {
+      "path": "几何.bin",
+      "status": 200
+    },
+    {
+      "path": "坐标-0.bin",
+      "status": 200
+    },
+    {
+      "path": "纹理.png",
+      "status": 200
+    },
+    {
+      "path": "子瓦片/tileset.json",
+      "status": 200
+    },
+    {
+      "path": "子瓦片/内容/街区.glb",
+      "status": 200
+    }
+  ],
+  "requestedWindow": {
+    "title": "Desktop WebGIS · Resource acceptance",
+    "decorations": false,
+    "width": 1440,
+    "height": 900,
+    "minWidth": 1024,
+    "minHeight": 680,
+    "label": "main"
+  },
+  "appData": "C:\\Users\\PC\\AppData\\Local\\com.desktop-webgis.resource-acceptance-1792734093710",
+  "viewport": {
+    "width": 1036,
+    "height": 648,
+    "devicePixelRatio": 1.5927083492279053
+  },
+  "nativeWindow": {
+    "scaleFactor": 1.1458333333333333,
+    "innerSize": {
+      "type": "Physical",
+      "width": 1650,
+      "height": 1031
+    },
+    "outerSize": {
+      "type": "Physical",
+      "width": 1668,
+      "height": 1041
+    }
+  },
+  "initial": {
+    "sceneObjects": 3,
+    "graphicObjects": 0,
+    "managedLayers": 3,
+    "dataSources": 1,
+    "primitives": 3,
+    "presentation": {
+      "id": "scene3d-mvkjlsfn-3-raxsli",
+      "visible": true,
+      "transform": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": 1
+      },
+      "position": [
+        116.39099999999999,
+        39.907,
+        -1.3969838619232178e-9
+      ]
+    }
+  },
+  "sceneEditorLayouts": [
+    {
+      "requested": {
+        "width": 1440,
+        "height": 900
+      },
+      "actual": {
+        "width": 1440,
+        "height": 900
+      },
+      "propertyActionReachable": true
+    },
+    {
+      "requested": {
+        "width": 1024,
+        "height": 680
+      },
+      "actual": {
+        "width": 1024,
+        "height": 680
+      },
+      "propertyActionReachable": true
+    }
+  ],
+  "webgl": {
+    "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+    "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5070 (0x00002F04) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  }
+}

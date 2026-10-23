@@ -1,0 +1,169 @@
+{
+  "date": "2026-10-23",
+  "baseline": "619fb3c",
+  "branch": "codex/3d-scene-editor-v1",
+  "cesium": "1.145.0",
+  "unit": {
+    "command": "pnpm -r test",
+    "exitCode": 0,
+    "passed": 1032,
+    "skipped": 6,
+    "packages": [
+      {
+        "package": "packages/ol-selection",
+        "passed": 9,
+        "skipped": 0
+      },
+      {
+        "package": "packages/cesium-scene-schema",
+        "passed": 29,
+        "skipped": 0
+      },
+      {
+        "package": "packages/ol-style",
+        "passed": 87,
+        "skipped": 0
+      },
+      {
+        "package": "packages/style-assistant",
+        "passed": 2,
+        "skipped": 0
+      },
+      {
+        "package": "packages/spatial-analysis",
+        "passed": 41,
+        "skipped": 0
+      },
+      {
+        "package": "packages/cesium-popup",
+        "passed": 3,
+        "skipped": 0
+      },
+      {
+        "package": "packages/ogc-io",
+        "passed": 53,
+        "skipped": 1
+      },
+      {
+        "package": "packages/scene-schema",
+        "passed": 27,
+        "skipped": 0
+      },
+      {
+        "package": "packages/cesium-measure",
+        "passed": 4,
+        "skipped": 0
+      },
+      {
+        "package": "packages/cesium-tileset-effects",
+        "passed": 8,
+        "skipped": 0
+      },
+      {
+        "package": "packages/cesium-layer",
+        "passed": 39,
+        "skipped": 0
+      },
+      {
+        "package": "packages/ol-scene-runtime",
+        "passed": 47,
+        "skipped": 0
+      },
+      {
+        "package": "packages/gis-core",
+        "passed": 88,
+        "skipped": 0
+      },
+      {
+        "package": "packages/scene-core",
+        "passed": 44,
+        "skipped": 0
+      },
+      {
+        "package": "packages/cesium-tileset-edit",
+        "passed": 8,
+        "skipped": 0
+      },
+      {
+        "package": "packages/cesium-effects",
+        "passed": 2,
+        "skipped": 0
+      },
+      {
+        "package": "packages/scene-codegen",
+        "passed": 11,
+        "skipped": 0
+      },
+      {
+        "package": "packages/vector-io",
+        "passed": 49,
+        "skipped": 0
+      },
+      {
+        "package": "packages/scene-publisher",
+        "passed": 8,
+        "skipped": 0
+      },
+      {
+        "package": "packages/ol-runtime",
+        "passed": 33,
+        "skipped": 0
+      },
+      {
+        "package": "packages/cesium-scene-runtime",
+        "passed": 42,
+        "skipped": 0
+      },
+      {
+        "package": "apps/desktop",
+        "passed": 398,
+        "skipped": 5
+      }
+    ],
+    "sourceLogSha256": "63cc9d0997606351803ca634977782c8017beb8c10b9b39d4a0720708c6612dc"
+  },
+  "build": {
+    "fullWorkspaceExitCode": 0,
+    "finalCodegenExitCode": 0,
+    "finalDesktopExitCode": 0,
+    "warnings": [
+      "Large output chunks",
+      "Tauri static and dynamic import overlap"
+    ]
+  },
+  "browser": {
+    "command": "pnpm --filter @desktop-webgis/desktop test:e2e:scene-editor",
+    "exitCode": 0,
+    "passed": 28,
+    "viewports": [
+      "1440x900",
+      "1024x680"
+    ],
+    "log": "browser-regression.txt"
+  },
+  "standaloneExport": {
+    "exitCode": 0,
+    "passed": 2,
+    "viewports": [
+      "1440x900",
+      "1024x680"
+    ],
+    "webgl2": true,
+    "log": "native-export.txt"
+  },
+  "native": {
+    "command": "pnpm --filter @desktop-webgis/desktop test:native-scene-editor",
+    "exitCode": 0,
+    "scenariosPassed": 9,
+    "report": "native-report.json",
+    "reportSha256": "44f6b10e7f508e876ae080a88bf06ac5d6bd81f38802a9fa8b33b71df21533e9"
+  },
+  "outstanding": [
+    "Production photogrammetry, large models, imagery and terrain datasets",
+    "Native OS file chooser",
+    "Windows system scaling at 125 percent",
+    "User interface and interaction acceptance",
+    "Imagery, Model and Scene descriptor expansion beyond Tileset pilot",
+    "Legacy workspace-state E2E expectations for previous 2D style draft UI"
+  ]
+}

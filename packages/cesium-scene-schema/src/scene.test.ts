@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createCesiumScene, createTransform, isSceneResourceUrl, parseCesiumScene, validateCesiumScene } from './index'
+import { createCesiumScene, createTransform, isSceneResourceUrl, parseCesiumScene, TILESET_PARAMETER_DESCRIPTORS, validateCesiumScene } from './index'
 
 describe('3D scene contract', () => {
   it('accepts a detached 3D scene with a georeferenced tileset', () => {
@@ -10,6 +10,20 @@ describe('3D scene contract', () => {
     expect(result).toEqual(scene)
     result.nodes[0].name = 'Changed'
     expect(scene.nodes[0].name).toBe('City')
+  })
+  it('preserves native tileset style JSON and validates only its JSON contract', () => {
+    const scene = createCesiumScene(); scene.assets.city = { type: '3dtiles', url: './city/tileset.json' }
+    const style = { color: 'color("red")', customExpression: { future: [1, true, null] } }
+    scene.nodes.push({ id: 'city', name: 'City', visible: true, type: '3dtiles', asset: 'city', transform: createTransform(), style, maximumScreenSpaceError: 0, cacheBytes: 0, dynamicScreenSpaceErrorDensity: 0 })
+    expect(parseCesiumScene(JSON.stringify(scene)).nodes[0]).toMatchObject({ style, maximumScreenSpaceError: 0, cacheBytes: 0 })
+    const invalid = structuredClone(scene) as typeof scene
+    if (invalid.nodes[0].type === '3dtiles') invalid.nodes[0].style = { bad: undefined }
+    expect(validateCesiumScene(invalid).some(issue => issue.path === '$.nodes[0].style')).toBe(true)
+  })
+  it('publishes the explicit initial Tileset parameter coverage contract', () => {
+    expect(new Set(TILESET_PARAMETER_DESCRIPTORS.map(item => item.lifecycle))).toEqual(new Set(['runtime', 'recreate', 'readonly', 'action']))
+    expect(TILESET_PARAMETER_DESCRIPTORS.filter(item => item.lifecycle === 'runtime' && item.kind !== 'json').every(item => item.validate(item.defaultValue))).toBe(true)
+    expect(TILESET_PARAMETER_DESCRIPTORS.find(item => item.apiName === 'url')?.validate('javascript:alert(1)')).toBe(false)
   })
   it('reports duplicate IDs, mismatched assets and invalid transforms', () => {
     const scene = createCesiumScene()

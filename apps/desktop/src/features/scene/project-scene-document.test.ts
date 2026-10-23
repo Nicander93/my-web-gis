@@ -33,6 +33,19 @@ function snapshot(): ProjectSnapshot {
 }
 
 describe('full project scene content', () => {
+  it('preserves native tileset style and parameter overrides through project save and v3 projection', () => {
+    const input = snapshot()
+    const node = input.project.city!.nodes[0]
+    if (node.type !== '3dtiles') throw new Error('Expected tileset fixture')
+    Object.assign(node, { style: { defines: { height: '${Height}' }, color: { conditions: [['${height} > 30', 'color("red")'], ['true', 'color("white")']] }, meta: { label: '${name}' } }, cacheBytes: 134217728, dynamicScreenSpaceError: false, dynamicScreenSpaceErrorDensity: .0005, dynamicScreenSpaceErrorFactor: 12, skipLevelOfDetail: true })
+    const saved = parseProjectSnapshot(serializeProjectSnapshot(input))
+    const document = createProjectSceneDocument(saved)
+    const projected = document.nodes.find(item => item.name === node.name)
+    expect(projected).toMatchObject({ style: node.style, cacheBytes: node.cacheBytes, dynamicScreenSpaceError: false, dynamicScreenSpaceErrorDensity: .0005, dynamicScreenSpaceErrorFactor: 12, skipLevelOfDetail: true })
+    const restored = createProjectFromSceneDocument(JSON.stringify(document))
+    expect(restored.project.city!.nodes.find(item => item.name === node.name)).toMatchObject({ style: node.style, cacheBytes: node.cacheBytes, dynamicScreenSpaceError: false, dynamicScreenSpaceErrorDensity: .0005, dynamicScreenSpaceErrorFactor: 12, skipLevelOfDetail: true })
+    expect(createProjectSceneDocument(restored)).toEqual(document)
+  })
   it('round trips standard drawing expressions and shared-source binding IDs through a required scene extension', () => {
     const input = snapshot()
     input.project = prepareProjectContent(input.project)

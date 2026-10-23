@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EntityCollection, JulianDate } from 'cesium'
 import type { Viewer } from 'cesium'
 import { createCesiumScene, createTransform } from '@desktop-webgis/cesium-scene-schema'
-import { CesiumSceneRuntime, createCesiumDocumentRuntime } from './index'
+import { CesiumSceneRuntime, createCesiumDocumentRuntime, validateCesiumTilesetStyle } from './index'
 import { migrateSceneDocument } from '@desktop-webgis/scene-schema'
 
 const probe = vi.hoisted(() => ({ created: 0, released: 0, nativeGate: undefined as Promise<void> | undefined, editors: [] as Array<{ stopEditing: ReturnType<typeof vi.fn>; cancel: ReturnType<typeof vi.fn> }> }))
@@ -45,6 +45,38 @@ function setup() {
   return { scene, viewer, runtime: new CesiumSceneRuntime(viewer, { target: 'map', scene }) }
 }
 describe('v3 document updates', () => {
+  it('previews removal of an optional tileset style and restores its saved definition on cancel', async () => {
+    const s = setup()
+    const node = s.scene.nodes[0]
+    if (node.type !== '3dtiles') throw new Error('Expected tileset')
+    node.style = { color: 'color("red")' }
+    await s.runtime.updateScene(s.scene)
+    const layer = s.runtime.layers.getLayer(node.id)! as import('@desktop-webgis/cesium-layer').TilesetLayer
+    const setStyle = vi.spyOn(layer, 'setStyle')
+    const { style: _previous, ...draft } = node
+    s.runtime.previewNode(node.id, draft)
+    expect(setStyle).toHaveBeenLastCalledWith(undefined)
+    expect(node.style).toEqual({ color: 'color("red")' })
+    s.runtime.previewNode(node.id, null)
+    expect(setStyle).toHaveBeenLastCalledWith(node.style)
+    s.runtime.destroy()
+  })
+  it('rejects invalid style before applying any other part of a mixed property preview', async () => {
+    const s = setup(); await s.runtime.updateScene(s.scene)
+    const layer = s.runtime.layers.getLayer('blocks')! as import('@desktop-webgis/cesium-layer').TilesetLayer
+    const base = structuredClone(s.scene.nodes[0])
+    if (base.type !== '3dtiles') throw new Error('Expected tileset')
+    const before = { name: layer.name, show: layer.show, transform: layer.getTransform() }
+    const quality = vi.spyOn(layer, 'setQuality')
+    expect(() => s.runtime.previewNode(base.id, { ...base, name: 'Invalid draft', visible: false, transform: { ...base.transform, translation: [100, 0, 0] }, maximumScreenSpaceError: 1, style: { color: 'color(' } })).toThrow()
+    expect({ name: layer.name, show: layer.show, transform: layer.getTransform() }).toEqual(before)
+    expect(quality).not.toHaveBeenCalled()
+    s.runtime.destroy()
+  })
+  it('validates native style candidates before they enter the runtime document', () => {
+    expect(validateCesiumTilesetStyle({ color: 'color("red")', future: { preserved: true } })).toEqual({ valid: true })
+    expect(validateCesiumTilesetStyle({ color: undefined })).toMatchObject({ valid: false })
+  })
   it('previews native transforms without changing the applied scene and restores the latest update', async () => {
     const s = setup()
     await s.runtime.updateScene(s.scene)
