@@ -1,3 +1,11 @@
+import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
+import { layerConfigurationQueries } from '@/session/layer-configuration-query'
+import { layerContentCommands } from '@/commands/layer-content.commands'
+import { projectSession } from '@/session/project-session'
+import { projectEdits } from '@/session/project-edits'
+import { featureData } from '@/data/feature-data'
+import { selectionCommands } from '@/commands/selection.commands'
+import { requireMapContent } from '@desktop-webgis/project'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createProject,
@@ -7,11 +15,11 @@ import {
   parseProjectSnapshot,
   serializeProjectSnapshot,
   type GisFeature
-} from '@desktop-webgis/gis-core'
-import { useProjectStore } from '@/stores/project.store'
-import { useSessionStore } from '@/stores/session.store'
-import { getLayerCapabilities, layerCommands } from '@/app/commands/layer.commands'
-import { registerExportDataCallback } from '@/app/commands/project.commands'
+} from '@desktop-webgis/project'
+import { useProjectStore } from '@/session/project.store'
+import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { getLayerCapabilities, layerCommands } from '@/commands/layer.commands'
+import { registerExportDataCallback } from '@/commands/project.commands'
 
 function feat(id: string): GisFeature {
   return {
@@ -22,17 +30,10 @@ function feat(id: string): GisFeature {
 }
 
 function resetStores(): void {
-  useProjectStore.getState()._resetAttributeHistoryForTests()
+  projectEdits.clear()
   layerCommands._resetStyleHistoryForTests()
-  useSessionStore.setState({ sessions: {} })
-  useProjectStore.setState({
-    project: createProject('P14 test'),
-    featuresByDataset: {},
-    dirty: false,
-    selectedLayerId: null,
-    selection: { layerId: null, featureIds: [] },
-    lastSelectionCountAfterFilter: null
-  })
+  useLayerViewStore.setState({ sessions: {} })
+  useProjectStore.setState({ project: createProject('P14 test'), dirty: false }); featureData.replaceAll({}); useLayerViewStore.setState({ selectedLayerId: null, selection: { layerId: null, featureIds: [] }, lastSelectionCountAfterFilter: null })
 }
 
 describe('P14 layer context menu / groups', () => {
@@ -41,66 +42,66 @@ describe('P14 layer context menu / groups', () => {
   })
   it('undoes nested folder moves, inherited locks, dissolution and subtree deletion atomically', () => {
     const state = useProjectStore.getState()
-    state.addLayer('nested-data', 'Nested layer', [feat('nested')], 'point')
-    const id = useProjectStore.getState().project.layers[0].id
-    const outer = state.createGroup('Outer')!, inner = state.createGroup('Inner', [id], outer)!
-    expect(useProjectStore.getState().project.groups.find(group => group.id === inner)?.parentId).toBe(outer)
-    state.setGroupLocked(outer, true)
+    layerContentCommands.addLayer('nested-data', 'Nested layer', [feat('nested')], 'point')
+    const id = requireMapContent(useProjectStore.getState().project).layers[0].id
+    const outer = layerConfigurationCommands.createGroup('Outer')!, inner = layerConfigurationCommands.createGroup('Inner', [id], outer)!
+    expect(requireMapContent(useProjectStore.getState().project).groups.find(group => group.id === inner)?.parentId).toBe(outer)
+    layerConfigurationCommands.setGroupLocked(outer, true)
     expect(getLayerCapabilities(id).canEditGeometry).toBe(false)
-    expect(() => state.relocateGroup(inner)).toThrow('锁定')
-    state.undoEdit()
+    expect(() => layerConfigurationCommands.relocateGroup(inner)).toThrow('锁定')
+    projectEdits.undo()
     expect(getLayerCapabilities(id).canEditGeometry).toBe(true)
-    const before = useProjectStore.getState().getSnapshot()
-    expect(() => state.relocateGroup(outer, inner)).toThrow('后代')
-    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
-    state.removeGroup(outer, true)
-    expect(useProjectStore.getState().project.layers).toHaveLength(0)
-    state.undoEdit()
-    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
-    state.removeGroup(outer, false)
-    expect(useProjectStore.getState().project.groups.find(group => group.id === inner)?.parentId).toBeUndefined()
-    state.undoEdit()
-    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
+    const before = projectSession.getSnapshot()
+    expect(() => layerConfigurationCommands.relocateGroup(outer, inner)).toThrow('后代')
+    expect(projectSession.getSnapshot()).toEqual(before)
+    layerContentCommands.removeGroup(outer, true)
+    expect(requireMapContent(useProjectStore.getState().project).layers).toHaveLength(0)
+    projectEdits.undo()
+    expect(projectSession.getSnapshot()).toEqual(before)
+    layerContentCommands.removeGroup(outer, false)
+    expect(requireMapContent(useProjectStore.getState().project).groups.find(group => group.id === inner)?.parentId).toBeUndefined()
+    projectEdits.undo()
+    expect(projectSession.getSnapshot()).toEqual(before)
   })
 
   it('persists visibility and order across serialize/parse', () => {
     const store = useProjectStore.getState()
-    store.addLayer('ds-a', 'A', [feat('a1')], 'point')
-    store.addLayer('ds-b', 'B', [feat('b1')], 'point')
-    store.addLayer('ds-c', 'C', [feat('c1')], 'point')
-    const ids = useProjectStore.getState().project.layers.map((l) => l.id)
+    layerContentCommands.addLayer('ds-a', 'A', [feat('a1')], 'point')
+    layerContentCommands.addLayer('ds-b', 'B', [feat('b1')], 'point')
+    layerContentCommands.addLayer('ds-c', 'C', [feat('c1')], 'point')
+    const ids = requireMapContent(useProjectStore.getState().project).layers.map((l) => l.id)
     const [a, b, c] = ids
-    useProjectStore.getState().setLayerVisible(b!, false)
-    useProjectStore.getState().createGroup('G', [b!, c!])
+    layerConfigurationCommands.setLayerVisible(b!, false)
+    layerConfigurationCommands.createGroup('G', [b!, c!])
     // createGroup prepends the group; move ungrouped A below by moving group stays first.
     const snap = {
       project: useProjectStore.getState().project,
-      featuresByDataset: useProjectStore.getState().featuresByDataset
+      featuresByDataset: featureData.readSnapshot()
     }
     const restored = parseProjectSnapshot(serializeProjectSnapshot(snap)).project
     expect(flattenLayerIds(restored)).toEqual([b, c, a])
-    expect(restored.layers.find((l) => l.id === b)?.visible).toBe(false)
+    expect(requireMapContent(restored).layers.find((l) => l.id === b)?.visible).toBe(false)
     expect(getEffectiveVisible(restored, b!)).toBe(false)
-    expect((restored.groups ?? [])).toHaveLength(1)
-    expect(restored.groups[0]?.layerIds).toEqual([b, c])
+    expect((requireMapContent(restored).groups ?? [])).toHaveLength(1)
+    expect(requireMapContent(restored).groups[0]?.layerIds).toEqual([b, c])
   })
 
   it('group hide preserves child visible and restores effective visibility', () => {
     const store = useProjectStore.getState()
-    store.addLayer('ds-a', 'A', [feat('a1')], 'point')
-    store.addLayer('ds-b', 'B', [feat('b1')], 'point')
-    const [a, b] = useProjectStore.getState().project.layers.map((l) => l.id)
-    useProjectStore.getState().setLayerVisible(b!, false)
-    const groupId = useProjectStore.getState().createGroup('G', [a!, b!])!
-    useProjectStore.getState().setGroupVisible(groupId, false)
+    layerContentCommands.addLayer('ds-a', 'A', [feat('a1')], 'point')
+    layerContentCommands.addLayer('ds-b', 'B', [feat('b1')], 'point')
+    const [a, b] = requireMapContent(useProjectStore.getState().project).layers.map((l) => l.id)
+    layerConfigurationCommands.setLayerVisible(b!, false)
+    const groupId = layerConfigurationCommands.createGroup('G', [a!, b!])!
+    layerConfigurationCommands.setGroupVisible(groupId, false)
 
     let project = useProjectStore.getState().project
-    expect(project.layers.find((l) => l.id === a)?.visible).toBe(true)
-    expect(project.layers.find((l) => l.id === b)?.visible).toBe(false)
+    expect(requireMapContent(project).layers.find((l) => l.id === a)?.visible).toBe(true)
+    expect(requireMapContent(project).layers.find((l) => l.id === b)?.visible).toBe(false)
     expect(getEffectiveVisible(project, a!)).toBe(false)
     expect(getEffectiveVisible(project, b!)).toBe(false)
 
-    useProjectStore.getState().setGroupVisible(groupId, true)
+    layerConfigurationCommands.setGroupVisible(groupId, true)
     project = useProjectStore.getState().project
     expect(getEffectiveVisible(project, a!)).toBe(true)
     expect(getEffectiveVisible(project, b!)).toBe(false)
@@ -108,57 +109,57 @@ describe('P14 layer context menu / groups', () => {
 
   it('getMapLayers list order matches flatten; list top is first', () => {
     const store = useProjectStore.getState()
-    store.addLayer('ds-a', 'A', [feat('a1')], 'point')
-    store.addLayer('ds-b', 'B', [feat('b1')], 'point')
-    const [a, b] = useProjectStore.getState().project.layers.map((l) => l.id)
-    useProjectStore.getState().moveLayer(b!, 'up')
-    const mapLayers = useProjectStore.getState().getMapLayers()
+    layerContentCommands.addLayer('ds-a', 'A', [feat('a1')], 'point')
+    layerContentCommands.addLayer('ds-b', 'B', [feat('b1')], 'point')
+    const [a, b] = requireMapContent(useProjectStore.getState().project).layers.map((l) => l.id)
+    layerConfigurationCommands.moveLayer(b!, 'up')
+    const mapLayers = layerConfigurationQueries.getMapLayers()
     expect(mapLayers.map((l) => l.id)).toEqual([b, a])
     expect(flattenLayerIds(useProjectStore.getState().project)).toEqual([b, a])
   })
 
   it('removeLayer cleans selection, session draft, group refs, orphan dataset', () => {
     const store = useProjectStore.getState()
-    store.addLayer('ds-a', 'A', [feat('a1'), feat('a2')], 'point')
-    const layerId = useProjectStore.getState().selectedLayerId!
-    useProjectStore.getState().setSelection({ layerId, featureIds: ['a1'] })
-    useSessionStore.getState().setLayerLoading(layerId, true)
-    useSessionStore.getState().setInspectorTab(layerId, 'style')
-    const groupId = useProjectStore.getState().createGroup('G', [layerId])!
+    layerContentCommands.addLayer('ds-a', 'A', [feat('a1'), feat('a2')], 'point')
+    const layerId = useLayerViewStore.getState().selectedLayerId!
+    selectionCommands.setSelection({ layerId, featureIds: ['a1'] })
+    useLayerViewStore.getState().setLayerLoading(layerId, true)
+    useLayerViewStore.getState().setInspectorTab(layerId, 'style')
+    const groupId = layerConfigurationCommands.createGroup('G', [layerId])!
 
-    const ok = useProjectStore.getState().removeLayer(layerId)
+    const ok = layerContentCommands.removeLayer(layerId)
     expect(ok).toBe(true)
-    const state = useProjectStore.getState()
-    expect(state.project.layers).toHaveLength(0)
-    expect(state.project.datasets).toHaveLength(0)
-    expect(state.featuresByDataset).toEqual({})
-    expect(state.selection).toEqual({ layerId: null, featureIds: [] })
-    expect(state.selectedLayerId).toBeNull()
-    expect(useSessionStore.getState().sessions[layerId]).toBeUndefined()
-    expect((state.project.groups ?? []).find((g) => g.id === groupId)?.layerIds ?? []).toEqual([])
+    const state = useProjectStore.getState(), stateFeatureData = featureData.readSnapshot()
+    expect(requireMapContent(state.project).layers).toHaveLength(0)
+    expect(requireMapContent(state.project).datasets).toHaveLength(0)
+    expect(stateFeatureData).toEqual({})
+    expect(useLayerViewStore.getState().selection).toEqual({ layerId: null, featureIds: [] })
+    expect(useLayerViewStore.getState().selectedLayerId).toBeNull()
+    expect(useLayerViewStore.getState().sessions[layerId]).toBeUndefined()
+    expect((requireMapContent(state.project).groups ?? []).find((g) => g.id === groupId)?.layerIds ?? []).toEqual([])
   })
 
   it('removeGroup keepChildren vs removeChildren', () => {
     const store = useProjectStore.getState()
-    store.addLayer('ds-a', 'A', [feat('a1')], 'point')
-    store.addLayer('ds-b', 'B', [feat('b1')], 'point')
-    const [a, b] = useProjectStore.getState().project.layers.map((l) => l.id)
-    const groupId = useProjectStore.getState().createGroup('G', [a!, b!])!
+    layerContentCommands.addLayer('ds-a', 'A', [feat('a1')], 'point')
+    layerContentCommands.addLayer('ds-b', 'B', [feat('b1')], 'point')
+    const [a, b] = requireMapContent(useProjectStore.getState().project).layers.map((l) => l.id)
+    const groupId = layerConfigurationCommands.createGroup('G', [a!, b!])!
 
-    useProjectStore.getState().removeGroup(groupId, false)
-    expect(useProjectStore.getState().project.groups).toHaveLength(0)
+    layerContentCommands.removeGroup(groupId, false)
+    expect(requireMapContent(useProjectStore.getState().project).groups).toHaveLength(0)
     expect(flattenLayerIds(useProjectStore.getState().project).sort()).toEqual([a, b].sort())
 
-    const g2 = useProjectStore.getState().createGroup('G2', [a!, b!])!
-    useProjectStore.getState().removeGroup(g2, true)
-    expect(useProjectStore.getState().project.layers).toHaveLength(0)
+    const g2 = layerConfigurationCommands.createGroup('G2', [a!, b!])!
+    layerContentCommands.removeGroup(g2, true)
+    expect(requireMapContent(useProjectStore.getState().project).layers).toHaveLength(0)
   })
 
   it('capabilities gate non-existent layers', () => {
     expect(getLayerCapabilities(null).canExport).toBe(false)
     expect(getLayerCapabilities('missing').exists).toBe(false)
-    useProjectStore.getState().addLayer('ds-a', 'A', [feat('a1')], 'point')
-    const id = useProjectStore.getState().selectedLayerId!
+    layerContentCommands.addLayer('ds-a', 'A', [feat('a1')], 'point')
+    const id = useLayerViewStore.getState().selectedLayerId!
     const caps = getLayerCapabilities(id)
     expect(caps.canStyle).toBe(true)
     expect(caps.canExport).toBe(true)
@@ -173,8 +174,8 @@ describe('P14 layer context menu / groups', () => {
         calls.push({ layerId, mode })
       }
     })
-    useProjectStore.getState().addLayer('ds-a', 'A', [feat('a1')], 'point')
-    const id = useProjectStore.getState().selectedLayerId!
+    layerContentCommands.addLayer('ds-a', 'A', [feat('a1')], 'point')
+    const id = useLayerViewStore.getState().selectedLayerId!
     layerCommands.export(id)
     layerCommands.copyToLocalLayer(id)
     expect(calls).toEqual([
@@ -185,8 +186,8 @@ describe('P14 layer context menu / groups', () => {
 
   it('normalizeLayerTree drops stale refs', () => {
     let project = createProject('x')
-    project.layers = []
-    project.groups = [
+    requireMapContent(project).layers = []
+    requireMapContent(project).groups = [
       {
         id: 'g1',
         name: 'G',
@@ -194,9 +195,9 @@ describe('P14 layer context menu / groups', () => {
         layerIds: ['ghost']
       }
     ]
-    project.rootOrder = [{ type: 'group', id: 'g1' }, { type: 'layer', id: 'ghost' }]
+    requireMapContent(project).rootOrder = [{ type: 'group', id: 'g1' }, { type: 'layer', id: 'ghost' }]
     project = normalizeLayerTree(project)
-    expect((project.groups ?? [])[0]?.layerIds).toEqual([])
-    expect(project.rootOrder).toEqual([{ type: 'group', id: 'g1' }])
+    expect((requireMapContent(project).groups ?? [])[0]?.layerIds).toEqual([])
+    expect(requireMapContent(project).rootOrder).toEqual([{ type: 'group', id: 'g1' }])
   })
 })

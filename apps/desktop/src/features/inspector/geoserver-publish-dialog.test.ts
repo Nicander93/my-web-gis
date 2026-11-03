@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { CartographyState } from '@desktop-webgis/gis-core'
+import type { CartographyState } from '@desktop-webgis/project'
 import { collectGeoServerFieldReferences, getGeoServerStyleFormatOptions, getRemoteStylePublishCopy, inferGeoServerFieldTypes } from './GeoServerPublishDialog.js'
 
 describe('GeoServer publishing preflight helpers', () => {

@@ -9,9 +9,13 @@ import { verifyNativeLayout, verifyNativeSimplification } from './native-layout-
 import { verifyNativeTitlebar } from './native-titlebar-checks.mjs'
 import { verifyNativeUx } from './native-ux-checks.mjs'
 import { verifyNativeSceneEditor, verifyNativeSceneEditorReopen } from './native-scene-editor-checks.mjs'
+import { verifyNativeDatasetStorage } from './native-dataset-storage-checks.mjs'
 
 const desktop = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const tauri = join(desktop, 'src-tauri')
+const tauri = process.env.DESKTOP_WEBGIS_NATIVE_TEST_TAURI_DIR ? resolve(process.env.DESKTOP_WEBGIS_NATIVE_TEST_TAURI_DIR) : join(desktop, 'src-tauri')
+const cargoTarget = process.env.CARGO_TARGET_DIR ? resolve(tauri, process.env.CARGO_TARGET_DIR) : join(tauri, 'target')
+const cargoBin = process.env.DESKTOP_WEBGIS_NATIVE_TEST_BINARY ?? 'desktop-webgis'
+assert.match(cargoBin, /^[a-zA-Z0-9_-]+$/)
 const runId = Date.now().toString()
 const uxOnly = process.argv.includes('--ux')
 const identifier = `com.desktop-webgis.${uxOnly ? 'native-ux' : 'resource-acceptance'}-${runId}`
@@ -98,13 +102,18 @@ async function launch() {
     return !!page
   }, 'Native application page did not load')
   page.setDefaultTimeout(30_000)
-  page.on('response', response => {
-    const resource = new URL(response.url())
+  const recordResource = (url, status, channel) => {
+    const resource = new URL(url)
     if (resource.hostname !== 'webgis-resource.localhost') return
-    oldResourceUrl ??= response.url()
+    oldResourceUrl ??= url
     // The ephemeral directory key is deliberately excluded from persisted evidence.
-    report.resourceResponses.push({ path: decodeURIComponent(resource.pathname.split('/').slice(2).join('/')), status: response.status() })
-  })
+    report.resourceResponses.push({ path: decodeURIComponent(resource.pathname.split('/').slice(2).join('/')), status, channel })
+  }
+  page.on('response', response => recordResource(response.url(), response.status(), 'playwright'))
+  // WebView2 custom-protocol responses can be omitted from Playwright's page events.
+  const network = await context.newCDPSession(page)
+  network.on('Network.responseReceived', ({ response }) => recordResource(response.url, response.status, 'cdp'))
+  await network.send('Network.enable')
   await page.route('**/*tile.openstreetmap.org/**', (route) => route.abort())
   const identity = await page.evaluate(async () => {
     const core = await import('/node_modules/@tauri-apps/api/core.js')
@@ -137,7 +146,7 @@ async function waitForSceneView() {
   if (await page.locator('.scene3d-canvas__viewport canvas').count()) {
     let previous, stable = 0
     await poll(async () => {
-      const camera = await page.evaluate(async () => (await import('/src/features/scene3d/scene3d-runtime-host.ts')).getLiveSceneCamera())
+      const camera = await page.evaluate(async () => (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneCamera())
       const values = camera && [...camera.position, camera.heading, camera.pitch, camera.roll]
       if (values && previous && values.every((value, index) => Math.abs(value - previous[index]) < (index === 2 ? 1e-5 : 1e-8))) stable++
       else stable = 0
@@ -148,7 +157,7 @@ async function waitForSceneView() {
 }
 async function saveTo(path) {
   await waitForSceneView()
-  await page.evaluate(async (file) => (await import('/src/services/project-io.ts')).setCurrentProjectPath(file), path)
+  await page.evaluate(async (file) => (await import('/src/session/project-io.ts')).setCurrentProjectPath(file), path)
   await page.getByRole('button', { name: '保存项目', exact: true }).click()
   await expect(page.locator('.project-dirty')).toHaveCount(0)
   await poll(async () => (await entries()).length === 0, 'Native save did not clear the acknowledged recovery draft')
@@ -159,9 +168,9 @@ async function ready(name, label = '模型') {
   const row = page.locator('.scene3d-layer-row').filter({ hasText: name })
   await expect(row.locator('small')).toHaveText(label, { timeout: 60_000 })
   const diagnostics = await page.evaluate(async (name) => {
-    const state = (await import('/src/stores/project.store.ts')).useProjectStore.getState()
-    const node = state.project.city.nodes.find(node => node.name === name)
-    return (await import('/src/features/scene3d/scene3d-runtime-host.ts')).getLiveSceneDiagnostics(node.id)
+    const state = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+    const node = state.project.content.scene.nodes.find(node => node.name === name)
+    return (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneDiagnostics(node.id)
   }, name)
   assert.ok(diagnostics.presentation, 'Native resource must have a loaded layer')
   if (label === '模型') assert.ok(diagnostics.presentation.position, 'Native model must have a loaded model matrix')
@@ -193,9 +202,9 @@ try {
   if (process.argv.includes('--scene-editor')) config.app.security = { capabilities: ['default', { identifier: 'scene-editor-acceptance', windows: ['main'], permissions: ['core:window:allow-set-size'] }] }
   report.requestedWindow = config.app.windows[0]
   await writeFile(join(output, 'tauri-config.json'), JSON.stringify(config, null, 2))
-  const build = start(['cargo', 'build', '--bin', 'desktop-webgis', '--locked'], tauri, { ...process.env, TAURI_CONFIG: JSON.stringify(config) })
+  const build = start(['cargo', 'build', '--bin', cargoBin, '--locked'], tauri, { ...process.env, TAURI_CONFIG: JSON.stringify(config) })
   assert.equal(await finished(build), 0)
-  await copyFile(join(tauri, 'target', 'debug', 'desktop-webgis.exe'), join(output, 'desktop-webgis.exe'))
+  await copyFile(join(cargoTarget, 'debug', `${cargoBin}.exe`), join(output, 'desktop-webgis.exe'))
   const source = join(output, '原始资源 #%', '模型.gltf')
   const relocated = join(output, '迁移资源 #%', '模型.gltf')
   const binary = await readFile(resolve(desktop, '../../examples/city-3d/city-sample/tower.glb'))
@@ -240,7 +249,9 @@ try {
   server = start(['pnpm', 'dev', '--port', String(serverPort), '--strictPort'], desktop)
   await poll(() => available(serverPort), 'Owned Vite server did not start')
   await launch()
-  if (uxOnly) {
+  if (process.argv.includes('--dataset-storage')) {
+    await verifyNativeDatasetStorage(page, report, output, saveTo, async () => { await crash(); await launch(); return page })
+  } else if (uxOnly) {
     await verifyNativeUx(page, report)
   } else if (titlebarOnly) {
     await verifyNativeTitlebar(page, report)
@@ -260,7 +271,7 @@ try {
   await dialog.getByRole('button', { name: '取消', exact: true }).click()
   // Assigned fixture paths exercise native IPC and the production runtime, not the OS picker.
   await page.evaluate(async ({ source, projectPath }) => {
-    (await import('/src/services/project-io.ts')).setCurrentProjectPath(projectPath)
+    (await import('/src/session/project-io.ts')).setCurrentProjectPath(projectPath)
     const commands = await import('/src/features/scene3d/scene3d-commands.ts')
     commands.addSceneAsset('model', { kind: 'absolute', path: source }, 'Native external GLTF')
     const directory = source.slice(0, source.lastIndexOf('/'))
@@ -283,20 +294,22 @@ try {
   await saveTo(projectPath)
   await expect(page.locator('.project-dirty')).toHaveCount(0)
   const saved = JSON.parse(await readFile(projectPath, 'utf8'))
-  const asset = Object.values(saved.project.city.assets).find(asset => asset.reference)
+  const asset = Object.values(saved.project.content.scene.assets).find(asset => asset.reference)
   assert.equal(asset.reference.kind, 'relative')
   assert.equal(asset.url, undefined)
-  assert.equal(Object.values(saved.project.city.assets).filter(asset => asset.reference?.kind === 'relative' && !asset.url).length, 3)
+  assert.equal(Object.values(saved.project.content.scene.assets).filter(asset => asset.reference?.kind === 'relative' && !asset.url).length, 3)
   const reopenedResponses = report.resourceResponses.length
   await crash(); await launch()
   assert.ok(oldResourceUrl)
   assert.equal(await page.evaluate(async url => (await fetch(url)).status, oldResourceUrl), 403, 'A previous process directory lease must not survive restart')
   await page.evaluate(async path => {
-    const text = await (await import('/src/services/files.ts')).readTextFile(path)
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+
+    const text = await (await import('/src/platform/files.ts')).readTextFile(path)
     const snapshot = JSON.parse(text)
-    const resolved = (await import('/src/services/project-resource-references.ts')).resolveProjectResourceReferences(snapshot, path)
-    ;(await import('/src/stores/project.store.ts')).useProjectStore.getState().loadSnapshot(resolved)
-    ;(await import('/src/services/project-io.ts')).setCurrentProjectPath(path)
+    const resolved = (await import('/src/session/project-resource-references.ts')).resolveProjectResourceReferences(snapshot, path)
+    ;projectSession.loadSnapshot(resolved)
+    ;(await import('/src/session/project-io.ts')).setCurrentProjectPath(path)
   }, projectPath)
   await readyResources()
   await dependencies('原始资源 #%', reopenedResponses)
@@ -314,9 +327,9 @@ try {
   await poll(async () => report.resourceResponses.some(item => item.path.includes('迁移资源 #%/几何.bin') && item.status === 200), 'Relocated external geometry must load from the new directory')
   await poll(async () => report.resourceResponses.some(item => item.path.includes('迁移资源 #%/纹理.png') && item.status === 200), 'Relocated texture must load from the new directory')
   const changed = await saveTo(projectPath)
-  const changedAsset = Object.values(changed.project.city.assets).find(asset => asset.reference)
+  const changedAsset = Object.values(changed.project.content.scene.assets).find(asset => asset.reference)
   assert.ok(changedAsset.reference.path.includes('迁移资源 #%'))
-  assert.deepEqual(changed.project.city.nodes, saved.project.city.nodes)
+  assert.deepEqual(changed.project.content.scene.nodes, saved.project.content.scene.nodes)
   report.scenarios.push({ name: 'Native relocation loads external binary from new directory and persists the new relative path', passed: true })
   const tileRow = page.locator('.scene3d-layer-row').filter({ hasText: 'Native nested Tileset' })
   await tileRow.locator('.scene3d-layer-row__select').click({ button: 'right' })
@@ -332,37 +345,47 @@ try {
     await poll(async () => report.resourceResponses.slice(relocatedResponses).some(item => item.path === `迁移资源 #%/${file}` && item.status === 200), `Relocated resource dependency missing: ${file}`)
   }
   const relocatedSnapshot = await saveTo(projectPath)
-  assert.deepEqual(relocatedSnapshot.project.city.nodes, saved.project.city.nodes)
-  assert.ok(Object.values(relocatedSnapshot.project.city.assets).every(asset => asset.reference?.path.startsWith('迁移资源 #%/')))
+  assert.deepEqual(relocatedSnapshot.project.content.scene.nodes, saved.project.content.scene.nodes)
+  assert.ok(Object.values(relocatedSnapshot.project.content.scene.assets).every(asset => asset.reference?.path.startsWith('迁移资源 #%/')))
   report.scenarios.push({ name: 'Parent directory relocation updates exactly Tileset and GeoJSON; nested content actually reloads without duplicating datasource', passed: true })
   const anotherPath = join(output, '另存目录', '副本.webgis.json')
   await mkdir(dirname(anotherPath), { recursive: true })
   const previousBytes = await readFile(projectPath)
   const copy = await page.evaluate(async path => {
-    const state = (await import('/src/stores/project.store.ts')).useProjectStore.getState()
-    const io = await import('/src/services/project-io.ts')
-    const before = structuredClone(state.getSnapshot())
-    await io.saveSnapshotToPath(path, io.createSnapshotFromState(state.project, state.featuresByDataset))
-    return { before, after: state.getSnapshot(), currentPath: io.getCurrentProjectPath() }
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+
+    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/data/feature-data.ts').at(-1) ?? '/src/data/feature-data.ts')
+
+    const state = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+    const io = await import('/src/session/project-io.ts')
+    const before = structuredClone(projectSession.getSnapshot())
+    await io.saveSnapshotToPath(path, io.createSnapshotFromState(state.project, featureData.readSnapshot()))
+    return { before, after: projectSession.getSnapshot(), currentPath: io.getCurrentProjectPath() }
   }, anotherPath)
   assert.deepEqual(copy.after, copy.before)
   assert.equal(copy.currentPath, projectPath)
   assert.deepEqual(await readFile(projectPath), previousBytes)
   const copySnapshot = JSON.parse(await readFile(anotherPath, 'utf8'))
-  const copyAsset = Object.values(copySnapshot.project.city.assets).find(asset => asset.reference)
+  const copyAsset = Object.values(copySnapshot.project.content.scene.assets).find(asset => asset.reference)
   assert.equal(copyAsset.reference.kind, 'absolute', 'Files outside the new project directory remain explicit absolute references')
   assert.equal(copyAsset.reference.path, relocated.replaceAll('\\', '/'))
-  assert.equal(Object.values(copySnapshot.project.city.assets).filter(asset => asset.reference?.kind === 'absolute').length, 3)
+  assert.equal(Object.values(copySnapshot.project.content.scene.assets).filter(asset => asset.reference?.kind === 'absolute').length, 3)
   report.scenarios.push({ name: 'Cross-directory native snapshot save preserves working state, current file and original bytes; external reference rebased correctly', passed: true })
   // Opening a copied project must not silently authorize paths outside its directory.
   await page.evaluate(async ({ snapshot, path }) => {
-    (await import('/src/stores/project.store.ts')).useProjectStore.getState().loadSnapshot(snapshot)
-    ;(await import('/src/services/project-io.ts')).setCurrentProjectPath(path)
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+
+    projectSession.loadSnapshot(snapshot)
+    ;(await import('/src/session/project-io.ts')).setCurrentProjectPath(path)
   }, { snapshot: copySnapshot, path: anotherPath })
   await expect(page.locator('.scene3d-footer__state')).toHaveClass(/scene3d-footer__state--error/)
   const beforeAuthorization = await page.evaluate(async () => {
-    const state = (await import('/src/stores/project.store.ts')).useProjectStore.getState()
-    return { snapshot: state.getSnapshot(), dirty: state.dirty, canUndo: state.canUndoEdit(), canRedo: state.canRedoEdit() }
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+
+    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-edits.ts').at(-1) ?? '/src/session/project-edits.ts')
+
+    const state = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+    return { snapshot: projectSession.getSnapshot(), dirty: state.dirty, canUndo: projectEdits.canUndo(), canRedo: projectEdits.canRedo() }
   })
   await page.locator('.scene3d-layer-row').filter({ hasText: 'Native nested Tileset' }).locator('.scene3d-layer-row__select').click({ button: 'right' })
   await page.getByRole('menuitem', { name: '数据源', exact: true }).click()
@@ -375,8 +398,12 @@ try {
   await readyResources()
   await dependencies('', authorizationResponses)
   const afterAuthorization = await page.evaluate(async () => {
-    const state = (await import('/src/stores/project.store.ts')).useProjectStore.getState()
-    return { snapshot: state.getSnapshot(), dirty: state.dirty, canUndo: state.canUndoEdit(), canRedo: state.canRedoEdit() }
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+
+    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-edits.ts').at(-1) ?? '/src/session/project-edits.ts')
+
+    const state = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+    return { snapshot: projectSession.getSnapshot(), dirty: state.dirty, canUndo: projectEdits.canUndo(), canRedo: projectEdits.canRedo() }
   })
   assert.deepEqual(afterAuthorization, beforeAuthorization)
   report.scenarios.push({ name: 'Copied project rejects unauthorized external roots; explicit same-directory authorization reloads all resources without project/history changes', passed: true })
@@ -389,7 +416,7 @@ try {
   await browser?.close().catch(() => undefined)
   await forceStop(server).catch(error => { report.serverStopError = String(error); process.exitCode = 1 })
   const normalEnvironment = { ...process.env }; delete normalEnvironment.TAURI_CONFIG
-  const build = start(['cargo', 'build', '--bin', 'desktop-webgis', '--locked'], tauri, normalEnvironment)
+  const build = start(['cargo', 'build', '--bin', cargoBin, '--locked'], tauri, normalEnvironment)
   if (await finished(build) !== 0) { report.normalBuildError = 'Normal debug configuration restore failed'; process.exitCode = 1 }
   await writeFile(join(output, 'report.json'), JSON.stringify(report, null, 2))
   console.log(`[native-resources] evidence: ${output}`)

@@ -1,7 +1,10 @@
+import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
+import { useFeaturesByDataset } from '@/data/feature-data'
+import { requireMapContent } from '@desktop-webgis/project'
 import { useEffect, useMemo, useState } from 'react'
 import { Alert, AutoComplete, Button, ColorPicker, Input, InputNumber, Modal, Select, Space, Switch } from 'antd'
-import { createId, getEffectiveLocked, getLayerCartography } from '@desktop-webgis/gis-core'
-import type { CartographyState } from '@desktop-webgis/gis-core'
+import { createId, getEffectiveLocked, getLayerCartography } from '@desktop-webgis/project'
+import type { CartographyState } from '@desktop-webgis/project'
 import {
   createDrawingLayer,
   duplicateDrawingLayer,
@@ -12,9 +15,9 @@ import {
 } from '@desktop-webgis/ol-style/cartography-operations'
 import { validateMapLibreStyle } from '@desktop-webgis/ol-style/cartography'
 import type { MapLibreStyleSpecification } from '@desktop-webgis/ol-style/cartography'
-import { useProjectStore } from '@/stores/project.store'
+import { useProjectStore } from '@/session/project.store'
 import { listAttributeFields } from './style-draft'
-import { beginStyleInteraction, finishStyleInteraction } from './style-interaction'
+import { beginStyleInteraction, finishStyleInteraction } from '@/session/style-interaction'
 import { LineWidthEditor } from './LineWidthEditor'
 import './symbol-editor.css'
 
@@ -173,8 +176,8 @@ function advancedOptions(layer: StyleLayer): Array<{ value: string; label: strin
 
 export function SymbolEditor({ layerId, onClose, initialType, initialDrawingLayerId }: SymbolEditorProps) {
   const project = useProjectStore(state => state.project)
-  const featuresByDataset = useProjectStore(state => state.featuresByDataset)
-  const layer = project.layers.find(candidate => candidate.id === layerId)
+  const featuresByDataset = useFeaturesByDataset()
+  const layer = requireMapContent(project).layers.find(candidate => candidate.id === layerId)
   const fragment = getLayerCartography(project, layerId)
   const [selectedLayerId, setSelectedLayerId] = useState<string | undefined>(() => chooseInitialLayerId(fragment?.styleLayers, initialType, initialDrawingLayerId))
   const [message, setMessage] = useState<string | null>(null)
@@ -221,7 +224,7 @@ export function SymbolEditor({ layerId, onClose, initialType, initialDrawingLaye
   function writeLatest(build: (layers: StandardStyleLayers, currentFragment: NonNullable<typeof fragment>) => StandardStyleLayers, transactionProperty?: string): boolean {
     const state = useProjectStore.getState()
     const currentProject = state.project
-    if (!currentProject.layers.some(candidate => candidate.id === layerId)) {
+    if (!requireMapContent(currentProject).layers.some(candidate => candidate.id === layerId)) {
       setMessage('图层已删除，无法继续编辑。')
       return false
     }
@@ -236,7 +239,7 @@ export function SymbolEditor({ layerId, onClose, initialType, initialDrawingLaye
     }
     try {
       const next = build(currentFragment.styleLayers, currentFragment)
-      state.setLayerCartography(layerId, next, transactionProperty ? beginStyleInteraction(layerId, transactionProperty) : undefined)
+      layerConfigurationCommands.setLayerCartography(layerId, next, transactionProperty ? beginStyleInteraction(layerId, transactionProperty) : undefined)
       setMessage(null)
       return true
     } catch (error) {

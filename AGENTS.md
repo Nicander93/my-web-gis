@@ -14,4 +14,5 @@
 
 - [文档总览](docs/README.md)：了解项目文档分类和阅读顺序。
 - [代码偏好与维护约定](docs/engineering/code-preferences.md)：修改代码前阅读。
-- [项目规范](docs/specs/)：涉及产品、架构、UI 或场景协议时阅读对应文档。
+- [代码分层](docs/architecture/layers.md)：新增或移动代码前阅读。
+- [项目规范](docs/product/)：涉及产品、交互或工作台约定时阅读对应文档。

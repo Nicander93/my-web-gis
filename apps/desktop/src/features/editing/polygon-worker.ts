@@ -4,7 +4,7 @@ import type { PolygonGeometryRequest, PolygonGeometryResult } from './polygon-ed
 export function calculatePolygonEdit(input: PolygonGeometryRequest, signal: AbortSignal, progress: (done: number, total: number) => void): Promise<PolygonGeometryResult> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) { reject(new DOMException('已取消', 'AbortError')); return }
-    const worker = new Worker(new URL('./polygon-topology.worker.ts', import.meta.url), { type: 'module' })
+    const worker = new Worker(new URL('./polygon-topology.worker', import.meta.url), { type: 'module' })
     const cleanup = () => {
       worker.onmessage = null; worker.onerror = null
       worker.terminate(); signal.removeEventListener('abort', abort)

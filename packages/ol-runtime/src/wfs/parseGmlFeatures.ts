@@ -3,8 +3,8 @@ import GML2 from 'ol/format/GML2'
 import GML3 from 'ol/format/GML3'
 import type Feature from 'ol/Feature'
 import type Geometry from 'ol/geom/Geometry'
-import type { GisFeature } from '@desktop-webgis/gis-core'
-import { createId } from '@desktop-webgis/gis-core'
+import type { GisFeature } from '@desktop-webgis/project'
+import { createId } from '@desktop-webgis/project'
 
 const geoJson4326 = new GeoJSON({
   dataProjection: 'EPSG:4326',
@@ -34,7 +34,7 @@ function olFeatureToGis(feature: Feature<Geometry>, importId?: string): GisFeatu
 
 /**
  * Parse WFS GML (2/3) response into GisFeatures (stored EPSG:4326).
- * GeoJSON responses should use gis-core parseGeoJsonFeatures instead.
+ * GeoJSON responses should use project parseGeoJsonFeatures instead.
  */
 export function parseWfsGmlFeatures(
   body: string,

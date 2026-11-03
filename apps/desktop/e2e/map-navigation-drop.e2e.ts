@@ -20,9 +20,13 @@ async function drop(page: Page, target: string, names = ['roads.geojson']) {
 }
 async function state(page: Page) {
   return page.evaluate(async () => {
-    const host = await import('/src/features/map/map-runtime-host.ts')
-    const store = (await import('/src/stores/project.store.ts')).useProjectStore.getState()
-    return { center: host.getMapRuntime()!.getMap().getView().getCenter(), snapshot: store.getSnapshot(), selection: store.selection, tool: host.getActiveEditTool() }
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+
+    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/view-state/layer-view.store.ts').at(-1) ?? '/src/view-state/layer-view.store.ts')).useLayerViewStore.getState()
+
+    const host = await import('/src/runtime/map-runtime-host.ts')
+    const store = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+    return { center: host.getMapRuntime()!.getMap().getView().getCenter(), snapshot: projectSession.getSnapshot(), selection: selectionSession.selection, tool: host.getActiveEditTool() }
   })
 }
 async function drag(page: Page, button: 'middle' | 'left', space = false) {
@@ -45,7 +49,7 @@ for (const [name, target] of [['地图', '[data-testid=map-runtime-viewport]'], 
   expect((await state(page)).snapshot).toEqual(before.snapshot)
   await page.getByRole('button', { name: '确认导入', exact: true }).click()
   await expect(page.locator('.layer-name-button').filter({ hasText: 'roads' })).toBeVisible()
-  expect((await state(page)).snapshot.project.layers).toHaveLength(1)
+  expect((await state(page)).snapshot.project.content.layers).toHaveLength(1)
   await page.getByRole('button', { name: '撤销', exact: true }).click()
   expect((await state(page)).snapshot).toEqual(before.snapshot)
 })
@@ -70,7 +74,7 @@ test('file drop on an existing layer row adds data without reordering the layer'
   const before = await state(page)
   await drop(page, '.layer-name-button')
   await page.getByRole('button', { name: '确认导入', exact: true }).click()
-  expect((await state(page)).snapshot.project.layers).toHaveLength(2)
+  expect((await state(page)).snapshot.project.content.layers).toHaveLength(2)
   await page.getByRole('button', { name: '撤销', exact: true }).click()
   expect((await state(page)).snapshot).toEqual(before.snapshot)
 })
@@ -80,9 +84,12 @@ test('middle and space-left pan preserve selection and an unfinished drawing', a
   await drop(page, '[data-testid=map-runtime-viewport]')
   await page.getByRole('button', { name: '确认导入', exact: true }).click()
   await page.evaluate(async () => {
-    const store = (await import('/src/stores/project.store.ts')).useProjectStore.getState()
-    const layer = store.project.layers[0]
-    store.setSelection({ layerId: layer.id, featureIds: store.getLayerFeatures(layer.id).map(row => row.id) })
+    const { getLayerFeatures } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/feature-query.ts').at(-1) ?? '/src/session/feature-query.ts')
+
+    const store = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+    const layer = store.project.content.layers[0]
+    const { selectionCommands } = await import('/src/commands/selection.commands.ts')
+    selectionCommands.setSelection({ layerId: layer.id, featureIds: getLayerFeatures(layer.id).map(row => row.id) })
   })
   const before = await state(page)
   await drag(page, 'middle')
@@ -96,7 +103,7 @@ test('middle and space-left pan preserve selection and an unfinished drawing', a
   expect(spaced.center).not.toEqual(middle.center)
   expect(spaced.selection).toEqual(before.selection)
   expect(spaced.snapshot).toEqual(before.snapshot)
-  await page.evaluate(async () => { (await import('/src/features/map/map-runtime-host.ts')).setActiveEditTool('draw-line') })
+  await page.evaluate(async () => { (await import('/src/runtime/map-runtime-host.ts')).setActiveEditTool('draw-line') })
   const box = (await page.getByTestId('map-runtime-viewport').boundingBox())!
   await page.mouse.click(box.x + box.width * .48, box.y + box.height * .5)
   await drag(page, 'middle')
@@ -105,10 +112,10 @@ test('middle and space-left pan preserve selection and an unfinished drawing', a
   expect((await state(page)).snapshot).toEqual(before.snapshot)
   await page.mouse.dblclick(box.x + box.width * .65, box.y + box.height * .65)
   await expect.poll(async () => {
-    const current = await state(page), layer = current.snapshot.project.layers[0]
+    const current = await state(page), layer = current.snapshot.project.content.layers[0]
     return current.snapshot.featuresByDataset[layer.datasetId].length
   }).toBe(2)
-  const current = await state(page), layer = current.snapshot.project.layers[0]
+  const current = await state(page), layer = current.snapshot.project.content.layers[0]
   expect(current.snapshot.featuresByDataset[layer.datasetId][1].geometry.coordinates).toHaveLength(2)
   await page.getByRole('button', { name: '撤销', exact: true }).click()
   expect((await state(page)).snapshot).toEqual(before.snapshot)

@@ -18,14 +18,16 @@ test('invalid polygon drawing creates no source ghost or history and a valid dra
   await page.getByRole('button', { name: '开始编辑', exact: true }).click()
   await page.getByRole('button', { name: '绘制要素', exact: true }).click()
   await expect.poll(() => page.evaluate(async () => {
-    const { getMapRuntime } = await import('/src/features/map/map-runtime-host.ts')
+    const { getMapRuntime } = await import('/src/runtime/map-runtime-host.ts')
     return !getMapRuntime()!.getMap().getView().getAnimating()
   })).toBe(true)
   const state = () => page.evaluate(async () => {
-    const { useProjectStore } = await import('/src/stores/project.store.ts')
-    const { getMapRuntime } = await import('/src/features/map/map-runtime-host.ts')
-    const store = useProjectStore.getState(), layer = store.project.layers[0]
-    return { snapshot: store.getSnapshot(), count: getMapRuntime()!.registry.getVector(layer.id)!.getSource()!.getFeatures().length }
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+
+    const { useProjectStore } = await import('/src/session/project.store.ts')
+    const { getMapRuntime } = await import('/src/runtime/map-runtime-host.ts')
+    const store = useProjectStore.getState(), layer = store.project.content.layers[0]
+    return { snapshot: projectSession.getSnapshot(), count: getMapRuntime()!.registry.getVector(layer.id)!.getSource()!.getFeatures().length }
   })
   const before = await state(), bounds = (await page.locator('.ol-viewport').boundingBox())!
   const cx = bounds.x + bounds.width / 2, cy = bounds.y + bounds.height / 2
@@ -35,7 +37,7 @@ test('invalid polygon drawing creates no source ghost or history and a valid dra
   for (const [x,y] of [[-35,-35],[35,-35],[0,35],[-35,-35]]) await page.mouse.click(cx + x, cy + y)
   await expect.poll(async () => (await state()).count).toBe(before.count + 1)
   const accepted = await state()
-  const datasetId = before.snapshot.project.layers[0].datasetId
+  const datasetId = before.snapshot.project.content.layers[0].datasetId
   expect(accepted.snapshot.featuresByDataset[datasetId]).toHaveLength(before.count + 1)
   await page.getByRole('button', { name: '撤销', exact: true }).click()
   await expect.poll(state).toEqual(before)

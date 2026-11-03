@@ -1,6 +1,6 @@
 import TileLayer from 'ol/layer/Tile'
 import WMTS from 'ol/source/WMTS'
-import type { WmtsDataset } from '@desktop-webgis/gis-core'
+import type { WmtsDataset } from '@desktop-webgis/project'
 import { buildWmtsTileGrid } from './buildWmtsTileGrid'
 
 export const GIS_WMTS_EXTENT_KEY = 'gisBboxWgs84'

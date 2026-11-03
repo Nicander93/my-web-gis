@@ -1,0 +1,159 @@
+60:  projectEpoch: number
+61:  project: Project
+62:  featuresByDataset: Record<string, GisFeature[]>
+63:  dirty: boolean
+64:  selectedLayerId: string | null
+66:  selection: SelectionState
+68:  lastSelectionCountAfterFilter: number | null
+265:  projectEpoch: 0,
+266:  project: createProject(),
+267:  featuresByDataset: {},
+268:  dirty: false,
+269:  selectedLayerId: null,
+270:  selection: { layerId: null, featureIds: [] },
+271:  lastSelectionCountAfterFilter: null,
+273:  addLayer: (datasetId, name, features, styleKind, processing) =>
+319:  setDatasetFeatures: (datasetId, features) =>
+329:  patchWfsServiceSource: (datasetId, patch) =>
+344:  copyFeaturesToLocalLayer: (features, name, styleKind, processing) => {
+364:  addServiceLayer: (input) => {
+408:  setSelectedLayer: (layerId) => set({ selectedLayerId: layerId }),
+409:  setDirty: (dirty) => set({ dirty }),
+411:  loadSnapshot: (snapshot) => {
+430:  getSnapshot: () => ({
+434:  applySnapshotAsEdit: (snapshot, label) => {
+441:  replaceSnapshotAsEdit: (snapshot, label) => {
+447:  setLayerStyle: (layerId, style, transactionId) => {
+458:  setLayerCartography: (layerId, styleLayers, transactionId) => {
+472:  getNormalizedLayerStyle: (layerId) => {
+478:  getLayerFeatures: (layerId) => {
+484:  getFilteredFeatures: (layerId) => {
+491:  setLayerFilter: (layerId, filter) => {
+509:  clearLayerFilter: (layerId) => get().setLayerFilter(layerId, []),
+511:  setSelection: (selection) => {
+525:  toggleFeatureSelection: (layerId, featureId, additive = true) => {
+546:  selectMatching: (layerId) => {
+555:  clearSelection: () =>
+558:  updateFeatureProperties: (layerId, featureId, nextProperties) => {
+588:  undoEdit: () => {
+605:  redoEdit: () => {
+622:  canUndoEdit: () => editHistory.canUndo,
+623:  getHistoryBlockReason: () => null,
+624:  canRedoEdit: () => editHistory.canRedo,
+626:  executeEditCommand: (command) => {
+641:  executeEditCommands: (commands) => {
+650:  undoAttributeEdit: () => get().undoEdit(),
+651:  redoAttributeEdit: () => get().redoEdit(),
+652:  canUndoAttributeEdit: () => get().canUndoEdit(),
+653:  canRedoAttributeEdit: () => get().canRedoEdit(),
+656:  getMapLayers: () => layersWithEffectiveVisibility(get().project),
+658:  setLayerVisible: (layerId, visible) =>
+669:  setLayerOpacity: (layerId, opacity) => {
+681:  setGroupVisible: (id, visible) => {
+687:  setGroupLocked: (id, locked) => {
+694:  renameLayer: (id, name) => {
+701:  renameGroup: (id, name) => {
+708:  moveRootEntry: (entry, direction) => {
+717:  moveLayer: (id, direction) => get().moveRootEntry({ type: 'layer', id }, direction),
+718:  relocateGroup: (id, parentId, index) => {
+722:  createGroup: (name = '新建组', ids = [], parentId) => {
+732:  removeGroup: (id, removeChildren) => {
+756:  removeLayer: (layerId) => {
+806:  relocateLayer: (id, target) => {
+810:  addLayersToGroup: (groupId, ids) => {
+816:  _resetAttributeHistoryForTests: () => {
+820:  _resetProjectHistoryForTests: () => {
+apps/desktop/src\app\Workspace.tsx:132:                layerCommands.createGroup('新建组', selected ? [selected] : [])
+apps/desktop/src\stores\project.store.ts:352:    get().executeEditCommand({ id: command.id, label: command.label,
+apps/desktop/src\stores\project.store.ts:439:    return get().executeEditCommand(command)
+apps/desktop/src\stores\project.store.ts:444:    return get().executeEditCommand(new ReplaceProjectSnapshotCommand(createId('cmd'), label, before, snapshot))
+apps/desktop/src\stores\project.store.ts:455:    get().executeEditCommand(new SetLayerStyleCommand(createId('cmd'), layerId, before, after, transactionId))
+apps/desktop/src\stores\project.store.ts:469:    get().executeEditCommand(new SetLayerCartographyCommand(createId('cmd'), layerId, before, after, transactionId))
+apps/desktop/src\stores\project.store.ts:509:  clearLayerFilter: (layerId) => get().setLayerFilter(layerId, []),
+apps/desktop/src\stores\project.store.ts:584:    get().setLayerFilter(layerId, layer.filter ?? [])
+apps/desktop/src\stores\project.store.ts:645:      if (get().executeEditCommand(command)) ok = true
+apps/desktop/src\stores\project.store.ts:650:  undoAttributeEdit: () => get().undoEdit(),
+apps/desktop/src\stores\project.store.ts:651:  redoAttributeEdit: () => get().redoEdit(),
+apps/desktop/src\stores\project.store.ts:685:    state.executeEditCommand(new SetLayerTreeCommand(createId('cmd'), '设置文件夹显隐', snapshotLayerTree(state.project), snapshotLayerTree(project)))
+apps/desktop/src\stores\project.store.ts:692:    state.executeEditCommand(new SetLayerTreeCommand(createId('cmd'), '设置文件夹锁定', snapshotLayerTree(state.project), snapshotLayerTree(project)))
+apps/desktop/src\stores\project.store.ts:699:    state.executeEditCommand(new SetLayerTreeCommand(createId('cmd'), '重命名图层', snapshotLayerTree(state.project), snapshotLayerTree(project)))
+apps/desktop/src\stores\project.store.ts:706:    state.executeEditCommand(new SetLayerTreeCommand(createId('cmd'), '重命名文件夹', snapshotLayerTree(state.project), snapshotLayerTree(project)))
+apps/desktop/src\stores\project.store.ts:715:    state.executeEditCommand(new SetLayerTreeCommand(createId('cmd'), '调整树对象顺序', snapshotLayerTree(project), snapshotLayerTree(after)))
+apps/desktop/src\stores\project.store.ts:717:  moveLayer: (id, direction) => get().moveRootEntry({ type: 'layer', id }, direction),
+apps/desktop/src\stores\project.store.ts:720:    state.executeEditCommand(new SetLayerTreeCommand(createId('cmd'), '移动文件夹', snapshotLayerTree(state.project), snapshotLayerTree(after)))
+apps/desktop/src\stores\project.store.ts:729:    state.executeEditCommand(new SetLayerTreeCommand(createId('cmd'), '创建文件夹', snapshotLayerTree(before), snapshotLayerTree(after)))
+apps/desktop/src\stores\project.store.ts:736:      state.executeEditCommand(new SetLayerTreeCommand(createId('cmd'), '解散文件夹', snapshotLayerTree(state.project), snapshotLayerTree(after)))
+apps/desktop/src\stores\project.store.ts:754:    state.applySnapshotAsEdit(after, '删除文件夹及其内容')
+apps/desktop/src\stores\project.store.ts:808:    state.executeEditCommand(new SetLayerTreeCommand(createId('cmd'), '移动图层', snapshotLayerTree(state.project), snapshotLayerTree(after)))
+apps/desktop/src\stores\project.store.ts:814:    state.executeEditCommand(new SetLayerTreeCommand(createId('cmd'), '移动图层到文件夹', snapshotLayerTree(state.project), snapshotLayerTree(after)))
+apps/desktop/src\app\commands\geometry-check.commands.ts:40:  state.setSelectedLayer(result.layerId)
+apps/desktop/src\app\commands\geometry-check.commands.ts:41:  state.setSelection({ layerId: result.layerId, featureIds: ids })
+apps/desktop/src\app\commands\edit.commands.ts:60:    if (useProjectStore.getState().undoEdit()) {
+apps/desktop/src\app\commands\edit.commands.ts:68:    if (useProjectStore.getState().redoEdit()) {
+apps/desktop/src\app\commands\layer.commands.ts:169:    useProjectStore.getState().setSelectedLayer(id)
+apps/desktop/src\app\commands\layer.commands.ts:221:    useProjectStore.getState().setSelectedLayer(id)
+apps/desktop/src\app\commands\layer.commands.ts:222:    useProjectStore.getState().moveLayer(id, 'up')
+apps/desktop/src\app\commands\layer.commands.ts:232:    useProjectStore.getState().setSelectedLayer(id)
+apps/desktop/src\app\commands\layer.commands.ts:233:    useProjectStore.getState().moveLayer(id, 'down')
+apps/desktop/src\app\commands\layer.commands.ts:244:    const ok = useProjectStore.getState().removeLayer(id)
+apps/desktop/src\app\commands\layer.commands.ts:258:    useProjectStore.getState().renameLayer(id, name)
+apps/desktop/src\app\commands\layer.commands.ts:270:    useProjectStore.getState().setSelectedLayer(id)
+apps/desktop/src\app\commands\layer.commands.ts:283:    useProjectStore.getState().setSelectedLayer(id)
+apps/desktop/src\app\commands\layer.commands.ts:296:    useProjectStore.getState().setSelectedLayer(id)
+apps/desktop/src\app\commands\layer.commands.ts:310:    useProjectStore.getState().setSelectedLayer(id)
+apps/desktop/src\app\commands\layer.commands.ts:322:    useProjectStore.getState().setSelectedLayer(id)
+apps/desktop/src\app\commands\layer.commands.ts:333:    useProjectStore.getState().setSelectedLayer(id)
+apps/desktop/src\app\commands\layer.commands.ts:338:    const id = useProjectStore.getState().createGroup(name, layerIds)
+apps/desktop/src\app\commands\layer.commands.ts:359:    projectState.setLayerStyle(layerId, after)
+apps/desktop/src\app\commands\layer.commands.ts:368:    const ok = useProjectStore.getState().undoEdit()
+apps/desktop/src\app\commands\layer.commands.ts:377:    const ok = useProjectStore.getState().redoEdit()
+apps/desktop/src\app\commands\project.commands.ts:118:    useProjectStore.getState().loadSnapshot({
+apps/desktop/src\app\commands\project.commands.ts:141:      useProjectStore.getState().loadSnapshot(opened.snapshot)
+apps/desktop/src\features\editing\PolygonEditControls.tsx:97:      useProjectStore.getState().executeEditCommand(result.command)
+apps/desktop/src\features\editing\PolygonEditControls.tsx:98:      useProjectStore.getState().setSelection(result.selection)
+apps/desktop/src\features\activity\ActivityPanel.tsx:34:    else { useProjectStore.getState().setSelectedLayer(id); useWorkbenchStore.getState().bindInspector(id); useWorkspaceStore.getState().setRightOpen(true) }
+apps/desktop/src\features\add-data\local-import-command.ts:40:    useProjectStore.getState().setSelectedLayer(this.after.project.layers.at(-1)?.id ?? null)
+apps/desktop/src\features\add-data\local-import-command.ts:45:    state.setSelectedLayer(state.project.layers.some((layer) => layer.id === this.previousLayerId) ? this.previousLayerId : null)
+apps/desktop/src\features\add-data\local-import-command.ts:53:  state.executeEditCommand(new ImportLocalLayersCommand(before, after, state.selectedLayerId))
+apps/desktop/src\features\map\map-runtime-host.ts:389:        useProjectStore.getState().setSelection(state)
+apps/desktop/src\features\map\map-runtime-host.ts:439:    useProjectStore.getState().clearSelection()
+apps/desktop/src\features\map\map-runtime-host.ts:443:  useProjectStore.getState().clearSelection()
+apps/desktop/src\features\map\map-runtime-host.ts:469:        useProjectStore.getState().executeEditCommand(command)
+apps/desktop/src\features\map\map-runtime-host.ts:478:      useProjectStore.getState().executeEditCommand(command)
+apps/desktop/src\features\map\map-runtime-host.ts:483:      useProjectStore.getState().executeEditCommands(commands)
+apps/desktop/src\features\map\map-runtime-host.ts:484:      useProjectStore.getState().clearSelection()
+apps/desktop/src\features\map\map-runtime-host.ts:488:      useProjectStore.getState().executeEditCommand(command)
+apps/desktop/src\features\map\map-runtime-host.ts:496:        useProjectStore.getState().setSelection({ layerId, featureIds })
+apps/desktop/src\services\processing.ts:73:  const copied = state.copyFeaturesToLocalLayer(result.features, name.trim(), inferLayerStyleKind(result.features), record)
+apps/desktop/src\features\project\RecoveryDraftHost.tsx:67:      useProjectStore.getState().loadSnapshot(entry.draft.snapshot)
+apps/desktop/src\features\project\RecoveryDraftHost.tsx:70:      useProjectStore.getState().setDirty(true)
+apps/desktop/src\features\layers\LayerPanel.tsx:196:      if (dragGroupId) useProjectStore.getState().relocateGroup(dragGroupId, target.kind === 'group' ? target.groupId : undefined, target.index)
+apps/desktop/src\features\layers\LayerPanel.tsx:531:          <MenuItem icon={FolderPlus} label="新建子文件夹" disabled={getLayerGroupState(tree, groupMenu.group.id).locked} onClick={() => { useProjectStore.getState().createGroup('新建文件夹', [], groupMenu.group.id); setGroupMenu(null) }} />
+apps/desktop/src\features\layers\LayerPanel.tsx:533:          <MenuItem icon={LockKeyhole} label={groupMenu.group.locked ? '解锁文件夹' : '锁定文件夹'} disabled={getLayerGroupState(tree, groupMenu.group.parentId).locked} onClick={() => { useProjectStore.getState().setGroupLocked(groupMenu.group.id, !groupMenu.group.locked); setGroupMenu(null) }} />
+apps/desktop/src\features\layers\LayerPanel.tsx:534:          {groupMenu.group.parentId && <MenuItem label="移到根目录" disabled={getLayerGroupState(tree, groupMenu.group.id).locked} onClick={() => { useProjectStore.getState().relocateGroup(groupMenu.group.id); setGroupMenu(null) }} />}
+apps/desktop/src\features\layers\LayerPanel.tsx:561:      {renamingGroup && <EditorDialog title="重命名文件夹" onClose={() => setRenamingGroup(null)}><form onSubmit={event => { event.preventDefault(); useProjectStore.getState().renameGroup(renamingGroup.id, renameValue); setRenamingGroup(null) }}><div className="dialog-body"><label className="editor-field">名称<input autoFocus required value={renameValue} onChange={event => setRenameValue(event.target.value)} /></label></div><footer className="dialog-footer"><button type="button" onClick={() => setRenamingGroup(null)}>取消</button><button className="button-primary" disabled={!renameValue.trim()}>应用</button></footer></form></EditorDialog>}
+apps/desktop/src\features\attribute-table\AttributeTable.tsx:506:              onClick: () => selectedLayerId && useProjectStore.getState().setSelection({
+apps/desktop/src\features\attribute-table\AttributeTable.tsx:578:              else if (!selectionIds.has(feature.id)) useProjectStore.getState().setSelection({ layerId: selectedLayerId, featureIds: [feature.id] })
+apps/desktop/src\services\project-save.ts:56:      current.setDirty(!unchanged)
+apps/desktop/src\services\project-save.ts:65:      if (!acknowledged) latest.setDirty(true)
+apps/desktop/src\features\layers\LayerFilterWindow.tsx:35:    try { useProjectStore.getState().setLayerFilter(layerId, conditions); onClose() }
+apps/desktop/src\features\scene\project-scene-controller.ts:80:      if (candidate.project.id === state.project.id) state.applySnapshotAsEdit(candidate, label)
+apps/desktop/src\features\scene\project-scene-controller.ts:81:      else state.replaceSnapshotAsEdit(candidate, label)
+apps/desktop/src\features\scene\scene-document.commands.ts:7:  return useProjectStore.getState().replaceSnapshotAsEdit(snapshot, label)
+apps/desktop/src\features\inspector\CartographyRulesPanel.tsx:61:      state.setLayerCartography(layerId, build(currentFragment.styleLayers, currentFragment.binding.styleSourceId))
+apps/desktop/src\features\inspector\FolderPropertyWindow.tsx:36:          store.executeEditCommand(new ApplyProjectSnapshotEditCommand(createId('cmd'), '应用文件夹属性', snapshot, after))
+apps/desktop/src\features\inspector\GeoServerPublishDialog.tsx:637:      if (!committedState.applySnapshotAsEdit(next, '发布 GeoServer 样式')) throw new Error('发布成功，但工程链接未能写入；远端结果保留。')
+apps/desktop/src\features\attribute-table\FieldSchemaDialog.tsx:48:      if (!useProjectStore.getState().executeEditCommand(new SetDatasetContentCommand(
+apps/desktop/src\features\attribute-table\FieldCalculator.tsx:72:      const ok = useProjectStore.getState().executeEditCommand(new SetDatasetContentCommand(
+apps/desktop/src\features\scene3d\scene3d-commands.ts:12:  state.executeEditCommand(new SetCesiumSceneCommand(createId('cmd'), label, before, after))
+apps/desktop/src\services\wfs-commands.ts:136:  store.setDatasetFeatures(datasetId, features)
+apps/desktop/src\services\wfs-commands.ts:137:  store.patchWfsServiceSource(datasetId, meta)
+apps/desktop/src\features\inspector\LayerPropertyWindow.tsx:88:      if (dirty) store.executeEditCommand(new ApplyProjectSnapshotEditCommand(createId('cmd'), '应用完整图层属性', snapshot, after))
+apps/desktop/src\features\inspector\published-wms.ts:8:  state.addServiceLayer({ name: `${request.workspace}:${request.layerName}（已发布）`, kind: 'wms', source: {
+apps/desktop/src\features\inspector\standard-style-properties.ts:13:  state.setLayerCartography(layerId, layers, transactionId)
+apps/desktop/src\features\scene3d\SceneWorkspace.tsx:381:    if (redo ? store.redoEdit() : store.undoEdit()) notify(redo ? '已重做' : '已撤销')
+apps/desktop/src\features\inspector\SymbolEditor.tsx:239:      state.setLayerCartography(layerId, next, transactionProperty ? beginStyleInteraction(layerId, transactionProperty) : undefined)
+apps/desktop/src\features\inspector\SymbolLibrary.tsx:73:    if (!useProjectStore.getState().applySnapshotAsEdit(snapshot, '选择符号预设')) throw new Error('符号未应用')
+apps/desktop/src\features\inspector\SymbolLibrary.tsx:100:    useProjectStore.getState().applySnapshotAsEdit(snapshot, '导入符号资源')
+apps/desktop/src\features\inspector\SymbolLibrary.tsx:123:    useProjectStore.getState().setLayerCartography(layerId, layers)
+apps/desktop/src\features\inspector\useCartographyEditor.ts:28:      useProjectStore.getState().setLayerStyle(layerId, next, property ? beginStyleInteraction(layerId, property) : undefined)

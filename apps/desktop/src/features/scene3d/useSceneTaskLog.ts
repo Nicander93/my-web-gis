@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { CesiumSceneNode } from '@desktop-webgis/cesium-scene-schema'
-import type { ResourceStates } from '@/services/diagnostics'
-import { useTaskLogStore } from '@/stores/task-log.store'
+import type { ResourceStates } from '@/runtime/diagnostics'
+import { useTaskLogStore } from '@/view-state/task-log.store'
 
 /** Record state transitions, rather than every runtime refresh or render. */
 export function useSceneTaskLog(states: ResourceStates, nodes: CesiumSceneNode[], epoch: number) {

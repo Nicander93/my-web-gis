@@ -1,6 +1,8 @@
 import { test, expect, type Page } from '@playwright/test'
 test.use({ actionTimeout: 15_000, screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
-async function snapshot(page: Page) { return page.evaluate(async () => (await import('/src/stores/project.store.ts')).useProjectStore.getState().getSnapshot()) }
+async function snapshot(page: Page) { return page.evaluate(async () => {
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+ const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path; return projectSession.getSnapshot() }) }
 async function upload(page: Page, name: string) {
   await page.locator('input[type=file]').setInputFiles({ name: `${name}.geojson`, mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({
     type: 'FeatureCollection', features: [{ type: 'Feature', id: 'source-001', properties: { code: '0007' }, geometry: { type: 'Point', coordinates: [116, 39, 12] } }]
@@ -23,7 +25,7 @@ test('real worker parses one file, preserves data and commits one undoable impor
   expect(await page.locator('input[type=file]').getAttribute('multiple')).toBeNull()
   await dialog.getByRole('button', { name: '确认导入', exact: true }).click()
   const imported = await snapshot(page)
-  expect(imported.project.layers.map(layer => layer.name)).toEqual(['single'])
+  expect(imported.project.content.layers.map(layer => layer.name)).toEqual(['single'])
   expect(Object.values(imported.featuresByDataset).flat()[0]).toMatchObject({ properties: { code: '0007' }, geometry: { coordinates: [expect.closeTo(116, 10), expect.closeTo(39, 10), 12] } })
   await page.getByRole('button', { name: '撤销', exact: true }).click()
   expect(await snapshot(page)).toEqual(before)
@@ -42,8 +44,12 @@ test('cancel and project replacement terminate pending workers without importing
   await upload(page, 'old-project')
   await expect(page.getByRole('button', { name: '取消读取', exact: true })).toBeVisible()
   await page.evaluate(async () => {
-    const store = (await import('/src/stores/project.store.ts')).useProjectStore.getState()
-    const next = store.getSnapshot(); next.project.id = 'replacement'; store.loadSnapshot(next)
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+
+    const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
+
+    const store = (await import(activeModule('/src/session/project.store.ts'))).useProjectStore.getState()
+    const next = projectSession.getSnapshot(); next.project.metadata.id = 'replacement'; projectSession.loadSnapshot(next)
   })
   const replacement = await snapshot(page)
   release()
@@ -55,8 +61,10 @@ test('cancel and project replacement terminate pending workers without importing
 test('large GeoJSON and CSV preview/parse use real workers while the main thread remains responsive', async ({ page }) => {
   test.setTimeout(120_000)
   const result = await page.evaluate(async () => {
-    const { importGeoJson, importCsvFile, inspectDxfLayers } = await import('/src/services/import.ts')
-    const { runImportTask } = await import('/src/services/import-worker.ts')
+    const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
+
+    const { importGeoJson, importCsvFile, inspectDxfLayers } = await import(activeModule('/src/exchange/import.ts'))
+    const { runImportTask } = await import(activeModule('/src/exchange/import-worker.ts'))
     let ticks = 0
     const timer = setInterval(() => ticks++, 0)
     try {

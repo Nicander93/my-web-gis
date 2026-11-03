@@ -1,3 +1,7 @@
+import { featureCommands } from '@/commands/feature.commands'
+import { useFeaturesByDataset } from '@/data/feature-data'
+import { selectionCommands } from '@/commands/selection.commands'
+import { requireMapContent } from '@desktop-webgis/project'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentRef, type KeyboardEvent, type ReactNode } from 'react'
 import { Checkbox, ConfigProvider, Dropdown, Input, Popover, Select, Table, Tooltip, type TableColumnsType } from 'antd'
 import { Calculator, ChevronLeft, ChevronRight, Columns3, Filter, PanelBottomClose, LocateFixed, MousePointer2, Pencil, Square, Sigma } from 'lucide-react'
@@ -8,20 +12,20 @@ import {
   type FieldFilterCondition,
   type FieldFilterOp,
   type GisFeature
-} from '@desktop-webgis/gis-core'
-import { useProjectStore } from '@/stores/project.store'
-import { useWorkbenchStore } from '@/stores/workbench.store'
-import { capabilitiesForDataset, getEffectiveLocked } from '@desktop-webgis/gis-core'
-import { useSessionStore } from '@/stores/session.store'
-import { Button } from '@/components/ui/Button'
-import { ModelessWindow } from '@/components/ui/ModelessWindow'
-import { zoomMapToFeature, zoomMapToSelected } from '@/features/map/map-runtime-host'
+} from '@desktop-webgis/project'
+import { useProjectStore } from '@/session/project.store'
+import { useWorkbenchStore } from '@/view-state/workbench.store'
+import { capabilitiesForDataset, isDatasetLocked } from '@desktop-webgis/project'
+import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { Button } from '@/ui/Button'
+import { ModelessWindow } from '@/ui/ModelessWindow'
+import { zoomMapToFeature, zoomMapToSelected } from '@/runtime/map-runtime-host'
 import { FieldCalculator } from './FieldCalculator'
 import './attribute-table.css'
 import { parseCellValue, resolveDatasetFields } from './field-edits'
 import { FieldSchemaDialog } from './FieldSchemaDialog'
 import { ColumnResizeHandle } from './ColumnResizeHandle'
-import { editCommands } from '@/app/commands/edit.commands'
+import { editCommands } from '@/commands/edit.commands'
 
 const PAGE_SIZE = 100
 // A stored marker keeps the technical ID hidden by default while allowing per-tab restoration.
@@ -60,27 +64,23 @@ export function AttributeTable({
   const selectedLayerId = layerId ?? tableLayerId
   const editLayerId = useWorkbenchStore((state) => state.editLayerId)
   const project = useProjectStore((state) => state.project)
-  const featuresByDataset = useProjectStore((state) => state.featuresByDataset)
-  const selection = useProjectStore((state) => state.selection)
-  const toggleFeatureSelection = useProjectStore(
-    (state) => state.toggleFeatureSelection
-  )
-  const clearSelection = useProjectStore((state) => state.clearSelection)
-  const updateFeatureProperties = useProjectStore(
-    (state) => state.updateFeatureProperties
-  )
+  const featuresByDataset = useFeaturesByDataset()
+  const selection = useLayerViewStore((state) => state.selection)
+  const toggleFeatureSelection = selectionCommands.toggleFeatureSelection
+  const clearSelection = selectionCommands.clearSelection
+  const updateFeatureProperties = featureCommands.updateProperties
 
-  const setAttributeTableState = useSessionStore(
+  const setAttributeTableState = useLayerViewStore(
     (state) => state.setAttributeTableState
   )
-  const layerSession = useSessionStore((state) =>
+  const layerSession = useLayerViewStore((state) =>
     selectedLayerId ? state.sessions[selectedLayerId] : undefined
   )
   const tableState = layerSession?.attributeTable
   const scrollRef = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
     if (!active || !selectedLayerId || !scrollRef.current) return
-    const saved = useSessionStore.getState().sessions[selectedLayerId]?.attributeTable
+    const saved = useLayerViewStore.getState().sessions[selectedLayerId]?.attributeTable
     scrollRef.current.scrollTop = saved?.scrollTop ?? 0
     scrollRef.current.scrollLeft = saved?.scrollLeft ?? 0
   }, [selectedLayerId, active])
@@ -121,16 +121,16 @@ export function AttributeTable({
   }, [columnsOpen, filterOpen, statisticsOpen, selectedLayerId, setAttributeTableState])
 
   const selectedLayer = selectedLayerId
-    ? project.layers.find((layer) => layer.id === selectedLayerId)
+    ? requireMapContent(project).layers.find((layer) => layer.id === selectedLayerId)
     : null
   const allFeatures = selectedLayer
     ? (featuresByDataset[selectedLayer.datasetId] ?? [])
     : []
-  const dataset = project.datasets.find((item) => item.id === selectedLayer?.datasetId)
+  const dataset = requireMapContent(project).datasets.find((item) => item.id === selectedLayer?.datasetId)
   const editingThisLayer = !!selectedLayerId && editLayerId === selectedLayerId
   const readOnlyReason = !capabilitiesForDataset(dataset).editGeometry ? '此数据源只读，可先复制为本地图层'
-    : selectedLayerId && getEffectiveLocked(project, selectedLayerId) ? '图层或父文件夹已锁定，请先解锁'
-    : editLayerId && !editingThisLayer ? `正在编辑「${project.layers.find(layer => layer.id === editLayerId)?.name ?? '其他图层'}」，请先结束该图层编辑`
+    : dataset && isDatasetLocked(project, dataset.id) ? '引用此数据源的图层或父文件夹已锁定，请先解锁'
+    : editLayerId && !editingThisLayer ? `正在编辑「${requireMapContent(project).layers.find(layer => layer.id === editLayerId)?.name ?? '其他图层'}」，请先结束该图层编辑`
     : ''
   const canEditCells = editingThisLayer && !readOnlyReason
   const filterDraft = tableState?.filterDraft ?? []
@@ -463,12 +463,12 @@ export function AttributeTable({
   </div>
   return (
     <div className="feature-panel attribute-table-content">
-      <Popover open={Boolean(columnsOpen || filterOpen || statisticsOpen)} trigger={[]} placement="topLeft" content={auxiliary}
+      {(selectedLayer || targetPicker || onClose) && <Popover open={Boolean(columnsOpen || filterOpen || statisticsOpen)} trigger={[]} placement="topLeft" content={auxiliary}
         getPopupContainer={trigger => trigger.parentElement!}>
       <div className="attr-toolbar" aria-label="属性表工具">
         {targetPicker}
         {selectedLayer && <>
-          <Tooltip classNames={{ root: 'attr-edit-tooltip' }} title={editingThisLayer ? '结束当前图层编辑；修改已记录，可撤销，请保存项目' : readOnlyReason || '编辑当前属性表对应的图层，不切换图层树选择'}>
+          <Tooltip classNames={{ root: 'attr-edit-tooltip' }} title={editingThisLayer ? '结束当前图层编辑；修改已记录，可撤销。提交要素请使用保存数据' : readOnlyReason || '编辑当前属性表对应的图层，不切换图层树选择'}>
             <span className="attr-edit-toggle"><Button className="attr-edit-toggle__button" aria-label={editingThisLayer ? '结束属性编辑' : '开始属性编辑'}
               variant={editingThisLayer ? 'primary' : 'default'}
               disabled={!editingThisLayer && !!readOnlyReason} onClick={toggleAttributeEditing}>
@@ -503,7 +503,7 @@ export function AttributeTable({
             if (!open) queueMicrotask(() => selectionMenuTrigger.current?.focus())
           }} menu={{ onClick: () => { setSelectionMenuOpen(false); selectionMenuTrigger.current?.focus() }, items: [
             { key: 'matching', label: '选择当前表格结果', title: '选择当前搜索和表格筛选结果，不改变地图图层过滤',
-              onClick: () => selectedLayerId && useProjectStore.getState().setSelection({
+              onClick: () => selectedLayerId && selectionCommands.setSelection({
                 layerId: selectedLayerId, featureIds: viewFeatures.map((feature) => feature.id)
               }) },
             { key: 'locate', label: '定位选中要素', disabled: selection.layerId !== selectedLayerId || !selection.featureIds.length,
@@ -540,7 +540,7 @@ export function AttributeTable({
         )}
       </div>
 
-      </Popover>
+      </Popover>}
       {selectedLayerId && calculatorOpen && <ModelessWindow title="字段计算器" width={760} height={580} className="attribute-field-calculator-window"
         onClose={() => setCalculatorOpen(false)}>
         <FieldCalculator layerId={selectedLayerId} tableFeatures={viewFeatures} selectedIds={selectionIds} onClose={() => setCalculatorOpen(false)} />
@@ -575,7 +575,7 @@ export function AttributeTable({
             onClick: (event) => {
               if (!selectedLayerId) return
               if (event.metaKey || event.ctrlKey) toggleFeatureSelection(selectedLayerId, feature.id, true)
-              else if (!selectionIds.has(feature.id)) useProjectStore.getState().setSelection({ layerId: selectedLayerId, featureIds: [feature.id] })
+              else if (!selectionIds.has(feature.id)) selectionCommands.setSelection({ layerId: selectedLayerId, featureIds: [feature.id] })
             }
           })}
           locale={{ emptyText: !selectedLayer ? '请选择一个图层' : emptySelectedOnly ? <div className="empty-selected-only">
@@ -588,7 +588,7 @@ export function AttributeTable({
       {selectedLayer && (
         <div className="attr-pagination" aria-label="表格状态与分页">
           <span className="attr-record-count" title={recordStatus}>{recordStatus}</span>
-          <span title={canEditCells ? '双击单元格编辑；修改立即记录，可撤销，请保存项目' : readOnlyReason || '点击属性表工具栏的“开始编辑”'}>
+          <span title={canEditCells ? '双击单元格编辑；修改立即记录，可撤销。提交要素请使用保存数据' : readOnlyReason || '点击属性表工具栏的“开始编辑”'}>
             {canEditCells ? '可编辑' : '只读'}
           </span>
           <Button

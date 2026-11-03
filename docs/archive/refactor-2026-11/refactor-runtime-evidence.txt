@@ -1,0 +1,130 @@
+2026-10-30 Runtime metadata/content migration
+HEAD: 2cf4a724aadb041ac030350079851494c37802d3; dirty worktree retained; no commit/push
+
+pnpm test: exit 0
+packages/ol-selection test:  Test Files  1 passed (1)
+packages/ol-selection test:       Tests  9 passed (9)
+packages/cesium-scene-schema test:  Test Files  5 passed (5)
+packages/cesium-scene-schema test:       Tests  29 passed (29)
+packages/ol-style test:  Test Files  12 passed (12)
+packages/ol-style test:       Tests  87 passed (87)
+packages/style-assistant test:  Test Files  1 passed (1)
+packages/style-assistant test:       Tests  2 passed (2)
+packages/cesium-popup test:  Test Files  1 passed (1)
+packages/cesium-popup test:       Tests  3 passed (3)
+packages/spatial-analysis test:  Test Files  6 passed (6)
+packages/spatial-analysis test:       Tests  41 passed (41)
+packages/ogc-io test:  Test Files  6 passed | 1 skipped (7)
+packages/ogc-io test:       Tests  53 passed | 1 skipped (54)
+packages/scene-schema test:  Test Files  5 passed (5)
+packages/scene-schema test:       Tests  27 passed (27)
+packages/cesium-measure test:  Test Files  1 passed (1)
+packages/cesium-measure test:       Tests  4 passed (4)
+packages/cesium-tileset-effects test:  Test Files  1 passed (1)
+packages/cesium-tileset-effects test:       Tests  8 passed (8)
+packages/cesium-layer test:  Test Files  6 passed (6)
+packages/cesium-layer test:       Tests  39 passed (39)
+packages/ol-scene-runtime test:  Test Files  8 passed (8)
+packages/ol-scene-runtime test:       Tests  47 passed (47)
+packages/gis-core test:  Test Files  21 passed (21)
+packages/gis-core test:       Tests  111 passed (111)
+packages/cesium-tileset-edit test:  Test Files  1 passed (1)
+packages/cesium-tileset-edit test:       Tests  8 passed (8)
+packages/cesium-effects test:  Test Files  2 passed (2)
+packages/cesium-effects test:       Tests  2 passed (2)
+packages/scene-core test:  Test Files  10 passed (10)
+packages/scene-core test:       Tests  44 passed (44)
+packages/scene-codegen test:  Test Files  1 passed (1)
+packages/scene-codegen test:       Tests  11 passed (11)
+packages/vector-io test:  Test Files  7 passed (7)
+packages/vector-io test:       Tests  49 passed (49)
+packages/scene-publisher test:  Test Files  2 passed (2)
+packages/scene-publisher test:       Tests  8 passed (8)
+packages/ol-runtime test:  Test Files  7 passed (7)
+packages/ol-runtime test:       Tests  33 passed (33)
+packages/cesium-scene-runtime test:  Test Files  6 passed (6)
+packages/cesium-scene-runtime test:       Tests  42 passed (42)
+apps/desktop test:  Test Files  77 passed (77)
+apps/desktop test:       Tests  407 passed | 5 skipped (412)
+
+pnpm build: exit 0
+packages/cesium-scene-schema build: Done
+packages/cesium-popup build: Done
+packages/ol-selection build: Done
+packages/style-assistant build: Done
+packages/ol-style build: Done
+packages/spatial-analysis build: Done in 122ms
+packages/spatial-analysis build: Done
+packages/cesium-measure build: Done
+packages/cesium-tileset-effects build: Done
+packages/cesium-layer build: Done
+packages/ogc-io build: Done
+packages/scene-schema build: Done
+packages/cesium-effects build: Done
+packages/cesium-tileset-edit build: Done
+packages/gis-core build: Done
+packages/ol-scene-runtime build: Done
+packages/scene-codegen build: Done
+packages/scene-core build: Done
+packages/vector-io build: Done
+packages/scene-publisher build: Done
+packages/cesium-scene-runtime build: Done
+packages/ol-runtime build: Done
+examples/city-3d/consumer build: ✓ built in 14.53s
+examples/city-3d/consumer build: Done
+apps/viewer build: ✓ built in 16.11s
+apps/viewer build: Done
+apps/desktop build: ✓ built in 26.10s
+apps/desktop build: Done
+
+Final format/cartography validation:
+$ vitest run "src/project-format.test.ts" "src/cartography.test.ts"
+
+ RUN  v3.2.7 D:/my-code-repo/my-web-gis/packages/gis-core
+
+ ✓ src/project-format.test.ts (21 tests) 31ms
+ ✓ src/cartography.test.ts (11 tests) 63ms
+
+ Test Files  2 passed (2)
+      Tests  32 passed (32)
+   Start at  12:51:34
+   Duration  1.12s (transform 291ms, setup 0ms, collect 534ms, tests 94ms, environment 0ms, prepare 294ms)
+
+
+Final save/recovery validation:
+$ vitest run "src/services/project-save.test.ts" "src/services/project-recovery.test.ts"
+
+ RUN  v3.2.7 D:/my-code-repo/my-web-gis/apps/desktop
+
+ ✓ src/services/project-recovery.test.ts (4 tests) 19ms
+ ✓ src/services/project-save.test.ts (14 tests) 512ms
+
+ Test Files  2 passed (2)
+      Tests  18 passed (18)
+   Start at  12:53:04
+   Duration  3.04s (transform 758ms, setup 0ms, collect 3.30s, tests 531ms, environment 0ms, prepare 358ms)
+
+
+Browser scene edit/export/save/reopen:
+
+Running 1 test using 1 worker
+
+
+
+(node:31084) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1/1] [desktop] › e2e\scene3d-editor-v1.e2e.ts:71:1 › native style drafts preview safely, survive highlight, history, scene export and reopen
+  1 passed (14.0s)
+
+Browser table data recovery final:
+
+Running 1 test using 1 worker
+
+
+
+(node:15768) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1/1] [desktop] › e2e\project-recovery.e2e.ts:30:1 › applied table edits survive abrupt page closure, restore as dirty and clear only after successful save
+  1 passed (13.4s)
+
+Other browser runs: import-transaction 3 passed; cartography-project 1 passed; damaged recovery cache 1 passed; 3D recovery 1 passed. These were split runs; earlier runs exposed outdated control locators and version assertions, subsequently fixed. Not a full E2E suite or native/GPU acceptance.

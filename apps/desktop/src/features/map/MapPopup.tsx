@@ -1,10 +1,12 @@
+import { useFeaturesByDataset, featureData } from '@/data/feature-data'
+import { requireMapContent } from '@desktop-webgis/project'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Feature from 'ol/Feature'
 import Overlay from 'ol/Overlay'
-import { useProjectStore } from '@/stores/project.store'
-import { useWorkbenchStore } from '@/stores/workbench.store'
-import { getActiveEditTool, getMapRuntime } from './map-runtime-host'
+import { useProjectStore } from '@/session/project.store'
+import { useWorkbenchStore } from '@/view-state/workbench.store'
+import { getActiveEditTool, getMapRuntime } from '@/runtime/map-runtime-host'
 
 interface PopupTarget { layerId: string; featureId: string; coordinate: number[] }
 
@@ -25,10 +27,10 @@ export function MapPopup() {
   const current = useRef<PopupTarget | null>(null)
   const [target, setTarget] = useState<PopupTarget | null>(null)
   const project = useProjectStore(state => state.project)
-  const features = useProjectStore(state => state.featuresByDataset)
+  const features = useFeaturesByDataset()
   const activeTool = useWorkbenchStore(state => state.activeTool)
   const identifyActive = useWorkbenchStore(state => state.identifyActive)
-  const layer = project.layers.find(item => item.id === target?.layerId)
+  const layer = requireMapContent(project).layers.find(item => item.id === target?.layerId)
   const feature = layer && features[layer.datasetId]?.find(item => item.id === target?.featureId)
   const definition = layer?.interaction?.popup
   const close = useCallback(() => { current.current = null; setTarget(null) }, [])
@@ -48,11 +50,11 @@ export function MapPopup() {
         if (!(native instanceof Feature)) return undefined
         const entry = runtime.registry.entries().find(([, candidate]) => candidate === nativeLayer)
         if (!entry || !runtime.isLayerVisible(entry[0]) || !runtime.isFeatureIncluded(entry[0], native)) return undefined
-        const state = useProjectStore.getState()
-        const candidate = state.project.layers.find(item => item.id === entry[0])
+        const state = useProjectStore.getState(), stateFeatureData = featureData.readSnapshot()
+        const candidate = requireMapContent(state.project).layers.find(item => item.id === entry[0])
         const id = native.get('domainFeatureId') ?? native.getId()
         if (!candidate?.interaction?.popup?.fields.length || id === undefined) return undefined
-        if (!state.featuresByDataset[candidate.datasetId]?.some(item => item.id === String(id))) return undefined
+        if (!stateFeatureData[candidate.datasetId]?.some(item => item.id === String(id))) return undefined
         return { layerId: candidate.id, featureId: String(id), coordinate: event.coordinate }
       }, { hitTolerance: 6 })
       current.current = hit ?? null
@@ -74,7 +76,7 @@ export function MapPopup() {
   }, [close, element])
 
   useEffect(() => { overlay.current?.setPosition(target?.coordinate) }, [target])
-  useEffect(() => { close() }, [project.crs, close])
+  useEffect(() => { close() }, [requireMapContent(project).crs, close])
   useEffect(() => {
     if (identifyActive || !feature || !definition?.fields.length || !['select', 'pan'].includes(activeTool)) close()
   }, [feature, definition, activeTool, identifyActive, close])

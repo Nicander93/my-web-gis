@@ -3,18 +3,20 @@ import { createCesiumScene, createTransform } from '@desktop-webgis/cesium-scene
 
 async function content(page: Page) {
   return page.evaluate(async () => {
-    const module = await import('/src/stores/project.store.ts')
-    return { snapshot: module.useProjectStore.getState().getSnapshot(), version: module.getProjectContentVersion() }
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+
+    const module = await import('/src/session/project.store.ts')
+    return { snapshot: projectSession.getSnapshot(), version: module.getProjectContentVersion() }
   })
 }
 async function opacity(page: Page, id: string) {
-  return page.evaluate(async id => (await import('/src/features/map/map-runtime-host.ts')).getMapRuntime()?.registry.get(id)?.getOpacity(), id)
+  return page.evaluate(async id => (await import('/src/runtime/map-runtime-host.ts')).getMapRuntime()?.registry.get(id)?.getOpacity(), id)
 }
 async function presentation(page: Page, id: string) {
-  return page.evaluate(async id => (await import('/src/features/scene3d/scene3d-runtime-host.ts')).getLiveSceneDiagnostics(id)?.presentation, id)
+  return page.evaluate(async id => (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneDiagnostics(id)?.presentation, id)
 }
 async function pendingPropertyEdits(page: Page) {
-  return page.evaluate(async () => (await import('/src/services/pending-property-edits.ts')).hasPendingPropertyEdits())
+  return page.evaluate(async () => (await import('/src/ui/pending-property-edits.ts')).hasPendingPropertyEdits())
 }
 test.use({ screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
 test.beforeEach(async ({ page }) => {
@@ -31,7 +33,7 @@ test('2D live preview stays outside content history and cancel restores the late
   await page.getByRole('button', { name: '确认导入', exact: true }).click()
   await page.locator('.layer-item').filter({ hasText: 'preview' }).click({ button: 'right' })
   await page.getByRole('menuitem', { name: '完整属性', exact: true }).click()
-  const dialog = page.locator('.scene-property-window'), before = await content(page), id = before.snapshot.project.layers[0].id
+  const dialog = page.locator('.scene-property-window'), before = await content(page), id = before.snapshot.project.content.layers[0].id
   await dialog.getByRole('switch', { name: '实时预览', exact: true }).click()
   await dialog.getByRole('spinbutton', { name: '不透明度', exact: true }).fill('35')
   await expect.poll(() => pendingPropertyEdits(page)).toBe(true)
@@ -43,7 +45,7 @@ test('2D live preview stays outside content history and cancel restores the late
   await dialog.getByRole('button', { name: '应用', exact: true }).click()
   await expect.poll(() => pendingPropertyEdits(page)).toBe(false)
   const applied = await content(page)
-  expect(applied.snapshot.project.layers[0].opacity).toBe(.35)
+  expect(applied.snapshot.project.content.layers[0].opacity).toBe(.35)
   await dialog.getByRole('spinbutton', { name: '不透明度', exact: true }).fill('60')
   await expect.poll(() => opacity(page, id)).toBe(.6)
   expect(await content(page)).toEqual(applied)
@@ -53,13 +55,13 @@ test('2D live preview stays outside content history and cancel restores the late
   await page.getByRole('tab', { name: '编辑', exact: true }).click()
   await page.getByRole('button', { name: '撤销', exact: true }).click()
   await expect.poll(() => opacity(page, id)).toBe(1)
-  expect((await content(page)).snapshot.project.layers[0].opacity).toBe(1)
+  expect((await content(page)).snapshot.project.content.layers[0].opacity).toBe(1)
   await page.locator('.layer-item').filter({ hasText: 'preview' }).click({ button: 'right' })
   await page.getByRole('menuitem', { name: '完整属性', exact: true }).click()
   await dialog.getByRole('switch', { name: '实时预览', exact: true }).click()
   await dialog.getByRole('spinbutton', { name: '不透明度', exact: true }).fill('20')
   await expect.poll(() => opacity(page, id)).toBe(.2)
-  await page.evaluate(async id => (await import('/src/stores/project.store.ts')).useProjectStore.getState().setLayerOpacity(id, .7), id)
+  await page.evaluate(async id => { const { layerConfigurationCommands } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/commands/layer-configuration.commands.ts').at(-1) ?? '/src/commands/layer-configuration.commands.ts'); return layerConfigurationCommands.setLayerOpacity(id, .7) }, id)
   await expect.poll(() => opacity(page, id)).toBe(.7)
   const external = await content(page)
   await dialog.getByRole('button', { name: '取消', exact: true }).click()
@@ -76,7 +78,7 @@ test('3D native visibility previews and cancel restores the latest applied state
   await expect(row.locator('small')).toHaveText('3D Tiles', { timeout: 30_000 })
   await row.locator('.scene3d-layer-row__select').click({ button: 'right' })
   await page.getByRole('menuitem', { name: '完整属性', exact: true }).click()
-  const dialog = page.locator('.scene-property-window'), before = await content(page), id = before.snapshot.project.city!.nodes[0].id
+  const dialog = page.locator('.scene-property-window'), before = await content(page), id = before.snapshot.project.content.scene!.nodes[0].id
   await dialog.getByRole('switch', { name: '实时预览', exact: true }).click()
   await dialog.getByRole('switch', { name: '显示对象', exact: true }).click()
   await expect.poll(() => pendingPropertyEdits(page)).toBe(true)
@@ -91,7 +93,7 @@ test('3D native visibility previews and cancel restores the latest applied state
   await dialog.getByRole('switch', { name: '实时预览', exact: true }).click()
   await dialog.getByRole('switch', { name: '显示对象', exact: true }).click()
   await dialog.getByRole('button', { name: '应用', exact: true }).click()
-  await expect.poll(async () => (await content(page)).snapshot.project.city?.nodes[0].visible).toBe(false)
+  await expect.poll(async () => (await content(page)).snapshot.project.content.scene?.nodes[0].visible).toBe(false)
   const applied = await content(page)
   await dialog.getByRole('switch', { name: '显示对象', exact: true }).click()
   await expect.poll(() => presentation(page, id)).toMatchObject({ visible: true })
@@ -101,7 +103,7 @@ test('3D native visibility previews and cancel restores the latest applied state
   expect(await content(page)).toEqual(applied)
   await page.getByRole('button', { name: '撤销', exact: true }).click()
   await expect.poll(() => presentation(page, id)).toMatchObject({ visible: true })
-  expect((await content(page)).snapshot.project.city?.nodes[0].visible).toBe(true)
+  expect((await content(page)).snapshot.project.content.scene?.nodes[0].visible).toBe(true)
 })
 
 test('GLB anchor and static water parameters preview without committing or reloading model data', async ({ page }) => {
@@ -128,7 +130,7 @@ test('GLB anchor and static water parameters preview without committing or reloa
     await page.getByRole('menuitem', { name: '完整属性', exact: true }).click()
     const dialog = page.locator('.scene-property-window')
     if (name === 'Water') await dialog.getByRole('menuitem', { name: '样式与参数', exact: true }).click()
-    const before = await content(page), id = before.snapshot.project.city!.nodes.find(node => node.name === name)!.id
+    const before = await content(page), id = before.snapshot.project.content.scene!.nodes.find(node => node.name === name)!.id
     await dialog.getByRole('switch', { name: '实时预览', exact: true }).click()
     await dialog.getByRole('spinbutton', { name: field, exact: true }).fill(value)
     await expect.poll(async () => { const state = await presentation(page, id); return name === 'Tower' ? state?.position?.[2] : state?.water?.height }).toBeCloseTo(Number(value), 3)

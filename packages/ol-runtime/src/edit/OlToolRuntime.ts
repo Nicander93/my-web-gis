@@ -7,7 +7,7 @@ import {
   createId,
   type EditTool,
   type GisFeature
-} from '@desktop-webgis/gis-core'
+} from '@desktop-webgis/project'
 import Feature from 'ol/Feature'
 import Collection from 'ol/Collection'
 import { unByKey } from 'ol/Observable'

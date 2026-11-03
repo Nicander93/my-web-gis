@@ -12,7 +12,7 @@ const username = process.env.CARTOGRAPHY_GEOSERVER_USER ?? 'admin'
 const password = process.env.CARTOGRAPHY_GEOSERVER_PASSWORD
 const workspace = 'sf'
 const imageSize = 256
-const outputDirectory = resolve('..', '..', 'docs/design/2d-cartography-geoserver/baseline/geoserver-2.28.2')
+const outputDirectory = resolve('..', 'test-results', 'cartography-geoserver', 'baseline', 'geoserver-2.28.2')
 
 interface FeatureTypeResponse {
   featureType: {

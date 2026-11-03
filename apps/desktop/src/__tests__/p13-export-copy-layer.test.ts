@@ -1,13 +1,21 @@
+import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
+import { layerContentCommands } from '@/commands/layer-content.commands'
+import { featureCommands } from '@/commands/feature.commands'
+import { getLayerFeatures } from '@/session/feature-query'
+import { projectEdits } from '@/session/project-edits'
+import { featureData } from '@/data/feature-data'
+import { selectionCommands } from '@/commands/selection.commands'
+import { requireMapContent } from '@desktop-webgis/project'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   createProject,
   parseGeoJsonFeatures,
   stringifyGeoJson,
   type GisFeature
-} from '@desktop-webgis/gis-core'
+} from '@desktop-webgis/project'
 import { featuresToCsv } from '@desktop-webgis/vector-io'
-import { useProjectStore } from '@/stores/project.store'
-import { useSessionStore } from '@/stores/session.store'
+import { useProjectStore } from '@/session/project.store'
+import { useLayerViewStore } from '@/view-state/layer-view.store'
 import {
   countExportScopes,
   resolveExportFeatures,
@@ -42,27 +50,20 @@ const emptyTable: TableViewState = {
 
 describe('P13 export scopes / copy / CSV', () => {
   beforeEach(() => {
-    useProjectStore.getState()._resetAttributeHistoryForTests()
-    useSessionStore.setState({ sessions: {} })
-    useProjectStore.setState({
-      project: createProject('P13 test'),
-      featuresByDataset: {},
-      dirty: false,
-      selectedLayerId: null,
-      selection: { layerId: null, featureIds: [] },
-      lastSelectionCountAfterFilter: null
-    })
+    projectEdits.clear()
+    useLayerViewStore.setState({ sessions: {} })
+    useProjectStore.setState({ project: createProject('P13 test'), dirty: false }); featureData.replaceAll({}); useLayerViewStore.setState({ selectedLayerId: null, selection: { layerId: null, featureIds: [] }, lastSelectionCountAfterFilter: null })
   })
 
   it('four scopes report correct counts (A / F / S / table)', () => {
-    useProjectStore.getState().addLayer('ds-1', 'Cities', sample, 'point')
-    const layerId = useProjectStore.getState().selectedLayerId!
-    const layer = useProjectStore.getState().project.layers.find((l) => l.id === layerId)!
-    useProjectStore.getState().setLayerFilter(layerId, [{ field: 'pop', op: 'gte', value: 20 }])
-    useProjectStore.getState().setSelection({ layerId, featureIds: ['f-b'] })
-    useSessionStore.getState().setAttributeTableState(layerId, { searchQuery: 'Beta' })
+    layerContentCommands.addLayer('ds-1', 'Cities', sample, 'point')
+    const layerId = useLayerViewStore.getState().selectedLayerId!
+    const layer = requireMapContent(useProjectStore.getState().project).layers.find((l) => l.id === layerId)!
+    layerConfigurationCommands.setLayerFilter(layerId, [{ field: 'pop', op: 'gte', value: 20 }])
+    selectionCommands.setSelection({ layerId, featureIds: ['f-b'] })
+    useLayerViewStore.getState().setAttributeTableState(layerId, { searchQuery: 'Beta' })
 
-    const allFeatures = useProjectStore.getState().featuresByDataset['ds-1']
+    const allFeatures = featureData.readSnapshot()['ds-1']
     const tableView: TableViewState = {
       searchQuery: 'Beta',
       selectedOnly: false,
@@ -70,9 +71,9 @@ describe('P13 export scopes / copy / CSV', () => {
       sortDirection: 'asc'
     }
     const counts = countExportScopes({
-      layer: useProjectStore.getState().project.layers.find((l) => l.id === layerId)!,
+      layer: requireMapContent(useProjectStore.getState().project).layers.find((l) => l.id === layerId)!,
       allFeatures,
-      selection: useProjectStore.getState().selection,
+      selection: useLayerViewStore.getState().selection,
       tableView
     })
     expect(counts.all).toBe(4)
@@ -83,19 +84,19 @@ describe('P13 export scopes / copy / CSV', () => {
   })
 
   it('snapshot is independent of later source edits', () => {
-    useProjectStore.getState().addLayer('ds-1', 'Cities', sample, 'point')
-    const layerId = useProjectStore.getState().selectedLayerId!
-    const layer = useProjectStore.getState().project.layers.find((l) => l.id === layerId)!
-    const allFeatures = useProjectStore.getState().featuresByDataset['ds-1']
+    layerContentCommands.addLayer('ds-1', 'Cities', sample, 'point')
+    const layerId = useLayerViewStore.getState().selectedLayerId!
+    const layer = requireMapContent(useProjectStore.getState().project).layers.find((l) => l.id === layerId)!
+    const allFeatures = featureData.readSnapshot()['ds-1']
     const snap = resolveExportFeatures({
       scope: 'all',
       layer,
       allFeatures,
-      selection: useProjectStore.getState().selection,
+      selection: useLayerViewStore.getState().selection,
       tableView: emptyTable
     })
     snap[0].properties.name = 'MUTATED'
-    expect(useProjectStore.getState().featuresByDataset['ds-1'][0].properties.name).toBe('Alpha')
+    expect(featureData.readSnapshot()['ds-1'][0].properties.name).toBe('Alpha')
   })
 
   it('GeoJSON round-trip keeps count, coords, and original formula-like strings', () => {
@@ -117,15 +118,13 @@ describe('P13 export scopes / copy / CSV', () => {
   })
 
   it('copy creates independent Dataset; edit copy ≠ source', () => {
-    useProjectStore.getState().addLayer('ds-1', 'Cities', sample, 'point')
-    const sourceLayerId = useProjectStore.getState().selectedLayerId!
+    layerContentCommands.addLayer('ds-1', 'Cities', sample, 'point')
+    const sourceLayerId = useLayerViewStore.getState().selectedLayerId!
     useProjectStore.getState().setDirty(false)
     expect(useProjectStore.getState().dirty).toBe(false)
 
-    const sourceFeatures = useProjectStore.getState().getLayerFeatures(sourceLayerId)
-    const result = useProjectStore
-      .getState()
-      .copyFeaturesToLocalLayer(sourceFeatures, 'Cities（副本）', 'point')
+    const sourceFeatures = getLayerFeatures(sourceLayerId)
+    const result = layerContentCommands.copyFeaturesToLocalLayer(sourceFeatures, 'Cities（副本）', 'point')
     expect(result).not.toBeNull()
     expect(useProjectStore.getState().dirty).toBe(true)
     expect(result!.datasetId).not.toBe('ds-1')
@@ -134,34 +133,34 @@ describe('P13 export scopes / copy / CSV', () => {
     const copyLayerId = result!.layerId
     const copyDs = result!.datasetId
     // mutate copy properties
-    const copyFeat = useProjectStore.getState().featuresByDataset[copyDs][0]
-    useProjectStore.getState().updateFeatureProperties(copyLayerId, copyFeat.id, {
+    const copyFeat = featureData.readSnapshot()[copyDs][0]
+    featureCommands.updateProperties(copyLayerId, copyFeat.id, {
       ...copyFeat.properties,
       name: 'COPY-EDIT'
     })
-    expect(useProjectStore.getState().featuresByDataset['ds-1'][0].properties.name).toBe('Alpha')
+    expect(featureData.readSnapshot()['ds-1'][0].properties.name).toBe('Alpha')
     expect(
-      useProjectStore.getState().featuresByDataset[copyDs].find((f) => f.id === copyFeat.id)
+      featureData.readSnapshot()[copyDs].find((f) => f.id === copyFeat.id)
         ?.properties.name
     ).toBe('COPY-EDIT')
 
     // object identity must differ
-    expect(useProjectStore.getState().featuresByDataset[copyDs][0]).not.toBe(
-      useProjectStore.getState().featuresByDataset['ds-1'][0]
+    expect(featureData.readSnapshot()[copyDs][0]).not.toBe(
+      featureData.readSnapshot()['ds-1'][0]
     )
   })
 
   it('cancel path does not set Dirty (dialog open alone is a no-op)', () => {
-    useProjectStore.getState().addLayer('ds-1', 'Cities', sample, 'point')
+    layerContentCommands.addLayer('ds-1', 'Cities', sample, 'point')
     useProjectStore.getState().setDirty(false)
     // Opening/closing export dialog never calls store mutations; assert dirty stays false
     // when only reading scopes.
-    const layerId = useProjectStore.getState().selectedLayerId!
-    const layer = useProjectStore.getState().project.layers.find((l) => l.id === layerId)!
+    const layerId = useLayerViewStore.getState().selectedLayerId!
+    const layer = requireMapContent(useProjectStore.getState().project).layers.find((l) => l.id === layerId)!
     void resolveExportFeatures({
       scope: 'selection',
       layer,
-      allFeatures: useProjectStore.getState().featuresByDataset['ds-1'],
+      allFeatures: featureData.readSnapshot()['ds-1'],
       selection: { layerId, featureIds: [] },
       tableView: emptyTable
     })
@@ -169,13 +168,13 @@ describe('P13 export scopes / copy / CSV', () => {
   })
 
   it('empty selection scope yields 0 features (no file)', () => {
-    useProjectStore.getState().addLayer('ds-1', 'Cities', sample, 'point')
-    const layerId = useProjectStore.getState().selectedLayerId!
-    const layer = useProjectStore.getState().project.layers.find((l) => l.id === layerId)!
+    layerContentCommands.addLayer('ds-1', 'Cities', sample, 'point')
+    const layerId = useLayerViewStore.getState().selectedLayerId!
+    const layer = requireMapContent(useProjectStore.getState().project).layers.find((l) => l.id === layerId)!
     const snap = resolveExportFeatures({
       scope: 'selection',
       layer,
-      allFeatures: useProjectStore.getState().featuresByDataset['ds-1'],
+      allFeatures: featureData.readSnapshot()['ds-1'],
       selection: { layerId, featureIds: [] },
       tableView: emptyTable
     })

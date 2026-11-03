@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { createCesiumScene } from '@desktop-webgis/cesium-scene-schema'
 
 test.use({ screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
-async function state(page: Page) { return page.evaluate(async () => (await import('/src/stores/project.store.ts')).useProjectStore.getState().getSnapshot()) }
+async function state(page: Page) { return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() }) }
 test.beforeEach(async ({ page }) => {
   await page.route('**/*tile.openstreetmap.org/**', route => route.abort())
   await page.goto('/')
@@ -23,13 +23,13 @@ test('2D popup drafts apply atomically, retain labels, cancel and undo', async (
   await dialog.getByRole('textbox', { name: '弹窗字段标签 name', exact: true }).fill('名称')
   expect(await state(page)).toEqual(before)
   await dialog.getByRole('button', { name: '应用', exact: true }).click()
-  await expect.poll(async () => (await state(page)).project.layers[0].interaction?.popup).toMatchObject({ fields: [{ field: 'name', label: '名称' }] })
+  await expect.poll(async () => (await state(page)).project.content.layers[0].interaction?.popup).toMatchObject({ fields: [{ field: 'name', label: '名称' }] })
   await dialog.getByRole('checkbox', { name: 'code', exact: true }).check()
   await dialog.getByRole('button', { name: '取消', exact: true }).click()
-  expect((await state(page)).project.layers[0].interaction?.popup?.fields).toEqual([{ field: 'name', label: '名称' }])
+  expect((await state(page)).project.content.layers[0].interaction?.popup?.fields).toEqual([{ field: 'name', label: '名称' }])
   await page.getByRole('tab', { name: '编辑', exact: true }).click()
   await page.getByRole('button', { name: '撤销', exact: true }).click()
-  expect((await state(page)).project.layers[0]).toEqual(before.project.layers[0])
+  expect((await state(page)).project.content.layers[0]).toEqual(before.project.content.layers[0])
 })
 
 test('3D root folder and cleared popup title field remain serializable and undoable', async ({ page }) => {
@@ -52,11 +52,11 @@ test('3D root folder and cleared popup title field remain serializable and undoa
   await dialog.getByRole('textbox', { name: '标题字段', exact: true }).fill('')
   await dialog.getByRole('button', { name: '应用', exact: true }).click()
   await expect(dialog.getByRole('alert')).toHaveCount(0)
-  const applied = (await state(page)).project.city!.nodes[0]
+  const applied = (await state(page)).project.content.scene!.nodes[0]
   expect(applied.groupId).toBeUndefined()
   expect(applied.popup?.titleField).toBeUndefined()
   expect(applied.popup?.fields).toEqual([{ field: 'name' }])
   await dialog.getByRole('button', { name: '取消', exact: true }).click()
   await page.getByRole('button', { name: '撤销', exact: true }).click()
-  expect((await state(page)).project.city!.nodes).toEqual(before.project.city!.nodes)
+  expect((await state(page)).project.content.scene!.nodes).toEqual(before.project.content.scene!.nodes)
 })

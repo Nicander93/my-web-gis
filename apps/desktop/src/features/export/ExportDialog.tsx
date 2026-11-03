@@ -1,18 +1,20 @@
+import { layerContentCommands } from '@/commands/layer-content.commands'
+import { useFeaturesByDataset } from '@/data/feature-data'
 import { useEffect, useMemo, useState } from 'react'
-import { EditorDialog } from '@/components/ui/EditorDialog'
-import { inferLayerStyleKind, type GisFeature } from '@desktop-webgis/gis-core'
+import { EditorDialog } from '@/ui/EditorDialog'
+import { inferLayerStyleKind, type GisFeature } from '@desktop-webgis/project'
 import {
   serializeVectorExport,
   type ExportFormat,
   type CoordinateExportCrs
 } from './serializeVectorExport'
 import { CRS_PRESETS } from '@desktop-webgis/vector-io'
-import { useProjectStore } from '@/stores/project.store'
-import { useSessionStore } from '@/stores/session.store'
-import { pickSaveFile, writeTextFile } from '@/services/files'
-import { emitCommandStatus } from '@/app/commands/status'
-import { getLayerCapabilities } from '@/app/commands/layer.commands'
-import type { ExportDialogMode } from '@/app/commands/project.commands'
+import { useProjectStore } from '@/session/project.store'
+import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { pickSaveFile, writeTextFile } from '@/platform/files'
+import { emitCommandStatus } from '@/platform/command-status'
+import { getLayerCapabilities } from '@/commands/layer.commands'
+import type { ExportDialogMode } from '@/commands/project.commands'
 import {
   EXPORT_SCOPE_LABELS,
   countExportScopes,
@@ -40,18 +42,16 @@ export function ExportDialog({
   mode = 'export'
 }: ExportDialogProps) {
   const project = useProjectStore((s) => s.project)
-  const featuresByDataset = useProjectStore((s) => s.featuresByDataset)
-  const selection = useProjectStore((s) => s.selection)
-  const selectedLayerId = useProjectStore((s) => s.selectedLayerId)
-  const copyFeaturesToLocalLayer = useProjectStore(
-    (s) => s.copyFeaturesToLocalLayer
-  )
+  const featuresByDataset = useFeaturesByDataset()
+  const selection = useLayerViewStore((s) => s.selection)
+  const selectedLayerId = useLayerViewStore((s) => s.selectedLayerId)
+  const copyFeaturesToLocalLayer = layerContentCommands.copyFeaturesToLocalLayer
 
   const targetLayerId = layerId ?? selectedLayerId
   const layer = findLayer(project, targetLayerId)
   const allFeatures = layer ? (featuresByDataset[layer.datasetId] ?? []) : []
 
-  const layerSession = useSessionStore((s) =>
+  const layerSession = useLayerViewStore((s) =>
     targetLayerId ? s.sessions[targetLayerId] : undefined
   )
   const tableView = useMemo(

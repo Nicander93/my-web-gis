@@ -1,17 +1,18 @@
+import { requireMapContent } from '@desktop-webgis/project'
 import { useEffect, useState } from 'react'
 import { Alert, Button, Checkbox, Input, InputNumber, Modal, Space, Switch, Table } from 'antd'
 import { isTauri } from '@tauri-apps/api/core'
-import { getLayerCartography } from '@desktop-webgis/gis-core'
+import { getLayerCartography } from '@desktop-webgis/project'
 import { exportSld, type SldExportResult } from '@desktop-webgis/ogc-io/sld-export'
 import { encodeSldPackage } from '@desktop-webgis/ogc-io/sld-package'
 import { verifyStyleAssets } from '@desktop-webgis/ol-style/style-assets'
-import { useProjectStore } from '@/stores/project.store'
-import { pickSaveFile, writeBinaryFile, writeTextFile } from '@/services/files'
+import { useProjectStore } from '@/session/project.store'
+import { pickSaveFile, writeBinaryFile, writeTextFile } from '@/platform/files'
 
 export function SldExportDialog({ layerId, onClose }: { layerId: string; onClose: () => void }) {
   const project = useProjectStore(state => state.project)
-  const layer = project.layers.find(layer => layer.id === layerId)
-  const [target, setTarget] = useState(layer?.name ?? 'style'), [crs, setCrs] = useState(project.crs)
+  const layer = requireMapContent(project).layers.find(layer => layer.id === layerId)
+  const [target, setTarget] = useState(layer?.name ?? 'style'), [crs, setCrs] = useState(requireMapContent(project).crs)
   const [geometryField, setGeometryField] = useState(''), [preview, setPreview] = useState(false), [zoom, setZoom] = useState(10)
   const [fieldTypesJson, setFieldTypesJson] = useState('{}')
   const [accepted, setAccepted] = useState(false), [error, setError] = useState<string>(), [status, setStatus] = useState<string>(), [busy, setBusy] = useState(false)
@@ -21,9 +22,9 @@ export function SldExportDialog({ layerId, onClose }: { layerId: string; onClose
     if (!fragment) throw new Error('当前图层不支持标准矢量样式输出')
     const fieldTypes: unknown = JSON.parse(fieldTypesJson)
     if (!fieldTypes || typeof fieldTypes !== 'object' || Array.isArray(fieldTypes) || Object.values(fieldTypes).some(value => !['number', 'string', 'boolean'].includes(String(value)))) throw new Error('目标字段类型须为字段名到 string/number/boolean 的 JSON 对象')
-    result = exportSld(fragment.styleLayers, { targetLayerName: target, crs, geometryField: geometryField || undefined, fieldTypes: fieldTypes as Record<string, 'number' | 'string' | 'boolean'>, assets: project.cartography?.assets, strict: true, ...(preview ? { previewZoom: zoom } : {}) })
+    result = exportSld(fragment.styleLayers, { targetLayerName: target, crs, geometryField: geometryField || undefined, fieldTypes: fieldTypes as Record<string, 'number' | 'string' | 'boolean'>, assets: requireMapContent(project).cartography?.assets, strict: true, ...(preview ? { previewZoom: zoom } : {}) })
   } catch (error) { validationError = error instanceof Error ? error.message : String(error) }
-  const contentKey = JSON.stringify({ layerId, fragment: getLayerCartography(project, layerId), assets: project.cartography?.assets, target, crs, geometryField, fieldTypesJson, preview, zoom })
+  const contentKey = JSON.stringify({ layerId, fragment: getLayerCartography(project, layerId), assets: requireMapContent(project).cartography?.assets, target, crs, geometryField, fieldTypesJson, preview, zoom })
   useEffect(() => { setAccepted(false); setStatus(undefined) }, [contentKey])
 
   async function save() {
@@ -31,7 +32,7 @@ export function SldExportDialog({ layerId, onClose }: { layerId: string; onClose
     const exported = result
     setBusy(true); setError(undefined)
     try {
-      await verifyStyleAssets(project.cartography?.assets ?? [])
+      await verifyStyleAssets(requireMapContent(project).cartography?.assets ?? [])
       const bytes = await encodeSldPackage(exported)
       const name = `${target.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_') || 'style'}.sld.zip`
       if (isTauri()) {

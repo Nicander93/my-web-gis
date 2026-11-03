@@ -1,6 +1,7 @@
 {
   "name": "@desktop-webgis/scene-core",
   "version": "0.1.0",
+  "private": true,
   "description": "Framework-independent scene creation and immutable update utilities.",
   "type": "module",
   "main": "./dist/index.js",

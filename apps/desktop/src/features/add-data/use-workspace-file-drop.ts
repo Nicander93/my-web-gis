@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { isTauri } from '@tauri-apps/api/core'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
-import { detectFileType } from '@/services/import'
-import { emitCommandStatus } from '@/app/commands/status'
+import { detectFileType } from '@/exchange/import'
+import { emitCommandStatus } from '@/platform/command-status'
 
 /** Browser files and native OS paths share the single-file import workflow. */
 export function useWorkspaceFileDrop(enabled: boolean, onDrop: (file: File | string) => void) {

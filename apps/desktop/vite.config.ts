@@ -15,7 +15,10 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
-      '@desktop-webgis/gis-core': fileURLToPath(new URL('../../packages/gis-core/src/index.ts', import.meta.url)),
+      '@desktop-webgis/project/geojson': fileURLToPath(new URL('../../packages/project/src/data/geojson.ts', import.meta.url)),
+      '@desktop-webgis/project/dataset-file': fileURLToPath(new URL('../../packages/project/src/data/dataset-file.ts', import.meta.url)),
+      '@desktop-webgis/project/id': fileURLToPath(new URL('../../packages/project/src/id.ts', import.meta.url)),
+      '@desktop-webgis/project': fileURLToPath(new URL('../../packages/project/src/index.ts', import.meta.url)),
       '@desktop-webgis/ol-runtime': fileURLToPath(new URL('../../packages/ol-runtime/src/index.ts', import.meta.url)),
       '@desktop-webgis/ogc-io/sld-export': fileURLToPath(new URL('../../packages/ogc-io/src/sld-export.ts', import.meta.url)),
       '@desktop-webgis/ogc-io/sld-package': fileURLToPath(new URL('../../packages/ogc-io/src/sld-package.ts', import.meta.url)),
@@ -32,6 +35,9 @@ export default defineConfig(({ mode }) => ({
         ? fileURLToPath(new URL('./cartography-spike.html', import.meta.url))
         : fileURLToPath(new URL('./index.html', import.meta.url))
     }
+  },
+  test: {
+    setupFiles: [fileURLToPath(new URL('./src/view-state/session-view-sync.ts', import.meta.url))]
   },
   clearScreen: false,
   server: {

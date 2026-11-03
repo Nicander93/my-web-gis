@@ -1,8 +1,8 @@
 {
   "name": "@desktop-webgis/ogc-io",
   "version": "0.1.0",
-  "private": true,
   "description": "OGC WMS/WMTS/WFS URL normalize, capabilities fetch helpers, and XML parsers.",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

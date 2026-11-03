@@ -12,9 +12,13 @@ export interface SceneCommitResult {
   observerErrors: unknown[]
 }
 /** Host remains the content owner; commits are synchronous and atomic, including validation/history. */
+export interface SceneCommitIntent {
+  /** Explicit move identity; array shifts do not mean every sibling was moved. */
+  move: { id: string; parentId?: string }
+}
 export interface SceneDocumentHost {
   read(): unknown
-  commit(document: SceneDocument, label: string): void
+  commit(document: SceneDocument, label: string, intent?: SceneCommitIntent): void
   /** Emits every completed host content change, including undo/redo; excludes UI-only changes. */
   subscribe(observer: (change: SceneChange) => void): () => void
 }
@@ -130,7 +134,7 @@ export class SceneController {
   }
   replaceNode(id: string, node: SceneNode): SceneCommitResult { return this.update('Replace node', document => replaceSceneNode(document, id, node)) }
   removeNode(id: string, cascade = false): SceneCommitResult { return this.update('Remove node', document => removeSceneNode(document, id, cascade)) }
-  moveNode(id: string, index: number, parentId?: string): SceneCommitResult { return this.update('Move node', document => moveSceneNode(document, id, index, parentId)) }
+  moveNode(id: string, index: number, parentId?: string): SceneCommitResult { return this.update('Move node', document => moveSceneNode(document, id, index, parentId), { move: { id, parentId } }) }
   setNodeVisible(id: string, visible: boolean): SceneCommitResult {
     return this.update('Set visibility', document => replaceSceneNode(document, id, { ...this.requireNode(document, id), visible }))
   }
@@ -169,17 +173,17 @@ export class SceneController {
     if (!node) throw new Error(`Node ${id} does not exist`)
     return node
   }
-  private update(label: string, operation: (document: SceneDocument) => SceneDocument): SceneCommitResult {
+  private update(label: string, operation: (document: SceneDocument) => SceneDocument, intent?: SceneCommitIntent): SceneCommitResult {
     this.requireActive()
-    return this.commit(label, operation(this.getDocument()))
+    return this.commit(label, operation(this.getDocument()), intent)
   }
-  private commit(label: string, next: SceneDocument): SceneCommitResult {
+  private commit(label: string, next: SceneDocument, intent?: SceneCommitIntent): SceneCommitResult {
     const before = this.getDocument()
     if (JSON.stringify(before) === JSON.stringify(next)) return { document: this.getDocument(), observerErrors: [] }
     this.cancelPreparation()
     if (this.host) {
       this.publishing = true
-      try { this.host.commit(structuredClone(next), label) }
+      try { this.host.commit(structuredClone(next), label, intent ? structuredClone(intent) : undefined) }
       finally { this.publishing = false }
     } else this.document = next
     const after = this.getDocument()

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { CartographyState } from '@desktop-webgis/gis-core'
+import type { CartographyState } from '@desktop-webgis/project'
 import { createDrawingLayer } from '@desktop-webgis/ol-style/cartography-operations'
 import { setRuleLayerVisibility, summarizeRuleFilter } from './CartographyRulesPanel'
 

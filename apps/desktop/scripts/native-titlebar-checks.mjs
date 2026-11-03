@@ -39,21 +39,25 @@ export async function verifyNativeTitlebar(page, report) {
   await page.getByRole('button', { name: /^二维地图/ }).click()
   await expect(page.locator('[data-map-runtime="mounted"]')).toBeVisible()
   const before = await page.evaluate(async () => {
-    const state = (await import('/src/stores/project.store.ts')).useProjectStore.getState()
-    return { snapshot: state.getSnapshot(), dirty: state.dirty }
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+
+    const state = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+    return { snapshot: projectSession.getSnapshot(), dirty: state.dirty }
   })
   await page.getByRole('button', { name: '最大化窗口', exact: true }).click()
   await page.getByRole('button', { name: '还原窗口', exact: true }).click()
   const after = await page.evaluate(async () => {
-    const state = (await import('/src/stores/project.store.ts')).useProjectStore.getState()
-    return { snapshot: state.getSnapshot(), dirty: state.dirty }
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+
+    const state = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+    return { snapshot: projectSession.getSnapshot(), dirty: state.dirty }
   })
   assert.deepEqual(after, before)
   assert.deepEqual(errors, [])
   report.scenarios.push({ name: 'Window operations preserve 2D project snapshot and dirty state without runtime errors', passed: true })
 
   await page.evaluate(async () => {
-    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const { useProjectStore } = await import('/src/session/project.store.ts')
     useProjectStore.setState({ dirty: true })
   })
   await page.getByRole('button', { name: '关闭窗口', exact: true }).click()
@@ -72,12 +76,12 @@ export async function verifyNativeTitlebar(page, report) {
   await expect(closing).toHaveCount(1)
   await closing.getByRole('button', { name: '取消', exact: true }).click()
   await page.evaluate(async () => {
-    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const { useProjectStore } = await import('/src/session/project.store.ts')
     useProjectStore.setState({ dirty: false })
   })
   report.scenarios.push({ name: 'Title-bar close and window.close() share one unsaved prompt; a second request does not stack dialogs', passed: true })
   await page.evaluate(async () => {
-    const { registerPendingPropertyEdit } = await import('/src/services/pending-property-edits.ts')
+    const { registerPendingPropertyEdit } = await import('/src/ui/pending-property-edits.ts')
     globalThis.__releaseTitlebarDraft = registerPendingPropertyEdit()
   })
   await page.getByRole('button', { name: '关闭窗口', exact: true }).click()

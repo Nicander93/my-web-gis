@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { GisFeature } from '@desktop-webgis/gis-core'
-import { createDefaultLayerStyle } from '@desktop-webgis/gis-core'
+import type { GisFeature } from '@desktop-webgis/project'
+import { createDefaultLayerStyle } from '@desktop-webgis/project'
 import {
   listAttributeFields,
   listNumericFields,

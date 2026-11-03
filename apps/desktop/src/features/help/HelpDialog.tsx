@@ -1,6 +1,6 @@
-import { EditorDialog } from '@/components/ui/EditorDialog'
-import type { HelpDialogPage } from '@/app/commands/help.commands'
-import { version } from '../../../package.json'
+import { EditorDialog } from '@/ui/EditorDialog'
+import type { HelpDialogPage } from '@/commands/help.commands'
+import { version } from '@/../package.json'
 
 interface HelpDialogProps {
   page: HelpDialogPage

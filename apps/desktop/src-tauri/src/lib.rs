@@ -44,6 +44,11 @@ fn write_text_path(path: String, content: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn create_text_path(path: String, content: String) -> Result<(), String> {
+    atomic_file::create_atomic(std::path::Path::new(&path), content.as_bytes()).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 fn read_binary_path(path: String) -> Result<Vec<u8>, String> {
     std::fs::read(path).map_err(|error| error.to_string())
 }
@@ -260,6 +265,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             read_text_path,
             write_text_path,
+            create_text_path,
             read_binary_path,
             write_binary_path,
             list_recovery_cache,

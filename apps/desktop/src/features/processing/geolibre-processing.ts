@@ -1,4 +1,4 @@
-import { createId, type GisFeature, type ProcessingOptions, type ProcessingResult } from '@desktop-webgis/gis-core'
+import { createId, type GisFeature, type ProcessingOptions, type ProcessingResult } from '@desktop-webgis/project'
 import { checkGeometries } from '@desktop-webgis/spatial-analysis'
 import { runTool } from 'geolibre-wasm/tools'
 

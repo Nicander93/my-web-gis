@@ -1,6 +1,6 @@
 import proj4 from 'proj4'
 import type { CrsInfo } from './types.js'
-import type { GeoJsonGeometry } from '@desktop-webgis/scene-schema'
+import type { GeoJsonGeometry } from './types.js'
 import { registerCrsPresets } from './crs-presets.js'
 
 const WGS84 = 'EPSG:4326'

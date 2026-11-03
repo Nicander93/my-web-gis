@@ -1,5 +1,6 @@
+import { requireMapContent } from '@desktop-webgis/project'
 import { capabilitiesForDataset, cloneValue, createId, getEffectiveLocked, SetDatasetContentCommand,
-  type GisFeature, type ProjectSnapshot } from '@desktop-webgis/gis-core'
+  type GisFeature, type ProjectSnapshot } from '@desktop-webgis/project'
 import type { AnalysisGeometry } from '@desktop-webgis/spatial-analysis'
 import { resolveDatasetFields, validateFieldValue } from '@/features/attribute-table/field-edits'
 
@@ -20,10 +21,10 @@ export type PolygonGeometryResult = { mode: 'merge'; geometry: Polygon | MultiPo
   | { mode: 'split'; parts: Record<string, Polygon[] | null> }
 
 export function getPolygonTarget(snapshot: ProjectSnapshot, layerId: string, ids: readonly string[]) {
-  const layer = snapshot.project.layers.find((item) => item.id === layerId)
-  const dataset = snapshot.project.datasets.find((item) => item.id === layer?.datasetId)
+  const layer = requireMapContent(snapshot.project).layers.find((item) => item.id === layerId)
+  const dataset = requireMapContent(snapshot.project).datasets.find((item) => item.id === layer?.datasetId)
   if (!layer || !dataset || !capabilitiesForDataset(dataset).editGeometry) throw new Error('请选择可写的本地矢量编辑目标')
-  const locked = snapshot.project.layers.find((item) => item.datasetId === dataset.id && getEffectiveLocked(snapshot.project, item.id))
+  const locked = requireMapContent(snapshot.project).layers.find((item) => item.datasetId === dataset.id && getEffectiveLocked(snapshot.project, item.id))
   if (locked) throw new Error(`共享数据集的图层 ${locked.name} 已锁定`)
   const features = snapshot.featuresByDataset[dataset.id] ?? []
   const lookup = new Map(features.map((feature) => [feature.id, feature]))

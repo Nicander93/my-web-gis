@@ -1,8 +1,16 @@
+import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
+import { layerContentCommands } from '@/commands/layer-content.commands'
+import { projectSession } from '@/session/project-session'
+import { projectEdits } from '@/session/project-edits'
+import { featureData } from '@/data/feature-data'
+import { selectionCommands } from '@/commands/selection.commands'
+import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { requireMapContent } from '@desktop-webgis/project'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createProject, parseProjectSnapshot, processFeatures, serializeProjectSnapshot, type GisFeature, type ProcessingOptions } from '@desktop-webgis/gis-core'
-import { useProjectStore } from '@/stores/project.store'
-import { addProcessingResult, processingInput, runProcessing } from '@/services/processing'
-import { processingCommands } from '@/app/commands/processing.commands'
+import { createProject, parseProjectSnapshot, processFeatures, serializeProjectSnapshot, type GisFeature, type ProcessingOptions } from '@desktop-webgis/project'
+import { useProjectStore } from '@/session/project.store'
+import { addProcessingResult, processingInput, runProcessing } from '@/commands/processing-run'
+import { processingCommands } from '@/commands/processing.commands'
 import { executeProcessing } from '@/features/processing/executeProcessing'
 
 const features: GisFeature[] = [1, 2, 3].map(value => ({ id: `f${value}`, geometry: { type: 'Point', coordinates: [116 + value / 10, 40] }, properties: { value } }))
@@ -10,15 +18,15 @@ const features: GisFeature[] = [1, 2, 3].map(value => ({ id: `f${value}`, geomet
 describe('processing workflow', () => {
   afterEach(() => vi.unstubAllGlobals())
   beforeEach(() => {
-    useProjectStore.getState()._resetProjectHistoryForTests()
-    useProjectStore.setState({ project: createProject('处理测试'), featuresByDataset: {}, dirty: false, selectedLayerId: null, selection: { layerId: null, featureIds: [] } })
-    useProjectStore.getState().addLayer('source', '站点', features, 'point')
+    projectEdits.clear()
+    useProjectStore.setState({ project: createProject('处理测试'), dirty: false }); featureData.replaceAll({}); useLayerViewStore.setState({ selectedLayerId: null, selection: { layerId: null, featureIds: [] } })
+    layerContentCommands.addLayer('source', '站点', features, 'point')
     useProjectStore.setState({ dirty: false })
   })
   it('resolves all, filtered and selected input consistently', () => {
-    const id = useProjectStore.getState().selectedLayerId!
-    useProjectStore.getState().setLayerFilter(id, [{ field: 'value', op: 'gte', value: 2 }])
-    useProjectStore.getState().setSelection({ layerId: id, featureIds: ['f1', 'f3'] })
+    const id = useLayerViewStore.getState().selectedLayerId!
+    layerConfigurationCommands.setLayerFilter(id, [{ field: 'value', op: 'gte', value: 2 }])
+    selectionCommands.setSelection({ layerId: id, featureIds: ['f1', 'f3'] })
     expect(processingInput(id, 'all')).toHaveLength(3)
     expect(processingInput(id, 'filtered').map(f => f.id)).toEqual(['f2', 'f3'])
     expect(processingInput(id, 'selected').map(f => f.id)).toEqual(['f3'])
@@ -27,23 +35,23 @@ describe('processing workflow', () => {
   it('commits an independent result that is included in project snapshots', () => {
     const state = useProjectStore.getState()
     const result = processFeatures(features, { tool: 'buffer', distance: 100, unit: 'meters' })
-    const id = addProcessingResult(state.project.id, '站点缓冲区', result)
-    const after = useProjectStore.getState()
-    const layer = after.project.layers.find(l => l.id === id)!
+    const id = addProcessingResult(state.project.metadata.id, '站点缓冲区', result)
+    const after = useProjectStore.getState(), afterFeatureData = featureData.readSnapshot()
+    const layer = requireMapContent(after.project).layers.find(l => l.id === id)!
     expect(layer.datasetId).not.toBe('source')
-    expect(after.featuresByDataset[layer.datasetId]).toHaveLength(3)
+    expect(afterFeatureData[layer.datasetId]).toHaveLength(3)
     expect(after.dirty).toBe(true)
-    expect(after.getSnapshot().featuresByDataset[layer.datasetId]).toHaveLength(3)
+    expect(projectSession.getSnapshot().featuresByDataset[layer.datasetId]).toHaveLength(3)
     result.features[0].properties.value = 99
-    expect(after.featuresByDataset[layer.datasetId][0].properties.value).toBe(1)
-    expect(after.featuresByDataset.source[0].geometry.type).toBe('Point')
+    expect(afterFeatureData[layer.datasetId][0].properties.value).toBe(1)
+    expect(afterFeatureData.source[0].geometry.type).toBe('Point')
   })
   it('rejects empty results and results from a project that has been replaced', () => {
     const state = useProjectStore.getState()
     const result = processFeatures(features, { tool: 'centroid' })
     expect(() => addProcessingResult('old-project', '结果', result)).toThrow('项目已切换')
-    expect(() => addProcessingResult(state.project.id, '结果', { features: [], inputCount: 0 })).toThrow('为空')
-    expect(useProjectStore.getState().project.layers).toHaveLength(1)
+    expect(() => addProcessingResult(state.project.metadata.id, '结果', { features: [], inputCount: 0 })).toThrow('为空')
+    expect(requireMapContent(useProjectStore.getState().project).layers).toHaveLength(1)
     expect(useProjectStore.getState().dirty).toBe(false)
   })
   it('already cancelled work never starts a worker or writes project state', async () => {
@@ -70,97 +78,97 @@ describe('processing workflow', () => {
 
   it('measurement fields support selection, independent data, undo and serialized provenance', async () => {
     const area: GisFeature = { id: 'area', properties: { population: 100 }, geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] } }
-    useProjectStore.getState().addLayer('areas', '区域', [area, { ...area, id: 'other' }], 'polygon')
-    const layerId = useProjectStore.getState().selectedLayerId!
-    useProjectStore.getState().setSelection({ layerId, featureIds: ['area'] })
-    const before = useProjectStore.getState().getSnapshot()
+    layerContentCommands.addLayer('areas', '区域', [area, { ...area, id: 'other' }], 'polygon')
+    const layerId = useLayerViewStore.getState().selectedLayerId!
+    selectionCommands.setSelection({ layerId, featureIds: ['area'] })
+    const before = projectSession.getSnapshot()
     const workers = fakeWorker()
     const options: ProcessingOptions = { tool: 'measure-area', field: 'area_km2', unit: 'square-kilometers' }
     const pending = processingCommands.run({ layerId, scope: 'selected', options, name: '面积', signal: new AbortController().signal })
     const worker = workers.current
     worker.onmessage!({ data: { result: executeProcessing(worker.payload.features, worker.payload.options) } })
     const completed = await pending
-    const snapshot = useProjectStore.getState().getSnapshot()
-    const resultLayer = snapshot.project.layers.find(layer => layer.id === completed.layerId)!
+    const snapshot = projectSession.getSnapshot()
+    const resultLayer = requireMapContent(snapshot.project).layers.find(layer => layer.id === completed.layerId)!
     expect(snapshot.featuresByDataset[resultLayer.datasetId][0].properties.area_km2).toBeCloseTo(12363.718, 2)
     expect(snapshot.featuresByDataset.areas).toEqual(before.featuresByDataset.areas)
     const saved = parseProjectSnapshot(serializeProjectSnapshot(snapshot))
-    expect(saved.project.datasets.find(dataset => dataset.id === resultLayer.datasetId)).toMatchObject({ processing: { options, scope: 'selected', inputCount: 1 } })
-    expect(useProjectStore.getState().undoEdit()).toBe(true)
-    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
-    expect(useProjectStore.getState().redoEdit()).toBe(true)
-    expect(useProjectStore.getState().getSnapshot()).toEqual(snapshot)
+    expect(requireMapContent(saved.project).datasets.find(dataset => dataset.id === resultLayer.datasetId)).toMatchObject({ processing: { options, scope: 'selected', inputCount: 1 } })
+    expect(projectEdits.undo()).toBe(true)
+    expect(projectSession.getSnapshot()).toEqual(before)
+    expect(projectEdits.redo()).toBe(true)
+    expect(projectSession.getSnapshot()).toEqual(snapshot)
     expect(executeProcessing([area], { tool: 'measure-perimeter', field: 'perimeter', unit: 'kilometers' }).features[0].properties.perimeter).toBeGreaterThan(400)
     expect(executeProcessing([{ ...area, geometry: { type: 'LineString', coordinates: [[0, 0], [1, 0]] } }], { tool: 'measure-length', field: 'length', unit: 'meters' }).features[0].properties.length).toBeCloseTo(111195.08, 1)
   })
 
   it('field previews sample scoped data without adding history or dirtying the project', async () => {
     const workers = fakeWorker()
-    const layerId = useProjectStore.getState().selectedLayerId!
-    useProjectStore.setState({ featuresByDataset: { source: Array.from({ length: 7 }, (_, index) => ({ ...features[0], id: `sample${index}`, properties: { value: index } })) } })
-    const before = useProjectStore.getState().getSnapshot()
+    const layerId = useLayerViewStore.getState().selectedLayerId!
+    featureData.replaceAll({ source: Array.from({ length: 7 }, (_, index) => ({ ...features[0], id: `sample${index}`, properties: { value: index } })) })
+    const before = projectSession.getSnapshot()
     const pending = processingCommands.preview({ layerId, scope: 'all', options: { tool: 'calculate-field', field: 'double', expression: 'field("value") * 2' }, signal: new AbortController().signal })
     const worker = workers.current
     expect(worker.payload.features).toHaveLength(5)
     worker.onmessage!({ data: { result: executeProcessing(worker.payload.features, worker.payload.options) } })
     expect(await pending).toEqual({ values: [0, 2, 4, 6, 8], total: 7 })
     expect(worker.terminated).toBe(true)
-    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
+    expect(projectSession.getSnapshot()).toEqual(before)
     expect(useProjectStore.getState().dirty).toBe(false)
   })
 
   it('rejects a field preview when source data changes while the worker runs', async () => {
     const workers = fakeWorker()
-    const pending = processingCommands.preview({ layerId: useProjectStore.getState().selectedLayerId!, scope: 'all', options: { tool: 'calculate-field', field: 'double', expression: 'field("value") * 2' }, signal: new AbortController().signal })
-    useProjectStore.setState({ featuresByDataset: { source: [...features] } })
+    const pending = processingCommands.preview({ layerId: useLayerViewStore.getState().selectedLayerId!, scope: 'all', options: { tool: 'calculate-field', field: 'double', expression: 'field("value") * 2' }, signal: new AbortController().signal })
+    featureData.replaceAll({ source: [...features] })
     const worker = workers.current
     worker.onmessage!({ data: { result: executeProcessing(worker.payload.features, worker.payload.options) } })
     await expect(pending).rejects.toThrow('输入数据已变化')
-    expect(useProjectStore.getState().project.layers).toHaveLength(1)
+    expect(requireMapContent(useProjectStore.getState().project).layers).toHaveLength(1)
   })
 
   it('field calculation persists its expression and rolls back the whole batch on an error', async () => {
     const workers = fakeWorker()
-    const layerId = useProjectStore.getState().selectedLayerId!
+    const layerId = useLayerViewStore.getState().selectedLayerId!
     const options: ProcessingOptions = { tool: 'calculate-field', field: 'double', expression: 'field("value") * 2' }
     const pending = processingCommands.run({ layerId, scope: 'all', options, name: '计算结果', signal: new AbortController().signal })
     let worker = workers.current
     worker.onmessage!({ data: { result: executeProcessing(worker.payload.features, worker.payload.options) } })
     const completed = await pending
-    const snapshot = parseProjectSnapshot(serializeProjectSnapshot(useProjectStore.getState().getSnapshot()))
-    const resultLayer = snapshot.project.layers.find(layer => layer.id === completed.layerId)!
+    const snapshot = parseProjectSnapshot(serializeProjectSnapshot(projectSession.getSnapshot()))
+    const resultLayer = requireMapContent(snapshot.project).layers.find(layer => layer.id === completed.layerId)!
     expect(snapshot.featuresByDataset[resultLayer.datasetId].map(row => row.properties.double)).toEqual([2, 4, 6])
-    expect(snapshot.project.datasets.find(dataset => dataset.id === resultLayer.datasetId)).toMatchObject({ processing: { options } })
-    const before = useProjectStore.getState().getSnapshot()
+    expect(requireMapContent(snapshot.project).datasets.find(dataset => dataset.id === resultLayer.datasetId)).toMatchObject({ processing: { options } })
+    const before = projectSession.getSnapshot()
     const failing = processingCommands.run({ layerId, scope: 'all', options: { ...options, expression: '1 / (field("value") - 2)' }, name: '失败结果', signal: new AbortController().signal })
     worker = workers.current
     try { executeProcessing(worker.payload.features, worker.payload.options) }
     catch (error) { worker.onmessage!({ data: { error: (error as Error).message } }) }
     await expect(failing).rejects.toThrow('f2')
-    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
+    expect(projectSession.getSnapshot()).toEqual(before)
   })
 
   it('command commits worker output and processing provenance survives save/reopen', async () => {
     const workerClass = fakeWorker()
-    const sourceId = useProjectStore.getState().selectedLayerId!
+    const sourceId = useLayerViewStore.getState().selectedLayerId!
     const pending = processingCommands.run({ layerId: sourceId, scope: 'all', options: { tool: 'buffer', distance: 100, unit: 'meters' }, name: '缓冲结果', signal: new AbortController().signal })
     const worker = workerClass.current
     const result = executeProcessing(worker.payload.features, worker.payload.options)
     worker.onmessage!({ data: { result } })
     const completed = await pending
     expect(worker.terminated).toBe(true)
-    const snapshot = parseProjectSnapshot(serializeProjectSnapshot(useProjectStore.getState().getSnapshot()))
-    useProjectStore.getState().loadSnapshot(snapshot)
-    const layer = snapshot.project.layers.find(l => l.id === completed.layerId)!
-    const dataset = snapshot.project.datasets.find(d => d.id === layer.datasetId)!
+    const snapshot = parseProjectSnapshot(serializeProjectSnapshot(projectSession.getSnapshot()))
+    projectSession.loadSnapshot(snapshot)
+    const layer = requireMapContent(snapshot.project).layers.find(l => l.id === completed.layerId)!
+    const dataset = requireMapContent(snapshot.project).datasets.find(d => d.id === layer.datasetId)!
     expect(dataset.kind === 'vector' && dataset.processing).toMatchObject({ sourceLayerId: sourceId, sourceLayerName: '站点', inputCount: 3, outputCount: 3, options: { tool: 'buffer', distance: 100, unit: 'meters' } })
-    expect(useProjectStore.getState().featuresByDataset[layer.datasetId][0].geometry.type).toBe('Polygon')
+    expect(featureData.readSnapshot()[layer.datasetId][0].geometry.type).toBe('Polygon')
   })
 
   it('cancellation terminates a running worker and never commits its late response', async () => {
     const workerClass = fakeWorker()
     const controller = new AbortController()
-    const pending = processingCommands.run({ layerId: useProjectStore.getState().selectedLayerId!, scope: 'all', options: { tool: 'centroid' }, name: '结果', signal: controller.signal })
+    const pending = processingCommands.run({ layerId: useLayerViewStore.getState().selectedLayerId!, scope: 'all', options: { tool: 'centroid' }, name: '结果', signal: controller.signal })
     const rejection = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
     const lateResponse = workerClass.current.onmessage!
     controller.abort()
@@ -168,80 +176,80 @@ describe('processing workflow', () => {
     expect(worker.terminated).toBe(true)
     lateResponse({ data: { result: processFeatures(features, { tool: 'centroid' }) } })
     await rejection
-    expect(useProjectStore.getState().project.layers).toHaveLength(1)
+    expect(requireMapContent(useProjectStore.getState().project).layers).toHaveLength(1)
     expect(useProjectStore.getState().dirty).toBe(false)
   })
 
   it('worker failure leaves source data and project unchanged', async () => {
     const workerClass = fakeWorker()
-    const pending = processingCommands.run({ layerId: useProjectStore.getState().selectedLayerId!, scope: 'all', options: { tool: 'centroid' }, name: '结果', signal: new AbortController().signal })
+    const pending = processingCommands.run({ layerId: useLayerViewStore.getState().selectedLayerId!, scope: 'all', options: { tool: 'centroid' }, name: '结果', signal: new AbortController().signal })
     workerClass.current.onmessage!({ data: { error: '要素 f2 无效' } })
     await expect(pending).rejects.toThrow('f2')
     expect(workerClass.current.terminated).toBe(true)
-    expect(useProjectStore.getState().project.layers).toHaveLength(1)
+    expect(requireMapContent(useProjectStore.getState().project).layers).toHaveLength(1)
     expect(useProjectStore.getState().dirty).toBe(false)
   })
 
   it('a project switch while processing prevents result insertion', async () => {
     const workerClass = fakeWorker()
-    const pending = processingCommands.run({ layerId: useProjectStore.getState().selectedLayerId!, scope: 'all', options: { tool: 'centroid' }, name: '结果', signal: new AbortController().signal })
-    useProjectStore.getState().loadSnapshot({ project: createProject('另一个项目'), featuresByDataset: {} })
+    const pending = processingCommands.run({ layerId: useLayerViewStore.getState().selectedLayerId!, scope: 'all', options: { tool: 'centroid' }, name: '结果', signal: new AbortController().signal })
+    projectSession.loadSnapshot({ project: createProject('另一个项目'), featuresByDataset: {} })
     expect(workerClass.current.onmessage).toBeNull()
     expect(workerClass.current.terminated).toBe(true)
     await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
-    expect(useProjectStore.getState().project.layers).toHaveLength(0)
+    expect(requireMapContent(useProjectStore.getState().project).layers).toHaveLength(0)
     expect(useProjectStore.getState().dirty).toBe(false)
   })
 
   it('uses the second layer filter snapshot and persists both input descriptions', async () => {
     const polygon = (id: string, west: number): GisFeature => ({ id, properties: { keep: id === 'b1' }, geometry: { type: 'Polygon', coordinates: [[[west, 0], [west + 2, 0], [west + 2, 2], [west, 2], [west, 0]]] } })
-    useProjectStore.getState().addLayer('area', '区域', [polygon('a', 0)], 'polygon')
-    const layerId = useProjectStore.getState().selectedLayerId!
-    useProjectStore.getState().addLayer('masks', '掩膜', [polygon('b1', 1), polygon('b2', 10)], 'polygon')
-    const overlayId = useProjectStore.getState().selectedLayerId!
-    useProjectStore.getState().setLayerFilter(overlayId, [{ field: 'keep', op: 'eq', value: true }])
+    layerContentCommands.addLayer('area', '区域', [polygon('a', 0)], 'polygon')
+    const layerId = useLayerViewStore.getState().selectedLayerId!
+    layerContentCommands.addLayer('masks', '掩膜', [polygon('b1', 1), polygon('b2', 10)], 'polygon')
+    const overlayId = useLayerViewStore.getState().selectedLayerId!
+    layerConfigurationCommands.setLayerFilter(overlayId, [{ field: 'keep', op: 'eq', value: true }])
     const workerClass = fakeWorker()
     const pending = processingCommands.run({ layerId, scope: 'all', overlay: { layerId: overlayId, scope: 'filtered' }, options: { tool: 'clip' }, name: '裁剪结果', signal: new AbortController().signal })
     const worker = workerClass.current
     expect(worker.payload.overlay.map(f => f.id)).toEqual(['b1'])
-    useProjectStore.getState().setLayerFilter(overlayId, [])
+    layerConfigurationCommands.setLayerFilter(overlayId, [])
     expect(worker.payload.overlay).toHaveLength(1)
     worker.onmessage!({ data: { result: executeProcessing(worker.payload.features, worker.payload.options, worker.payload.overlay) } })
     const completed = await pending
-    const snapshot = parseProjectSnapshot(serializeProjectSnapshot(useProjectStore.getState().getSnapshot()))
-    const resultLayer = snapshot.project.layers.find(l => l.id === completed.layerId)!
-    const dataset = snapshot.project.datasets.find(d => d.id === resultLayer.datasetId)!
+    const snapshot = parseProjectSnapshot(serializeProjectSnapshot(projectSession.getSnapshot()))
+    const resultLayer = requireMapContent(snapshot.project).layers.find(l => l.id === completed.layerId)!
+    const dataset = requireMapContent(snapshot.project).datasets.find(d => d.id === resultLayer.datasetId)!
     expect(dataset.kind === 'vector' && dataset.processing?.overlay).toEqual({ layerId: overlayId, layerName: '掩膜', scope: 'filtered', inputCount: 1 })
     expect(completed.outputCount).toBe(1)
   })
 
   it('empty overlay results do not create layers or mark the project dirty', async () => {
     const workerClass = fakeWorker()
-    const id = useProjectStore.getState().selectedLayerId!
+    const id = useLayerViewStore.getState().selectedLayerId!
     const pending = processingCommands.run({ layerId: id, scope: 'all', overlay: { layerId: id, scope: 'all' }, options: { tool: 'intersect' }, name: '空结果', signal: new AbortController().signal })
     workerClass.current.onmessage!({ data: { result: { features: [], inputCount: 3, overlayCount: 3 } } })
     await expect(pending).rejects.toThrow('没有符合条件')
-    expect(useProjectStore.getState().project.layers).toHaveLength(1)
+    expect(requireMapContent(useProjectStore.getState().project).layers).toHaveLength(1)
     expect(useProjectStore.getState().dirty).toBe(false)
   })
 
   it('location extraction captures selection and preserves geometry and provenance after reopen', async () => {
-    const layerId = useProjectStore.getState().selectedLayerId!
-    useProjectStore.getState().setSelection({ layerId, featureIds: ['f2'] })
-    useProjectStore.getState().addLayer('mask', '提取范围', [{ id: 'mask', properties: {}, geometry: { type: 'Polygon', coordinates: [[[116, 39], [117, 39], [117, 41], [116, 41], [116, 39]]] } }], 'polygon')
-    const overlayId = useProjectStore.getState().selectedLayerId!
-    useProjectStore.getState().setSelection({ layerId, featureIds: ['f2'] })
+    const layerId = useLayerViewStore.getState().selectedLayerId!
+    selectionCommands.setSelection({ layerId, featureIds: ['f2'] })
+    layerContentCommands.addLayer('mask', '提取范围', [{ id: 'mask', properties: {}, geometry: { type: 'Polygon', coordinates: [[[116, 39], [117, 39], [117, 41], [116, 41], [116, 39]]] } }], 'polygon')
+    const overlayId = useLayerViewStore.getState().selectedLayerId!
+    selectionCommands.setSelection({ layerId, featureIds: ['f2'] })
     const workerClass = fakeWorker()
     const pending = processingCommands.run({ layerId, scope: 'selected', overlay: { layerId: overlayId, scope: 'all' }, options: { tool: 'extract-location', predicate: 'within' }, name: '范围内站点', signal: new AbortController().signal })
     const worker = workerClass.current
     expect(worker.payload.features.map(f => f.id)).toEqual(['f2'])
-    useProjectStore.getState().setSelection({ layerId, featureIds: ['f1'] })
+    selectionCommands.setSelection({ layerId, featureIds: ['f1'] })
     worker.onmessage!({ data: { result: executeProcessing(worker.payload.features, worker.payload.options, worker.payload.overlay) } })
     const completed = await pending
-    const snapshot = parseProjectSnapshot(serializeProjectSnapshot(useProjectStore.getState().getSnapshot()))
-    useProjectStore.getState().loadSnapshot(snapshot)
-    const resultLayer = snapshot.project.layers.find(l => l.id === completed.layerId)!
-    const dataset = snapshot.project.datasets.find(d => d.id === resultLayer.datasetId)!
+    const snapshot = parseProjectSnapshot(serializeProjectSnapshot(projectSession.getSnapshot()))
+    projectSession.loadSnapshot(snapshot)
+    const resultLayer = requireMapContent(snapshot.project).layers.find(l => l.id === completed.layerId)!
+    const dataset = requireMapContent(snapshot.project).datasets.find(d => d.id === resultLayer.datasetId)!
     expect(dataset.kind === 'vector' && dataset.processing).toMatchObject({ scope: 'selected', inputCount: 1, outputCount: 1, options: { tool: 'extract-location', predicate: 'within' }, overlay: { layerId: overlayId, inputCount: 1 } })
     expect(snapshot.featuresByDataset[resultLayer.datasetId][0].geometry).toEqual(features[1].geometry)
     expect(snapshot.featuresByDataset.source).toEqual(features)
@@ -249,23 +257,23 @@ describe('processing workflow', () => {
   })
 
   it('unmatched location extraction leaves the project unchanged', async () => {
-    const layerId = useProjectStore.getState().selectedLayerId!
-    useProjectStore.getState().addLayer('mask', '远处范围', [{ id: 'mask', properties: {}, geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] } }], 'polygon')
-    const overlayId = useProjectStore.getState().selectedLayerId!
+    const layerId = useLayerViewStore.getState().selectedLayerId!
+    layerContentCommands.addLayer('mask', '远处范围', [{ id: 'mask', properties: {}, geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] } }], 'polygon')
+    const overlayId = useLayerViewStore.getState().selectedLayerId!
     useProjectStore.setState({ dirty: false })
-    const before = useProjectStore.getState().getSnapshot()
+    const before = projectSession.getSnapshot()
     const workerClass = fakeWorker()
     const pending = processingCommands.run({ layerId, scope: 'all', overlay: { layerId: overlayId, scope: 'all' }, options: { tool: 'extract-location', predicate: 'intersects' }, name: '空结果', signal: new AbortController().signal })
     const worker = workerClass.current
     worker.onmessage!({ data: { result: executeProcessing(worker.payload.features, worker.payload.options, worker.payload.overlay) } })
     await expect(pending).rejects.toThrow('没有符合空间关系')
-    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
+    expect(projectSession.getSnapshot()).toEqual(before)
     expect(useProjectStore.getState().dirty).toBe(false)
   })
 
   it('missing or empty second input is rejected before starting work', async () => {
     const workerClass = fakeWorker()
-    const args = { layerId: useProjectStore.getState().selectedLayerId!, scope: 'all' as const, options: { tool: 'clip' as const }, name: '结果', signal: new AbortController().signal }
+    const args = { layerId: useLayerViewStore.getState().selectedLayerId!, scope: 'all' as const, options: { tool: 'clip' as const }, name: '结果', signal: new AbortController().signal }
     await expect(processingCommands.run(args)).rejects.toThrow('请选择第二输入')
     await expect(processingCommands.run({ ...args, overlay: { layerId: args.layerId, scope: 'selected' } })).rejects.toThrow('第二输入范围')
     expect(workerClass.current).toBeUndefined()
@@ -273,98 +281,98 @@ describe('processing workflow', () => {
   })
 
   it('summary results preserve empty regions, provenance and a complete undo/redo step', async () => {
-    const sourceLayer = useProjectStore.getState().selectedLayerId!
-    useProjectStore.getState().setSelection({ layerId: sourceLayer, featureIds: ['f2'] })
+    const sourceLayer = useLayerViewStore.getState().selectedLayerId!
+    selectionCommands.setSelection({ layerId: sourceLayer, featureIds: ['f2'] })
     const area: GisFeature = { id: 'area', properties: { code: 'a' }, geometry: { type: 'Polygon', coordinates: [[[116, 39], [117, 39], [117, 41], [116, 41], [116, 39]]] } }
     const empty: GisFeature = { id: 'empty', properties: { code: 'b' }, geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] } }
-    useProjectStore.getState().addLayer('areas', '行政区', [area, empty], 'polygon')
-    const layerId = useProjectStore.getState().selectedLayerId!
-    const before = useProjectStore.getState().getSnapshot()
+    layerContentCommands.addLayer('areas', '行政区', [area, empty], 'polygon')
+    const layerId = useLayerViewStore.getState().selectedLayerId!
+    const before = projectSession.getSnapshot()
     const workerClass = fakeWorker()
     const pending = processingCommands.run({ layerId, scope: 'all', overlay: { layerId: sourceLayer, scope: 'selected' }, options: { tool: 'summarize-location', predicate: 'intersects', field: 'value', prefix: 'stats_' }, name: '区域统计', signal: new AbortController().signal })
     const worker = workerClass.current
     worker.onmessage!({ data: { result: executeProcessing(worker.payload.features, worker.payload.options, worker.payload.overlay) } })
     const completed = await pending
-    const snapshot = useProjectStore.getState().getSnapshot()
-    const resultLayer = snapshot.project.layers.find(layer => layer.id === completed.layerId)!
+    const snapshot = projectSession.getSnapshot()
+    const resultLayer = requireMapContent(snapshot.project).layers.find(layer => layer.id === completed.layerId)!
     expect(snapshot.featuresByDataset[resultLayer.datasetId].map(row => [row.properties.stats_count, row.properties.stats_sum, row.properties.stats_mean])).toEqual([[1, 2, 2], [0, 0, null]])
     const reopened = parseProjectSnapshot(serializeProjectSnapshot(snapshot))
-    const dataset = reopened.project.datasets.find(dataset => dataset.id === resultLayer.datasetId)!
+    const dataset = requireMapContent(reopened.project).datasets.find(dataset => dataset.id === resultLayer.datasetId)!
     expect(dataset.kind === 'vector' && dataset.processing?.options).toEqual({ tool: 'summarize-location', predicate: 'intersects', field: 'value', prefix: 'stats_' })
-    expect(useProjectStore.getState().undoEdit()).toBe(true)
-    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
-    expect(useProjectStore.getState().selectedLayerId).toBe(layerId)
-    expect(useProjectStore.getState().redoEdit()).toBe(true)
-    expect(useProjectStore.getState().getSnapshot()).toEqual(snapshot)
-    expect(useProjectStore.getState().selectedLayerId).toBe(completed.layerId)
+    expect(projectEdits.undo()).toBe(true)
+    expect(projectSession.getSnapshot()).toEqual(before)
+    expect(useLayerViewStore.getState().selectedLayerId).toBe(layerId)
+    expect(projectEdits.redo()).toBe(true)
+    expect(projectSession.getSnapshot()).toEqual(snapshot)
+    expect(useLayerViewStore.getState().selectedLayerId).toBe(completed.layerId)
   })
 
   it('attribute join captures second-input filters and saves independent result attributes', async () => {
-    const layerId = useProjectStore.getState().selectedLayerId!
-    useProjectStore.getState().addLayer('lookup', '业务表', features.map((feature, index) => ({ ...feature, id: `lookup${index}`, properties: { key: feature.properties.value, label: `站点${index}`, keep: index === 1 } })), 'point')
-    const overlayId = useProjectStore.getState().selectedLayerId!
-    useProjectStore.getState().setLayerFilter(overlayId, [{ field: 'keep', op: 'eq', value: true }])
+    const layerId = useLayerViewStore.getState().selectedLayerId!
+    layerContentCommands.addLayer('lookup', '业务表', features.map((feature, index) => ({ ...feature, id: `lookup${index}`, properties: { key: feature.properties.value, label: `站点${index}`, keep: index === 1 } })), 'point')
+    const overlayId = useLayerViewStore.getState().selectedLayerId!
+    layerConfigurationCommands.setLayerFilter(overlayId, [{ field: 'keep', op: 'eq', value: true }])
     const workerClass = fakeWorker()
     const options = { tool: 'attribute-join' as const, inputKey: 'value', joinKey: 'key', fields: ['label'], prefix: 'business_', mode: 'left' as const }
     const pending = processingCommands.run({ layerId, scope: 'all', overlay: { layerId: overlayId, scope: 'filtered' }, options, name: '关联结果', signal: new AbortController().signal })
     const worker = workerClass.current
     worker.onmessage!({ data: { result: executeProcessing(worker.payload.features, worker.payload.options, worker.payload.overlay) } })
     const completed = await pending
-    const snapshot = parseProjectSnapshot(serializeProjectSnapshot(useProjectStore.getState().getSnapshot()))
-    const layer = snapshot.project.layers.find(layer => layer.id === completed.layerId)!
+    const snapshot = parseProjectSnapshot(serializeProjectSnapshot(projectSession.getSnapshot()))
+    const layer = requireMapContent(snapshot.project).layers.find(layer => layer.id === completed.layerId)!
     expect(snapshot.featuresByDataset[layer.datasetId].map(feature => feature.properties.business_label)).toEqual([null, '站点1', null])
     expect(snapshot.featuresByDataset.source).toEqual(features)
-    expect(snapshot.project.datasets.find(dataset => dataset.id === layer.datasetId)).toMatchObject({ processing: { options, overlay: { scope: 'filtered', inputCount: 1 } } })
+    expect(requireMapContent(snapshot.project).datasets.find(dataset => dataset.id === layer.datasetId)).toMatchObject({ processing: { options, overlay: { scope: 'filtered', inputCount: 1 } } })
   })
 
   it('line clipping uses selected inputs, preserves multipart results and supports undo/save', async () => {
     const road: GisFeature = { id: 'road', properties: { name: '道路', value: 7 }, geometry: { type: 'LineString', coordinates: [[-2, 5], [12, 5]] } }
     const area: GisFeature = { id: 'area', properties: {}, geometry: { type: 'Polygon', coordinates: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]], [[4, 4], [4, 6], [6, 6], [6, 4], [4, 4]]] } }
-    useProjectStore.getState().addLayer('roads', '道路', [road, { ...road, id: 'unselected' }], 'line')
-    const layerId = useProjectStore.getState().selectedLayerId!
-    useProjectStore.getState().addLayer('areas', '范围', [area], 'polygon')
-    const overlayId = useProjectStore.getState().selectedLayerId!
-    useProjectStore.getState().setSelection({ layerId, featureIds: ['road'] })
-    const before = useProjectStore.getState().getSnapshot()
+    layerContentCommands.addLayer('roads', '道路', [road, { ...road, id: 'unselected' }], 'line')
+    const layerId = useLayerViewStore.getState().selectedLayerId!
+    layerContentCommands.addLayer('areas', '范围', [area], 'polygon')
+    const overlayId = useLayerViewStore.getState().selectedLayerId!
+    selectionCommands.setSelection({ layerId, featureIds: ['road'] })
+    const before = projectSession.getSnapshot()
     const workerClass = fakeWorker()
     const pending = processingCommands.run({ layerId, scope: 'selected', overlay: { layerId: overlayId, scope: 'all' }, options: { tool: 'clip-lines' }, name: '道路裁剪', signal: new AbortController().signal })
     const worker = workerClass.current
     worker.onmessage!({ data: { result: executeProcessing(worker.payload.features, worker.payload.options, worker.payload.overlay) } })
     const completed = await pending
-    const snapshot = useProjectStore.getState().getSnapshot()
-    const resultLayer = snapshot.project.layers.find(layer => layer.id === completed.layerId)!
+    const snapshot = projectSession.getSnapshot()
+    const resultLayer = requireMapContent(snapshot.project).layers.find(layer => layer.id === completed.layerId)!
     expect(snapshot.featuresByDataset[resultLayer.datasetId]).toHaveLength(1)
     expect(snapshot.featuresByDataset[resultLayer.datasetId][0]).toMatchObject({ geometry: { type: 'MultiLineString' }, properties: road.properties, metadata: { sourceId: 'road' } })
     const saved = parseProjectSnapshot(serializeProjectSnapshot(snapshot))
-    expect(saved.project.datasets.find(dataset => dataset.id === resultLayer.datasetId)).toMatchObject({ processing: { options: { tool: 'clip-lines' }, scope: 'selected', inputCount: 1, outputCount: 1 } })
-    expect(useProjectStore.getState().undoEdit()).toBe(true)
-    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
-    expect(useProjectStore.getState().redoEdit()).toBe(true)
-    expect(useProjectStore.getState().getSnapshot()).toEqual(snapshot)
+    expect(requireMapContent(saved.project).datasets.find(dataset => dataset.id === resultLayer.datasetId)).toMatchObject({ processing: { options: { tool: 'clip-lines' }, scope: 'selected', inputCount: 1, outputCount: 1 } })
+    expect(projectEdits.undo()).toBe(true)
+    expect(projectSession.getSnapshot()).toEqual(before)
+    expect(projectEdits.redo()).toBe(true)
+    expect(projectSession.getSnapshot()).toEqual(snapshot)
   })
 
   it('empty line clipping reports no segments without changing project state', async () => {
-    useProjectStore.getState().addLayer('roads', '道路', [{ id: 'outside', properties: {}, geometry: { type: 'LineString', coordinates: [[-2, -2], [-1, -1]] } }], 'line')
-    const layerId = useProjectStore.getState().selectedLayerId!
-    useProjectStore.getState().addLayer('areas', '范围', [{ id: 'area', properties: {}, geometry: { type: 'Polygon', coordinates: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]] } }], 'polygon')
-    const overlayId = useProjectStore.getState().selectedLayerId!
+    layerContentCommands.addLayer('roads', '道路', [{ id: 'outside', properties: {}, geometry: { type: 'LineString', coordinates: [[-2, -2], [-1, -1]] } }], 'line')
+    const layerId = useLayerViewStore.getState().selectedLayerId!
+    layerContentCommands.addLayer('areas', '范围', [{ id: 'area', properties: {}, geometry: { type: 'Polygon', coordinates: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]] } }], 'polygon')
+    const overlayId = useLayerViewStore.getState().selectedLayerId!
     useProjectStore.setState({ dirty: false })
-    const before = useProjectStore.getState().getSnapshot()
+    const before = projectSession.getSnapshot()
     const workerClass = fakeWorker()
     const pending = processingCommands.run({ layerId, scope: 'all', overlay: { layerId: overlayId, scope: 'all' }, options: { tool: 'clip-lines' }, name: '空裁剪', signal: new AbortController().signal })
     const worker = workerClass.current
     worker.onmessage!({ data: { result: executeProcessing(worker.payload.features, worker.payload.options, worker.payload.overlay) } })
     await expect(pending).rejects.toThrow('没有裁剪后的线段')
-    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
+    expect(projectSession.getSnapshot()).toEqual(before)
     expect(useProjectStore.getState().dirty).toBe(false)
   })
 
   it('a spatial result limit fails atomically and is retained in successful provenance', async () => {
-    const layerId = useProjectStore.getState().selectedLayerId!
+    const layerId = useLayerViewStore.getState().selectedLayerId!
     const area: GisFeature = { id: 'area', properties: { code: 'A' }, geometry: { type: 'Polygon', coordinates: [[[116, 39], [117, 39], [117, 41], [116, 41], [116, 39]]] } }
-    useProjectStore.getState().addLayer('join-areas', '重叠区域', [area, { ...area, id: 'area2' }], 'polygon')
-    const overlayId = useProjectStore.getState().selectedLayerId!
-    const before = useProjectStore.getState().getSnapshot()
+    layerContentCommands.addLayer('join-areas', '重叠区域', [area, { ...area, id: 'area2' }], 'polygon')
+    const overlayId = useLayerViewStore.getState().selectedLayerId!
+    const before = projectSession.getSnapshot()
     const workers = fakeWorker()
     const options: ProcessingOptions = { tool: 'spatial-join', predicate: 'within', fields: ['code'], prefix: 'region_', mode: 'inner', maxResults: 5 }
     const args = { layerId, scope: 'all' as const, overlay: { layerId: overlayId, scope: 'all' as const }, options, name: '有限结果', signal: new AbortController().signal }
@@ -377,31 +385,31 @@ describe('processing workflow', () => {
     expect(limitError?.message).toMatch(/超过 5/)
     worker.onmessage!({ data: { error: limitError!.message } })
     await expect(failure).rejects.toThrow('超过 5')
-    expect(useProjectStore.getState().getSnapshot()).toEqual(before)
+    expect(projectSession.getSnapshot()).toEqual(before)
     const pending = processingCommands.run({ ...args, options: { ...options, maxResults: 6 } })
     worker = workers.current
     worker.onmessage!({ data: { result: executeProcessing(worker.payload.features, worker.payload.options, worker.payload.overlay) } })
     const result = await pending
-    const snapshot = parseProjectSnapshot(serializeProjectSnapshot(useProjectStore.getState().getSnapshot()))
-    const layer = snapshot.project.layers.find(layer => layer.id === result.layerId)!
-    expect(snapshot.project.datasets.find(dataset => dataset.id === layer.datasetId)).toMatchObject({ processing: { options: { maxResults: 6 } } })
+    const snapshot = parseProjectSnapshot(serializeProjectSnapshot(projectSession.getSnapshot()))
+    const layer = requireMapContent(snapshot.project).layers.find(layer => layer.id === result.layerId)!
+    expect(requireMapContent(snapshot.project).datasets.find(dataset => dataset.id === layer.datasetId)).toMatchObject({ processing: { options: { maxResults: 6 } } })
   })
 
   it('spatial join preserves pair provenance and multiple matches through save/reopen', async () => {
-    const layerId = useProjectStore.getState().selectedLayerId!
+    const layerId = useLayerViewStore.getState().selectedLayerId!
     const area: GisFeature = { id: 'area', properties: { name: '区域' }, geometry: { type: 'Polygon', coordinates: [[[116, 39], [117, 39], [117, 41], [116, 41], [116, 39]]] } }
-    useProjectStore.getState().addLayer('join-areas', '区域', [area, { ...area, id: 'area-2', properties: { name: '重叠区域' } }], 'polygon')
-    const overlayId = useProjectStore.getState().selectedLayerId!
+    layerContentCommands.addLayer('join-areas', '区域', [area, { ...area, id: 'area-2', properties: { name: '重叠区域' } }], 'polygon')
+    const overlayId = useLayerViewStore.getState().selectedLayerId!
     const workerClass = fakeWorker()
     const options = { tool: 'spatial-join' as const, predicate: 'within' as const, fields: ['name'], prefix: 'region_', mode: 'inner' as const }
     const pending = processingCommands.run({ layerId, scope: 'all', overlay: { layerId: overlayId, scope: 'all' }, options, name: '点区连接', signal: new AbortController().signal })
     const worker = workerClass.current
     worker.onmessage!({ data: { result: executeProcessing(worker.payload.features, worker.payload.options, worker.payload.overlay) } })
     const completed = await pending
-    const snapshot = parseProjectSnapshot(serializeProjectSnapshot(useProjectStore.getState().getSnapshot()))
-    const layer = snapshot.project.layers.find(layer => layer.id === completed.layerId)!
+    const snapshot = parseProjectSnapshot(serializeProjectSnapshot(projectSession.getSnapshot()))
+    const layer = requireMapContent(snapshot.project).layers.find(layer => layer.id === completed.layerId)!
     expect(snapshot.featuresByDataset[layer.datasetId]).toHaveLength(6)
     expect(snapshot.featuresByDataset[layer.datasetId].slice(0, 2).map(feature => feature.metadata?.overlaySourceId)).toEqual(['area', 'area-2'])
-    expect(snapshot.project.datasets.find(dataset => dataset.id === layer.datasetId)).toMatchObject({ processing: { options, outputCount: 6 } })
+    expect(requireMapContent(snapshot.project).datasets.find(dataset => dataset.id === layer.datasetId)).toMatchObject({ processing: { options, outputCount: 6 } })
   })
 })

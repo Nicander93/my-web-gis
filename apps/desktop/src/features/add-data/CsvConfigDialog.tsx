@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { AlertCircle } from 'lucide-react'
-import { runImportTask } from '@/services/import-worker'
+import { runImportTask } from '@/exchange/import-worker'
 import type { CsvPreviewResult, CrsInfo } from '@desktop-webgis/vector-io'
 import { CRS_PRESETS, isGeographicCrsCode } from '@desktop-webgis/vector-io'
 

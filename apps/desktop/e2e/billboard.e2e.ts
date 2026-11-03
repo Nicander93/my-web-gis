@@ -2,8 +2,8 @@ import { expect, test, type Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 
 test.use({ actionTimeout: 15_000, screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
-async function snapshot(page: Page) { return page.evaluate(async () => (await import('/src/stores/project.store.ts')).useProjectStore.getState().getSnapshot()) }
-async function native(page: Page, id: string) { return page.evaluate(async id => (await import('/src/features/scene3d/scene3d-runtime-host.ts')).getLiveSceneDiagnostics(id)?.presentation?.graphic, id) }
+async function snapshot(page: Page) { return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() }) }
+async function native(page: Page, id: string) { return page.evaluate(async id => (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneDiagnostics(id)?.presentation?.graphic, id) }
 
 test('billboard placement, embedded image draft, preview, cancel, undo and saved-project reopen', async ({ page }, info) => {
   test.setTimeout(120_000)
@@ -16,20 +16,20 @@ test('billboard placement, embedded image draft, preview, cancel, undo and saved
   const canvas = page.locator('.scene3d-canvas__viewport canvas'), bounds = (await canvas.boundingBox())!
   for (const [index, x] of [.46, .54].entries()) {
     await page.mouse.click(bounds.x + bounds.width * x, bounds.y + bounds.height * .5)
-    await expect.poll(async () => (await snapshot(page)).project.city?.nodes.length).toBe(index + 1)
+    await expect.poll(async () => (await snapshot(page)).project.content.scene?.nodes.length).toBe(index + 1)
     await expect(page.getByText('连续放置图标 · 单击创建，Esc 退出', { exact: true })).toBeVisible()
   }
   await page.keyboard.press('Escape')
   await expect(page.getByText('连续放置图标 · 单击创建，Esc 退出', { exact: true })).toHaveCount(0)
-  const placed = await snapshot(page), first = placed.project.city!.nodes[0]
+  const placed = await snapshot(page), first = placed.project.content.scene!.nodes[0]
   if (first.type !== 'graphic') throw new Error('Expected graphic')
   expect(first.geometry.type).toBe('point')
   expect(first.style.billboard).toMatchObject({ width: 32, height: 44 })
   await expect.poll(() => native(page, first.id)).toMatchObject({ point: false, billboard: first.style.billboard })
   await page.getByRole('button', { name: '撤销', exact: true }).click()
-  expect((await snapshot(page)).project.city?.nodes).toHaveLength(1)
+  expect((await snapshot(page)).project.content.scene?.nodes).toHaveLength(1)
   await page.getByRole('button', { name: '重做', exact: true }).click()
-  expect((await snapshot(page)).project.city?.nodes).toEqual(placed.project.city?.nodes)
+  expect((await snapshot(page)).project.content.scene?.nodes).toEqual(placed.project.content.scene?.nodes)
   await page.locator('.scene3d-layer-row__select').filter({ hasText: first.name }).click({ button: 'right' })
   await page.getByRole('menuitem', { name: '完整属性', exact: true }).click()
   const dialog = page.locator('.scene-property-window')
@@ -38,15 +38,15 @@ test('billboard placement, embedded image draft, preview, cancel, undo and saved
   await dialog.getByRole('spinbutton', { name: '图标宽度', exact: true }).fill('48')
   await dialog.getByRole('textbox', { name: '标注文字', exact: true }).fill('POI')
   await expect.poll(() => native(page, first.id)).toMatchObject({ point: false, billboard: { width: 48 }, label: 'POI' })
-  expect((await snapshot(page)).project.city?.nodes).toEqual(placed.project.city?.nodes)
+  expect((await snapshot(page)).project.content.scene?.nodes).toEqual(placed.project.content.scene?.nodes)
   await dialog.locator('input[type=file]').setInputFiles({ name: 'broken.png', mimeType: 'image/png', buffer: Buffer.from('invalid image') })
   await expect(dialog.getByRole('alert')).toContainText('图片无法解码')
-  expect((await snapshot(page)).project.city?.nodes).toEqual(placed.project.city?.nodes)
+  expect((await snapshot(page)).project.content.scene?.nodes).toEqual(placed.project.content.scene?.nodes)
   const image = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGP4DwQACfsD/fteaysAAAAASUVORK5CYII=', 'base64')
   await dialog.locator('input[type=file]').setInputFiles({ name: 'icon.png', mimeType: 'image/png', buffer: image })
   await expect.poll(() => native(page, first.id)).toMatchObject({ billboard: { image: `data:image/png;base64,${image.toString('base64')}` } })
   await dialog.getByRole('button', { name: '应用', exact: true }).click()
-  const applied = await snapshot(page), updated = applied.project.city!.nodes[0]
+  const applied = await snapshot(page), updated = applied.project.content.scene!.nodes[0]
   if (updated.type !== 'graphic') throw new Error('Expected graphic')
   expect(updated.style.billboard?.image).toBe(`data:image/png;base64,${image.toString('base64')}`)
   await dialog.getByRole('spinbutton', { name: '图标高度', exact: true }).fill('60')
@@ -54,18 +54,18 @@ test('billboard placement, embedded image draft, preview, cancel, undo and saved
   await dialog.getByRole('button', { name: '取消', exact: true }).click()
   await expect.poll(() => native(page, first.id)).toMatchObject({ billboard: updated.style.billboard, label: 'POI' })
   await page.getByRole('button', { name: '撤销', exact: true }).click()
-  expect((await snapshot(page)).project.city?.nodes).toEqual(placed.project.city?.nodes)
+  expect((await snapshot(page)).project.content.scene?.nodes).toEqual(placed.project.content.scene?.nodes)
   await page.getByRole('button', { name: '重做', exact: true }).click()
   const download = page.waitForEvent('download')
   await page.getByRole('button', { name: '保存项目', exact: true }).click()
   const path = info.outputPath('billboard.webgis.json')
   await (await download).saveAs(path)
   const saved = JSON.parse(readFileSync(path, 'utf8'))
-  expect(saved.project.city.nodes[0].style).toEqual(updated.style)
+  expect(saved.project.content.scene.nodes[0].style).toEqual(updated.style)
   await page.getByRole('button', { name: '文件', exact: true }).click()
   const chooser = page.waitForEvent('filechooser')
   await page.getByRole('menuitem', { name: /^打开/ }).click()
   await (await chooser).setFiles(path)
-  expect((await snapshot(page)).project.city?.nodes).toEqual(saved.project.city.nodes)
+  expect((await snapshot(page)).project.content.scene?.nodes).toEqual(saved.project.content.scene.nodes)
   await expect.poll(() => native(page, first.id)).toMatchObject({ point: false, billboard: updated.style.billboard, label: 'POI' })
 })

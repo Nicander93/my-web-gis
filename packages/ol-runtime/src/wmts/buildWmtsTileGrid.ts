@@ -1,6 +1,6 @@
 import WMTSTileGrid from 'ol/tilegrid/WMTS'
 import { get as getProjection } from 'ol/proj'
-import type { WmtsPersistedMatrix } from '@desktop-webgis/gis-core'
+import type { WmtsPersistedMatrix } from '@desktop-webgis/project'
 import {
   normalizeCrsCode,
   resolutionFromScaleDenominator

@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { initTools } from 'geolibre-wasm/tools'
-import type { GisFeature } from '@desktop-webgis/gis-core'
+import type { GisFeature } from '@desktop-webgis/project'
 import { simplifyFeatures } from './geolibre-processing'
 
 const options = { tool: 'simplify', tolerance: .0001, unit: 'degrees' } as const

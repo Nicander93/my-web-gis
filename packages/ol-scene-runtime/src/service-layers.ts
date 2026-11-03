@@ -1,6 +1,6 @@
 /**
  * Scene WMS / WMTS layer builders for ol-scene-runtime.
- * Mirrors desktop ol-runtime behaviour without pulling gis-core Dataset types.
+ * Mirrors desktop ol-runtime behaviour without pulling project Dataset types.
  */
 import TileLayer from 'ol/layer/Tile.js'
 import TileWMS from 'ol/source/TileWMS.js'

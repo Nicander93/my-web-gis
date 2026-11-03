@@ -1,5 +1,5 @@
 import 'ol/ol.css'
-import { OlDocumentRuntime } from '../../../../packages/ol-scene-runtime/src/index'
+import { OlDocumentRuntime } from '@/../../../packages/ol-scene-runtime/src/index'
 import { CARTOGRAPHY_EXTENSION, type SceneDocument, type JsonValue } from '@desktop-webgis/scene-schema'
 import type { MapLibreStyleSpecification } from '@desktop-webgis/ol-style/cartography'
 import { BUILTIN_SYMBOL_PRESETS } from '@desktop-webgis/ol-style/symbol-library'

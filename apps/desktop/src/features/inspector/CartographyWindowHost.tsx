@@ -1,5 +1,6 @@
-import { useProjectStore } from '@/stores/project.store'
-import { useWorkbenchStore } from '@/stores/workbench.store'
+import { requireMapContent } from '@desktop-webgis/project'
+import { useProjectStore } from '@/session/project.store'
+import { useWorkbenchStore } from '@/view-state/workbench.store'
 import { SldExportDialog } from './SldExportDialog'
 import { GeoServerPublishDialog } from './GeoServerPublishDialog'
 import { addPublishedWmsLayer } from './published-wms'
@@ -8,7 +9,7 @@ import { addPublishedWmsLayer } from './published-wms'
 export function CartographyWindowHost() {
   const request = useWorkbenchStore(state => state.cartographyDialog)
   const epoch = useProjectStore(state => state.projectEpoch)
-  const exists = useProjectStore(state => state.project.layers.some(layer => layer.id === request?.layerId))
+  const exists = useProjectStore(state => requireMapContent(state.project).layers.some(layer => layer.id === request?.layerId))
   if (!request || request.epoch !== epoch || !exists) return null
   function close() {
     if (useWorkbenchStore.getState().cartographyDialog === request) useWorkbenchStore.getState().setCartographyDialog(null)

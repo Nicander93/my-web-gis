@@ -60,9 +60,9 @@ export async function verifyNativeSceneEditor(page, report) {
 export async function verifyNativeSceneEditorReopen(page, report) {
   await expect.poll(() => readNativeTileset(page)).toMatchObject({ style, maximumScreenSpaceError: 8 })
   const presentation = await page.evaluate(async () => {
-    const { useProjectStore } = await import('/src/stores/project.store.ts')
-    const node = useProjectStore.getState().project.city.nodes.find(node => node.type === '3dtiles')
-    return (await import('/src/features/scene3d/scene3d-runtime-host.ts')).getLiveSceneDiagnostics(node.id)?.presentation?.tileset
+    const { useProjectStore } = await import('/src/session/project.store.ts')
+    const node = useProjectStore.getState().project.content.scene.nodes.find(node => node.type === '3dtiles')
+    return (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneDiagnostics(node.id)?.presentation?.tileset
   })
   assert.deepEqual(JSON.parse(JSON.stringify(presentation.style)), style)
   assert.equal(presentation.maximumScreenSpaceError, 8)
@@ -70,5 +70,5 @@ export async function verifyNativeSceneEditorReopen(page, report) {
 }
 
 async function readNativeTileset(page) {
-  return page.evaluate(async () => (await import('/src/stores/project.store.ts')).useProjectStore.getState().project.city.nodes.find(node => node.type === '3dtiles'))
+  return page.evaluate(async () => (await import('/src/session/project.store.ts')).useProjectStore.getState().project.content.scene.nodes.find(node => node.type === '3dtiles'))
 }

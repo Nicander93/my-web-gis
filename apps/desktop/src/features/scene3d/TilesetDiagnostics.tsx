@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Button } from 'antd'
-import { getLiveSceneDiagnostics } from './scene3d-runtime-host'
+import { getLiveSceneDiagnostics } from '@/runtime/scene3d-runtime-host'
 import { ScenePropertyGroup } from './ScenePropertyGroup'
 
 /** Runtime-only readings and actions never enter a project command. */

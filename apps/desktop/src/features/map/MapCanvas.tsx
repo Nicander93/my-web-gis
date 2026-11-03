@@ -1,7 +1,10 @@
+import { requireMapContent } from '@desktop-webgis/project'
 import { useEffect, useRef, useState } from 'react'
-import { useWorkbenchStore } from '@/stores/workbench.store'
-import { useProjectStore } from '@/stores/project.store'
-import { useSnappingStore } from '@/stores/snapping.store'
+import { useWorkbenchStore } from '@/view-state/workbench.store'
+import { useProjectStore } from '@/session/project.store'
+import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { featureData } from '@/data/feature-data'
+import { useSnappingStore } from '@/view-state/snapping.store'
 import { MapPopup } from './MapPopup'
 import { MapIdentify } from './MapIdentify'
 import { installTemporaryPan } from './temporary-pan'
@@ -13,13 +16,15 @@ import {
   syncMapFromProject,
   unmountMapRuntime,
   isMapRuntimeMounted
-} from './map-runtime-host'
+} from '@/runtime/map-runtime-host'
 
 function toolHint(tool: string): string {
   switch (tool) {
     case 'select': {
-      const { project, selectedLayerId } = useProjectStore.getState()
-      if (project.layers.find(layer => layer.id === selectedLayerId)?.interaction?.selectable === false) {
+      const { project } = useProjectStore.getState()
+      const { selectedLayerId } = useLayerViewStore.getState()
+      if (project.content.kind !== 'map2d') return '地图工具'
+      if (requireMapContent(project).layers.find(layer => layer.id === selectedLayerId)?.interaction?.selectable === false) {
         return '此图层未启用地图选择；属性表仍可选择和定位'
       }
       return '单击或拖框选择 · Shift 追加 · Alt 移除 · Esc 取消'
@@ -55,7 +60,7 @@ export function MapCanvas() {
     const target = viewportRef.current
     if (!target) return
 
-    const mapState = useProjectStore.getState().project.mapState
+    const mapState = requireMapContent(useProjectStore.getState().project).initialView
     const runtime = mountMapRuntime(target, mapState)
     const disposePan = installTemporaryPan(runtime.getMap())
     runtime.onPointerMove((info) => {
@@ -80,18 +85,28 @@ export function MapCanvas() {
   }, [])
 
   useEffect(() => {
+    let synchronizedProject = useProjectStore.getState().project, synchronizedFeatures = featureData.readSnapshot()
+    const synchronize = () => {
+      const { project } = useProjectStore.getState(), features = featureData.readSnapshot()
+      if (!isMapRuntimeMounted() || project.content.kind !== 'map2d' || project === synchronizedProject && features === synchronizedFeatures) return
+      synchronizedProject = project; synchronizedFeatures = features
+      syncMapFromProject()
+    }
     const unsubscribe = useProjectStore.subscribe((state, previous) => {
-      if (!isMapRuntimeMounted()) return
+      // Store notifies before React unmounts the old workspace on project replacement.
+      if (!isMapRuntimeMounted() || state.project.content.kind !== 'map2d') return
 
-      const projectChanged =
-        state.project !== previous.project ||
-        state.featuresByDataset !== previous.featuresByDataset
+      const projectChanged = state.project !== previous.project
 
-      if (projectChanged) syncMapFromProject()
-      if (state.project.crs !== previous.project.crs) useWorkbenchStore.getState().setMapReadout('')
-      if (projectChanged || state.selectedLayerId !== previous.selectedLayerId) setHint(toolHint(getActiveEditTool()))
+      synchronize()
+      if (previous.project.content.kind !== 'map2d' || state.project.content.crs !== previous.project.content.crs) useWorkbenchStore.getState().setMapReadout('')
+      if (projectChanged) setHint(toolHint(getActiveEditTool()))
     })
-    return unsubscribe
+    const unsubscribeSession = useLayerViewStore.subscribe((state, previous) => {
+      if (state.selectedLayerId !== previous.selectedLayerId) setHint(toolHint(getActiveEditTool()))
+    })
+    const unsubscribeData = featureData.subscribe(synchronize)
+    return () => { unsubscribe(); unsubscribeSession(); unsubscribeData() }
   }, [])
 
   useEffect(() => {

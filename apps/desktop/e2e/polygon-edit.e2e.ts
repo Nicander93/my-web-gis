@@ -21,8 +21,10 @@ async function prepare(page: Page) {
 
 async function snapshot(page: Page) {
   return page.evaluate(async () => {
-    const { useProjectStore } = await import('/src/stores/project.store.ts')
-    return useProjectStore.getState().getSnapshot()
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+
+    const { useProjectStore } = await import('/src/session/project.store.ts')
+    return projectSession.getSnapshot()
   })
 }
 
@@ -35,7 +37,7 @@ function area(geometry: { type: string; coordinates: number[][][] | number[][][]
 
 test('real worker merge/split applies attributes, conserves topology and survives one-step history plus file IO', async ({ page }, info) => {
   await prepare(page)
-  const before = await snapshot(page), dataset = before.project.datasets[0].id
+  const before = await snapshot(page), dataset = before.project.content.datasets[0].id
   await page.getByRole('button', { name: '合并面', exact: true }).click()
   const merge = page.getByRole('dialog', { name: '合并面', exact: true })
   const policy = merge.getByLabel('合并属性策略')
@@ -103,14 +105,14 @@ test('canceling a real owned worker during load leaves geometry and history unto
   expect((await snapshot(page)).featuresByDataset).toEqual(before.featuresByDataset)
   await dialog.getByRole('button', { name: '关闭', exact: true }).click()
   await page.getByRole('button', { name: '撤销', exact: true }).click()
-  expect((await snapshot(page)).project.layers).toHaveLength(0)
+  expect((await snapshot(page)).project.content.layers).toHaveLength(0)
   await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled()
   expect(errors).toEqual([])
 })
 
 test('a completed worker cannot overwrite data edited while computation was pending', async ({ page }) => {
   await prepare(page)
-  const before = await snapshot(page), dataset = before.project.datasets[0].id
+  const before = await snapshot(page), dataset = before.project.content.datasets[0].id
   let unblock!: () => void, started!: () => void
   const gate = new Promise<void>((resolve) => { unblock = resolve })
   const requestStarted = new Promise<void>((resolve) => { started = resolve })
@@ -124,10 +126,14 @@ test('a completed worker cannot overwrite data edited while computation was pend
   await requestStarted
   // Use the real edit command to model another input arriving during an asynchronous calculation.
   await page.evaluate(async () => {
-    const { useProjectStore } = await import('/src/stores/project.store.ts')
-    const state = useProjectStore.getState(), layer = state.project.layers[0]
-    const feature = state.featuresByDataset[layer.datasetId][0]
-    state.updateFeatureProperties(layer.id, feature.id, { ...feature.properties, value: 99 })
+    const { featureCommands } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/commands/feature.commands.ts').at(-1) ?? '/src/commands/feature.commands.ts')
+
+    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/data/feature-data.ts').at(-1) ?? '/src/data/feature-data.ts')
+
+    const { useProjectStore } = await import('/src/session/project.store.ts')
+    const state = useProjectStore.getState(), layer = state.project.content.layers[0]
+    const feature = featureData.readSnapshot()[layer.datasetId][0]
+    featureCommands.updateProperties(layer.id, feature.id, { ...feature.properties, value: 99 })
   })
   const modified = await snapshot(page)
   unblock()
@@ -139,7 +145,7 @@ test('a completed worker cannot overwrite data edited while computation was pend
   await page.getByRole('button', { name: '撤销', exact: true }).click()
   expect((await snapshot(page)).featuresByDataset).toEqual(before.featuresByDataset)
   await page.getByRole('button', { name: '撤销', exact: true }).click()
-  expect((await snapshot(page)).project.layers).toHaveLength(0)
+  expect((await snapshot(page)).project.content.layers).toHaveLength(0)
   await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled()
 })
 
@@ -157,6 +163,6 @@ test('an invalid or ineffective cutter leaves source features and history unchan
   expect((await snapshot(page)).featuresByDataset).toEqual(before.featuresByDataset)
   await dialog.getByRole('button', { name: '关闭', exact: true }).click()
   await page.getByRole('button', { name: '撤销', exact: true }).click()
-  expect((await snapshot(page)).project.layers).toHaveLength(0)
+  expect((await snapshot(page)).project.content.layers).toHaveLength(0)
   await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled()
 })

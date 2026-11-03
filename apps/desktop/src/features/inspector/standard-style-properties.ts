@@ -1,6 +1,7 @@
-import { getEffectiveLocked, getLayerCartography } from '@desktop-webgis/gis-core'
+import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
+import { getEffectiveLocked, getLayerCartography } from '@desktop-webgis/project'
 import { setDrawingLayerProperty } from '@desktop-webgis/ol-style/cartography-operations'
-import { useProjectStore } from '@/stores/project.store'
+import { useProjectStore } from '@/session/project.store'
 
 /** Changes one parameter while retaining all sibling expressions, rules and metadata. */
 export function updateStandardStyleProperty(epoch: number, layerId: string, drawingId: string, section: 'paint' | 'layout', property: string, value: unknown, transactionId?: string): void {
@@ -10,5 +11,5 @@ export function updateStandardStyleProperty(epoch: number, layerId: string, draw
   const fragment = getLayerCartography(state.project, layerId)
   if (!fragment) throw new Error('图层已移除。')
   const layers = setDrawingLayerProperty(fragment.styleLayers, drawingId, section, property, value)
-  state.setLayerCartography(layerId, layers, transactionId)
+  layerConfigurationCommands.setLayerCartography(layerId, layers, transactionId)
 }

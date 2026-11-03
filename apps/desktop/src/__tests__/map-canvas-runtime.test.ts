@@ -1,14 +1,18 @@
+import { layerContentCommands } from '@/commands/layer-content.commands'
+import { projectSession } from '@/session/project-session'
+import { projectEdits } from '@/session/project-edits'
+import { requireMapContent } from '@desktop-webgis/project'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createProject, type MapState } from '@desktop-webgis/gis-core'
-import { mapCommands } from '@/app/commands/map.commands'
-import { editCommands } from '@/app/commands/edit.commands'
-import { layerCommands } from '@/app/commands/layer.commands'
-import { useProjectStore } from '@/stores/project.store'
-import { useWorkbenchStore } from '@/stores/workbench.store'
-import { useSessionStore } from '@/stores/session.store'
+import { createProject, type MapState } from '@desktop-webgis/project'
+import { mapCommands } from '@/commands/map.commands'
+import { editCommands } from '@/commands/edit.commands'
+import { layerCommands } from '@/commands/layer.commands'
+import { useProjectStore } from '@/session/project.store'
+import { useWorkbenchStore } from '@/view-state/workbench.store'
+import { useLayerViewStore } from '@/view-state/layer-view.store'
 import {
   _setMapRuntimeForTests,
   getActiveEditTool,
@@ -23,23 +27,24 @@ import {
   zoomMapToAll,
   zoomMapToLayer,
   retryMapServiceLayer
-} from '@/features/map/map-runtime-host'
+} from '@/runtime/map-runtime-host'
 import type { OlMapRuntime } from '@desktop-webgis/ol-runtime'
 
 const mapFeatureDir = join(dirname(fileURLToPath(import.meta.url)), '../features/map')
+const mapRuntimeDir = join(dirname(fileURLToPath(import.meta.url)), '../runtime')
 
 function resetStores(): void {
   ;(globalThis as unknown as { window: EventTarget }).window = new EventTarget()
-  useSessionStore.setState({
+  useLayerViewStore.setState({
     sessions: {},
     wfsLoadGeneration: 0,
     wfsAbortByLayer: {},
     mapViewExtentWgs84: [73, 18, 135, 54]
   })
-  useProjectStore.getState()._resetAttributeHistoryForTests?.()
-  useProjectStore.getState()._resetProjectHistoryForTests?.()
+  projectEdits.clear?.()
+  projectEdits.clear?.()
   layerCommands._resetStyleHistoryForTests?.()
-  useProjectStore.getState().loadSnapshot({
+  projectSession.loadSnapshot({
     project: createProject('MapCanvas wiring'),
     featuresByDataset: {}
   })
@@ -131,7 +136,7 @@ describe('MapCanvas OlMapRuntime selection tool wiring', () => {
   })
 
   it('host source mounts OlSelectionRuntime and OlToolRuntime with the map', () => {
-    const src = readFileSync(join(mapFeatureDir, 'map-runtime-host.ts'), 'utf8')
+    const src = readFileSync(join(mapRuntimeDir, 'map-runtime-host.ts'), 'utf8')
     expect(src).toContain('OlSelectionRuntime')
     expect(src).toContain('OlToolRuntime')
     expect(src).toContain('new OlSelectionRuntime')
@@ -154,7 +159,7 @@ describe('MapCanvas OlMapRuntime selection tool wiring', () => {
     _setMapRuntimeForTests(runtime, true)
     expect(isMapRuntimeMounted()).toBe(true)
 
-    useProjectStore.getState().addLayer(
+    layerContentCommands.addLayer(
       'ds-1',
       'Points',
       [
@@ -175,7 +180,7 @@ describe('MapCanvas OlMapRuntime selection tool wiring', () => {
     expect(document.nodes.filter((node: { type: string }) => node.type === 'vector')).toHaveLength(1)
     expect(Object.keys(featuresByDataset)).toContain('ds-1')
     expect(document.resources['ds-1'].type).toBe('geojson')
-    await vi.waitFor(() => expect(getLiveMapState()?.zoom).toBe(useProjectStore.getState().project.mapState.zoom))
+    await vi.waitFor(() => expect(getLiveMapState()?.zoom).toBe(requireMapContent(useProjectStore.getState().project).initialView.zoom))
   })
 
   it('does not expose the previous viewport after a same-ID project reload during sync', async () => {
@@ -184,21 +189,21 @@ describe('MapCanvas OlMapRuntime selection tool wiring', () => {
     let finish!: (applied: boolean) => void
     ;(runtime.syncDocument as ReturnType<typeof vi.fn>).mockImplementationOnce(() => new Promise<boolean>((resolve) => { finish = resolve }))
     syncMapFromProject()
-    const reopened = useProjectStore.getState().getSnapshot()
-    useProjectStore.getState().loadSnapshot(reopened)
+    const reopened = projectSession.getSnapshot()
+    projectSession.loadSnapshot(reopened)
     finish(true); await Promise.resolve()
     expect(getLiveMapState()).toBeNull()
     syncMapFromProject()
-    await vi.waitFor(() => expect(getLiveMapState()?.zoom).toBe(reopened.project.mapState.zoom))
+    await vi.waitFor(() => expect(getLiveMapState()?.zoom).toBe(requireMapContent(reopened.project).initialView.zoom))
   })
 
   it('geometry callbacks stay on the explicit target while browsing another layer', () => {
     const runtime = createMockRuntime()
     _setMapRuntimeForTests(runtime, true)
     const store = useProjectStore.getState()
-    store.addLayer('target', 'Lines', [{ id:'line', geometry:{ type:'LineString', coordinates:[[0,0],[1,1]] }, properties:{} }], 'line')
-    const targetId = useProjectStore.getState().selectedLayerId!
-    store.addLayer('browse', 'Points', [{ id:'point', geometry:{ type:'Point', coordinates:[0,0] }, properties:{} }], 'point')
+    layerContentCommands.addLayer('target', 'Lines', [{ id:'line', geometry:{ type:'LineString', coordinates:[[0,0],[1,1]] }, properties:{} }], 'line')
+    const targetId = useLayerViewStore.getState().selectedLayerId!
+    layerContentCommands.addLayer('browse', 'Points', [{ id:'point', geometry:{ type:'Point', coordinates:[0,0] }, properties:{} }], 'point')
     useWorkbenchStore.getState().setEditLayer(targetId)
     const activate = vi.spyOn(getToolRuntime()!, 'activate')
     expect(setActiveEditTool('draw-point')).toBe(true)
@@ -206,8 +211,8 @@ describe('MapCanvas OlMapRuntime selection tool wiring', () => {
     const callbacks = activate.mock.calls.at(-1)![1]
     expect(callbacks.getActiveLayerId()).toBe(targetId)
     callbacks.onSelectionChange?.(['line'])
-    expect(useProjectStore.getState().selection).toEqual({ layerId:targetId, featureIds:['line'] })
-    expect(useProjectStore.getState().selectedLayerId).not.toBe(targetId)
+    expect(useLayerViewStore.getState().selection).toEqual({ layerId:targetId, featureIds:['line'] })
+    expect(useLayerViewStore.getState().selectedLayerId).not.toBe(targetId)
   })
 
   it('zoom commands drive the real map view when runtime is mounted', () => {
@@ -240,7 +245,7 @@ describe('MapCanvas OlMapRuntime selection tool wiring', () => {
     const runtime = createMockRuntime()
     _setMapRuntimeForTests(runtime, true)
 
-    useProjectStore.getState().addLayer(
+    layerContentCommands.addLayer(
       'ds-v',
       'Local',
       [
@@ -252,14 +257,14 @@ describe('MapCanvas OlMapRuntime selection tool wiring', () => {
       ],
       'point'
     )
-    const layerId = useProjectStore.getState().selectedLayerId!
+    const layerId = useLayerViewStore.getState().selectedLayerId!
     expect(zoomMapToLayer(layerId)).toBe(true)
     expect(runtime.zoomToLayer).toHaveBeenCalledWith(layerId)
 
     layerCommands.zoomToLayer(layerId)
     expect(runtime.zoomToLayer).toHaveBeenCalledTimes(2)
 
-    useProjectStore.getState().addServiceLayer({
+    layerContentCommands.addServiceLayer({
       name: 'WMS',
       kind: 'wms',
       source: {
@@ -275,7 +280,7 @@ describe('MapCanvas OlMapRuntime selection tool wiring', () => {
         authMode: 'none'
       }
     })
-    const wmsId = useProjectStore.getState().selectedLayerId!
+    const wmsId = useLayerViewStore.getState().selectedLayerId!
     layerCommands.retryServiceLayer(wmsId)
     expect(retryMapServiceLayer(wmsId)).toBe(true)
     expect(runtime.retryWmsLayer).toHaveBeenCalled()
@@ -340,7 +345,7 @@ describe('MapCanvas OlMapRuntime selection tool wiring', () => {
     const runtime = createMockRuntime()
     _setMapRuntimeForTests(runtime, true)
 
-    useProjectStore.getState().addLayer(
+    layerContentCommands.addLayer(
       'ds-edit',
       'Editable points',
       [
@@ -376,7 +381,7 @@ describe('MapCanvas OlMapRuntime selection tool wiring', () => {
     const runtime = createMockRuntime()
     _setMapRuntimeForTests(runtime, true)
 
-    useProjectStore.getState().addServiceLayer({
+    layerContentCommands.addServiceLayer({
       name: 'WMS',
       kind: 'wms',
       source: {

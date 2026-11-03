@@ -1,0 +1,566 @@
+2026-10-30 / HEAD 2cf4a724aadb041ac030350079851494c37802d3 / dirty workspace, no commit or push
+
+Stage 1 strict workspace domain:
+- pnpm test: exit 0 (.codex-refactor-exclusive-workspace-tests.log)
+- pnpm build: exit 0 (.codex-refactor-exclusive-workspace-build.log)
+- gis-core: 22 files / 114 passed
+- Desktop: 77 files / 408 passed / 5 skipped
+- Browser: independent Vite 5196 + local Chrome, screenshots/trace off;
+  cartography-project, project-recovery (3), scene3d-editor-v1 style/history/export/reopen:
+  5 passed (48.3s), exit 0 (.codex-refactor-exclusive-browser.log).
+  This is a selected behavior suite, not all E2E.
+
+Native scene editor after strict union, before configuration isolation:
+- pnpm --filter @desktop-webgis/desktop test:native-scene-editor
+- exit 0, 9/9 passed (.codex-refactor-exclusive-native-unsandboxed.log)
+- .artifacts/native-resources-1793346431731/report.json
+- Native Tauri/WebView2 + actual fs/resource protocol; nested tilesets/glb/geojson,
+  external gltf bin paths, style/history/parameters, save/restart/reopen,
+  relocation, cross-directory copy, explicit external-root authorization.
+- No error, stopError, serverStopError or normalBuildError. screenshots=false.
+- File chooser NOT verified (fixture working paths assigned). Windows 125% scale NOT verified.
+- Hardware diagnostics do not establish visual/GPU quality acceptance.
+- Prior sandbox run .artifacts/native-resources-1793337353932 had 3 passing scenarios,
+  then Windows process-stop login credential failure; not counted as full pass.
+  Its exact owned processes were checked and cleaned before the approved external run.
+
+Stage 2 first configuration slice:
+- gis-core tests: 114 passed (.codex-refactor-config-core-tests.log)
+- Desktop before added tests: 408 passed / 5 skipped (.codex-refactor-config-desktop-tests.log)
+- Configuration boundary + baseline: 7 passed (.codex-refactor-config-boundary-final.log)
+- Configuration revision + save/recovery: 24 passed (.codex-refactor-config-revision.log)
+- Desktop build: exit 0 (.codex-refactor-config-build-final.log)
+- After configRevision and mounted-workspace subscription fixes:
+  Desktop complete suite 78 files / 414 passed / 5 skipped; build exit 0
+  (.codex-refactor-config-desktop-final.log, .codex-refactor-config-build-verified.log).
+- Browser selected config behaviors: 2 passed (18.9s), exit 0
+  (.codex-refactor-config-browser-chrome.log), same independent Chrome/Vite setup.
+- Default Playwright browser missing: initial launch failed before tests ran
+  (.codex-refactor-config-browser.log); rerun uses installed Chrome via
+  PLAYWRIGHT_CHROMIUM_EXECUTABLE=C:/Program Files/Google/Chrome/Application/chrome.exe.
+- Same-ID mounted workspace replacement 2D -> 3D -> 2D: 1 passed, exit 0
+  (.codex-refactor-workspace-switch-final.log). No page errors; strict union keys,
+  epoch increment, configRevision reset, history reset, old runtime unmount asserted.
+
+10,000-feature Store counter (single observation, not timing threshold):
+operation    copiedIntoStore  copiedOutOfStore  syncEligiblePublications  elapsedMs
+visibility   0                0                 1                         0.2490
+style        0                0                 1                         0.4711
+geometry     10000            10000             1                         44.6103
+scene projection: convertedFeatures=10000, elapsedMs=71.6846
+The Store counter does not measure total allocations or actual OL Source rebuilds.
+The 10,000-feature Proxy boundary test additionally requires zero feature-array reads
+for style/visibility/opacity/tree configuration Execute/Undo/Redo.
+
+Session ownership and application selection commands:
+- selection/selectedLayerId/lastSelectionCountAfterFilter removed from ProjectState,
+  single owner is existing SessionStore; no mirror/proxy in Project.
+- Set/toggle/matching/clear selection removed from ProjectStore and implemented as
+  Application selectionCommands. Browsing uses Session action directly.
+- Project and Session map subscriptions separated and both disposed on unmount/reset.
+- Desktop full suite: 78 files / 415 passed / 5 skipped; build exit 0
+  (.codex-refactor-session-actions-tests.log, .codex-refactor-session-actions-build.log).
+- New mount/remount/unmount subscription test + configuration + save: 28 passed, exit 0
+  (.codex-refactor-session-lifecycle-final.log).
+- Browser: attribute-tabs read-only/lock/target + same-ID workspace replacement passed
+  in .codex-refactor-session-actions-browser.log (the selection probes in that run failed).
+- Browser: box/modifiers/empty/row locate + Scene display edits preserving table and
+  selection through Undo/Redo: 2 passed (10.1s), exit 0
+  (.codex-refactor-session-active-modules-browser.log).
+- Earlier probe failure: obsolete diagnostics menu text fixed from actual UI; later
+  HMR module URL mismatch fixed by importing the actual loaded runtime URL.
+  Behavior assertions retained. screenshots off; not full E2E or native acceptance.
+
+Data ownership migration:
+- featuresByDataset removed from ProjectState, not moved to another Zustand Store.
+  Existing MemoryFeatureStore is the sole data owner (services/feature-data.ts).
+- Immutable cached views retain unchanged rows/datasets; React subscribes via
+  useSyncExternalStore. getAll/snapshot remain detached read/export boundaries.
+- Synchronous data transactions journal touched entries, rollback views/revision/order,
+  support nested savepoints and publish once on successful completion.
+- syncStoreFromState and editedFeatures removed. Single row commands directly use
+  the owner; snapshot host callbacks own both config and data writes without repeats.
+- Recovery independently watches data and retains the previous project's view;
+  save contentVersion observes configuration and data revisions.
+- pnpm test + pnpm build: exit 0
+  (.codex-refactor-data-workspace-tests.log, .codex-refactor-data-workspace-build.log).
+  Core 23 files / 117 passed; Desktop 78 files / 418 passed / 5 skipped.
+- Data boundary/recovery/baseline after extra assertions: 15 passed, exit 0
+  (.codex-refactor-data-final-boundary.log).
+- Browser: 6 passed in .codex-refactor-data-browser.log; its cartography case failed
+  during workspace-build-triggered Vite HMR, rerun cartography passed in
+  .codex-refactor-data-browser-final.log. That rerun's two worker probes initially
+  read a second module instance; active loaded-module URLs fixed the probes.
+- Worker suite final: 3 passed (8.1s), exit 0 (.codex-refactor-data-worker-final.log).
+  Selected browser total 10 passed across batches; not full E2E.
+- Native after data migration: test:native-scene-editor exit 0, 9/9 passed
+  (.codex-refactor-data-native-cdp.log;
+   .artifacts/native-resources-1793349912120/report.json).
+  37 actual custom-protocol responses captured through CDP Network.responseReceived;
+  Playwright page response events did not report these requests in this WebView2 run.
+  Original dependency paths/status-200 assertions preserved. Save/restart/reopen,
+  relative refs, relocation, cross-directory copy, authorization, owned-process cleanup
+  and normal-build restoration all passed, no recorded cleanup/build errors.
+  Earlier .artifacts/native-resources-1793349607309/report.json had loaded objects
+  but zero response evidence; not counted as a pass. Its cleanup/build restore succeeded.
+  Screenshots off. Native file chooser, 125% scale signoff and visual quality not verified.
+- Initial Desktop suite had one counter failure because fixture loading was included
+  in the configuration operation's read count; measurement starts after loading,
+  additionally requires zero readSnapshot/getAll/snapshot access for configuration.
+
+10,000-row updated isolated Store probe (no React/OL mounted):
+operation    copiedIntoStore  copiedOutOfStore  syncEligiblePublications  elapsedMs
+visibility   0                0                 1                         0.2138
+style        0                0                 1                         0.4759
+geometry     0                0                 1                         0.0511
+first data-view materialization: 10000 row references, 0.0211ms (not deep clones).
+scene projection: 10000 converted features, 81.6796ms, still full projection.
+Timing is a single observation; full rendering and row-view costs are separate.
+Remaining full-row views and failed-delete ID-order journal are not million-row queries.
+
+Application edit boundary and single history:
+- EditHistory moved out of ProjectStore to services/project-edits.ts; data query,
+  attribute edit and refresh APIs removed from ProjectState and routed through
+  feature-query.ts and app/commands/feature.commands.ts.
+- Configuration staged while data transaction runs; command failure or failed Undo
+  does not publish configuration/data/UI changes or consume history.
+- Same-scope command batch: atomic data rollback, one undo step, reversed Undo order,
+  detached command-list identity. Mixed configuration/data batches rejected.
+- No-op tree/default unlocked config and invalid opacity preserve redo branch.
+- Opacity coalesces only within explicit gesture IDs; Inspector uses existing
+  style-interaction lifetime. useEditHistory publishes scalar history state, not rows.
+- Full pnpm test + pnpm build exit 0:
+  .codex-refactor-edits-workspace-final-tests.log (Core 117; Desktop 427 passed / 5 skipped),
+  .codex-refactor-edits-workspace-final-build.log (includes Viewer and consumers).
+- Final scoped tests after batch payload + UI follow-up error isolation:
+  23 passed, exit 0 (.codex-refactor-edits-follow-up-tests.log); Desktop build exit 0
+  (.codex-refactor-edits-follow-up-build.log). project-edits.test.ts has 10 cases.
+- Browser main batch: 8 passed (44.3s), exit 0 (.codex-refactor-edits-browser.log):
+  opacity real keyboard gestures; same-ID 2D/3D replacement; worker import/undo and
+  cancellation/replacement; cartography save/reopen; 3D style/history/export;
+  Scene display preserving table/selection; drawing/toolbar Undo target preservation.
+- Native: 9/9 passed, exit 0 (.codex-refactor-edits-native.log), report
+  .artifacts/native-resources-1793351650402/report.json. No cleanup/build-restore errors.
+  Native result precedes final 2D UI follow-up error-isolation hardening; this final
+  change has separate scoped unit/build/browser verification. No screenshots.
+  Existing file chooser/125% signoff/visual acceptance limits still apply.
+- After final UI follow-up isolation: real worker import/Undo + real opacity keyboard
+  gesture tests 2 passed (24.8s), exit 0 (.codex-refactor-edits-follow-up-browser.log).
+
+2026-11-01 structural sharing and Application lifecycle:
+- normalizeLayerTree retains valid frozen input identity and unchanged folders/orders;
+  cartography reconciliation retains unchanged metadata/content. Tree history reuses
+  stable-ID objects and unchanged fields rather than replacing all live tree branches.
+- New sharing tests: frozen/stale-tree repair in Core and Store style/rename/Undo
+  metadata, layer, style, group, order, source-config reference preservation.
+- Core 23 files / 118 passed (.codex-refactor-sharing-core-final.log).
+- loadSnapshot/getSnapshot/applySnapshotAsEdit/replaceSnapshotAsEdit removed from
+  ProjectState; services/project-session.ts is an Application function facade with
+  no duplicate Project or new Store.
+- Lifecycle preflights before cancellation/cleanup; valid load aborts WFS work,
+  advances request generation and project epoch, clears history/session/data owner,
+  resets configRevision. Same project ID still opens a new epoch.
+- New-epoch configuration does not compare the file's legacy style cache against
+  the previous project to reinterpret its authoritative standard drawing.
+- Full pnpm test + pnpm build exit 0
+  (.codex-refactor-lifecycle-workspace-tests.log, .codex-refactor-lifecycle-workspace-build.log):
+  Desktop 433 passed / 5 skipped, Core 118 passed, Viewer/consumers built.
+- After new-epoch drawing regression: Desktop 81 files / 434 passed / 5 skipped,
+  Desktop build exit 0 (.codex-refactor-lifecycle-final-tests.log,
+  .codex-refactor-lifecycle-final-build.log). project-session.test.ts has 4 cases.
+- Browser selected lifecycle/save/recovery/import/workspace/3D-style workflows:
+  8 passed (51.1s), exit 0 (.codex-refactor-lifecycle-browser.log), screenshots off.
+- Native lifecycle verification: 9/9 passed, exit 0 (.codex-refactor-lifecycle-native.log),
+  .artifacts/native-resources-1793521397086/report.json. No error/stopError/
+  serverStopError/normalBuildError, screenshots false. Real native filesystem and
+  resource protocol used; native file chooser and visual quality remain unverified.
+- Kept plain immutable Core operations and controlled Zustand publication rather
+  than adding Immer around already-produced replacements or introducing patch history.
+  Input preparation still clones some configuration snapshots; shared-reference tests
+  verify the published object graph. No claim of provider paging or incremental OL sync.
+
+Open work: ProjectStore retains creation/removal/configuration wrappers, unified dirty remains,
+Provider/EditBuffer and independent data commit not implemented, map full projection
+and duplicate sync remain, 100k/1m validation not complete. Full contract is unchanged.
+
+2026-11-01 Application layer/dataset creation and deletion
+- Removed addLayer/copyFeaturesToLocalLayer/addServiceLayer/removeLayer/removeGroup from ProjectState;
+  application commands and consumers use app/commands/layer-content.commands.ts.
+- Ordinary and service creation now share the sole undo history. Preserved ordinary/service
+  feature selection and copy-result selection clearing. Creation undo cancels owned requests,
+  clears sessions/cache and restores an existing previous selection target.
+- Removal records only orphaned dataset rows, retains shared datasets and unrelated row/config
+  references, restores tree/cartography/data in one Undo, and stages cleanup before publication.
+  Removed-dataset rows remain full arrays in history; this is not Provider/EditBuffer paging.
+- 8 new Application cases cover ownership, shared data, failure/redo, nested locks,
+  request/session cleanup, missing targets and loaded service creation undo.
+- pnpm test exit 0 (.codex-refactor-content-workspace-tests.log):
+  Core 118 passed; Desktop 82 files / 442 passed / 5 skipped.
+- pnpm build exit 0 (.codex-refactor-content-workspace-final-build.log), including Desktop,
+  Viewer and consumers; existing chunk-size warnings retained.
+- Final Chrome batch 11 passed, exit 0 (.codex-refactor-content-browser-final.log):
+  UI shared-data deletion/Undo/Redo/save with actual OL Source assertions; table tabs/editing;
+  worker import/cancel/responsiveness; bearer/query-token WMS requests; drawing round-trip;
+  3D style preview/history/export/reopen. No screenshot calls in selected workflows.
+- First browser batch: 6 passed / 1 table import-confirm timeout; same-target follow-up also
+  timed out. Developer worker dependency requests were slow, but a stable root cause is not proven.
+  Instrumented run and unchanged original follow-up passed, then final whole batch passed.
+  Kept .codex-refactor-content-browser.log, ...-browser-follow-up.log, ...-browser-debug.log,
+  ...-browser-follow-up-2.log. No importer production change was made to force a pass.
+- No native rerun for this batch. Previous lifecycle-native 9/9 remains evidence for that earlier
+  revision only; native chooser/scale/visual acceptance remain unverified.
+- git diff --check exit 0 (.codex-refactor-content-final-diff-check.log).
+  Branch main; HEAD/local origin-main 2cf4a724aadb041ac030350079851494c37802d3.
+  Original unrelated UI changes retained; no commit or push.
+
+Open work now: configuration business wrappers and dirty/save semantics remain in stage 2;
+Provider/EditBuffer, explicit data commit, incremental map projection/sync and 100k/1m gates
+remain pending. Creation/deletion migration does not complete the original stage 0-5 contract.
+
+2026-11-01 Configuration use cases, configuration-only drafts and explicit initial view
+- ProjectState now exposes only project/projectEpoch/configRevision/dirty/setDirty.
+  Migrated 16 configuration operations plus queries and WFS metadata, including UI/probes.
+  Runtime source updates use the controlled commit with no user history entry and skip no-ops.
+- Complete layer/folder drafts, symbol assets/presets, publication links and popup/selectability
+  use configuration-only Application edits, with no feature snapshot permission.
+  Core ApplyProjectConfigurationCommand prevents layer/dataset creation, deletion or rebinding;
+  existing Core history/patch helpers retained. No parallel Project owner or history added.
+- Added explicit 2D initial-view command and toolbar entry, including no-op/invalid input guards.
+  Project IO persists configured map and scene presets and does not read live navigation.
+  Runtime camera movement during writing no longer prevents acknowledgement; an explicit
+  initial-camera configuration edit still keeps dirty through the revision guard.
+- 8 new configuration boundary cases and 1 new save concurrency case.
+- Final pnpm test + pnpm build exit 0:
+  .codex-refactor-configuration-worker-workspace-tests.log / ...-workspace-build.log.
+  Desktop 83 files / 451 passed / 5 skipped; Core 118 passed; vector-io 49 passed.
+  Viewer and consumers built. Existing chunk/linker warnings retained.
+- Browser property/preview batch: 9 passed / 1 new-view sampling failure
+  (.codex-refactor-configuration-browser.log). The failed assertion sampled an unfinished OL
+  zoom animation; changed the test to wait for getAnimating=false, keeping exact equality.
+  Initial-view navigation/Undo/Redo/save/reopen passed in subsequent batches.
+- A subsequent 10-case batch had 9 passed / 1 repeated second-import confirmation timeout.
+  Diagnostic repeats passed. Passive end-of-test observations saw a tiny parse take 8368 ms
+  once versus roughly 0.1-0.2 s otherwise, without proving every timeout's root cause.
+- Narrowed import worker runtime dependencies to Core geojson/id and vector-io coordinate
+  conversion subpaths, lazily loading CSV/DXF/SHP parsers. Published explicit package subpaths
+  and ordered Vite aliases. Production entry shrank from 360.07 to 140.74 kB, with separate
+  format chunks; these figures are entry sizes, not the sum of all parser bytes.
+- Restarted Vite after builds, then final 10-case batch passed (about 1.1m):
+  .codex-refactor-configuration-worker-browser.log. Includes original table workflow, initial
+  view round-trip, actual OL shared source, standard drawing, 3D style and real worker cases.
+- Additional formats/table-reopen batch 6/6 passed (22.5s), original timeouts unchanged:
+  .codex-refactor-configuration-formats-browser.log. Chinese projected multilayer SHP,
+  CSV preview, malformed/duplicate/null GeoJSON, DXF coordinate and curve/bulge handling.
+  Browser batches overlap and are not summed as unique cases.
+- vector-io test:consumer exit 0 (.codex-refactor-configuration-vector-consumer.log),
+  including built Node exports and strict TypeScript consumer checks.
+- Native test:native-scene-editor exit 0, scenarios 9/9 passed:
+  .codex-refactor-configuration-native.log,
+  .artifacts/native-resources-1793526957800/report.json. 37 actual resource responses,
+  screenshots false; owned-process cleanup and normal build restore succeeded.
+  Native chooser and Windows 125-percent/visual acceptance remain unverified.
+- git diff --check exit 0 (.codex-refactor-configuration-final-diff-check.log).
+  main; HEAD/local origin-main remain 2cf4a724aadb041ac030350079851494c37802d3.
+  Unrelated original UI changes retained; no commit/push, no goal completion claimed.
+
+Open work: audit public Scene/projection configuration paths, implement global history
+lock/capability preflights (getBlockReason is still empty), split config/data dirty and save
+semantics, then Provider/EditBuffer, independent data commit, incremental OL sync and 100k/1m
+validation. The mounted map still performs full feature projection/snapshots, so isolated
+configuration-command tests do not prove end-to-end O(1) feature costs. Stages 0-5 remain active.
+
+2026-11-01 History preflight, contextual row permissions and public configuration commits
+- Core EditTargets identify dataset/layer/folder/scene-node/scene-folder targets without live
+  row reads. Root moves capture explicit target identities, including 3D UI commands; copied
+  targets do not follow caller selection-array mutations. Changed assets guard referencing nodes.
+- Application execute/undo/redo preflights current definition locks and Dataset-kind capability.
+  getBlockReason is implemented; blocked replays return false with the history branch intact.
+  Visibility/local unlock exceptions and missing-local-lock=false semantics are preserved.
+- Writable FeatureStore context validates actual writes for custom commands without metadata.
+  Ownership is staged before storage setup/teardown; retained readonly rows cannot be replaced
+  or cleared through row APIs. Contextual block errors roll back and retain replay diagnostics
+  keyed to the exact command/document/data revision; unrelated errors still propagate.
+- Map projection switching now performs a configuration-only commit and does not read feature
+  views/snapshots. Public Scene commits with unchanged owners/definitions/rows use the existing
+  configuration scope, preserving effective data references/revision across undo/redo.
+  Resource/data changes retain snapshot lifecycle/session cleanup; SDK full reads still project rows.
+- Preserved explicit host childOrder for semantically unchanged portable folder children.
+  Removed duplicate JSON-order-sensitive draft locking checks in favour of common preflight.
+- Added 12 history/write preflight, 2 projection-command and 2 public-bridge cases.
+  Final pnpm test and pnpm build exit 0 (.codex-refactor-preflight-final-workspace-tests.log,
+  .codex-refactor-preflight-final-workspace-build.log): Desktop 85 files / 467 passed / 5 skipped,
+  Core 118 passed; all workspace builds completed. Existing chunk/linker warnings retained.
+- An earlier workspace build found nullable empty-history diagnostics; fixed the guard and added
+  an empty-history case. Final build/test evidence above supersedes that failed build.
+- First browser batch 11 passed / 2 failed (.codex-refactor-preflight-browser.log):
+  known second-import timeout and stale project.crs probe in the domestic projection/CSV case.
+  Updated probes to content.crs and actual reconstructed snapshot features, retaining numeric
+  CSV/native-coordinate assertions; fixed an undefined-vs-undefined CRS assignment assertion.
+- Added failure-only import task/worker attachment, without changing action timeouts or parser
+  production code. Diagnostic original table workflow repeated 3/3 passed (45.1s), then restarted
+  Vite and passed 6/6 (41.5s): .codex-refactor-preflight-import-diagnostic.log and
+  .codex-refactor-preflight-browser-follow-up.log. Failure root cause remains unproven.
+  Other first-batch cases passed: native OL projection, blocked toolbar retry, public Scene display/
+  view edits, drawing, gestures, initial view, cartography, readonly table, 3D style and source CRS.
+- Native test:native-scene-editor exit 0, all 9 scenarios passed:
+  .codex-refactor-preflight-native.log,
+  .artifacts/native-resources-1793531477296/report.json. 66 recorded resource responses;
+  native save/restart/reopen, resource dependencies, style/history, relocation/copy/authorization
+  passed. Owned-process cleanup and normal build restoration succeeded, screenshots false.
+  Native chooser and Windows scale/visual quality remain unverified.
+- Final git diff --check exit 0 (.codex-refactor-preflight-final-diff-check.log).
+  main; HEAD/local origin-main 2cf4a724aadb041ac030350079851494c37802d3.
+  Original unrelated UI changes retained; no commits or pushes.
+
+Open work: unify public 2D node locking vs legacy editable mapping and opaque public root-order
+intent; split configuration dirty/data pending and save boundaries; implement Provider/EditBuffer
+and provider-level writability/version checks; remove full SDK/renderer row projection/snapshots
+and large inline-resource assumptions; finish incremental OL and 100k/1m evidence.
+The full stage 0-5 objective stays active; stage 2 is not marked complete.
+
+
+2026-11-01 local map locks / shared data editing
+Layer.locked is optional, explicit and independent of legacy editable. Old editable=false
+alone stays unlocked; literal public locked=true remains a lock. Portable host edits retain
+legacy editable. Local/ancestor locks gate configuration and data, local unlock and visibility
+retain their intended exceptions. Shared dataset locks gate all row editing entrances and
+cancel an active map edit target. Context menu unlock and history keep feature rows/revision.
+Combined unlock+protected mutation is rejected for map layers/folders and scene nodes.
+
+Final workspace tests: exit 0, desktop 85 files / 474 passed / 5 skipped, core 119 passed.
+  .codex-refactor-local-lock-serial-test.log
+Workspace build: exit 0; existing Vite size warnings.
+  .codex-refactor-local-lock-workspace-build.log
+Browser isolated batch: 13/16 passed; scene follow-up 5/5 passed in 9.4s.
+  .codex-refactor-local-lock-isolated-browser.log
+  .codex-refactor-local-lock-scene-final.log
+Two obsolete scene draft-decision cases became one immediate-style/import-cancel/undo case;
+table assertion now distinguishes independent table filtering from persisted layer filter.
+Current 15 distinct browser cases pass across the isolated batch and follow-up. No screenshots.
+Concurrent unit/browser run: two 5s unit timeouts; serial unchanged-timeout rerun passed.
+Second import stalled during concurrent run; failure attachment task stayed running with a live
+worker. Trace module dependency downloads clone/coordinate-transform took about 23/25s,
+exceeding the existing 15s action timeout. The isolated original table cases passed. This
+explains the observed sample's load delay, not every historical failure; no importer lifecycle
+production patch or timeout increase. This batch did not rerun native acceptance.
+Owned Vite processes stopped. Main HEAD/local tracking origin-main remain
+2cf4a724aadb041ac030350079851494c37802d3. Original UI edits retained; no commit/push.
+Stage 2 remains open: opaque public root-order intent, full SDK document reads, configuration
+vs data dirty/save ownership, real Provider/EditBuffer, incremental map updates and 100k/1m.
+
+
+2026-11-01 runtime source/overlay frames for project replacement history
+Existing ReplaceProjectSnapshotCommand passes an optional command identity and direction.
+Host retains Provider/Buffer ownership with that command, restores source + pending overlay
+on Undo/Redo, and journals frame changes for failed replacement rollback. Resource retention
+follows the single history (including nested batches); discarded redo branches and history
+clear release unreferenced providers, retaining the active source.
+Workspace tests/build exit 0: .codex-refactor-runtime-frames-workspace-test.log and
+.codex-refactor-runtime-frames-workspace-build.log. Desktop 484 passed / 5 skipped, Core129.
+Additional disposal case included in final owner suite: 8 passed,
+.codex-refactor-runtime-frames-final-owner-test.log.
+Browser actual OL source/effective/pending replacement replay + scene imports: 10/10 passed,
+16.7s, .codex-refactor-runtime-frames-browser.log. Screenshots off; owned Vite stopped.
+No native/visual verification this batch. Save still serializes full effective snapshots;
+independent durable data commits, config/data dirty, selective data history cleanup, closing
+and crash recovery remain required. Full stage 0-5 goal remains active. No commit/push.
+
+2026-11-02 runtime column identities and schema transaction rollback
+Runtime-only column identity survives rename and ordinary refresh by matching name;
+delete/re-add uses a distinct identity. Schema commands and same-project snapshots
+restore identities through the existing Application Undo/Redo, including rollback
+of failed command frames and implicit property removal. Metadata reads do not
+materialize all rows. No durable column IDs or rename/delete commit support yet.
+Workspace test/build exit 0: Desktop510 passed / 5 skipped, Core135 passed.
+  .codex-refactor-field-identity-snapshot-workspace-test.log
+  .codex-refactor-field-identity-snapshot-workspace-build.log
+Browser7/7 passed in23.3s: real field-management delete/right-name-reuse history,
+actual OL properties, and six existing history/preflight cases.
+  .codex-refactor-field-identity-final-browser.log
+Screenshots/trace off, owned Vite stopped; no native/visual acceptance this batch.
+Rename/delete preflight remains protected pending historical field-reference rebase.
+Target binding/reopen, config/data dirty split, closing/recovery and stage4/5 gates
+remain open. Full goal remains active; original UI changes retained, no commit/push.
+
+2026-11-02 shared simultaneous field-reference mapping
+Core maps historical names by column identity; rename/delete collisions are handled
+in one traversal. Real field edits reuse shared legacy/standard reference remappers.
+Literal/display values and object-local keys survive; dynamic feature-property names
+and dangling standard-style references still reject before publication.
+Workspace tests/build exit 0: Desktop510 passed / 5 skipped, Core138 passed.
+  .codex-refactor-field-reference-workspace-test.log
+  .codex-refactor-field-reference-workspace-build.log
+Browser9/9 passed in30.0s: actual rename/filter Undo/Redo, worker typed empty import,
+field-add internal commit and six history/preflight cases.
+  .codex-refactor-field-reference-browser.log
+Diff check exit0. Owned Vite stopped; screenshots/trace off; no native/visual evidence.
+Historical command namespace binding and rename/delete commit remain incomplete;
+the shared remapper alone does not prove their completion. Full goal stays active.
+
+2026-11-02 acknowledged schema commit rebases existing-source configuration history
+Application captures per-command before/after column namespaces, including children
+of batches. Core prepares detached filter/style/tree/configuration mementos for both
+history branches. Explicit schema commands can finish after mapped layer/cartography
+effects are proven equal. Name reuse and repeated commits preserve logical columns.
+Schema acknowledgement temporarily freezes history so asynchronous persistence cannot
+invalidate preflight; failure releases the freeze and retains original Undo behavior.
+Workspace test/build exit0: Desktop518 passed /5 skipped; Core138 passed.
+  .codex-refactor-history-fields-workspace-test.log
+  .codex-refactor-history-fields-final-workspace-build.log
+Browser9/9 passed in30.4s: UI delete/rename, internal test-adapter commit, subsequent
+filter Undo/Redo with source and actual OL values remaining committed.
+  .codex-refactor-history-fields-browser.log
+Creation/import history is explicitly cleared to establish an existing-source fixture;
+its schema lifecycle remains unsupported and preflight rejects before persistence.
+Opaque configuration, unsupported mixed schemas and advanced deletion remain guarded.
+Owned Vite stopped; screenshots/trace off, no new native/visual acceptance. Full goal
+and stages2/3 remain open; no data-save UI, commit or push.
+
+2026-11-02 creation/import/removal lifecycle commit rebase
+Explicit lifecycle contracts retain creation/removal while restoring acknowledged rows,
+schema and references. Import subclasses and AddDatasetLayer's selection wrapper preserve
+their original UI follow-ups. Same-project snapshot rebase retains an opaque schema key,
+so unsaved datasets can Undo/Redo their original Buffer identity frames after another
+dataset commits; the key does not retain the old command/snapshot.
+Workspace tests/build exit0: Desktop522 passed /5 skipped; Core138 passed.
+  .codex-refactor-schema-lifecycle-workspace-test.log
+  .codex-refactor-schema-lifecycle-workspace-build.log
+Field commit suite12 passed: creation/removal replay, multiple import commits, selection,
+other-source pending edits and partial-commit schema frames.
+  .codex-refactor-schema-lifecycle-multiple-commit-test.log
+Browser9/9 passed in31.0s; real import history is retained, then UI delete/rename and an
+internal test-adapter commit, followed by import Undo/Redo with actual OL right=1/pending0.
+  .codex-refactor-schema-lifecycle-browser.log
+This supersedes the prior existing-source-only browser fixture. No new native disk or
+visual evidence. Owned Vite stopped; screenshots/trace off. Cross-project resources,
+unsupported mixed schemas/advanced deletion, source target/reopen, dirty split, closing,
+recovery and stage4/5 gates remain open. Full goal active; no data-save UI, commit/push.
+
+2026-11-02 mixed snapshot schema commit
+Same-project mixed snapshots rebase before/after field references from captured column
+identities, then align acknowledged rows/schema. Independent configuration and unsaved
+datasets remain in the single history; pure schema/data effects end. Structural field
+replacement does not infer rename from similar values. Advanced retired operands reject
+before persistence; callers without identity mappings retain the previous schema guard.
+Workspace tests/build exit0: Desktop526 passed /5 skipped; Core138 passed.
+  .codex-refactor-mixed-schema-workspace-test.log
+  .codex-refactor-mixed-schema-workspace-build.log
+Mixed/history suite27 passed; browser10/10 passed in32.6s. New browser case commits
+value -> count:number/nullable=false, then toolbar Undo/Redo changes only layer naming;
+actual OL and original source retain count=9/pending0 and declared schema.
+  .codex-refactor-mixed-schema-history-test.log
+  .codex-refactor-mixed-schema-browser.log
+Owned Vite stopped; screenshots/trace off; test-adapter persistence, no native disk,
+reopen or visual evidence. Cross-project resources, unknown mixed commands, advanced
+deletion, durable target/reopen, dirty split, closing/recovery and stage4/5 remain open.
+Full goal active; no data-save UI, commit or push.
+
+2026-11-02 explicit target binding, reference load and native process restart
+Vector storage references are separate from original provenance. Configuration binding
+materializes original Provider rows/schema without committing pending edits. Bound data
+save compares the file baseline, commits through the existing barrier and preserves
+project identity/configRevision/dirty. Source/epoch/target races reject stale binding.
+Reference hydration loads only absent embedded dataset entries, preserving legacy edits;
+native picker and known-path open share validation and path resolution. Browser missing
+local references reject explicitly. Save As rebases storage without changing input source.
+Native create_text_path stages/flushes and hard-links only into an absent destination;
+existing/concurrent-created files survive. This new-file guarantee is not an update OS CAS.
+Workspace tests/build exit0: Desktop544 passed /5 skipped; Core155 passed.
+  .codex-refactor-storage-binding-workspace-test.log
+  .codex-refactor-storage-binding-workspace-build.log
+Browser13/13 passed in41.1s; Rust atomic module8 passed/1 ignored child entry.
+  .codex-refactor-storage-binding-browser.log
+  .codex-refactor-storage-create-native-test.log
+Real native5/5 passed: no-clobber initialization, original/pending separation, unchanged
+configuration during commit, process restart via relative reference, second disk commit.
+  .codex-refactor-storage-binding-native.log
+  .artifacts/native-resources-1793597812520/report.json
+Owned PID43992/44316 and Vite14884 stopped; default Rust configuration restored.
+Screenshots off. Assigned fixture paths; no OS chooser/data-save UI/visual acceptance.
+Reference-only reopen uses an explicit migration fixture; default project Save remains
+embedded. Pending recovery/version migration, config/data dirty split, closing/recovery,
+update concurrency and stage4/5 gates remain open. Full goal active; no commit/push.
+
+2026-11-02 retired advanced historical style dependencies
+Active schema deletion retains strict reference checks. Historical mementos retire
+dependent paint/layout properties and compound-filter clauses; independent geometry,
+other fields and literal text remain. Classified branches retire with their field,
+leaving fallback styles and consistent binding IDs. Dynamic names still guard actual
+mapping; empty mappings preserve dynamic styles for ordinary row commits.
+Workspace tests/build exit0: Desktop531 passed /5 skipped; Core141 passed.
+  .codex-refactor-retired-style-final-workspace-test.log
+  .codex-refactor-retired-style-final-workspace-build.log
+  .codex-refactor-retired-style-core-test.log
+Browser12/12 passed in39.9s. UI deletion/internal test-adapter commit followed by style
+Undo/Redo evaluates actual OL radius5/default then4, without restoring retired data;
+pending0. Import, mixed schema and resource-replacement cases also pass in
+the same serial browser suite.
+  .codex-refactor-retired-style-final-browser.log
+Owned Vite stopped; screenshots/trace off. No native disk, durable target reopen or
+visual acceptance. Unknown mixed contracts, target/reopen, dirty split, closing/
+recovery and stage4/5 remain open. Full goal active; no data-save UI, commit/push.
+
+2026-11-02 managed GeoJSON source codec and real-worker provenance round trip
+Internal data writer now preserves stable internal IDs, portable source metadata and
+declared schema in versioned GeoJSON foreign members; canonical coordinates are WGS84.
+Host scene mapping metadata is excluded. Reader fails all rows on corruption/unknown
+version/duplicate IDs; writer rejects JSON coercion/omission before file publication.
+Import parser recognizes managed files before CRS conversion, preserves original source
+CRS metadata without transforming canonical geometry, and rejects a second source CRS.
+Dedicated dataset-file entry + exact Vite alias keep the import worker on narrow imports.
+Workspace tests/build exit0: Desktop534 passed /5 skipped; Core153 passed.
+  .codex-refactor-managed-dataset-workspace-test.log
+  .codex-refactor-managed-dataset-workspace-build.log
+  .codex-refactor-managed-dataset-core-test.log
+  .codex-refactor-managed-dataset-corrected-writer-test.log
+Browser13/13 passed in41.1s, including real worker import of sourceId42/original CRS/
+importId, stable ID, typed code001 and canonical 3D coordinates; source/effective/pending0.
+  .codex-refactor-managed-dataset-browser.log
+Owned Vite stopped, screenshots/trace off. File adapter mocked in persistence tests;
+no new native disk evidence. Dataset target references/project reopen, OS CAS, config/
+data save split, dirty split, closing/recovery and stage4/5 remain incomplete. The codec
+is a prerequisite for target binding, not evidence that binding/reopen is finished.
+Full goal active; no data-save UI, commit or push.
+
+2026-11-02 cross-project resource snapshot schema rebase
+Captured logical namespaces identify the matching before/after side. Whole resource
+replacement rebases only that side, even when projects share a datasetId. Detached
+commands retain an opaque resource key; history pruning follows declared keys through
+batches, preserving original Provider frames until history clear/discard releases them.
+Two new Application tests cover A/B independent schema acknowledgements, original A
+pending edits, batched A->B->C replacement and actual Provider disposal after clear.
+Workspace tests/build exit0: Desktop528 passed /5 skipped; Core138 passed.
+  .codex-refactor-resource-schema-workspace-test.log
+  .codex-refactor-resource-schema-workspace-build.log
+  .codex-refactor-resource-schema-history-test.log
+Browser11/11 passed in34.7s: B commits count=30; toolbar restores A value=9/source1/
+pending1, then replays B with committed schema/source/pending0 and actual OL values.
+  .codex-refactor-resource-schema-browser.log
+Owned Vite stopped; screenshots/trace off; test-adapter persistence, no native disk,
+target reopen or visual evidence. Advanced retired historical operands, unknown mixed
+commands, durable target/reopen, dirty split, closing/recovery and stage4/5 remain open.
+Full goal active; no data-save UI, commit or push.
+
+2026-11-02 independent edit lifecycle metadata and commit publication sessions
+Runtime derives immutable active-source pending/saving snapshots without a parallel row
+store/history. Successful outer transactions publish once; rollback preserves snapshot
+identity. Same-count edits advance publication revision; unchanged dataset items reuse
+references. Save completion does not require row-cache changes/full Provider reads.
+Application commit holds mutation/source replacement until receipt/history cleanup and
+schema unlock finish, then publishes completion. A completion observer can safely create
+a new pending/undoable edit. Observer exceptions cannot strand the publication session.
+Data replay preflights saving; toolbar history hooks subscribe to lifecycle metadata.
+Workspace tests/final build exit0: Desktop554 passed /5 skipped; Core155 passed.
+  .codex-refactor-edit-lifecycle-workspace-test.log
+  .codex-refactor-edit-lifecycle-final-build.log
+  .codex-refactor-edit-lifecycle-preflight-test.log
+Browser13/13 passed in41.4s; native5/5 passed with published pending/saving assertions.
+  .codex-refactor-edit-lifecycle-browser.log
+  .codex-refactor-edit-lifecycle-native.log
+  .artifacts/native-resources-1793600193367/report.json
+Owned PID34660/34364, native Vite13335 and browser Vite5196 stopped; normal Rust config
+restored, screenshots off. Existing assigned-path/reference-only-fixture limits remain.
+Legacy data dirty behavior is intentionally not removed before closing/recovery migrate.
+Active-source metadata alone is not a retained/inactive-source unsaved-data audit.
+Config/data save split, pending restoration, closing/discard/cancel and stage4/5 remain
+open. Full goal active; no data-save UI, commit or push.

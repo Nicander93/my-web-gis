@@ -1,0 +1,114 @@
+基线：2cf4a724aadb041ac030350079851494c37802d3；2026-10-30；原有 dirty UI 工作区
+pnpm test：exit 0
+packages/ol-selection test:  Test Files  1 passed (1)
+packages/ol-selection test:       Tests  9 passed (9)
+packages/cesium-scene-schema test:  Test Files  5 passed (5)
+packages/cesium-scene-schema test:       Tests  29 passed (29)
+packages/ol-style test:  Test Files  12 passed (12)
+packages/ol-style test:       Tests  87 passed (87)
+packages/style-assistant test:  Test Files  1 passed (1)
+packages/style-assistant test:       Tests  2 passed (2)
+packages/cesium-popup test:  Test Files  1 passed (1)
+packages/cesium-popup test:       Tests  3 passed (3)
+packages/spatial-analysis test:  Test Files  6 passed (6)
+packages/spatial-analysis test:       Tests  41 passed (41)
+packages/ogc-io test:  Test Files  6 passed | 1 skipped (7)
+packages/ogc-io test:       Tests  53 passed | 1 skipped (54)
+packages/scene-schema test:  Test Files  5 passed (5)
+packages/scene-schema test:       Tests  27 passed (27)
+packages/cesium-tileset-effects test:  Test Files  1 passed (1)
+packages/cesium-tileset-effects test:       Tests  8 passed (8)
+packages/cesium-measure test:  Test Files  1 passed (1)
+packages/cesium-measure test:       Tests  4 passed (4)
+packages/cesium-layer test:  Test Files  6 passed (6)
+packages/cesium-layer test:       Tests  39 passed (39)
+packages/ol-scene-runtime test:  Test Files  8 passed (8)
+packages/ol-scene-runtime test:       Tests  47 passed (47)
+packages/gis-core test:  Test Files  19 passed (19)
+packages/gis-core test:       Tests  88 passed (88)
+packages/cesium-tileset-edit test:  Test Files  1 passed (1)
+packages/cesium-tileset-edit test:       Tests  8 passed (8)
+packages/scene-core test:  Test Files  10 passed (10)
+packages/scene-core test:       Tests  44 passed (44)
+packages/cesium-effects test:  Test Files  2 passed (2)
+packages/cesium-effects test:       Tests  2 passed (2)
+packages/scene-codegen test:  Test Files  1 passed (1)
+packages/scene-codegen test:       Tests  11 passed (11)
+packages/vector-io test:  Test Files  7 passed (7)
+packages/vector-io test:       Tests  49 passed (49)
+packages/scene-publisher test:  Test Files  2 passed (2)
+packages/scene-publisher test:       Tests  8 passed (8)
+packages/ol-runtime test:  Test Files  7 passed (7)
+packages/ol-runtime test:       Tests  33 passed (33)
+packages/cesium-scene-runtime test:  Test Files  6 passed (6)
+packages/cesium-scene-runtime test:       Tests  42 passed (42)
+apps/desktop test:  Test Files  76 passed (76)
+apps/desktop test:       Tests  400 passed | 5 skipped (405)
+
+pnpm build：exit 0
+packages/cesium-scene-schema build: Done
+packages/cesium-popup build: Done
+packages/ol-selection build: Done
+packages/style-assistant build: Done
+packages/spatial-analysis build: Done in 117ms
+packages/spatial-analysis build: Done
+packages/ol-style build: Done
+packages/cesium-measure build: Done
+packages/cesium-tileset-effects build: Done
+packages/cesium-layer build: Done
+packages/ogc-io build: Done
+packages/scene-schema build: Done
+packages/cesium-effects build: Done
+packages/cesium-tileset-edit build: Done
+packages/gis-core build: Done
+packages/ol-scene-runtime build: Done
+packages/scene-codegen build: Done
+packages/scene-core build: Done
+packages/vector-io build: Done
+packages/scene-publisher build: Done
+packages/cesium-scene-runtime build: Done
+packages/ol-runtime build: Done
+examples/city-3d/consumer build: ✓ built in 14.88s
+examples/city-3d/consumer build: Done
+apps/viewer build: ✓ built in 16.67s
+apps/viewer build: Done
+apps/desktop build: ✓ built in 27.08s
+apps/desktop build: Done
+
+新增计数测试：
+$ vitest run "src/__tests__/architecture-baseline.test.ts"
+
+ RUN  v3.2.7 D:/my-code-repo/my-web-gis/apps/desktop
+
+stdout | src/__tests__/architecture-baseline.test.ts > architecture refactor baseline > measures configuration and single-feature operations with 100 features
+{"operation":"visibility","count":100,"elapsedMs":0.3305000000000291,"copiedIntoStore":0,"copiedOutOfStore":0,"syncEligiblePublications":1}
+{"operation":"style","count":100,"elapsedMs":1.966399999999794,"copiedIntoStore":100,"copiedOutOfStore":100,"syncEligiblePublications":2}
+{"operation":"geometry","count":100,"elapsedMs":0.5914999999999964,"copiedIntoStore":100,"copiedOutOfStore":100,"syncEligiblePublications":1}
+{"operation":"scene-projection","count":100,"elapsedMs":3.833100000000286,"convertedFeatures":100}
+
+stdout | src/__tests__/architecture-baseline.test.ts > architecture refactor baseline > measures configuration and single-feature operations with 10000 features
+{"operation":"visibility","count":10000,"elapsedMs":0.10140000000001237,"copiedIntoStore":0,"copiedOutOfStore":0,"syncEligiblePublications":1}
+{"operation":"style","count":10000,"elapsedMs":46.21759999999995,"copiedIntoStore":10000,"copiedOutOfStore":10000,"syncEligiblePublications":2}
+{"operation":"geometry","count":10000,"elapsedMs":43.290899999999965,"copiedIntoStore":10000,"copiedOutOfStore":10000,"syncEligiblePublications":1}
+{"operation":"scene-projection","count":10000,"elapsedMs":68.58289999999988,"convertedFeatures":10000}
+
+ ✓ src/__tests__/architecture-baseline.test.ts (2 tests) 309ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  12:04:14
+   Duration  2.81s (transform 689ms, setup 0ms, collect 1.65s, tests 309ms, environment 0ms, prepare 175ms)
+
+
+新增样本迁移测试：
+$ vitest run "src/project.architecture-fixtures.test.ts"
+
+ RUN  v3.2.7 D:/my-code-repo/my-web-gis/packages/gis-core
+
+ ✓ src/project.architecture-fixtures.test.ts (2 tests) 9ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  12:10:59
+   Duration  2.16s (transform 615ms, setup 0ms, collect 1.37s, tests 9ms, environment 0ms, prepare 148ms)
+

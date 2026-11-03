@@ -1,9 +1,12 @@
+import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
+import { useFeaturesByDataset } from '@/data/feature-data'
+import { requireMapContent } from '@desktop-webgis/project'
 import { useEffect, useState } from 'react'
 import { Alert, Button, Input, Select, Tag } from 'antd'
-import { applyFieldFilter, type FieldFilterCondition, type FieldFilterOp } from '@desktop-webgis/gis-core'
-import { useProjectStore } from '@/stores/project.store'
-import { ModelessWindow } from '@/components/ui/ModelessWindow'
-import { layerFilterEvent } from './layer-filter-request'
+import { applyFieldFilter, type FieldFilterCondition, type FieldFilterOp } from '@desktop-webgis/project'
+import { useProjectStore } from '@/session/project.store'
+import { ModelessWindow } from '@/ui/ModelessWindow'
+import { layerFilterEvent } from '@/view-state/layer-filter-request'
 
 export function LayerFilterWindowHost() {
   const epoch = useProjectStore(state => state.projectEpoch)
@@ -18,8 +21,8 @@ export function LayerFilterWindowHost() {
 
 function LayerFilterWindow({ layerId, onClose }: { layerId: string; onClose(): void }) {
   const project = useProjectStore(state => state.project)
-  const features = useProjectStore(state => state.featuresByDataset)
-  const layer = project.layers.find(item => item.id === layerId)
+  const features = useFeaturesByDataset()
+  const layer = requireMapContent(project).layers.find(item => item.id === layerId)
   const [base] = useState(() => JSON.stringify(layer?.filter ?? []))
   const [conditions, setConditions] = useState<FieldFilterCondition[]>(() => structuredClone(layer?.filter ?? []))
   const [field, setField] = useState(''), [op, setOp] = useState<FieldFilterOp>('eq'), [value, setValue] = useState('')
@@ -29,10 +32,10 @@ function LayerFilterWindow({ layerId, onClose }: { layerId: string; onClose(): v
   const hasValue = op !== 'is-empty' && op !== 'is-not-empty'
   const count = applyFieldFilter(rows, conditions).length
   function apply() {
-    const current = useProjectStore.getState().project.layers.find(item => item.id === layerId)
+    const current = requireMapContent(useProjectStore.getState().project).layers.find(item => item.id === layerId)
     if (!current) { setError('图层已移除。'); return }
     if (JSON.stringify(current.filter ?? []) !== base) { setError('图层过滤已在其他位置改变，请重新打开。'); return }
-    try { useProjectStore.getState().setLayerFilter(layerId, conditions); onClose() }
+    try { layerConfigurationCommands.setLayerFilter(layerId, conditions); onClose() }
     catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)) }
   }
   return <ModelessWindow title="图层过滤" width={560} height={300} onClose={onClose}><div className="layer-filter-window">

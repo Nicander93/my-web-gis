@@ -1,5 +1,5 @@
 import { Box, FolderOpen, Map } from 'lucide-react'
-import { projectCommands } from '@/app/commands/project.commands'
+import { projectCommands } from '@/commands/project.commands'
 
 /** 无项目时提供直接可用的工作入口，不展示虚构的最近项目。 */
 export function ProjectStartScreen() {

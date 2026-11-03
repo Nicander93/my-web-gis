@@ -15,12 +15,14 @@ async function importPoints(page: Page) {
 
 async function state(page: Page) {
   return page.evaluate(async () => {
+    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/view-state/layer-view.store.ts').at(-1) ?? '/src/view-state/layer-view.store.ts')).useLayerViewStore.getState()
+
     const loaded = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(loaded('/src/stores/project.store.ts')) as typeof import('../src/stores/project.store')
+    const { useProjectStore } = await import(loaded('/src/session/project.store.ts')) as typeof import('@/session/project.store')
     const project = useProjectStore.getState().project
-    const { getMapRuntime } = await import(loaded('/src/features/map/map-runtime-host.ts')) as typeof import('../src/features/map/map-runtime-host')
-    const layer = project.layers.find(item => item.id === useProjectStore.getState().selectedLayerId)!
-    const binding = project.cartography.bindings.find(item => item.gisLayerId === layer.id)!
+    const { getMapRuntime } = await import(loaded('/src/runtime/map-runtime-host.ts')) as typeof import('@/runtime/map-runtime-host')
+    const layer = project.content.layers.find(item => item.id === selectionSession.selectedLayerId)!
+    const binding = project.content.cartography.bindings.find(item => item.gisLayerId === layer.id)!
     const runtime = getMapRuntime(), native = runtime?.registry.getVector(layer.id)
     const samples = native?.getSource()?.getFeatures().map(feature => {
       const result = native.getStyleFunction()?.(feature, runtime!.getMap().getView().getResolution()!)
@@ -29,7 +31,7 @@ async function state(page: Page) {
         text: styles.find(style => style.getText())?.getText()?.getText() }
     }) ?? []
     return { layer: structuredClone(layer), samples, fragment: structuredClone({ binding,
-      styleLayers: project.cartography.styleLayers.filter(item => binding.styleLayerIds.includes(item.id)) }) }
+      styleLayers: project.content.cartography.styleLayers.filter(item => binding.styleLayerIds.includes(item.id)) }) }
   })
 }
 

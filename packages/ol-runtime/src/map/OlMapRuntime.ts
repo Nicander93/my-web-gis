@@ -1,7 +1,7 @@
 import { applyFieldFilter,
   isLegacyStyle, migrateLegacyStyle,
   isTileServiceKind,
-  layerListZIndex, type BasemapConfig, type Dataset, type GisFeature, type Layer, type MapState, type WmsDataset, type WmtsDataset } from '@desktop-webgis/gis-core'
+  layerListZIndex, type BasemapConfig, type Dataset, type GisFeature, type Layer, type MapState, type WmsDataset, type WmtsDataset } from '@desktop-webgis/project'
 import { createOlSceneLayer, createOlVectorLayer, updateGoogleMapTilesAttribution, OlDocumentRuntime, type OlDocumentOptions } from '@desktop-webgis/ol-scene-runtime'
 import type { SceneSource, SceneDocument } from '@desktop-webgis/scene-schema'
 import type Feature from 'ol/Feature'
@@ -18,7 +18,7 @@ import { defaults as defaultInteractions } from 'ol/interaction'
 import { boundingExtent, isEmpty } from 'ol/extent'
 import { transformExtent } from 'ol/proj'
 import type { Coordinate } from 'ol/coordinate'
-import { toOlFeature } from '../feature/featureAdapter'
+import { applyGisFeature, toOlFeature } from '../feature/featureAdapter'
 import { OlLayerRegistry } from '../layer/OlLayerRegistry'
 import { createLayerStyle } from '../layer/style'
 import {
@@ -129,8 +129,13 @@ export class OlMapRuntime {
       for (const node of document.nodes) {
         if (node.type !== 'vector' || candidates.has(node.resource)) continue
         const features = featuresByDataset[node.resource] ?? [], previous = this.sourceSnapshots.get(node.resource)
-        const source = previous?.features === features && previous.projection === definition.projection ? previous.source : new VectorSource({ features: features.map(feature => toOlFeature(feature, definition.projection)) })
-        if (source !== previous?.source) { created.add(source); this.ownedDocumentSources.add(source) }
+        let source = previous?.projection === definition.projection ? previous.source : undefined
+        if (source && previous) {
+          if (previous.features !== features) this.patchSourceFeatures(source, features, definition.projection)
+        } else {
+          source = new VectorSource({ features: features.map(feature => toOlFeature(feature, definition.projection)) })
+          created.add(source); this.ownedDocumentSources.add(source)
+        }
         candidates.set(node.resource, { features, projection: definition.projection, source })
       }
       Object.keys(this.documentSources).forEach(id => delete this.documentSources[id])
@@ -184,6 +189,19 @@ export class OlMapRuntime {
 
   private releaseDocumentSource(source: VectorSource<Feature<Geometry>>): void {
     if (this.ownedDocumentSources.delete(source)) source.dispose()
+  }
+
+  /** Update rows inside an existing Source so Draw/Modify keep valid Feature references. */
+  private patchSourceFeatures(source: VectorSource<Feature<Geometry>>, features: GisFeature[], projection: string): void {
+    const next = new Map(features.map(feature => [feature.id, feature]))
+    for (const olFeature of source.getFeatures()) {
+      const id = String(olFeature.get('domainFeatureId') ?? olFeature.getId() ?? '')
+      const row = next.get(id)
+      if (!row) { source.removeFeature(olFeature); continue }
+      next.delete(id)
+      applyGisFeature(olFeature, row, projection)
+    }
+    for (const row of next.values()) source.addFeature(toOlFeature(row, projection))
   }
 
   isFeatureIncluded(layerId: string, feature: Feature<Geometry>): boolean {

@@ -1,20 +1,25 @@
+import { layerContentCommands } from '@/commands/layer-content.commands'
+import { featureCommands } from '@/commands/feature.commands'
+import { projectEdits } from '@/session/project-edits'
+import { featureData } from '@/data/feature-data'
+import { requireMapContent } from '@desktop-webgis/project'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createProject,
   parseProjectSnapshot,
   serializeProjectSnapshot,
   capabilitiesForDataset
-} from '@desktop-webgis/gis-core'
+} from '@desktop-webgis/project'
 import {
   listSelectableLayers,
   parseCapabilitiesXml,
   WFS_DEFAULT_MAX_FEATURES
 } from '@desktop-webgis/ogc-io'
-import { useProjectStore } from '@/stores/project.store'
-import { useSessionStore } from '@/stores/session.store'
-import { getLayerCapabilities, layerCommands } from '@/app/commands/layer.commands'
-import { _resetCredentialsForTests } from '@/services/credentials'
-import { startWfsBoundedLoad } from '@/services/wfs-commands'
+import { useProjectStore } from '@/session/project.store'
+import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { getLayerCapabilities, layerCommands } from '@/commands/layer.commands'
+import { _resetCredentialsForTests } from '@/platform/credentials'
+import { startWfsBoundedLoad } from '@/commands/wfs.commands'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -25,23 +30,16 @@ const fixturesDir = join(
 )
 
 function resetStores(): void {
-  useProjectStore.getState()._resetAttributeHistoryForTests()
+  projectEdits.clear()
   layerCommands._resetStyleHistoryForTests()
-  useSessionStore.setState({
+  useLayerViewStore.setState({
     sessions: {},
     mapViewExtentWgs84: [116.3, 39.8, 116.5, 40.0],
     wfsLoadGeneration: 0,
     wfsAbortByLayer: {}
   })
   _resetCredentialsForTests()
-  useProjectStore.setState({
-    project: createProject('P18 test'),
-    featuresByDataset: {},
-    dirty: false,
-    selectedLayerId: null,
-    selection: { layerId: null, featureIds: [] },
-    lastSelectionCountAfterFilter: null
-  })
+  useProjectStore.setState({ project: createProject('P18 test'), dirty: false }); featureData.replaceAll({}); useLayerViewStore.setState({ selectedLayerId: null, selection: { layerId: null, featureIds: [] }, lastSelectionCountAfterFilter: null })
 }
 
 describe('P18 WFS bounded snapshot', () => {
@@ -69,7 +67,7 @@ describe('P18 WFS bounded snapshot', () => {
     })
     vi.stubGlobal('fetch', fetchImpl)
 
-    const added = useProjectStore.getState().addServiceLayer({
+    const added = layerContentCommands.addServiceLayer({
       name: parks.title || parks.name,
       kind: 'wfs',
       source: {
@@ -87,7 +85,7 @@ describe('P18 WFS bounded snapshot', () => {
     })!
     expect(added).toBeTruthy()
 
-    const layer = useProjectStore.getState().project.layers.find((l) => l.id === added.layerId)!
+    const layer = requireMapContent(useProjectStore.getState().project).layers.find((l) => l.id === added.layerId)!
     expect(layer.editable).toBe(false)
 
     await startWfsBoundedLoad({
@@ -105,10 +103,10 @@ describe('P18 WFS bounded snapshot', () => {
       isRefresh: false
     })
 
-    const features = useProjectStore.getState().featuresByDataset[added.datasetId] ?? []
+    const features = featureData.readSnapshot()[added.datasetId] ?? []
     expect(features.length).toBe(2)
 
-    const ds = useProjectStore.getState().project.datasets.find((d) => d.id === added.datasetId)
+    const ds = requireMapContent(useProjectStore.getState().project).datasets.find((d) => d.id === added.datasetId)
     expect(ds?.kind).toBe('wfs')
     if (ds?.kind === 'wfs') {
       expect(ds.source.loadedCount).toBe(2)
@@ -131,10 +129,10 @@ describe('P18 WFS bounded snapshot', () => {
 
     const snap = {
       project: useProjectStore.getState().project,
-      featuresByDataset: useProjectStore.getState().featuresByDataset
+      featuresByDataset: featureData.readSnapshot()
     }
     const restored = parseProjectSnapshot(serializeProjectSnapshot(snap))
-    const restoredDs = restored.project.datasets.find((d) => d.kind === 'wfs')
+    const restoredDs = requireMapContent(restored.project).datasets.find((d) => d.kind === 'wfs')
     expect(restoredDs?.kind).toBe('wfs')
     if (restoredDs?.kind === 'wfs') {
       expect(restoredDs.source.loadedCount).toBe(2)
@@ -163,7 +161,7 @@ describe('P18 WFS bounded snapshot', () => {
       vi.fn(async () => new Response(body, { status: 200, headers: { 'content-type': 'application/json' } }))
     )
 
-    const added = useProjectStore.getState().addServiceLayer({
+    const added = layerContentCommands.addServiceLayer({
       name: 'parks',
       kind: 'wfs',
       source: {
@@ -190,7 +188,7 @@ describe('P18 WFS bounded snapshot', () => {
       authMode: 'none'
     })
 
-    const ds = useProjectStore.getState().project.datasets.find((d) => d.id === added.datasetId)
+    const ds = requireMapContent(useProjectStore.getState().project).datasets.find((d) => d.id === added.datasetId)
     expect(ds?.kind).toBe('wfs')
     if (ds?.kind === 'wfs') {
       expect(ds.source.loadedCount).toBe(3)
@@ -216,7 +214,7 @@ describe('P18 WFS bounded snapshot', () => {
       .mockRejectedValueOnce(new TypeError('Failed to fetch'))
     vi.stubGlobal('fetch', fetchMock)
 
-    const added = useProjectStore.getState().addServiceLayer({
+    const added = layerContentCommands.addServiceLayer({
       name: 'parks',
       kind: 'wfs',
       source: {
@@ -243,7 +241,7 @@ describe('P18 WFS bounded snapshot', () => {
       },
       authMode: 'none'
     })
-    expect(useProjectStore.getState().featuresByDataset[added.datasetId]?.length).toBe(2)
+    expect(featureData.readSnapshot()[added.datasetId]?.length).toBe(2)
 
     await startWfsBoundedLoad({
       layerId: added.layerId,
@@ -258,12 +256,12 @@ describe('P18 WFS bounded snapshot', () => {
       authMode: 'none',
       isRefresh: true
     })
-    expect(useProjectStore.getState().featuresByDataset[added.datasetId]?.length).toBe(2)
+    expect(featureData.readSnapshot()[added.datasetId]?.length).toBe(2)
     vi.unstubAllGlobals()
   })
 
   it('copy to local creates editable vector without WFS-T', () => {
-    const added = useProjectStore.getState().addServiceLayer({
+    const added = layerContentCommands.addServiceLayer({
       name: 'parks',
       kind: 'wfs',
       source: {
@@ -274,7 +272,7 @@ describe('P18 WFS bounded snapshot', () => {
         authMode: 'none'
       }
     })!
-    useProjectStore.getState().setDatasetFeatures(added.datasetId, [
+    featureCommands.replaceDatasetFeatures(added.datasetId, [
       {
         id: '1',
         geometry: { type: 'Point', coordinates: [116.4, 39.9] },
@@ -282,17 +280,17 @@ describe('P18 WFS bounded snapshot', () => {
       }
     ])
 
-    const copied = useProjectStore.getState().copyFeaturesToLocalLayer(
-      useProjectStore.getState().featuresByDataset[added.datasetId]!,
+    const copied = layerContentCommands.copyFeaturesToLocalLayer(
+      featureData.readSnapshot()[added.datasetId]!,
       'parks (本地)',
       'point'
     )
     expect(copied).toBeTruthy()
-    const localDs = useProjectStore.getState().project.datasets.find((d) => d.id === copied!.datasetId)
+    const localDs = requireMapContent(useProjectStore.getState().project).datasets.find((d) => d.id === copied!.datasetId)
     expect(localDs?.kind).toBe('vector')
     expect(capabilitiesForDataset(localDs).editGeometry).toBe(true)
     // Original WFS remains non-editable
-    const wfsDs = useProjectStore.getState().project.datasets.find((d) => d.id === added.datasetId)
+    const wfsDs = requireMapContent(useProjectStore.getState().project).datasets.find((d) => d.id === added.datasetId)
     expect(capabilitiesForDataset(wfsDs).editGeometry).toBe(false)
   })
 
@@ -314,7 +312,7 @@ describe('P18 WFS bounded snapshot', () => {
       )
     )
 
-    const added = useProjectStore.getState().addServiceLayer({
+    const added = layerContentCommands.addServiceLayer({
       name: 'parks',
       kind: 'wfs',
       source: {
@@ -343,7 +341,7 @@ describe('P18 WFS bounded snapshot', () => {
     })
 
     // Switch project generation mid-flight
-    useSessionStore.getState().bumpWfsLoadGeneration()
+    useLayerViewStore.getState().bumpWfsLoadGeneration()
     pendingFetch.resolve?.(
       new Response(readFileSync(join(fixturesDir, 'wfs-getfeature-geojson.json'), 'utf8'), {
         status: 200,
@@ -352,7 +350,7 @@ describe('P18 WFS bounded snapshot', () => {
     )
     await loadPromise
     // Features must not be applied after generation bump
-    expect(useProjectStore.getState().featuresByDataset[added.datasetId] ?? []).toEqual([])
+    expect(featureData.readSnapshot()[added.datasetId] ?? []).toEqual([])
 
     vi.unstubAllGlobals()
   })

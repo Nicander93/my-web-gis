@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { VectorDataset } from '@desktop-webgis/gis-core'
+import type { VectorDataset } from '@desktop-webgis/project'
 import {
   _resetCredentialsForTests,
   _setSecureCredentialBackendForTests,
@@ -15,7 +15,7 @@ import {
   putSessionCredential,
   wipeSessionMemoryOnly,
   type SecureCredentialBackend
-} from '@/services/credentials'
+} from '@/platform/credentials'
 
 function memoryBackend(): SecureCredentialBackend & { store: Map<string, string> } {
   const store = new Map<string, string>()

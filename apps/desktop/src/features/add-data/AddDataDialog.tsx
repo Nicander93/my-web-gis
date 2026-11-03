@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Spin } from 'antd'
-import { Button } from '@/components/ui/Button'
-import { EditorDialog } from '@/components/ui/EditorDialog'
+import { Button } from '@/ui/Button'
+import { EditorDialog } from '@/ui/EditorDialog'
 import { isTauri } from '@tauri-apps/api/core'
 import { FileText, Upload, CheckCircle2, AlertCircle } from 'lucide-react'
-import { pickFile, readFile } from '@/services/files'
+import { pickFile, readFile } from '@/platform/files'
 import {
   importGeoJson,
   inspectDxfLayers,
@@ -12,12 +12,12 @@ import {
   importDxfFile,
   importCsvFile,
   detectFileType
-} from '@/services/import'
-import type { ImportResult } from '@/services/import'
+} from '@/exchange/import'
+import type { ImportResult } from '@/exchange/import'
 import type { CrsInfo } from '@desktop-webgis/vector-io'
 import { CRS_PRESETS } from '@desktop-webgis/vector-io'
 import { CsvConfigDialog } from './CsvConfigDialog'
-import { useProjectStore } from '@/stores/project.store'
+import { useProjectStore } from '@/session/project.store'
 import type { CsvConfig } from './CsvConfigDialog'
 import {
   ServiceConnectPanel,
@@ -87,11 +87,11 @@ export function AddDataDialog({
   openRef.current = open
   useEffect(() => {
     if (open) {
-      openedProjectId.current = useProjectStore.getState().project.id
+      openedProjectId.current = useProjectStore.getState().project.metadata.id
       openedProjectEpoch.current = useProjectStore.getState().projectEpoch
     }
     const unsubscribe = useProjectStore.subscribe(state => {
-      if (open && (state.project.id !== openedProjectId.current || state.projectEpoch !== openedProjectEpoch.current)) {
+      if (open && (state.project.metadata.id !== openedProjectId.current || state.projectEpoch !== openedProjectEpoch.current)) {
         parseGeneration.current++
         parseController.current?.abort()
         setLoading(false)
@@ -147,7 +147,7 @@ export function AddDataDialog({
   function handleConfirm() {
     if (loading || !parseResult) return
     try {
-      if (useProjectStore.getState().project.id !== openedProjectId.current || useProjectStore.getState().projectEpoch !== openedProjectEpoch.current) throw new Error('工程已改变，请关闭窗口并重新导入')
+      if (useProjectStore.getState().project.metadata.id !== openedProjectId.current || useProjectStore.getState().projectEpoch !== openedProjectEpoch.current) throw new Error('工程已改变，请关闭窗口并重新导入')
       onImport(parseResult)
       handleClose()
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
@@ -155,7 +155,7 @@ export function AddDataDialog({
 
   function isCurrentRead(generation: number): boolean {
     if (parseGeneration.current !== generation || !openRef.current) return false
-    if (useProjectStore.getState().project.id !== openedProjectId.current || useProjectStore.getState().projectEpoch !== openedProjectEpoch.current) {
+    if (useProjectStore.getState().project.metadata.id !== openedProjectId.current || useProjectStore.getState().projectEpoch !== openedProjectEpoch.current) {
       setError('读取期间工程已改变，结果未导入；请重新打开添加数据窗口')
       return false
     }

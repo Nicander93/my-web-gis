@@ -1,4 +1,4 @@
-import { createId } from '@desktop-webgis/gis-core'
+import { createId } from '@desktop-webgis/project'
 import { parseSymbolPreset, validateSymbolPreset, type SymbolPreset } from '@desktop-webgis/ol-style/symbol-library'
 import { verifyStyleAssets } from '@desktop-webgis/ol-style/style-assets'
 import { readPersonalSymbolLibrary, writePersonalSymbolLibrary, type PersonalSymbolLibrary } from './symbol-library-store'

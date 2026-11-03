@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildGetMapUrl } from './getMapRequest'
 import { createWmsTileLayer, refreshWmsTileLayer } from './createWmsLayer'
-import type { WmsDataset } from '@desktop-webgis/gis-core'
+import type { WmsDataset } from '@desktop-webgis/project'
 
 describe('WMS GetMap URL + axis order (via OL helpers)', () => {
   const extent4326: [number, number, number, number] = [-10, 40, 10, 60]

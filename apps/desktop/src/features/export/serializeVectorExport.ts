@@ -1,4 +1,4 @@
-import { stringifyGeoJson, type GisFeature } from '@desktop-webgis/gis-core'
+import { stringifyGeoJson, type GisFeature } from '@desktop-webgis/project'
 import { featuresToCsv, pointsToCoordinateCsv, type CrsPresetCode } from '@desktop-webgis/vector-io'
 
 export type ExportFormat = 'geojson' | 'csv' | 'coordinate-csv'

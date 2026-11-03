@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Alert, Button, Input, Select, Segmented } from 'antd'
 import { validateCesiumTilesetStyle } from '@desktop-webgis/cesium-scene-runtime'
-import { PropertyField } from '@/components/ui/PropertyFields'
+import { PropertyField } from '@/ui/PropertyFields'
 
 interface Props {
   value?: Record<string, unknown>

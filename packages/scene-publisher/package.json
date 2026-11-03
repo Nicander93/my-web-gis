@@ -1,6 +1,7 @@
 {
   "name": "@desktop-webgis/scene-publisher",
   "version": "0.1.0",
+  "private": true,
   "description": "Build portable static artifacts from declarative two-dimensional map scenes.",
   "type": "module",
   "main": "./dist/index.js",
@@ -14,7 +15,10 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "sideEffects": false,
   "scripts": {
     "build": "tsc -p tsconfig.json",

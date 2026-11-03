@@ -605,5 +605,3 @@ export async function createCesiumDocumentRuntime(options: Omit<CesiumSceneRunti
     destroy() { if (destroyed) return; destroyed = true; revision++; runtime.destroy() }
   }
 }
-
-export * from './compat-city.js'

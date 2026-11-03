@@ -44,7 +44,7 @@ test('WMS and WMTS catalog selection, order and opacity survive a project file r
   await page.getByRole('button', { name: '保存项目', exact: true }).click()
   const download = await downloadEvent, body = readFileSync((await download.path())!)
   const saved = JSON.parse(body.toString('utf8'))
-  expect(saved.project.datasets.map(dataset => dataset.kind).sort()).toEqual(['wms', 'wmts'])
+  expect(saved.project.content.datasets.map(dataset => dataset.kind).sort()).toEqual(['wms', 'wmts'])
   await page.reload()
   await page.getByRole('button', { name: '文件', exact: true }).click()
   const chooserEvent = page.waitForEvent('filechooser')
@@ -70,10 +70,10 @@ async function addService(page: Page, type: string, layer: string) {
 
 async function nativeLayers(page: Page) {
   return page.evaluate(async () => {
-    const { getMapRuntime } = await import('/src/features/map/map-runtime-host.ts')
-    const { useProjectStore } = await import('/src/stores/project.store.ts')
+    const { getMapRuntime } = await import('/src/runtime/map-runtime-host.ts')
+    const { useProjectStore } = await import('/src/session/project.store.ts')
     const runtime = getMapRuntime(), project = useProjectStore.getState().project
-    return project.layers.map(layer => ({ name: layer.name, opacity: runtime?.registry.get(layer.id)?.getOpacity(),
+    return project.content.layers.map(layer => ({ name: layer.name, opacity: runtime?.registry.get(layer.id)?.getOpacity(),
       type: runtime?.registry.get(layer.id)?.getSource()?.constructor.name,
       index: runtime?.getMap().getLayers().getArray().indexOf(runtime.registry.get(layer.id)!) }))
   })

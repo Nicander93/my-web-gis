@@ -2,20 +2,19 @@
 
 Lightweight 2D desktop GIS workspace based on Tauri 2, React, TypeScript and OpenLayers.
 
-The desktop also supports independent Cesium 3D projects. The current [productization implementation record](docs/plans/desktop-productization-implementation.md) tracks the supplied M0–M9 plan and distinguishes implemented workflows from pending work.
+The desktop also supports independent Cesium 3D projects. Two-dimensional maps and three-dimensional scenes are exclusive project types.
 
 The shared shell uses **File / Window / Settings / Help**, task tabs and one compact tool row. Panels overlay the full map viewport. Drag a panel title to float it, use its docking selector to move it to an edge, or maximize it. Closed panels reopen from **Window**; **Window → Reset layout** restores the default. Floating title bars support arrow keys (Shift for larger steps); focused resize handles support arrow keys; Esc cancels an active window drag. Layout is saved locally and never changes project data or undo history.
 
 ## What is included
 
-- `packages/gis-core`: project, dataset, layer, feature, selection, GeoJSON, edit commands and undo/redo history.
+- `packages/project`: project, dataset, layer, feature, selection, GeoJSON, edit commands and undo/redo history.
 - `packages/ol-runtime`: OpenLayers map runtime, layer registry, feature adapter, selection runtime and edit tool runtime.
 - `packages/scene-schema` / `scene-core`: versioned JSON scene contract and immutable scene operations.
 - `packages/ol-scene-runtime`: public OpenLayers adapter for XYZ, Tianditu, Google Map Tiles and GeoJSON scenes.
 - `packages/scene-publisher`: static Viewer artifact builder and `scene-publish` CLI.
 - `packages/vector-io`: SHP ZIP and ASCII DXF import plus Shapefile export.
 - `packages/scene-codegen`: OpenLayers ESM code generation without embedded provider secrets.
-- `packages/style-assistant`: deterministic smart styling and a validated, provider-neutral AI adapter.
 - `apps/desktop`: React Desktop shell with a map-first workspace, overlay panels, Ribbon-style header and lightweight commands; GIS capabilities are being reconnected incrementally.
 - `apps/viewer`: framework-independent static Scene Viewer for URL publishing.
 - `examples`: sample GeoJSON files for manual import testing.
@@ -56,8 +55,8 @@ Use:
 
 ## Project documents
 
-- [`docs/README.md`](docs/README.md): project document index and progressive reading order.
-- [`docs/specs/`](docs/specs/): product, architecture, UI and scene specifications.
+- [`docs/README.md`](docs/README.md): project document index and reading order.
+- [`docs/architecture/`](docs/architecture/): architecture overview, layering rules, data and editing model.
 - [`docs/engineering/code-preferences.md`](docs/engineering/code-preferences.md): code and maintenance conventions.
 - [`docs/assets/`](docs/assets/): UI reference images.
 

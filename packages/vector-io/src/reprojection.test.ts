@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createCoordinateTransform, reprojectFeatures } from './coordinate-transform.js'
 import { pointsToCoordinateCsv } from './coordinate-csv.js'
 import { importCsv, previewCsv } from './csv.js'
-import type { GeoJsonGeometry } from '@desktop-webgis/scene-schema'
+import type { GeoJsonGeometry } from './types.js'
 
 describe('reprojection and coordinate interchange', () => {
   it('does not allow an unknown projection to pass via an identity shortcut', () => {

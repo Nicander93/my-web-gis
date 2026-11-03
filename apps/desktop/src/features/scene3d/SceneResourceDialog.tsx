@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Alert, Form, Input, Radio } from 'antd'
 import { Box, Building2, Layers2 } from 'lucide-react'
 import { isSceneResourceUrl, type ResourceReference } from '@desktop-webgis/cesium-scene-schema'
-import { EditorDialog } from '@/components/ui/EditorDialog'
-import { Button } from '@/components/ui/Button'
+import { EditorDialog } from '@/ui/EditorDialog'
+import { Button } from '@/ui/Button'
 
 export type SceneResourceType = '3dtiles' | 'model' | 'geojson'
 interface SceneResourceDialogProps {

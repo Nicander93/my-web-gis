@@ -32,7 +32,7 @@
 | 样式 UI | `StylePanel.tsx`：基于草稿、点击“应用” | V4 布局，实时生效；可编辑结构化表达式 |
 | 标注 UI | `LabelPanel.tsx`：字段、字号、色彩、描边、偏移、Zoom 输入 | MapLibre `symbol` 样式层 + 可选多规则标注 UI |
 | 撤销与项目 | `project.store.ts`、`layer.commands.ts`：已有 `EditHistory` 和 `SetLayerStyleCommand` | 支持高频即时预览与按“用户操作”合并的一次撤销 |
-| 数据模型 | `packages/gis-core/src/types.ts`：`Layer.style` 为旧式样式、`Layer.datasetId` 指向数据集 | 增加标准样式层集合与稳定映射，旧项目迁移 |
+| 数据模型 | `packages/project/src/types.ts`：`Layer.style` 为旧式样式、`Layer.datasetId` 指向数据集 | 增加标准样式层集合与稳定映射，旧项目迁移 |
 | 服务读取 | `ogc-io` / `ServiceConnectPanel`：读取 WMS、WMTS、WFS | 增加独立的 GeoServer REST 发布模块；不混入“连接并加载服务”模块 |
 
 **代码版本注意**：桌面应用 `apps/desktop/package.json` 对 `ol` 使用 `^10.6.1`，`packages/ol-style/package.json` peer 范围为 `^10.10.0`。实施前应检查锁文件里实际解析到的 OpenLayers 版本，并统一工作区与适配库的兼容要求。此处不能仅依赖 `package.json` 文本断言安装版本。
@@ -426,6 +426,6 @@ interface PublishedStyleLink {
 - MapLibre Style Specification v8：[规范概览](https://maplibre.org/maplibre-style-spec/)、[Layers](https://maplibre.org/maplibre-style-spec/layers/)、[Sources](https://maplibre.org/maplibre-style-spec/sources/)、[Expressions](https://maplibre.org/maplibre-style-spec/expressions/)。
 - OpenLayers `ol-mapbox-style`：[applyStyle API](https://openlayers.org/ol-mapbox-style/functions/applyStyle.html)、[stylefunction API](https://openlayers.org/ol-mapbox-style/functions/stylefunction.html)。
 - GeoServer：[SLD Rules](https://docs.geoserver.org/stable/en/user/styling/sld/reference/rules/)、[REST Styles](https://docs.geoserver.org/stable/en/user/rest/api/styles/)、[MBStyle 扩展](https://docs.geoserver.org/main/en/user/styling/mbstyle/)、[MBStyle 安装](https://docs.geoserver.org/main/en/user/styling/mbstyle/installing/)。
-- 项目源码：[仓库](https://github.com/Nicander93/my-web-gis)、[`ol-style/types.ts`](https://github.com/Nicander93/my-web-gis/blob/main/packages/ol-style/src/types.ts)、[`ol-style/compiler.ts`](https://github.com/Nicander93/my-web-gis/blob/main/packages/ol-style/src/compiler.ts)、[`project.store.ts`](https://github.com/Nicander93/my-web-gis/blob/main/apps/desktop/src/stores/project.store.ts)、[`Layer` 契约](https://github.com/Nicander93/my-web-gis/blob/main/packages/gis-core/src/types.ts)。
+- 项目源码：[仓库](https://github.com/Nicander93/my-web-gis)、[`ol-style/types.ts`](https://github.com/Nicander93/my-web-gis/blob/main/packages/ol-style/src/types.ts)、[`ol-style/compiler.ts`](https://github.com/Nicander93/my-web-gis/blob/main/packages/ol-style/src/compiler.ts)、[`project.store.ts`](https://github.com/Nicander93/my-web-gis/blob/main/apps/desktop/src/stores/project.store.ts)、[`Layer` 契约](https://github.com/Nicander93/my-web-gis/blob/main/packages/project/src/types.ts)。
 
 > 下一项独立讨论：**三维制图系统**。优先明确 3D Tiles、三维矢量 Entity/Primitive、影像和地形各自的表现能力与配置 UI，再选择 Cesium 3D Tiles Styling / Cesium Material / 可能的 glTF 资源体系；不在二维规范中预设所有三维实现方式。

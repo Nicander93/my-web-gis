@@ -1,21 +1,23 @@
+import { projectSession } from '@/session/project-session'
+import { useFeaturesByDataset } from '@/data/feature-data'
 import { useMemo, useState } from 'react'
 import { Alert, Button, Input } from 'antd'
-import { findSecretLeaks } from '@desktop-webgis/gis-core'
+import { findSecretLeaks } from '@desktop-webgis/project'
 import { generateCesiumModule, inspectCesiumCodegenCapabilities } from '@desktop-webgis/scene-codegen'
-import { ModelessWindow } from '@/components/ui/ModelessWindow'
-import { useProjectStore } from '@/stores/project.store'
-import { createProjectSceneDocument } from '../scene/project-scene-document'
-import { saveCesiumModule } from '@/services/cesium-code-export'
+import { ModelessWindow } from '@/ui/ModelessWindow'
+import { useProjectStore } from '@/session/project.store'
+import { createProjectSceneDocument } from '@/exchange/project-scene-document'
+import { saveCesiumModule } from '@/exchange/cesium-code-export'
 
 /** A reviewed standalone export, separate from project and scene JSON persistence. */
 export function CesiumCodeExportWindow({ onClose }: { onClose(): void }) {
   const project = useProjectStore(state => state.project)
-  const features = useProjectStore(state => state.featuresByDataset)
+  const features = useFeaturesByDataset()
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState('')
   const result = useMemo(() => {
     try {
-      const document = createProjectSceneDocument(useProjectStore.getState().getSnapshot())
+      const document = createProjectSceneDocument(projectSession.getSnapshot())
       const leaks = findSecretLeaks(document)
       if (leaks.length) throw new Error(`场景含疑似密钥字段：${leaks.slice(0, 5).join(', ')}`)
       const diagnostics = inspectCesiumCodegenCapabilities(document)
@@ -27,7 +29,7 @@ export function CesiumCodeExportWindow({ onClose }: { onClose(): void }) {
     if (!result.code || saving) return
     setSaving(true); setStatus('')
     try {
-      const saved = await saveCesiumModule(result.code, project.name)
+      const saved = await saveCesiumModule(result.code, project.metadata.name)
       setStatus(saved === 'cancelled' ? '已取消导出' : saved === 'saved' ? 'CesiumJS 模块已保存' : 'CesiumJS 模块下载已发起')
     } catch (reason) { setStatus(reason instanceof Error ? reason.message : '导出失败') }
     finally { setSaving(false) }

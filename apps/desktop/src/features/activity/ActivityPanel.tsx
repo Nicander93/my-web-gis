@@ -1,10 +1,11 @@
+import { useLayerViewStore } from '@/view-state/layer-view.store'
 import { useEffect, useState } from 'react'
 import { Alert, Button, Collapse, Descriptions, Empty, Select, Space, Table, Tag, Typography } from 'antd'
-import { useTaskLogStore, canCancelTask, type TaskEntry, type TaskStatus } from '@/stores/task-log.store'
-import { useProjectStore } from '@/stores/project.store'
-import { useWorkbenchStore } from '@/stores/workbench.store'
-import { useWorkspaceStore } from '@/stores/workspace.store'
-import { collectDiagnostics, type ResourceStates } from '@/services/diagnostics'
+import { useTaskLogStore, canCancelTask, type TaskEntry, type TaskStatus } from '@/view-state/task-log.store'
+import { useProjectStore } from '@/session/project.store'
+import { useWorkbenchStore } from '@/view-state/workbench.store'
+import { useWorkspaceStore } from '@/view-state/workspace.store'
+import { collectDiagnostics, type ResourceStates } from '@/runtime/diagnostics'
 import './activity-panel.css'
 
 const statuses: Record<TaskStatus, string> = { running: '处理中', succeeded: '已完成', failed: '失败', cancelled: '已取消' }
@@ -31,7 +32,7 @@ export function ActivityPanel({ tab, sceneStates, onSelectResource }: { tab: 'ta
   }
   function selectResource(id: string) {
     if (onSelectResource) onSelectResource(id)
-    else { useProjectStore.getState().setSelectedLayer(id); useWorkbenchStore.getState().bindInspector(id); useWorkspaceStore.getState().setRightOpen(true) }
+    else { useLayerViewStore.getState().setSelectedLayer(id); useWorkbenchStore.getState().bindInspector(id); useWorkspaceStore.getState().setRightOpen(true) }
   }
   return <div className="activity-panel">
     {tab === 'tasks' ? <>

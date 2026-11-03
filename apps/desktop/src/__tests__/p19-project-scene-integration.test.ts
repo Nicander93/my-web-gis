@@ -1,3 +1,10 @@
+import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
+import { layerConfigurationQueries } from '@/session/layer-configuration-query'
+import { layerContentCommands } from '@/commands/layer-content.commands'
+import { projectSession } from '@/session/project-session'
+import { projectEdits } from '@/session/project-edits'
+import { featureData } from '@/data/feature-data'
+import { requireMapContent } from '@desktop-webgis/project'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   assertNoSecretValues,
@@ -7,25 +14,25 @@ import {
   parseProjectSnapshot,
   serializeProjectSnapshot,
   findSecretLeaks
-} from '@desktop-webgis/gis-core'
-import { compileProjectToScene } from '../features/scene/compile-project'
-import { useProjectStore } from '@/stores/project.store'
-import { useSessionStore } from '@/stores/session.store'
-import { layerCommands } from '@/app/commands/layer.commands'
-import { editCommands } from '@/app/commands/edit.commands'
+} from '@desktop-webgis/project'
+import { compileProjectToScene } from '@/exchange/compile-project'
+import { useProjectStore } from '@/session/project.store'
+import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { layerCommands } from '@/commands/layer.commands'
+import { editCommands } from '@/commands/edit.commands'
 
 function resetStores(): void {
   ;(globalThis as any).window = { dispatchEvent: () => true }
-  useSessionStore.setState({
+  useLayerViewStore.setState({
     sessions: {},
     wfsLoadGeneration: 0,
     wfsAbortByLayer: {},
     mapViewExtentWgs84: [73, 18, 135, 54]
   })
-  useProjectStore.getState()._resetAttributeHistoryForTests?.()
-  useProjectStore.getState()._resetProjectHistoryForTests?.()
+  projectEdits.clear?.()
+  projectEdits.clear?.()
   layerCommands._resetStyleHistoryForTests?.()
-  useProjectStore.getState().loadSnapshot({
+  projectSession.loadSnapshot({
     project: createProject('P19'),
     featuresByDataset: {}
   })
@@ -38,7 +45,7 @@ describe('P19 project + Scene integration', () => {
 
   it('save → reopen preserves mixed layers, order, style, filter, features; no layout/secrets', () => {
     const store = useProjectStore.getState()
-    store.addLayer('ds1', 'Points', [
+    layerContentCommands.addLayer('ds1', 'Points', [
       {
         id: 'a',
         geometry: { type: 'Point', coordinates: [1, 2] },
@@ -52,12 +59,12 @@ describe('P19 project + Scene integration', () => {
       }
     ], 'point')
 
-    const layerId = useProjectStore.getState().project.layers[0]!.id
-    useProjectStore.getState().setLayerFilter(layerId, [{ field: 'name', op: 'eq', value: 'keep' }])
-    useProjectStore.getState().setLayerOpacity(layerId, 0.4)
-    useProjectStore.getState().setLayerOpacity(layerId, 0.7) // coalesce slider
+    const layerId = requireMapContent(useProjectStore.getState().project).layers[0]!.id
+    layerConfigurationCommands.setLayerFilter(layerId, [{ field: 'name', op: 'eq', value: 'keep' }])
+    layerConfigurationCommands.setLayerOpacity(layerId, 0.4, 'opacity-gesture')
+    layerConfigurationCommands.setLayerOpacity(layerId, 0.7, 'opacity-gesture')
 
-    useProjectStore.getState().addServiceLayer({
+    layerContentCommands.addServiceLayer({
       name: 'WMS',
       kind: 'wms',
       source: {
@@ -73,7 +80,7 @@ describe('P19 project + Scene integration', () => {
 
     const snap = buildPersistedSnapshot(
       useProjectStore.getState().project,
-      useProjectStore.getState().featuresByDataset
+      featureData.readSnapshot()
     )
     assertNoSecretValues(snap)
     const json = serializeProjectSnapshot(snap)
@@ -82,22 +89,22 @@ describe('P19 project + Scene integration', () => {
     expect(json).not.toContain('desktop-webgis.workspace-layout')
 
     // Simulate close → open
-    useProjectStore.getState().loadSnapshot({ project: createProject('empty'), featuresByDataset: {} })
+    projectSession.loadSnapshot({ project: createProject('empty'), featuresByDataset: {} })
     const restored = parseProjectSnapshot(json)
-    useProjectStore.getState().loadSnapshot(restored)
+    projectSession.loadSnapshot(restored)
 
     const project = useProjectStore.getState().project
-    expect(project.layers).toHaveLength(2)
-    expect(project.layers[0]?.filter).toEqual([{ field: 'name', op: 'eq', value: 'keep' }])
-    expect(project.layers[0]?.opacity).toBe(0.7)
-    expect(project.layers[0]?.style).toBeTruthy()
-    expect(useProjectStore.getState().featuresByDataset[project.layers[0]!.datasetId]).toHaveLength(2)
-    expect(project.datasets.some((d) => d.kind === 'wms')).toBe(true)
+    expect(requireMapContent(project).layers).toHaveLength(2)
+    expect(requireMapContent(project).layers[0]?.filter).toEqual([{ field: 'name', op: 'eq', value: 'keep' }])
+    expect(requireMapContent(project).layers[0]?.opacity).toBe(0.7)
+    expect(requireMapContent(project).layers[0]?.style).toBeTruthy()
+    expect(featureData.readSnapshot()[requireMapContent(project).layers[0]!.datasetId]).toHaveLength(2)
+    expect(requireMapContent(project).datasets.some((d) => d.kind === 'wms')).toBe(true)
   })
 
   it('compile Scene applies filter, labels WFS snapshot, strips credentials; blocks bad basemap', () => {
     const project = createProject('Pub')
-    project.datasets.push({
+    requireMapContent(project).datasets.push({
       id: 'wfs1',
       name: 'WFS',
       kind: 'wfs',
@@ -114,7 +121,7 @@ describe('P19 project + Scene integration', () => {
         truncatedByLimit: true
       }
     })
-    project.layers.push({
+    requireMapContent(project).layers.push({
       id: 'lw',
       datasetId: 'wfs1',
       name: 'WFS',
@@ -124,7 +131,7 @@ describe('P19 project + Scene integration', () => {
       style: createDefaultLayerStyle('polygon'),
       filter: []
     })
-    project.rootOrder = [{ type: 'layer', id: 'lw' }]
+    requireMapContent(project).rootOrder = [{ type: 'layer', id: 'lw' }]
     const { scene, notes } = compileProjectToScene({
       project,
       featuresByDataset: {
@@ -144,14 +151,14 @@ describe('P19 project + Scene integration', () => {
   })
 
   it('style / filter / opacity share one EditCommand history; opacity drag coalesces', () => {
-    useProjectStore.getState().addLayer(
+    layerContentCommands.addLayer(
       'd1',
       'L',
       [{ id: 'f', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { v: 1 } }],
       'point'
     )
-    const layerId = useProjectStore.getState().project.layers[0]!.id
-    const before = useProjectStore.getState().getNormalizedLayerStyle(layerId)!
+    const layerId = requireMapContent(useProjectStore.getState().project).layers[0]!.id
+    const before = layerConfigurationQueries.getNormalizedLayerStyle(layerId)!
 
     expect(layerCommands.applyStyle(layerId, {
       ...before,
@@ -159,23 +166,23 @@ describe('P19 project + Scene integration', () => {
       symbol: { type: 'circle', radius: 12, fill: { r: 1, g: 0, b: 0, a: 1 } }
     })).toBe(true)
 
-    useProjectStore.getState().setLayerFilter(layerId, [{ field: 'v', op: 'eq', value: 1 }])
-    useProjectStore.getState().setLayerOpacity(layerId, 0.2)
-    useProjectStore.getState().setLayerOpacity(layerId, 0.5)
-    useProjectStore.getState().setLayerOpacity(layerId, 0.9)
+    layerConfigurationCommands.setLayerFilter(layerId, [{ field: 'v', op: 'eq', value: 1 }])
+    layerConfigurationCommands.setLayerOpacity(layerId, 0.2, 'opacity-gesture')
+    layerConfigurationCommands.setLayerOpacity(layerId, 0.5, 'opacity-gesture')
+    layerConfigurationCommands.setLayerOpacity(layerId, 0.9, 'opacity-gesture')
 
     // Undo opacity (one step) → filter still present
     editCommands.undo()
-    expect(useProjectStore.getState().project.layers[0]?.opacity).toBe(1)
-    expect(useProjectStore.getState().project.layers[0]?.filter).toEqual([
+    expect(requireMapContent(useProjectStore.getState().project).layers[0]?.opacity).toBe(1)
+    expect(requireMapContent(useProjectStore.getState().project).layers[0]?.filter).toEqual([
       { field: 'v', op: 'eq', value: 1 }
     ])
 
     editCommands.undo() // filter
-    expect(useProjectStore.getState().project.layers[0]?.filter ?? []).toEqual([])
+    expect(requireMapContent(useProjectStore.getState().project).layers[0]?.filter ?? []).toEqual([])
 
     editCommands.undo() // style
-    const undone = useProjectStore.getState().getNormalizedLayerStyle(layerId)!
+    const undone = layerConfigurationQueries.getNormalizedLayerStyle(layerId)!
     expect(undone).toEqual(before)
   })
 

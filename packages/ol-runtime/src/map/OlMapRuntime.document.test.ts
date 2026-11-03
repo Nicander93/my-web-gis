@@ -5,7 +5,7 @@ import LayerGroup from 'ol/layer/Group'
 import type View from 'ol/View'
 import type BaseLayer from 'ol/layer/Base'
 import type { SceneDocument } from '@desktop-webgis/scene-schema'
-import type { GisFeature } from '@desktop-webgis/gis-core'
+import type { GisFeature } from '@desktop-webgis/project'
 import type Feature from 'ol/Feature'
 import type Geometry from 'ol/geom/Geometry'
 import VectorSource from 'ol/source/Vector'
@@ -79,8 +79,8 @@ describe('Desktop portable OL document synchronization', () => {
       expect(await pending).toBe(false)
       resolve(new Response(JSON.stringify({ session: 'late', tileWidth: 256, tileHeight: 256 })))
       await new Promise(done => setTimeout(done, 0))
-      expect(dispose).toHaveBeenCalledTimes(2)
-      expect(new Set(dispose.mock.contexts).size).toBe(2)
+      // Changed feature arrays now patch the owned Source instead of allocating a replacement.
+      expect(dispose).toHaveBeenCalledTimes(1)
       expect(runtime.registry.entries()).toEqual([])
     } finally { dispose.mockRestore(); vi.unstubAllGlobals() }
   })
@@ -158,10 +158,11 @@ describe('Desktop portable OL document synchronization', () => {
     expect(disposed).toHaveBeenCalledOnce()
   })
 
-  it('retains installed content when preparation fails and replaces changed data after retry', async () => {
+  it('retains installed content when preparation fails and patches changed rows without replacing the Source', async () => {
     const { runtime, document, features } = fixture()
     await runtime.syncDocument(document, { data: features })
-    const layer = runtime.registry.getVector('first')!, source = layer.getSource()!, view = runtime.getMap().getView(), disposed = vi.spyOn(source, 'dispose')
+    const layer = runtime.registry.getVector('first')!, source = layer.getSource()!, view = runtime.getMap().getView()
+    const kept = source.getFeatureById('host-0')! as Feature<Geometry>, disposed = vi.spyOn(source, 'dispose')
     const next = structuredClone(document)
     next.resources.provider = { type: 'provider', provider: 'google-map-tiles', mapType: 'roadmap', language: 'en-US', region: 'US', credential: 'missing' }
     next.credentials = { missing: { type: 'runtime-reference', key: 'missing' } }
@@ -173,8 +174,11 @@ describe('Desktop portable OL document synchronization', () => {
     const changed: GisFeature[] = [{ ...features[0], geometry: { type: 'Point', coordinates: [3, 4] } }]
     document.resources.data = { type: 'geojson', data: { type: 'FeatureCollection', features: changed.map(feature => ({ type: 'Feature', id: feature.id, geometry: feature.geometry, properties: { value: 0 } })) } }
     await runtime.syncDocument(document, { data: changed })
-    expect(runtime.registry.getVector('first')!.getSource()).not.toBe(source)
-    expect(disposed).toHaveBeenCalledOnce()
+    expect(runtime.registry.getVector('first')!.getSource()).toBe(source)
+    expect(source.getFeatureById('host-0')).toBe(kept)
+    expect(kept.getGeometry()?.getExtent()).not.toEqual([0, 0, 0, 0])
+    expect(source.getFeatures()).toHaveLength(1)
+    expect(disposed).not.toHaveBeenCalled()
     expect(runtime.getMap().getView()).toBe(view)
     runtime.unmount()
   })

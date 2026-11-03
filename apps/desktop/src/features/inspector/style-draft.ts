@@ -3,8 +3,8 @@
  * 重新分类是明确动作；属性编辑沿用现有断点，不在此重算。
  */
 
-import type { GisFeature } from '@desktop-webgis/gis-core'
-import { cloneValue } from '@desktop-webgis/gis-core'
+import type { GisFeature } from '@desktop-webgis/project'
+import { cloneValue } from '@desktop-webgis/project'
 import {
   classifyEqualInterval,
   classifyQuantile,

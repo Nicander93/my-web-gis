@@ -1,6 +1,7 @@
 {
   "name": "@desktop-webgis/cesium-scene-runtime",
   "version": "0.1.0",
+  "private": true,
   "description": "Independent runtime API for general Cesium 3D scenes",
   "license": "MIT",
   "type": "module",

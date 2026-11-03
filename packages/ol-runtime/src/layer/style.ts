@@ -1,5 +1,5 @@
-import type { Layer } from '@desktop-webgis/gis-core'
-import { isLegacyStyle, migrateLegacyStyle } from '@desktop-webgis/gis-core'
+import type { Layer } from '@desktop-webgis/project'
+import { isLegacyStyle, migrateLegacyStyle } from '@desktop-webgis/project'
 import { compileStyle } from '@desktop-webgis/ol-style'
 import type { FeatureLike } from 'ol/Feature'
 import CircleStyle from 'ol/style/Circle'

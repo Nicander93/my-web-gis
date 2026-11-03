@@ -1,4 +1,4 @@
-import type { GeoJsonGeometry } from '@desktop-webgis/scene-schema'
+import type { GeoJsonGeometry } from './types.js'
 import { reprojectFeatures } from './coordinate-transform.js'
 import { featuresToCsv } from './csv-write.js'
 import type { CrsInfo } from './types.js'

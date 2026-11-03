@@ -1,21 +1,27 @@
+import { projectSession } from '@/session/project-session'
+import { projectEdits } from '@/session/project-edits'
+import { useFeaturesByDataset } from '@/data/feature-data'
+import { selectionCommands } from '@/commands/selection.commands'
+import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { requireMapContent } from '@desktop-webgis/project'
 import { useEffect, useRef, useState, type ComponentRef } from 'react'
 import { Alert, Button, Form, Input, Progress, Select, Space } from 'antd'
 import { Merge, Split } from 'lucide-react'
-import { useProjectStore } from '@/stores/project.store'
-import { useWorkbenchStore } from '@/stores/workbench.store'
-import { EditorDialog } from '@/components/ui/EditorDialog'
-import { emitCommandStatus } from '@/app/commands/status'
-import { setActiveEditTool } from '@/features/map/map-runtime-host'
+import { useProjectStore } from '@/session/project.store'
+import { useWorkbenchStore } from '@/view-state/workbench.store'
+import { EditorDialog } from '@/ui/EditorDialog'
+import { emitCommandStatus } from '@/platform/command-status'
+import { setActiveEditTool } from '@/runtime/map-runtime-host'
 import { getPolygonTarget, preparePolygonEdit, type AttributePolicy, type LineString, type MultiLineString } from './polygon-edit'
 import { calculatePolygonEdit } from './polygon-worker'
 
 /** Editing commands are enabled only for a bound polygon selection. */
 export function PolygonEditControls() {
   const project = useProjectStore((state) => state.project)
-  const selection = useProjectStore((state) => state.selection)
-  const rows = useProjectStore((state) => state.featuresByDataset)
+  const selection = useLayerViewStore((state) => state.selection)
+  const rows = useFeaturesByDataset()
   const layerId = useWorkbenchStore((state) => state.editLayerId)
-  const layer = project.layers.find((item) => item.id === layerId)
+  const layer = requireMapContent(project).layers.find((item) => item.id === layerId)
   const selected = layer && selection.layerId === layerId ? selection.featureIds : []
   const polygonsOnly = selected.length > 0 && selected.every((id) => rows[layer!.datasetId]?.some((feature) => feature.id === id &&
     (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon')))
@@ -38,12 +44,12 @@ export function PolygonEditControls() {
 
 function PolygonEditDialog({ mode, layerId, ids, onClose }: { mode: 'merge' | 'split'; layerId: string; ids: string[]; onClose(): void }) {
   const project = useProjectStore((state) => state.project)
-  const featuresByDataset = useProjectStore((state) => state.featuresByDataset)
-  const [projectId] = useState(project.id)
-  const [datasetId] = useState(project.layers.find((layer) => layer.id === layerId)?.datasetId)
+  const featuresByDataset = useFeaturesByDataset()
+  const [projectId] = useState(project.metadata.id)
+  const [datasetId] = useState(requireMapContent(project).layers.find((layer) => layer.id === layerId)?.datasetId)
   const [primaryId, setPrimaryId] = useState(ids[0])
   const [policy, setPolicy] = useState<AttributePolicy>('primary')
-  const cutters = project.layers.flatMap((layer) => (featuresByDataset[layer.datasetId] ?? []).flatMap((feature) =>
+  const cutters = requireMapContent(project).layers.flatMap((layer) => (featuresByDataset[layer.datasetId] ?? []).flatMap((feature) =>
     feature.geometry.type === 'LineString' || feature.geometry.type === 'MultiLineString'
       ? [{ key: JSON.stringify([layer.id, feature.id]), label: `${layer.name} / ${feature.id}`, geometry: feature.geometry }] : []))
   const [source, setSource] = useState<'existing' | 'json'>(cutters.length ? 'existing' : 'json')
@@ -60,7 +66,7 @@ function PolygonEditDialog({ mode, layerId, ids, onClose }: { mode: 'merge' | 's
     const frame = requestAnimationFrame(() => applyButton.current?.focus())
     return () => cancelAnimationFrame(frame)
   }, [busy, notice])
-  const layer = project.layers.find((item) => item.id === layerId)
+  const layer = requireMapContent(project).layers.find((item) => item.id === layerId)
   const title = mode === 'merge' ? '合并面' : '分割面'
 
   async function apply(): Promise<void> {
@@ -68,8 +74,8 @@ function PolygonEditDialog({ mode, layerId, ids, onClose }: { mode: 'merge' | 's
     setNotice(null)
     let operation: AbortController | null = null
     try {
-      const before = useProjectStore.getState().getSnapshot()
-      if (before.project.id !== projectId || layer?.datasetId !== datasetId || useWorkbenchStore.getState().editLayerId !== layerId) throw new Error('工程或编辑目标已改变，请重新打开操作窗口')
+      const before = projectSession.getSnapshot()
+      if (before.project.metadata.id !== projectId || layer?.datasetId !== datasetId || useWorkbenchStore.getState().editLayerId !== layerId) throw new Error('工程或编辑目标已改变，请重新打开操作窗口')
       let cutter: LineString | MultiLineString | undefined
       if (mode === 'split') {
         if (source === 'existing') cutter = cutters.find((item) => item.key === cutterId)?.geometry
@@ -89,13 +95,13 @@ function PolygonEditDialog({ mode, layerId, ids, onClose }: { mode: 'merge' | 's
         if (!operation!.signal.aborted) setProgress(Math.round(done / total * 100))
       })
       if (operation.signal.aborted) return
-      const current = useProjectStore.getState().getSnapshot()
+      const current = projectSession.getSnapshot()
       const target = getPolygonTarget(current, layerId, ids)
-      if (current.project.id !== projectId || target.dataset.id !== datasetId || useWorkbenchStore.getState().editLayerId !== layerId ||
+      if (current.project.metadata.id !== projectId || target.dataset.id !== datasetId || useWorkbenchStore.getState().editLayerId !== layerId ||
         JSON.stringify({ dataset: target.dataset, features: target.features }) !== prepared.fingerprint) throw new Error('计算期间数据或编辑目标已改变，结果未应用，请重新计算')
       const result = prepared.finish(geometry)
-      useProjectStore.getState().executeEditCommand(result.command)
-      useProjectStore.getState().setSelection(result.selection)
+      projectEdits.execute(result.command)
+      selectionCommands.setSelection(result.selection)
       emitCommandStatus(result.message)
       onClose()
     } catch (error) {

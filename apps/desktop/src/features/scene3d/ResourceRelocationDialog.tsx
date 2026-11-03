@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { Button, Input, Radio, Alert } from 'antd'
 import type { CesiumScene } from '@desktop-webgis/cesium-scene-schema'
-import { EditorDialog } from '@/components/ui/EditorDialog'
-import { pickDirectory, pickFile } from '@/services/files'
+import { EditorDialog } from '@/ui/EditorDialog'
+import { pickDirectory, pickFile } from '@/platform/files'
 import { isTauri } from '@tauri-apps/api/core'
-import { planResourceRelocation, type ResourceRelocation } from '@/services/resource-relocation'
-import { localProjectDirectory, normalizeLocalResourcePath, resolveResourceReference } from '@/services/resource-paths'
+import { planResourceRelocation, type ResourceRelocation } from '@/session/resource-relocation'
+import { localProjectDirectory, normalizeLocalResourcePath, resolveResourceReference } from '@/platform/resource-paths'
 
 interface Props {
   scene: CesiumScene

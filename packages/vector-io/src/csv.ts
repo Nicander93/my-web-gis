@@ -1,5 +1,5 @@
 import Papa from 'papaparse'
-import type { GeoJsonFeatureCollection, GeoJsonFeature } from '@desktop-webgis/scene-schema'
+import type { GeoJsonFeatureCollection, GeoJsonFeature } from './types.js'
 import type { VectorImportResult, VectorImportWarning, CrsInfo } from './types.js'
 
 export interface CsvImportOptions {

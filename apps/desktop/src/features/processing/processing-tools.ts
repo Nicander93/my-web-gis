@@ -1,4 +1,4 @@
-import type { ProcessingTool } from '@desktop-webgis/gis-core'
+import type { ProcessingTool } from '@desktop-webgis/project'
 
 export type DesktopProcessingTool = ProcessingTool | 'check-geometry'
 

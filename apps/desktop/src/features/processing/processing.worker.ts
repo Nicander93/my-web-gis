@@ -1,4 +1,4 @@
-import type { GisFeature, ProcessingOptions } from '@desktop-webgis/gis-core'
+import type { GisFeature, ProcessingOptions } from '@desktop-webgis/project'
 import { executeProcessing } from './executeProcessing'
 import { checkGeometries } from '@desktop-webgis/spatial-analysis'
 

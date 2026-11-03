@@ -1,3 +1,6 @@
+import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
+import { layerContentCommands } from '@/commands/layer-content.commands'
+import { requireMapContent } from '@desktop-webgis/project'
 import {
   ChevronDown,
   ChevronRight,
@@ -17,10 +20,10 @@ import {
   LockKeyhole
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Button } from '@/components/ui/Button'
-import { useProjectStore } from '@/stores/project.store'
-import { openPropertyWindow } from '@/features/inspector/property-window-request'
-import { useSessionStore } from '@/stores/session.store'
+import { Button } from '@/ui/Button'
+import { useProjectStore } from '@/session/project.store'
+import { openPropertyWindow } from '@/view-state/property-window-request'
+import { useLayerViewStore } from '@/view-state/layer-view.store'
 import {
   isLegacyStyle,
   migrateLegacyStyle,
@@ -32,7 +35,7 @@ import {
   type Layer,
   type LayerGroup,
   type LayerTreeEntry
-} from '@desktop-webgis/gis-core'
+} from '@desktop-webgis/project'
 import {
   colorToString,
   symbolPrimaryColor,
@@ -42,12 +45,13 @@ import {
 import { LayerContextMenu } from './LayerContextMenu'
 import { Legend } from '@/features/inspector/Legend'
 import { LayerPopupMenu } from './LayerPopupMenu'
-import { MenuItem } from '@/app/header/menus/MenuItem'
-import { EditorDialog } from '@/components/ui/EditorDialog'
-import { projectCommands } from '@/app/commands/project.commands'
-import { layerCommands } from '@/app/commands/layer.commands'
-import { useWorkbenchStore } from '@/stores/workbench.store'
-import { emitCommandStatus } from '@/app/commands/status'
+import { MenuItem } from '@/ui/MenuItem'
+import { EditorDialog } from '@/ui/EditorDialog'
+import { projectCommands } from '@/commands/project.commands'
+import { layerCommands } from '@/commands/layer.commands'
+import { useWorkbenchStore } from '@/view-state/workbench.store'
+import { emitCommandStatus } from '@/platform/command-status'
+import { useFeatureEditState } from '@/data/feature-data'
 
 function previewFromSymbol(symbol: Symbol): {
   kind: 'point' | 'line' | 'polygon'
@@ -102,22 +106,23 @@ interface LayerPanelProps {
 
 export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
   const editLayerId = useWorkbenchStore((state) => state.editLayerId)
+  const pendingByDataset = new Map(useFeatureEditState().datasets.map(dataset => [dataset.datasetId, dataset.pendingCount]))
   const [deletingGroup, setDeletingGroup] = useState<LayerGroup | null>(null)
   const [removeChildren, setRemoveChildren] = useState(false)
   const [query, setQuery] = useState('')
   const [expandedLegends, setExpandedLegends] = useState<Record<string, boolean>>({})
   const searchInputRef = useRef<HTMLInputElement>(null)
   const project = useProjectStore((state) => state.project)
-  const selectedLayerId = useProjectStore((state) => state.selectedLayerId)
-  const selection = useProjectStore((state) => state.selection)
-  const setSelectedLayer = useProjectStore((state) => state.setSelectedLayer)
-  const setLayerVisible = useProjectStore((state) => state.setLayerVisible)
-  const setGroupVisible = useProjectStore((state) => state.setGroupVisible)
-  const renameLayer = useProjectStore((state) => state.renameLayer)
-  const removeGroup = useProjectStore((state) => state.removeGroup)
-  const relocateLayer = useProjectStore((state) => state.relocateLayer)
-  const moveRootEntry = useProjectStore((state) => state.moveRootEntry)
-  const sessions = useSessionStore((state) => state.sessions)
+  const selectedLayerId = useLayerViewStore((state) => state.selectedLayerId)
+  const selection = useLayerViewStore((state) => state.selection)
+  const setSelectedLayer = useLayerViewStore((state) => state.setSelectedLayer)
+  const setLayerVisible = layerConfigurationCommands.setLayerVisible
+  const setGroupVisible = layerConfigurationCommands.setGroupVisible
+  const renameLayer = layerConfigurationCommands.renameLayer
+  const removeGroup = layerContentCommands.removeGroup
+  const relocateLayer = layerConfigurationCommands.relocateLayer
+  const moveRootEntry = layerConfigurationCommands.moveRootEntry
+  const sessions = useLayerViewStore((state) => state.sessions)
 
   const [menu, setMenu] = useState<MenuState | null>(null)
   const [groupMenu, setGroupMenu] = useState<{
@@ -135,11 +140,11 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
   const [renamingGroup, setRenamingGroup] = useState<LayerGroup | null>(null)
 
   const tree = useMemo(() => normalizeLayerTree(project), [project])
-  const rootOrder = tree.rootOrder
-  const groups = tree.groups
+  const rootOrder = requireMapContent(tree).rootOrder
+  const groups = requireMapContent(tree).groups
   const layerById = useMemo(
-    () => new Map(tree.layers.map((layer) => [layer.id, layer])),
-    [tree.layers]
+    () => new Map(requireMapContent(tree).layers.map((layer) => [layer.id, layer])),
+    [requireMapContent(tree).layers]
   )
   const groupById = useMemo(
     () => new Map(groups.map((group) => [group.id, group])),
@@ -193,7 +198,7 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
       | { kind: 'group'; groupId: string; index: number }
   ): void {
     try {
-      if (dragGroupId) useProjectStore.getState().relocateGroup(dragGroupId, target.kind === 'group' ? target.groupId : undefined, target.index)
+      if (dragGroupId) layerConfigurationCommands.relocateGroup(dragGroupId, target.kind === 'group' ? target.groupId : undefined, target.index)
       else if (dragLayerId) relocateLayer(dragLayerId, target)
     } catch (error) { emitCommandStatus(error instanceof Error ? error.message : '移动失败') }
     setDragLayerId(null)
@@ -295,9 +300,15 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
               }
             />
             <span>{layer.name}</span>
+            {getEffectiveLocked(tree, layer.id) && <LockKeyhole size={12} aria-label="图层已锁定" />}
             {editLayerId === layer.id && (
               <span className="layer-edit-marker" title="编辑目标已锁定">
                 编辑
+              </span>
+            )}
+            {!!pendingByDataset.get(layer.datasetId) && (
+              <span className="layer-edit-marker" title="有未提交的数据编辑">
+                未提交
               </span>
             )}
             {isLoading ? (
@@ -457,7 +468,7 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
         }}
       >
         {rootOrder.map((entry, index) => renderRootEntry(entry, index))}
-        {tree.layers.length === 0 && (
+        {requireMapContent(tree).layers.length === 0 && (
           <div className="workbench-empty">
             <Folder size={24} />
             <strong>尚无图层</strong>
@@ -469,7 +480,7 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
             </button>
           </div>
         )}
-        {tree.layers.length > 0 && filteredEmpty && (
+        {requireMapContent(tree).layers.length > 0 && filteredEmpty && (
           <p className="empty-state">没有匹配的图层</p>
         )}
       </div>
@@ -528,10 +539,10 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
           onClose={() => setGroupMenu(null)}
         >
           <MenuItem label="完整属性" onClick={() => { openPropertyWindow({ kind: 'folder', id: groupMenu.group.id }); setGroupMenu(null) }} />
-          <MenuItem icon={FolderPlus} label="新建子文件夹" disabled={getLayerGroupState(tree, groupMenu.group.id).locked} onClick={() => { useProjectStore.getState().createGroup('新建文件夹', [], groupMenu.group.id); setGroupMenu(null) }} />
+          <MenuItem icon={FolderPlus} label="新建子文件夹" disabled={getLayerGroupState(tree, groupMenu.group.id).locked} onClick={() => { layerConfigurationCommands.createGroup('新建文件夹', [], groupMenu.group.id); setGroupMenu(null) }} />
           <MenuItem icon={Pencil} label="重命名文件夹" disabled={getLayerGroupState(tree, groupMenu.group.id).locked} onClick={() => { setRenamingGroup(groupMenu.group); setRenameValue(groupMenu.group.name); setGroupMenu(null) }} />
-          <MenuItem icon={LockKeyhole} label={groupMenu.group.locked ? '解锁文件夹' : '锁定文件夹'} disabled={getLayerGroupState(tree, groupMenu.group.parentId).locked} onClick={() => { useProjectStore.getState().setGroupLocked(groupMenu.group.id, !groupMenu.group.locked); setGroupMenu(null) }} />
-          {groupMenu.group.parentId && <MenuItem label="移到根目录" disabled={getLayerGroupState(tree, groupMenu.group.id).locked} onClick={() => { useProjectStore.getState().relocateGroup(groupMenu.group.id); setGroupMenu(null) }} />}
+          <MenuItem icon={LockKeyhole} label={groupMenu.group.locked ? '解锁文件夹' : '锁定文件夹'} disabled={getLayerGroupState(tree, groupMenu.group.parentId).locked} onClick={() => { layerConfigurationCommands.setGroupLocked(groupMenu.group.id, !groupMenu.group.locked); setGroupMenu(null) }} />
+          {groupMenu.group.parentId && <MenuItem label="移到根目录" disabled={getLayerGroupState(tree, groupMenu.group.id).locked} onClick={() => { layerConfigurationCommands.relocateGroup(groupMenu.group.id); setGroupMenu(null) }} />}
           <MenuItem
             icon={ArrowUp}
             label="上移组"
@@ -558,7 +569,7 @@ export function LayerPanel({ searchOpen, onCloseSearch }: LayerPanelProps) {
           />
         </LayerPopupMenu>
       ) : null}
-      {renamingGroup && <EditorDialog title="重命名文件夹" onClose={() => setRenamingGroup(null)}><form onSubmit={event => { event.preventDefault(); useProjectStore.getState().renameGroup(renamingGroup.id, renameValue); setRenamingGroup(null) }}><div className="dialog-body"><label className="editor-field">名称<input autoFocus required value={renameValue} onChange={event => setRenameValue(event.target.value)} /></label></div><footer className="dialog-footer"><button type="button" onClick={() => setRenamingGroup(null)}>取消</button><button className="button-primary" disabled={!renameValue.trim()}>应用</button></footer></form></EditorDialog>}
+      {renamingGroup && <EditorDialog title="重命名文件夹" onClose={() => setRenamingGroup(null)}><form onSubmit={event => { event.preventDefault(); layerConfigurationCommands.renameGroup(renamingGroup.id, renameValue); setRenamingGroup(null) }}><div className="dialog-body"><label className="editor-field">名称<input autoFocus required value={renameValue} onChange={event => setRenameValue(event.target.value)} /></label></div><footer className="dialog-footer"><button type="button" onClick={() => setRenamingGroup(null)}>取消</button><button className="button-primary" disabled={!renameValue.trim()}>应用</button></footer></form></EditorDialog>}
     </div>
   )
 }

@@ -11,8 +11,8 @@ test('source CRS assignment keeps coordinates, supports cancel, undo/redo and sa
   await page.getByRole('region', { name: '二维功能区' }).getByRole('button', { name: '添加数据', exact: true }).click()
   await page.locator('input[type=file]').setInputFiles({ name: 'crs.geojson', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: { code: '001' }, geometry: { type: 'Point', coordinates: [116.4, 39.9, 10] } }] })) })
   await page.getByRole('button', { name: '确认导入', exact: true }).click()
-  const snapshot = () => page.evaluate(async () => (await import('/src/stores/project.store.ts')).useProjectStore.getState().getSnapshot())
-  const before = await snapshot(), datasetId = before.project.layers[0].datasetId
+  const snapshot = () => page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() })
+  const before = await snapshot(), datasetId = before.project.content.layers[0].datasetId
   async function open() {
     await page.locator('.layer-item').filter({ hasText: 'crs' }).click({ button: 'right' })
     await page.getByRole('menuitem', { name: '完整属性', exact: true }).click()
@@ -30,9 +30,9 @@ test('source CRS assignment keeps coordinates, supports cancel, undo/redo and sa
   await page.locator('.scene-property-window').getByRole('button', { name: '应用', exact: true }).click()
   await expect(page.locator('.scene-property-window').getByRole('alert').filter({ hasText: '无效' })).toHaveCount(0)
   const applied = await snapshot()
-  expect(applied.project.datasets.find(item => item.id === datasetId)).toMatchObject({ sourceCrs: 'EPSG:3857' })
+  expect(applied.project.content.datasets.find(item => item.id === datasetId)).toMatchObject({ sourceCrs: 'EPSG:3857' })
   expect(applied.featuresByDataset).toEqual(before.featuresByDataset)
-  expect(applied.project.crs).toBe(before.project.crs)
+  expect(applied.project.content.crs).toBe(before.project.content.crs)
   await choose('EPSG:4490')
   await page.locator('.scene-property-window').getByRole('button', { name: '重新载入', exact: true }).click()
   await expect(page.getByRole('combobox', { name: '源 CRS 赋值', exact: true })).toHaveValue('')
@@ -48,7 +48,7 @@ test('source CRS assignment keeps coordinates, supports cancel, undo/redo and sa
   const path = info.outputPath('source-crs.webgis.json')
   await (await download).saveAs(path)
   const saved = JSON.parse(readFileSync(path, 'utf8'))
-  expect(saved.project.datasets).toEqual(applied.project.datasets)
+  expect(saved.project.content.datasets).toEqual(applied.project.content.datasets)
   expect(saved.featuresByDataset).toEqual(before.featuresByDataset)
   await page.getByRole('button', { name: '文件', exact: true }).click()
   const chooser = page.waitForEvent('filechooser')

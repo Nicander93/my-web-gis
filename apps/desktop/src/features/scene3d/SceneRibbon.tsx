@@ -1,11 +1,11 @@
 import { HelpCircle, Play, Redo2, Save, Undo2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { WorkbenchRibbon } from '@/app/header/WorkbenchRibbon'
-import { MenuItem } from '@/app/header/menus/MenuItem'
-import { useWorkspaceStore } from '@/stores/workspace.store'
-import { helpCommands } from '@/app/commands/help.commands'
-import { Button } from '@/components/ui/Button'
-import { useSaveStore } from '@/stores/save.store'
+import { WorkbenchRibbon } from '@/ui/WorkbenchRibbon'
+import { MenuItem } from '@/ui/MenuItem'
+import { useWorkspaceStore } from '@/view-state/workspace.store'
+import { helpCommands } from '@/commands/help.commands'
+import { Button } from '@/ui/Button'
+import { useSaveStore } from '@/session/save.store'
 
 export interface SceneRibbonCommand { id: string; label: string; icon: LucideIcon; disabled?: string; active?: boolean; execute(): void }
 interface SceneRibbonProps {

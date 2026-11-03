@@ -29,9 +29,6 @@ importers:
       '@desktop-webgis/cesium-scene-schema':
         specifier: workspace:*
         version: link:../../packages/cesium-scene-schema
-      '@desktop-webgis/gis-core':
-        specifier: workspace:*
-        version: link:../../packages/gis-core
       '@desktop-webgis/ogc-io':
         specifier: workspace:*
         version: link:../../packages/ogc-io
@@ -41,6 +38,9 @@ importers:
       '@desktop-webgis/ol-style':
         specifier: workspace:*
         version: link:../../packages/ol-style
+      '@desktop-webgis/project':
+        specifier: workspace:*
+        version: link:../../packages/project
       '@desktop-webgis/scene-codegen':
         specifier: workspace:*
         version: link:../../packages/scene-codegen
@@ -53,9 +53,6 @@ importers:
       '@desktop-webgis/spatial-analysis':
         specifier: workspace:*
         version: link:../../packages/spatial-analysis
-      '@desktop-webgis/style-assistant':
-        specifier: workspace:*
-        version: link:../../packages/style-assistant
       '@desktop-webgis/vector-io':
         specifier: workspace:*
         version: link:../../packages/vector-io
@@ -333,55 +330,6 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)
 
-  packages/gis-core:
-    dependencies:
-      '@desktop-webgis/cesium-scene-schema':
-        specifier: workspace:*
-        version: link:../cesium-scene-schema
-      '@desktop-webgis/ol-style':
-        specifier: workspace:*
-        version: link:../ol-style
-      '@desktop-webgis/scene-schema':
-        specifier: workspace:*
-        version: link:../scene-schema
-      '@turf/boolean-valid':
-        specifier: 7.3.4
-        version: 7.3.4
-      '@turf/buffer':
-        specifier: 7.3.4
-        version: 7.3.4
-      '@turf/centroid':
-        specifier: 7.3.4
-        version: 7.3.4
-      '@turf/difference':
-        specifier: 7.3.4
-        version: 7.3.4
-      '@turf/envelope':
-        specifier: 7.3.4
-        version: 7.3.4
-      '@turf/flatten':
-        specifier: 7.3.4
-        version: 7.3.4
-      '@turf/intersect':
-        specifier: 7.3.4
-        version: 7.3.4
-      '@turf/kinks':
-        specifier: 7.3.4
-        version: 7.3.4
-      '@turf/union':
-        specifier: 7.3.4
-        version: 7.3.4
-      jsts:
-        specifier: 2.7.1
-        version: 2.7.1
-    devDependencies:
-      typescript:
-        specifier: ^5.9.2
-        version: 5.9.2
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.7(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)
-
   packages/ogc-io:
     dependencies:
       '@desktop-webgis/ol-style':
@@ -406,9 +354,6 @@ importers:
 
   packages/ol-runtime:
     dependencies:
-      '@desktop-webgis/gis-core':
-        specifier: workspace:*
-        version: link:../gis-core
       '@desktop-webgis/ogc-io':
         specifier: workspace:*
         version: link:../ogc-io
@@ -421,6 +366,9 @@ importers:
       '@desktop-webgis/ol-style':
         specifier: workspace:*
         version: link:../ol-style
+      '@desktop-webgis/project':
+        specifier: workspace:*
+        version: link:../project
       '@desktop-webgis/scene-schema':
         specifier: workspace:*
         version: link:../scene-schema
@@ -490,6 +438,25 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.4)(jiti@2.7.0)(lightningcss@1.32.0)
+
+  packages/project:
+    dependencies:
+      '@desktop-webgis/cesium-scene-schema':
+        specifier: workspace:*
+        version: link:../cesium-scene-schema
+      '@desktop-webgis/ol-style':
+        specifier: workspace:*
+        version: link:../ol-style
+      '@desktop-webgis/spatial-analysis':
+        specifier: workspace:*
+        version: link:../spatial-analysis
+    devDependencies:
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)
 
   packages/scene-codegen:
     dependencies:
@@ -566,7 +533,34 @@ importers:
       '@turf/area':
         specifier: 7.3.4
         version: 7.3.4
+      '@turf/boolean-valid':
+        specifier: 7.3.4
+        version: 7.3.4
+      '@turf/buffer':
+        specifier: 7.3.4
+        version: 7.3.4
+      '@turf/centroid':
+        specifier: 7.3.4
+        version: 7.3.4
+      '@turf/difference':
+        specifier: 7.3.4
+        version: 7.3.4
+      '@turf/envelope':
+        specifier: 7.3.4
+        version: 7.3.4
+      '@turf/flatten':
+        specifier: 7.3.4
+        version: 7.3.4
+      '@turf/intersect':
+        specifier: 7.3.4
+        version: 7.3.4
+      '@turf/kinks':
+        specifier: 7.3.4
+        version: 7.3.4
       '@turf/length':
+        specifier: 7.3.4
+        version: 7.3.4
+      '@turf/union':
         specifier: 7.3.4
         version: 7.3.4
       '@types/geojson':
@@ -589,20 +583,8 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)
 
-  packages/style-assistant:
-    devDependencies:
-      typescript:
-        specifier: ^5.9.2
-        version: 5.9.2
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.7(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)
-
   packages/vector-io:
     dependencies:
-      '@desktop-webgis/scene-schema':
-        specifier: workspace:*
-        version: link:../scene-schema
       '@mapbox/shp-write':
         specifier: 0.4.3
         version: 0.4.3

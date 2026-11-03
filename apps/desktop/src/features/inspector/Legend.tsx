@@ -1,7 +1,8 @@
-import { getLayerCartography, isLegacyStyle, migrateLegacyStyle } from '@desktop-webgis/gis-core'
+import { requireMapContent } from '@desktop-webgis/project'
+import { getLayerCartography, isLegacyStyle, migrateLegacyStyle } from '@desktop-webgis/project'
 import { buildLegendItems, colorToString } from '@desktop-webgis/ol-style'
 import { buildCartographyLegendItems } from '@desktop-webgis/ol-style/cartography-model'
-import { useProjectStore } from '@/stores/project.store'
+import { useProjectStore } from '@/session/project.store'
 
 interface LegendProps {
   layerId: string
@@ -10,7 +11,7 @@ interface LegendProps {
 /** 图例仅反映已应用配置，不读取草稿。 */
 export function Legend({ layerId }: LegendProps) {
   const project = useProjectStore(state => state.project)
-  const layer = project.layers.find(item => item.id === layerId)
+  const layer = requireMapContent(project).layers.find(item => item.id === layerId)
 
   if (!layer) {
     return null

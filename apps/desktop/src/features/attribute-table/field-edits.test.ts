@@ -1,9 +1,13 @@
+import { projectSession } from '@/session/project-session'
+import { projectEdits } from '@/session/project-edits'
+import { featureData } from '@/data/feature-data'
+import { requireMapContent } from '@desktop-webgis/project'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { createProject, createDefaultLayerStyle, SetDatasetContentCommand, type GisFeature } from '@desktop-webgis/gis-core'
+import { createProject, createDefaultLayerStyle, SetDatasetContentCommand, type GisFeature } from '@desktop-webgis/project'
 import { calculateTableField, parseCellValue, previewTableField, resolveDatasetFields, resolveFieldCalculationTargets } from './field-edits'
-import { useProjectStore } from '@/stores/project.store'
-import { useSessionStore } from '@/stores/session.store'
-import { useWorkbenchStore } from '@/stores/workbench.store'
+import { useProjectStore } from '@/session/project.store'
+import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { useWorkbenchStore } from '@/view-state/workbench.store'
 
 const features: GisFeature[] = [2, 0, 4].map((value, index) => ({ id: `row-${index}`,
   geometry: { type: 'Point', coordinates: [116 + index, 39] }, properties: { value, code: '001' } }))
@@ -64,24 +68,24 @@ describe('typed table edits', () => {
 describe('atomic field history and table sessions', () => {
   beforeEach(() => {
     const project = createProject('Fields')
-    project.datasets = [{ id: 'dataset', name: 'Fields', kind: 'vector', source: { type: 'memory', label: 'Fields' } }]
-    project.layers = [{ id: 'layer', datasetId: 'dataset', name: 'Fields', visible: true, opacity: 1, editable: true, style: createDefaultLayerStyle('point') }]
-    useProjectStore.getState().loadSnapshot({ project, featuresByDataset: { dataset: features } })
+    requireMapContent(project).datasets = [{ id: 'dataset', name: 'Fields', kind: 'vector', source: { type: 'memory', label: 'Fields' } }]
+    requireMapContent(project).layers = [{ id: 'layer', datasetId: 'dataset', name: 'Fields', visible: true, opacity: 1, editable: true, style: createDefaultLayerStyle('point') }]
+    projectSession.loadSnapshot({ project, featuresByDataset: { dataset: features } })
   })
   it('undoes and redoes fields plus all rows once without clearing bound tabs or scroll', () => {
     useWorkbenchStore.getState().bindTable('layer')
-    useSessionStore.getState().setAttributeTableState('layer', { searchQuery: '001', scrollTop: 70, fieldOrder: ['code', 'value'] })
+    useLayerViewStore.getState().setAttributeTableState('layer', { searchQuery: '001', scrollTop: 70, fieldOrder: ['code', 'value'] })
     const result = calculateTableField(features, undefined, numeric, 'field("value") + 5', new Set(features.map((feature) => feature.id)))
-    useProjectStore.getState().executeEditCommand(new SetDatasetContentCommand('calc', '字段计算', 'dataset', { features }, result))
-    expect(useProjectStore.getState().featuresByDataset.dataset[0].properties.result).toBe(7)
-    expect(useProjectStore.getState().undoEdit()).toBe(true)
-    expect(useProjectStore.getState().featuresByDataset.dataset).toEqual(features)
-    expect(useProjectStore.getState().project.datasets[0].fields).toBeUndefined()
-    expect(useProjectStore.getState().canUndoEdit()).toBe(false)
-    expect(useProjectStore.getState().redoEdit()).toBe(true)
-    expect(useProjectStore.getState().project.datasets[0].fields?.find((field) => field.name === 'result')).toEqual(numeric)
+    projectEdits.execute(new SetDatasetContentCommand('calc', '字段计算', 'dataset', { features }, result))
+    expect(featureData.readSnapshot().dataset[0].properties.result).toBe(7)
+    expect(projectEdits.undo()).toBe(true)
+    expect(featureData.readSnapshot().dataset).toEqual(features)
+    expect(requireMapContent(useProjectStore.getState().project).datasets[0].fields).toBeUndefined()
+    expect(projectEdits.canUndo()).toBe(false)
+    expect(projectEdits.redo()).toBe(true)
+    expect(requireMapContent(useProjectStore.getState().project).datasets[0].fields?.find((field) => field.name === 'result')).toEqual(numeric)
     expect(useWorkbenchStore.getState().tableLayerIds).toEqual(['layer'])
-    expect(useSessionStore.getState().sessions.layer.attributeTable?.scrollTop).toBe(70)
+    expect(useLayerViewStore.getState().sessions.layer.attributeTable?.scrollTop).toBe(70)
   })
   it('closes and removes only the target tab and selects an adjacent one', () => {
     const workbench = useWorkbenchStore.getState()

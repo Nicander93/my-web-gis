@@ -1,15 +1,16 @@
-import { createId, SetCesiumSceneCommand } from '@desktop-webgis/gis-core'
+import { projectEdits } from '@/session/project-edits'
+import { createId, SetCesiumSceneCommand, type EditTargets } from '@desktop-webgis/project'
 import { createCesiumScene, createTransform, getCesiumSceneNodeState, getCesiumSceneGroupState, moveCesiumSceneNodes, moveCesiumSceneGroup, removeCesiumSceneGroup, validateResourceReference, isSceneResourceUrl } from '@desktop-webgis/cesium-scene-schema'
 import type { CesiumSceneGroup, CesiumSceneNode, CesiumScene, GeoPosition, ResourceReference } from '@desktop-webgis/cesium-scene-schema'
-import { useProjectStore } from '@/stores/project.store'
+import { useProjectStore } from '@/session/project.store'
 
-export function updateScene(label: string, update: (scene: CesiumScene) => CesiumScene): void {
+export function updateScene(label: string, update: (scene: CesiumScene) => CesiumScene, targets?: EditTargets): void {
   const state = useProjectStore.getState()
-  const before = state.project.city
+  const before = state.project.content.scene
   const after = update(structuredClone(before ?? createCesiumScene()))
   after.version = 2
   if (JSON.stringify(before) === JSON.stringify(after)) return
-  state.executeEditCommand(new SetCesiumSceneCommand(createId('cmd'), label, before, after))
+  projectEdits.execute(new SetCesiumSceneCommand(createId('cmd'), label, before, after, targets))
 }
 
 export function addSceneAsset(type: '3dtiles' | 'model' | 'geojson', source: string | ResourceReference, name: string, position: GeoPosition = [116.391,39.907,0]): string {
@@ -109,11 +110,11 @@ export function patchSceneGroup(id: string, patch: Partial<Pick<CesiumSceneGroup
   })
 }
 export function moveSceneSelection(ids: readonly string[], groupId?: string, beforeId?: string): void {
-  updateScene('移动场景对象', scene => moveCesiumSceneNodes(scene, ids, groupId, beforeId))
+  updateScene('移动场景对象', scene => moveCesiumSceneNodes(scene, ids, groupId, beforeId), { sceneNodeIds: ids, sceneGroupIds: groupId ? [groupId] : [] })
 }
 export function dissolveSceneGroup(id: string): void { updateScene('解散场景分组', scene => removeCesiumSceneGroup(scene, id)) }
 export function moveSceneFolder(id: string, parentId?: string, beforeId?: string): void {
-  updateScene('移动场景文件夹', scene => moveCesiumSceneGroup(scene, id, parentId, beforeId))
+  updateScene('移动场景文件夹', scene => moveCesiumSceneGroup(scene, id, parentId, beforeId), { sceneGroupIds: [id, ...(parentId ? [parentId] : [])] })
 }
 export function reorderSceneFolder(id: string, direction: -1 | 1): void {
   updateScene('调整文件夹顺序', scene => {
@@ -123,5 +124,5 @@ export function reorderSceneFolder(id: string, direction: -1 | 1): void {
     const index = siblings.findIndex(item => item.id === id)
     if (index + direction < 0 || index + direction >= siblings.length) return scene
     return moveCesiumSceneGroup(scene, id, group.parentId, direction < 0 ? siblings[index - 1].id : siblings[index + 2]?.id)
-  })
+  }, { sceneGroupIds: [id] })
 }

@@ -13,15 +13,15 @@
 
 - 新的 Desktop UI 使用 React、TypeScript 和函数组件；优先使用明确的 props 和局部状态。
 - Zustand 只保存跨组件共享状态。布局状态与 GIS Project、选中要素、OpenLayers Runtime 等业务状态分开。
-- Command 表达完整的用户操作，负责调用 Store 或 Service；纯计算函数放在 `utils`，GIS 能力放在对应 package/service。
+- Command 表达完整的用户操作，负责调用 Store 或 Service；新代码放在哪一层见 [分层规则](../architecture/layers.md)。
 - UI 不直接散落操作 OpenLayers API；通过 runtime/service 或 command 连接外部能力。
 - 面板容器负责开关、尺寸、恢复入口和布局；具体 Feature 通过 `children` 注入，不让容器反向 import Feature。
 
 ## Desktop 通用组件
 
-- 按用户 2026-10-13 补充要求，通用控件统一使用 Ant Design React（antd），主题与密度服从已确认的二维/三维 HTML 原型。
+- 按用户 2026-10-13 补充要求，通用控件统一使用 Ant Design React（antd），主题与密度服从 [工作台原型](../prototypes/workbench/desktop-webgis-2d-final.html)。
 - 新增 Button/Input/Select/Checkbox/Form/Dropdown/Tabs/Modal/Table 等不再手写原生控件；既有控件按功能批次迁移。业务包装保持轻薄，不伪造 DOM 事件适配库组件。
-- Docking、地图画布、GIS 控制柄及系统文件对话框保留真实业务边界。详细迁移顺序和验收见 [实施补充细则](../design/desktop-productization/implementation-addendum.md)。
+- Docking、地图画布、GIS 控制柄及系统文件对话框保留真实业务边界。
 
 ## 注释与命名
 

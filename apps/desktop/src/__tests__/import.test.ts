@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
-import { importGeoJson } from '../services/import'
-import { readBinaryFile } from '../services/files'
+import { importGeoJson } from '@/exchange/import'
+import { readBinaryFile } from '@/platform/files'
 
-vi.mock('../services/files', () => ({ readFile: vi.fn(), readBinaryFile: vi.fn() }))
+vi.mock('@/platform/files', () => ({ readFile: vi.fn(), readBinaryFile: vi.fn() }))
 
 describe('Import GeoJSON', () => {
   it('uses the native Windows source basename without altering the path passed to file IO', async () => {
@@ -73,9 +73,9 @@ describe('Import GeoJSON', () => {
   })
 })
 
-vi.mock('@/services/import-worker', async () => {
-  const parser = await import('../services/import-parser')
-  return { runImportWorker: async (request: import('../services/import-worker').ImportRequest) => {
+vi.mock('@/exchange/import-worker', async () => {
+  const parser = await import('@/exchange/import-parser')
+  return { runImportWorker: async (request: import('@/exchange/import-worker').ImportRequest) => {
     if (request.kind === 'geojson') return parser.importGeoJson(request.source, request.options)
     if (request.kind === 'csv') return parser.importCsvFile(request.source, request.options)
     if (request.kind === 'shapefile') return parser.importShapefileZip(request.source, request.options)

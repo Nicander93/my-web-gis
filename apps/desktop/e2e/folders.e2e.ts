@@ -16,10 +16,12 @@ async function roundTrip(page: Page, info: TestInfo) {
   await (await download).saveAs(path)
   const saved = JSON.parse(readFileSync(path, 'utf8'))
   const current = await page.evaluate(async () => {
-    const { useProjectStore, getProjectContentVersion } = await import('/src/stores/project.store.ts')
-    const { createSnapshotFromState } = await import('/src/services/project-io.ts')
+    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/data/feature-data.ts').at(-1) ?? '/src/data/feature-data.ts')
+
+    const { useProjectStore, getProjectContentVersion } = await import('/src/session/project.store.ts')
+    const { createSnapshotFromState } = await import('/src/session/project-io.ts')
     const state = useProjectStore.getState()
-    return { dirty: state.dirty, version: getProjectContentVersion(), snapshot: createSnapshotFromState(state.project, state.featuresByDataset) }
+    return { dirty: state.dirty, version: getProjectContentVersion(), snapshot: createSnapshotFromState(state.project, featureData.readSnapshot()) }
   })
   await info.attach('saved-version-comparison', { body: JSON.stringify({ saved, current }), contentType: 'application/json' })
   expect(current.dirty).toBe(false)
@@ -49,12 +51,14 @@ test('2D nested folders retain datasets, order and inherited locks through file 
   const inner = page.locator('.layer-group-header').filter({ hasText: 'Inner' })
   await page.locator('.layer-item').filter({ hasText: 'nested' }).dragTo(inner)
   const state = await page.evaluate(async () => {
-    const { useProjectStore } = await import('/src/stores/project.store.ts')
-    return useProjectStore.getState().getSnapshot()
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+
+    const { useProjectStore } = await import('/src/session/project.store.ts')
+    return projectSession.getSnapshot()
   })
-  const outer = state.project.groups.find(group => group.name === 'Outer')!, child = state.project.groups.find(group => group.name === 'Inner')!
+  const outer = state.project.content.groups.find(group => group.name === 'Outer')!, child = state.project.content.groups.find(group => group.name === 'Inner')!
   expect(child.parentId).toBe(outer.id)
-  expect(child.layerIds).toEqual([state.project.layers[0].id])
+  expect(child.layerIds).toEqual([state.project.content.layers[0].id])
   await page.getByRole('button', { name: '组操作：Outer', exact: true }).click()
   await page.getByRole('menuitem', { name: '锁定文件夹', exact: true }).click()
   await page.getByRole('tab', { name: '编辑', exact: true }).click()
@@ -63,7 +67,7 @@ test('2D nested folders retain datasets, order and inherited locks through file 
   await expect(page.getByRole('button', { name: '开始编辑', exact: true })).toBeEnabled()
   const saved = await roundTrip(page, info)
   await expect(page.locator('.layer-group-name').filter({ hasText: 'Inner' })).toBeVisible()
-  expect(saved.project.groups.find((group: { name: string }) => group.name === 'Inner').parentId).toBe(outer.id)
+  expect(saved.project.content.groups.find((group: { name: string }) => group.name === 'Inner').parentId).toBe(outer.id)
   await page.getByRole('button', { name: '组操作：Outer', exact: true }).click()
   await page.getByRole('menuitem', { name: '删除组', exact: true }).click()
   await page.getByRole('button', { name: '移除组，保留图层', exact: true }).click()
@@ -88,8 +92,8 @@ test('3D nested folder creation, cycle rejection and saved parent IDs use real s
   await outerButton.dragTo(innerHeader)
   await expect(page.locator('.scene3d-footer__state')).toContainText('后代')
   const saved = await roundTrip(page, info)
-  const outer = saved.project.city.groups.find((group: { name: string }) => group.name === 'Outer')
-  expect(saved.project.city.groups.find((group: { name: string }) => group.name === 'Inner').parentId).toBe(outer.id)
+  const outer = saved.project.content.scene.groups.find((group: { name: string }) => group.name === 'Outer')
+  expect(saved.project.content.scene.groups.find((group: { name: string }) => group.name === 'Inner').parentId).toBe(outer.id)
   await expect(page.locator('.scene3d-scene-group__name').filter({ hasText: 'Inner' })).toBeVisible()
   await page.screenshot({ path: info.outputPath('nested-3d.png') })
 })

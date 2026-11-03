@@ -17,13 +17,15 @@ async function openMap(page: Page) {
 
 async function cartographyState(page: Page) {
   return page.evaluate(async () => {
+    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/view-state/layer-view.store.ts').at(-1) ?? '/src/view-state/layer-view.store.ts')).useLayerViewStore.getState()
+
     const loaded = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(loaded('/src/stores/project.store.ts')) as typeof import('../src/stores/project.store')
-    const { getMapRuntime } = await import(loaded('/src/features/map/map-runtime-host.ts')) as typeof import('../src/features/map/map-runtime-host')
-    const { useWorkbenchStore } = await import(loaded('/src/stores/workbench.store.ts')) as typeof import('../src/stores/workbench.store')
+    const { useProjectStore } = await import(loaded('/src/session/project.store.ts')) as typeof import('@/session/project.store')
+    const { getMapRuntime } = await import(loaded('/src/runtime/map-runtime-host.ts')) as typeof import('@/runtime/map-runtime-host')
+    const { useWorkbenchStore } = await import(loaded('/src/view-state/workbench.store.ts')) as typeof import('@/view-state/workbench.store')
     const state = useProjectStore.getState()
-    const layer = state.project.layers.find(item => item.id === (useWorkbenchStore.getState().inspectorLayerId ?? state.selectedLayerId))!
-    const binding = state.project.cartography.bindings.find(item => item.gisLayerId === layer.id)!
+    const layer = state.project.content.layers.find(item => item.id === (useWorkbenchStore.getState().inspectorLayerId ?? selectionSession.selectedLayerId))!
+    const binding = state.project.content.cartography.bindings.find(item => item.gisLayerId === layer.id)!
     const runtimeLayer = getMapRuntime()?.registry.getVector(layer.id)
     const feature = runtimeLayer?.getSource()?.getFeatures()[0]
     const result = feature ? runtimeLayer?.getStyleFunction()?.(feature, getMapRuntime()!.getMap().getView().getResolution()!) : undefined
@@ -31,11 +33,11 @@ async function cartographyState(page: Page) {
     const radius = (style?.getImage() as unknown as { getRadius(): number } | undefined)?.getRadius() ?? null
     return {
       layer: structuredClone(layer),
-      fragment: structuredClone(state.project.cartography.styleLayers.filter(item => binding.styleLayerIds.includes(item.id))),
+      fragment: structuredClone(state.project.content.cartography.styleLayers.filter(item => binding.styleLayerIds.includes(item.id))),
       radius,
       selectedLayerId: layer.id,
-      layerIds: state.project.layers.map(item => item.id),
-      layerCount: state.project.layers.length,
+      layerIds: state.project.content.layers.map(item => item.id),
+      layerCount: state.project.content.layers.length,
       dirty: state.dirty
     }
   })
@@ -73,8 +75,8 @@ test('point radius edits coalesce by gesture, undo separately and save the focus
   await (await download).saveAs(savedPath)
   const saved = JSON.parse(readFileSync(savedPath, 'utf8'))
   const savedLayerId = (await cartographyState(page)).selectedLayerId
-  const savedBinding = saved.project.cartography.bindings.find((binding: { gisLayerId: string }) => binding.gisLayerId === savedLayerId)
-  const savedFragment = saved.project.cartography.styleLayers.filter((style: { id: string }) => savedBinding.styleLayerIds.includes(style.id))
+  const savedBinding = saved.project.content.cartography.bindings.find((binding: { gisLayerId: string }) => binding.gisLayerId === savedLayerId)
+  const savedFragment = saved.project.content.cartography.styleLayers.filter((style: { id: string }) => savedBinding.styleLayerIds.includes(style.id))
   expect(savedFragment[0].paint['circle-radius']).toBe(41)
 
   await input.fill('47')
@@ -101,8 +103,8 @@ test('switching layers preserves immediate edits without a draft dialog', async 
   await firstInput.blur()
   const firstLayer = await cartographyState(page)
   const names = await page.evaluate(async () => {
-    const { useProjectStore } = await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/stores/project.store.ts') ?? '/src/stores/project.store.ts')
-    return useProjectStore.getState().project.layers.map(layer => ({ id: layer.id, name: layer.name }))
+    const { useProjectStore } = await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/session/project.store.ts') ?? '/src/session/project.store.ts')
+    return useProjectStore.getState().project.content.layers.map(layer => ({ id: layer.id, name: layer.name }))
   })
   await page.getByLabel('配置图层').click()
   await page.locator('.ant-select-dropdown:visible .ant-select-item-option').nth(names.findIndex(layer => layer.id !== firstLayer.selectedLayerId)).click()
@@ -147,13 +149,13 @@ test('advanced expressions remain intact while safe sibling parameters stay edit
   await expect(page.getByRole('img', { name: 'Points符号预览', exact: true }).locator('..')).not.toHaveAttribute('title')
   const before = await page.evaluate(async () => {
     const loaded = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(loaded('/src/stores/project.store.ts')) as typeof import('../src/stores/project.store')
-    return structuredClone(useProjectStore.getState().project.cartography)
+    const { useProjectStore } = await import(loaded('/src/session/project.store.ts')) as typeof import('@/session/project.store')
+    return structuredClone(useProjectStore.getState().project.content.cartography)
   })
   await expect(panel.getByLabel('渲染方式')).toHaveCount(0)
   await panel.getByLabel('标准描边宽度', { exact: true }).fill('3')
   await panel.getByLabel('标准描边宽度', { exact: true }).blur()
-  const edited = await page.evaluate(async () => (await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/stores/project.store.ts') ?? '/src/stores/project.store.ts')).useProjectStore.getState().project.cartography)
+  const edited = await page.evaluate(async () => (await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/session/project.store.ts') ?? '/src/session/project.store.ts')).useProjectStore.getState().project.content.cartography)
   expect(edited!.styleLayers[0]!.paint!['circle-radius']).toEqual(before!.styleLayers[0]!.paint!['circle-radius'])
   expect(edited!.styleLayers[0]!.paint!['circle-stroke-width']).toBe(3)
   await page.getByRole('button', { name: '撤销', exact: true }).click()
@@ -161,8 +163,8 @@ test('advanced expressions remain intact while safe sibling parameters stay edit
   await expect(page.getByText('当前没有文字样式，可在专业标注编辑中添加。', { exact: true })).toBeVisible()
   const after = await page.evaluate(async () => {
     const loaded = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(loaded('/src/stores/project.store.ts')) as typeof import('../src/stores/project.store')
-    return structuredClone(useProjectStore.getState().project.cartography)
+    const { useProjectStore } = await import(loaded('/src/session/project.store.ts')) as typeof import('@/session/project.store')
+    return structuredClone(useProjectStore.getState().project.content.cartography)
   })
   expect(after).toEqual(before)
 })

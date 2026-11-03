@@ -1,7 +1,9 @@
+import { projectConfiguration } from '@/session/project-configuration'
+import { requireMapContent } from '@desktop-webgis/project'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Checkbox, Descriptions, Input, InputNumber, Modal, Select, Space, Steps, Tag, Typography } from 'antd'
-import type { CartographyState, ProjectSnapshot } from '@desktop-webgis/gis-core'
-import { findGroupForLayer, getLayerCartography, getLayerGroupState } from '@desktop-webgis/gis-core'
+import type { CartographyState, ProjectSnapshot } from '@desktop-webgis/project'
+import { findGroupForLayer, getLayerCartography, getLayerGroupState } from '@desktop-webgis/project'
 import { createGeoServerClient, hashLayer, type GeoServerFeatureType, type GeoServerLayer, type MbStyleCapability, type RemoteStyle } from '@desktop-webgis/ogc-io/geoserver-client'
 import { exportSld } from '@desktop-webgis/ogc-io/sld-export'
 import type { SldExportResult } from '@desktop-webgis/ogc-io/sld-export'
@@ -9,9 +11,9 @@ import { exportMbStyle } from '@desktop-webgis/ogc-io/mbstyle-export'
 import type { MbStyleExportResult } from '@desktop-webgis/ogc-io/mbstyle-export'
 import type { ProjectStyleAsset } from '@desktop-webgis/ol-style/style-assets'
 import { encodeSldPackage } from '@desktop-webgis/ogc-io/sld-package'
-import { useProjectStore } from '@/stores/project.store'
-import { canPersistCredentialsSafely, persistCredentialSecurely, putSessionCredential } from '@/services/credentials'
-import { createGeoServerTransport } from '@/services/geoserver-transport'
+import { useProjectStore } from '@/session/project.store'
+import { canPersistCredentialsSafely, persistCredentialSecurely, putSessionCredential } from '@/platform/credentials'
+import { createGeoServerTransport } from '@/exchange/geoserver-transport'
 import {
   createBasicAuthorization,
   createGeoServerConnectionId,
@@ -19,8 +21,8 @@ import {
   removeGeoServerConnection,
   saveGeoServerConnection,
   validateGeoServerBaseUrl
-} from '@/services/geoserver-connections'
-import type { GeoServerConnection } from '@/services/geoserver-connections'
+} from '@/exchange/geoserver-connections'
+import type { GeoServerConnection } from '@/exchange/geoserver-connections'
 import './geoserver-publish-dialog.css'
 
 export interface GeoServerLoadWmsRequest {
@@ -91,7 +93,7 @@ function preflightContent(preflight: Preflight): string | undefined {
 
 function ownerMatches(owner: { projectId: string; projectEpoch: number }): boolean {
   const state = useProjectStore.getState()
-  return state.project.id === owner.projectId && state.projectEpoch === owner.projectEpoch
+  return state.project.metadata.id === owner.projectId && state.projectEpoch === owner.projectEpoch
 }
 
 function valuePath(layerId: string, section: string, name: string): string {
@@ -199,13 +201,13 @@ function hasValidBbox(featureType: GeoServerFeatureType): boolean {
 export function GeoServerPublishDialog({ layerId, onClose, onLoadWms }: GeoServerPublishDialogProps) {
   const publishStartedRef = useRef(false)
   const project = useProjectStore(state => state.project)
-  const projectId = project.id
+  const projectId = project.metadata.id
   const projectEpoch = useProjectStore(state => state.projectEpoch)
-  const owner = useRef({ projectId: useProjectStore.getState().project.id, projectEpoch: useProjectStore.getState().projectEpoch }).current
-  const layer = project.layers.find(item => item.id === layerId)
-  const dataset = project.datasets.find(item => item.id === layer?.datasetId)
+  const owner = useRef({ projectId: useProjectStore.getState().project.metadata.id, projectEpoch: useProjectStore.getState().projectEpoch }).current
+  const layer = requireMapContent(project).layers.find(item => item.id === layerId)
+  const dataset = requireMapContent(project).datasets.find(item => item.id === layer?.datasetId)
   const fragment = useMemo(() => getLayerCartography(project, layerId), [project, layerId])
-  const fragmentAssets = useMemo(() => referencedAssets(fragment?.styleLayers ?? [], project.cartography?.assets ?? []), [fragment, project.cartography?.assets])
+  const fragmentAssets = useMemo(() => referencedAssets(fragment?.styleLayers ?? [], requireMapContent(project).cartography?.assets ?? []), [fragment, requireMapContent(project).cartography?.assets])
 
   const [connections, setConnections] = useState(() => listGeoServerConnections())
   const [selectedConnectionId, setSelectedConnectionId] = useState('')
@@ -271,7 +273,7 @@ export function GeoServerPublishDialog({ layerId, onClose, onLoadWms }: GeoServe
 
   useEffect(() => {
     const unsubscribe = useProjectStore.subscribe(state => {
-      if (state.project.id !== owner.projectId || state.projectEpoch !== owner.projectEpoch) {
+      if (state.project.metadata.id !== owner.projectId || state.projectEpoch !== owner.projectEpoch) {
         requestRef.current?.abort()
         requestRef.current = null
         setLoading(false)
@@ -367,7 +369,7 @@ export function GeoServerPublishDialog({ layerId, onClose, onLoadWms }: GeoServe
 
   async function connect(): Promise<void> {
     const current = useProjectStore.getState()
-    if (current.project.id !== owner.projectId || current.projectEpoch !== owner.projectEpoch) { setError('工程已切换，请关闭窗口并重新打开。'); return }
+    if (current.project.metadata.id !== owner.projectId || current.projectEpoch !== owner.projectEpoch) { setError('工程已切换，请关闭窗口并重新打开。'); return }
     let normalizedUrl: string
     try { normalizedUrl = validateGeoServerBaseUrl(baseUrl) } catch (reason) { setError(reason instanceof Error ? reason.message : 'GeoServer 地址无效'); return }
     const capturedConnectionInput = connectionInputKeyRef.current
@@ -566,17 +568,17 @@ export function GeoServerPublishDialog({ layerId, onClose, onLoadWms }: GeoServe
     const checked = preflight
     const currentFragment = getLayerCartography(useProjectStore.getState().project, layerId)
     const currentState = useProjectStore.getState()
-    const currentLayer = currentState.project.layers.find(item => item.id === layerId)
+    const currentLayer = requireMapContent(currentState.project).layers.find(item => item.id === layerId)
     if (!checked || checked.inputKey !== inputKeyRef.current || !preflightContent(checked) || hasUnsupported) { setError('预检结果已失效或存在不支持项，请重新预检。'); return }
     if (!activeConnection || !workspace || !store || !featureTypeName || !clientRef.current) { setError('连接或目标选择已改变，请重新预检。'); return }
-    if (currentState.project.id !== owner.projectId || currentState.projectEpoch !== owner.projectEpoch || !currentLayer || !currentFragment) { setError('工程已切换或目标图层已删除，本次发布已取消。'); return }
+    if (currentState.project.metadata.id !== owner.projectId || currentState.projectEpoch !== owner.projectEpoch || !currentLayer || !currentFragment) { setError('工程已切换或目标图层已删除，本次发布已取消。'); return }
     if (getLayerGroupState(currentState.project, findGroupForLayer(currentState.project, layerId)?.id).locked) { setError('图层或所属文件夹已锁定，不能发布。'); return }
     if (styleConflict && !allowOverride) { setError('远端已有不同版本，请明确同意覆盖，或更换样式名。'); return }
     if (hasApproximation && !allowApproximation) { setError('样式存在近似降级，请明确同意后发布。'); return }
     if (checked.format !== format) { setError('发布格式已改变，请重新预检。'); return }
     const target = { connectionId: activeConnection.id, workspace, store, layerName: featureTypeName, styleName: styleName.trim(), format }
     const client = clientRef.current
-    if (await hashContent(currentFragment.styleLayers, referencedAssets(currentFragment.styleLayers, currentState.project.cartography?.assets ?? [])) !== checked.contentHash) {
+    if (await hashContent(currentFragment.styleLayers, referencedAssets(currentFragment.styleLayers, requireMapContent(currentState.project).cartography?.assets ?? [])) !== checked.contentHash) {
       setError('本地图层样式在预检后已变化，请重新预检。')
       return
     }
@@ -607,34 +609,31 @@ export function GeoServerPublishDialog({ layerId, onClose, onLoadWms }: GeoServe
       const latest = useProjectStore.getState()
       const latestFragment = getLayerCartography(latest.project, layerId)
       const latestContentHash = latestFragment
-        ? await hashContent(latestFragment.styleLayers, referencedAssets(latestFragment.styleLayers, latest.project.cartography?.assets ?? []))
+        ? await hashContent(latestFragment.styleLayers, referencedAssets(latestFragment.styleLayers, requireMapContent(latest.project).cartography?.assets ?? []))
         : ''
       const committedState = useProjectStore.getState()
       const committedFragment = getLayerCartography(committedState.project, layerId)
-      const committedLayer = committedState.project.layers.find(item => item.id === layerId)
-      if (!isActive(sequence, controller) || inputKeyRef.current !== checked.inputKey || JSON.stringify(committedFragment) !== JSON.stringify(latestFragment) || committedState.project.cartography?.assets !== latest.project.cartography?.assets || committedState.project.id !== owner.projectId || committedState.projectEpoch !== owner.projectEpoch || !committedLayer || !committedFragment
+      const committedLayer = requireMapContent(committedState.project).layers.find(item => item.id === layerId)
+      if (!isActive(sequence, controller) || inputKeyRef.current !== checked.inputKey || JSON.stringify(committedFragment) !== JSON.stringify(latestFragment) || requireMapContent(committedState.project).cartography?.assets !== requireMapContent(latest.project).cartography?.assets || committedState.project.metadata.id !== owner.projectId || committedState.projectEpoch !== owner.projectEpoch || !committedLayer || !committedFragment
           || getLayerGroupState(committedState.project, findGroupForLayer(committedState.project, layerId)?.id).locked
           || latestContentHash !== checked.contentHash
-          || committedState.project.id !== latest.project.id || committedState.projectEpoch !== latest.projectEpoch) {
+          || committedState.project.metadata.id !== latest.project.metadata.id || committedState.projectEpoch !== latest.projectEpoch) {
         setError('发布完成，但本地图层在等待期间发生变化或已锁定；远端结果保留，本地链接未更新。')
         return
       }
-      const snapshot = committedState.getSnapshot()
+      const snapshot = { project: projectConfiguration.getSnapshot(), featuresByDataset: {} }
       const next: ProjectSnapshot = {
         ...snapshot,
-        project: {
-          ...snapshot.project,
-          layers: snapshot.project.layers.map(item => item.id === layerId ? {
+        project: { ...snapshot.project, content: { ...requireMapContent(snapshot.project), layers: requireMapContent(snapshot.project).layers.map(item => item.id === layerId ? {
             ...item,
             publishedStyle: {
               connectionId: target.connectionId, workspace: target.workspace, store: target.store, layerName: target.layerName,
               styleName: result.styleName, remoteFormat: target.format,
               lastPublishedHash: result.remoteHash, lastPublishedAt: new Date().toISOString(), lastPublishedContentHash: checked.contentHash
             }
-          } : item)
-        }
+          } : item) } }
       }
-      if (!committedState.applySnapshotAsEdit(next, '发布 GeoServer 样式')) throw new Error('发布成功，但工程链接未能写入；远端结果保留。')
+      if (!projectConfiguration.apply(next.project, '发布 GeoServer 样式')) throw new Error('发布成功，但工程链接未能写入；远端结果保留。')
       setContentFingerprint(checked.contentHash)
       setStyleName(result.styleName)
       setSuccess(true)

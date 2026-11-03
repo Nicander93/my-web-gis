@@ -42,8 +42,11 @@ async function reachable(locator) {
 
 async function projectHistory(page) {
   return evaluate(page, async () => {
-    const state = (await import('/src/stores/project.store.ts')).useProjectStore.getState()
-    return { snapshot: state.getSnapshot(), dirty: state.dirty, undo: state.canUndoEdit(), redo: state.canRedoEdit() }
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+
+    const state = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-edits.ts').at(-1) ?? '/src/session/project-edits.ts')
+    return { snapshot: projectSession.getSnapshot(), dirty: state.dirty, undo: projectEdits.canUndo(), redo: projectEdits.canRedo() }
   }, undefined, 'Project/history read')
 }
 
@@ -97,7 +100,21 @@ export async function verifyNativeUx(page, report) {
   const settings = page.getByRole('dialog', { name: '软件设置', exact: true })
   await expect(settings).toBeVisible()
   for (const label of ['软件主题', '界面字号', '控件密度']) await reachable(settings.getByLabel(label, { exact: true }))
-  await selectOption(page, settings, '界面字号', '14 px')
+  const slider = settings.getByRole('slider', { name: '界面字号' })
+  await slider.focus()
+  await slider.press('Home')
+  await expect(slider).toHaveAttribute('aria-valuenow', '8')
+  const dimensions = () => evaluate(page, () => ({
+    header: document.querySelector('.window-bar').getBoundingClientRect().height,
+    rail: document.querySelector('.workspace-toolrail').getBoundingClientRect().width,
+    layer: document.querySelector('.panel-left').getBoundingClientRect().width
+  }), undefined, 'Native interface dimensions')
+  const small = await dimensions()
+  await slider.press('End')
+  await expect(slider).toHaveAttribute('aria-valuenow', '14')
+  const large = await dimensions()
+  assert.ok(small.header < large.header && small.rail < large.rail && small.layer < large.layer, 'Native interface dimensions must follow font scaling')
+  report.interfaceScale = { small, large }
   await selectOption(page, settings, '控件密度', '标准')
   await selectOption(page, settings, '软件主题', '深色')
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')

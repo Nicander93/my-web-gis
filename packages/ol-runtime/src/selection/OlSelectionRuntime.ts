@@ -1,4 +1,4 @@
-import type { SelectionState } from '@desktop-webgis/gis-core'
+import type { SelectionState } from '@desktop-webgis/project'
 import { createSelectionController, type SelectionController, type SelectionRequest } from '@desktop-webgis/ol-selection'
 import { createSelectionStyle } from '../layer/style'
 import type { OlMapRuntime } from '../map/OlMapRuntime'

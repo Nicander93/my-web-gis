@@ -1,4 +1,4 @@
-import { processFeatures, type GisFeature, type ProcessingOptions, type ProcessingResult } from '@desktop-webgis/gis-core'
+import { processFeatures, type GisFeature, type ProcessingOptions, type ProcessingResult } from '@desktop-webgis/project'
 import { addGeometryMeasurements, calculateField, clipLines, joinAttributes, joinByLocation, summarizeByLocation } from '@desktop-webgis/spatial-analysis'
 
 /** Route serializable UI requests to reusable package APIs, without project or runtime dependencies. */

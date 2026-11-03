@@ -1,5 +1,5 @@
 import { Box, Download, Eye, FileInput, Globe, LayoutPanelLeft, Plus, Redo2, Trash2, Undo2, Waves } from 'lucide-react'
-import { MenuItem } from '@/app/header/menus/MenuItem'
+import { MenuItem } from '@/ui/MenuItem'
 import { requestSceneAction } from './scene3d-actions'
 import type { SceneAction } from './scene3d-actions'
 

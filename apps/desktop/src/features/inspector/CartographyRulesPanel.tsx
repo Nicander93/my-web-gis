@@ -1,9 +1,11 @@
+import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
+import { requireMapContent } from '@desktop-webgis/project'
 import { useState } from 'react'
 import { Alert, Button, Dropdown, Select, Space, Table, Tag } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { Eye, EyeOff, MoreHorizontal, Pencil } from 'lucide-react'
-import { createId, getEffectiveLocked, getLayerCartography } from '@desktop-webgis/gis-core'
-import type { CartographyState } from '@desktop-webgis/gis-core'
+import { createId, getEffectiveLocked, getLayerCartography } from '@desktop-webgis/project'
+import type { CartographyState } from '@desktop-webgis/project'
 import {
   createDrawingLayer,
   duplicateDrawingLayer,
@@ -12,8 +14,8 @@ import {
   setDrawingLayerProperty,
   type DrawingLayerType
 } from '@desktop-webgis/ol-style/cartography-operations'
-import { useProjectStore } from '@/stores/project.store'
-import { finishStyleInteraction } from './style-interaction'
+import { useProjectStore } from '@/session/project.store'
+import { finishStyleInteraction } from '@/session/style-interaction'
 import './cartography-rules-panel.css'
 
 type StyleLayer = CartographyState['styleLayers'][number]
@@ -47,7 +49,7 @@ export function CartographyRulesPanel({ layerId, onEdit, onBack }: { layerId: st
 
   function writeLatest(build: (current: StyleLayer[], styleSourceId: string) => StyleLayer[]) {
     const state = useProjectStore.getState()
-    if (!state.project.layers.some(layer => layer.id === layerId) || getEffectiveLocked(state.project, layerId)) {
+    if (!requireMapContent(state.project).layers.some(layer => layer.id === layerId) || getEffectiveLocked(state.project, layerId)) {
       setError('当前图层已删除或锁定，无法修改规则。')
       return
     }
@@ -58,7 +60,7 @@ export function CartographyRulesPanel({ layerId, onEdit, onBack }: { layerId: st
     }
     try {
       finishStyleInteraction(layerId)
-      state.setLayerCartography(layerId, build(currentFragment.styleLayers, currentFragment.binding.styleSourceId))
+      layerConfigurationCommands.setLayerCartography(layerId, build(currentFragment.styleLayers, currentFragment.binding.styleSourceId))
       setError(undefined)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))

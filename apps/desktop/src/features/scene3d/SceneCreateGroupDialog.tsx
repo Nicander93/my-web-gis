@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { EditorDialog } from '@/components/ui/EditorDialog'
+import { EditorDialog } from '@/ui/EditorDialog'
 
 export function SceneCreateGroupDialog({ count, locked, onClose, onCreate }: { count: number; locked: boolean; onClose(): void; onCreate(name: string, includeSelection: boolean): void }) {
   const [name, setName] = useState('新建分组'), [includeSelection, setIncludeSelection] = useState(count > 0 && !locked), [error, setError] = useState('')

@@ -1,10 +1,11 @@
+import { requireMapContent } from '@desktop-webgis/project'
 import { Select, Tabs, theme } from 'antd'
 import { useContext } from 'react'
 import { createPortal } from 'react-dom'
-import { DockHeaderContext } from '@/components/ui/DockHeaderContext'
-import { useProjectStore } from '@/stores/project.store'
-import { useWorkbenchStore } from '@/stores/workbench.store'
-import { layerCommands, getLayerCapabilities } from '@/app/commands/layer.commands'
+import { DockHeaderContext } from '@/ui/DockHeaderContext'
+import { useProjectStore } from '@/session/project.store'
+import { useWorkbenchStore } from '@/view-state/workbench.store'
+import { layerCommands, getLayerCapabilities } from '@/commands/layer.commands'
 import { AttributeTable } from './AttributeTable'
 
 /** Each open layer retains its own drafts, filters, pagination and scroll state. */
@@ -15,13 +16,13 @@ export function AttributeTableHost() {
   const activeId = useWorkbenchStore((state) => state.tableLayerId)
   const openIds = useWorkbenchStore((state) => state.tableLayerIds)
   const layers = openIds.flatMap((id) => {
-    const layer = project.layers.find((item) => item.id === id)
+    const layer = requireMapContent(project).layers.find((item) => item.id === id)
     return layer ? [layer] : []
   })
   const picker = <Select className="table-target-picker" aria-label="属性表图层" style={{ width: 150 }}
     value={activeId ?? undefined} placeholder="选择图层" virtual={false} showSearch={{ optionFilterProp: 'label' }}
     onChange={(id) => layerCommands.openAttributeTable(id)}
-    options={project.layers.filter((layer) => getLayerCapabilities(layer.id).canAttributeTable)
+    options={requireMapContent(project).layers.filter((layer) => getLayerCapabilities(layer.id).canAttributeTable)
       .map((layer) => ({ value: layer.id, label: layer.name }))} />
   return <div className="attribute-table-host">
     {layers.length === 0 ? <><div className="attribute-table-tab-bar">{picker}</div><AttributeTable /></> :

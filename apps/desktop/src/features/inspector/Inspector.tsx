@@ -1,37 +1,42 @@
+import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
+import { useFeaturesByDataset } from '@/data/feature-data'
+import { requireMapContent } from '@desktop-webgis/project'
 import { useEffect } from 'react'
 import { Settings2 } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
-import { useSessionStore } from '@/stores/session.store'
-import { useProjectStore } from '@/stores/project.store'
-import { useWorkbenchStore } from '@/stores/workbench.store'
-import { layerCommands } from '@/app/commands/layer.commands'
-import { capabilitiesForDataset } from '@desktop-webgis/gis-core'
+import { Button } from '@/ui/Button'
+import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { useProjectStore } from '@/session/project.store'
+import { useWorkbenchStore } from '@/view-state/workbench.store'
+import { layerCommands } from '@/commands/layer.commands'
+import { capabilitiesForDataset, getEffectiveLocked } from '@desktop-webgis/project'
 import { StylePanel } from './StylePanel'
 import { LabelPanel } from './LabelPanel'
 import { Legend } from './Legend'
-import { getLayerCapabilities } from '@/app/commands/layer.commands'
+import { getLayerCapabilities } from '@/commands/layer.commands'
 import { PopupFields } from './PopupFields'
-import { openPropertyWindow } from './property-window-request'
+import { openPropertyWindow } from '@/view-state/property-window-request'
+import { beginStyleInteraction, finishStyleInteraction } from '@/session/style-interaction'
 
 type InspectorTab = 'layer' | 'style' | 'label'
 
 export function Inspector() {
   const selectedLayerId = useWorkbenchStore((state) => state.inspectorLayerId)
   const project = useProjectStore((state) => state.project)
-  const featuresByDataset = useProjectStore((state) => state.featuresByDataset)
-  const setLayerOpacity = useProjectStore((state) => state.setLayerOpacity)
-  const setTab = useSessionStore((state) => state.setInspectorTab)
+  const featuresByDataset = useFeaturesByDataset()
+  const setLayerOpacity = layerConfigurationCommands.setLayerOpacity
+  const setTab = useLayerViewStore((state) => state.setInspectorTab)
 
   const layerId = selectedLayerId || 'no-layer'
-  const session = useSessionStore((state) => state.sessions[layerId])
+  useEffect(() => () => finishStyleInteraction(layerId), [layerId])
+  const session = useLayerViewStore((state) => state.sessions[layerId])
   const tab: InspectorTab = session?.inspector?.activeTab === 'feature' ? 'layer' : session?.inspector?.activeTab ?? 'layer'
 
   const selectedLayer = selectedLayerId
-    ? project.layers.find((layer) => layer.id === selectedLayerId)
+    ? requireMapContent(project).layers.find((layer) => layer.id === selectedLayerId)
     : null
 
   const dataset = selectedLayer
-    ? project.datasets.find((item) => item.id === selectedLayer.datasetId)
+    ? requireMapContent(project).datasets.find((item) => item.id === selectedLayer.datasetId)
     : undefined
   const caps = getLayerCapabilities(selectedLayerId)
   const featureCount = selectedLayer
@@ -119,13 +124,22 @@ export function Inspector() {
                 <label className="inspector-opacity">
                   <input
                     type="range"
+                    aria-label="不透明度"
+                    disabled={getEffectiveLocked(project, selectedLayerId)}
                     min={0}
                     max={100}
                     value={Math.round(selectedLayer.opacity * 100)}
+                    onPointerDown={() => { finishStyleInteraction(); beginStyleInteraction(selectedLayerId, 'opacity') }}
+                    onPointerUp={() => finishStyleInteraction(selectedLayerId)}
+                    onPointerCancel={() => finishStyleInteraction(selectedLayerId)}
+                    onKeyDown={event => { if (!event.repeat) { finishStyleInteraction(); beginStyleInteraction(selectedLayerId, 'opacity') } }}
+                    onKeyUp={() => finishStyleInteraction(selectedLayerId)}
+                    onBlur={() => finishStyleInteraction(selectedLayerId)}
                     onChange={(e) =>
                       setLayerOpacity(
                         selectedLayerId,
-                        Number(e.target.value) / 100
+                        Number(e.target.value) / 100,
+                        beginStyleInteraction(selectedLayerId, 'opacity')
                       )
                     }
                   />

@@ -1,16 +1,19 @@
+import { projectConfiguration } from '@/session/project-configuration'
+import { useFeaturesByDataset, featureData } from '@/data/feature-data'
+import { requireMapContent } from '@desktop-webgis/project'
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Alert, Button, ColorPicker, Input, InputNumber, Select, Switch } from 'antd'
-import { ApplyProjectSnapshotEditCommand, createId, findGroupForLayer, getLayerGroupState, isLegacyStyle, migrateLegacyStyle } from '@desktop-webgis/gis-core'
-import type { Layer, ProcessingRecord } from '@desktop-webgis/gis-core'
+import { getEffectiveLocked, isLegacyStyle, migrateLegacyStyle } from '@desktop-webgis/project'
+import type { Layer, ProcessingRecord } from '@desktop-webgis/project'
 import { cloneSymbolWithColor, colorToString, symbolPrimaryColor } from '@desktop-webgis/ol-style'
 import type { LayerStyle, Symbol } from '@desktop-webgis/ol-style'
-import { useProjectStore } from '@/stores/project.store'
-import { PropertyWindow } from '@/components/ui/PropertyWindow'
-import { propertyWindowEvent } from './property-window-request'
-import type { PropertyWindowRequest } from './property-window-request'
+import { useProjectStore } from '@/session/project.store'
+import { PropertyWindow } from '@/ui/PropertyWindow'
+import { propertyWindowEvent } from '@/view-state/property-window-request'
+import type { PropertyWindowRequest } from '@/view-state/property-window-request'
 import { FolderPropertyWindow } from './FolderPropertyWindow'
-import { createMapPropertyPreview } from '@/features/map/map-runtime-host'
+import { createMapPropertyPreview } from '@/runtime/map-runtime-host'
 import { PopupDraftFields } from './PopupDraftFields'
 import { CRS_PRESETS } from '@desktop-webgis/vector-io'
 import { assignSourceCrs } from './source-crs'
@@ -34,13 +37,13 @@ export function LayerPropertyWindowHost() {
 function LayerPropertyWindow({ id, onClose }: { id: string; onClose(): void }) {
   const cartographyEditor = useCartographyEditor(id)
   const project = useProjectStore(state => state.project)
-  const featuresByDataset = useProjectStore(state => state.featuresByDataset)
+  const featuresByDataset = useFeaturesByDataset()
   const epoch = useState(() => useProjectStore.getState().projectEpoch)[0]
-  const current = project.layers.find(layer => layer.id === id)
+  const current = requireMapContent(project).layers.find(layer => layer.id === id)
   const title = useState(() => current?.name ?? id)[0]
   const [base, setBase] = useState(() => structuredClone(current))
   const [draft, setDraft] = useState(() => structuredClone(current))
-  const [baseDataset, setBaseDataset] = useState(() => structuredClone(project.datasets.find(dataset => dataset.id === current?.datasetId)))
+  const [baseDataset, setBaseDataset] = useState(() => structuredClone(requireMapContent(project).datasets.find(dataset => dataset.id === current?.datasetId)))
   const [sourceCrs, setSourceCrs] = useState(() => baseDataset?.kind === 'vector' ? baseDataset.sourceCrs ?? '' : '')
   const [section, setSection] = useState('general'), [query, setQuery] = useState(''), [error, setError] = useState('')
   const [preview, setPreview] = useState(false)
@@ -51,7 +54,7 @@ function LayerPropertyWindow({ id, onClose }: { id: string; onClose(): void }) {
     return () => session.dispose()
   }, [preview, base, draft, current, epoch])
   if (!base || !draft) return null
-  const dataset = project.datasets.find(dataset => dataset.id === draft.datasetId)
+  const dataset = requireMapContent(project).datasets.find(dataset => dataset.id === draft.datasetId)
   const datasetFeatures = dataset ? featuresByDataset[dataset.id] ?? [] : []
   const geometryCounts = new Map<string, number>()
   for (const feature of datasetFeatures) geometryCounts.set(feature.geometry.type, (geometryCounts.get(feature.geometry.type) ?? 0) + 1)
@@ -74,24 +77,24 @@ function LayerPropertyWindow({ id, onClose }: { id: string; onClose(): void }) {
   }
   function apply(close = false): void {
     try {
-      const store = useProjectStore.getState(), snapshot = store.getSnapshot()
-      const live = snapshot.project.layers.find(layer => layer.id === id)
+      const store = useProjectStore.getState(), snapshot = { project: projectConfiguration.getSnapshot(), featuresByDataset: {} }
+      const live = requireMapContent(snapshot.project).layers.find(layer => layer.id === id)
       if (store.projectEpoch !== epoch) throw new Error('项目已切换，请重新打开窗口。')
       if (!live) throw new Error('图层已删除。')
       if (JSON.stringify(live) !== JSON.stringify(base)) throw new Error('图层已被其他操作修改，请重新载入。')
-      if (getLayerGroupState(snapshot.project, findGroupForLayer(snapshot.project, id)?.id).locked) throw new Error('所属文件夹已锁定。')
+      if (getEffectiveLocked(snapshot.project, id)) throw new Error('图层或所属文件夹已锁定。')
       if (!draft?.name.trim()) throw new Error('请输入图层名称。')
       if (!Number.isFinite(draft.opacity) || draft.opacity < 0 || draft.opacity > 1) throw new Error('不透明度必须在 0–100% 之间。')
       if (draft.minZoom !== undefined && draft.maxZoom !== undefined && draft.minZoom > draft.maxZoom) throw new Error('最小缩放不能大于最大缩放。')
       const after = crsDirty && baseDataset?.kind === 'vector' ? assignSourceCrs(snapshot, baseDataset, sourceCrs) : structuredClone(snapshot)
-      after.project.layers = after.project.layers.map(layer => layer.id === id ? structuredClone(draft) : layer)
-      if (dirty) store.executeEditCommand(new ApplyProjectSnapshotEditCommand(createId('cmd'), '应用完整图层属性', snapshot, after))
-      setBase(structuredClone(draft)); setBaseDataset(structuredClone(after.project.datasets.find(dataset => dataset.id === draft.datasetId))); setError(''); if (close) onClose()
+      requireMapContent(after.project).layers = requireMapContent(after.project).layers.map(layer => layer.id === id ? structuredClone(draft) : layer)
+      if (dirty) projectConfiguration.apply(after.project, '应用完整图层属性')
+      setBase(structuredClone(draft)); setBaseDataset(structuredClone(requireMapContent(after.project).datasets.find(dataset => dataset.id === draft.datasetId))); setError(''); if (close) onClose()
     } catch (reason) { setError(reason instanceof Error ? reason.message : '属性无效') }
   }
   const symbol = style.mode === 'single' ? style.symbol : style.fallback
   const setSymbol = (symbol: Symbol) => setStyle(style.mode === 'single' ? { ...style, symbol } : { ...style, fallback: symbol })
-  const popupFields = [...new Set([...(dataset?.fields?.map(field => field.name) ?? []), ...(useProjectStore.getState().featuresByDataset[draft.datasetId] ?? []).slice(0, 100).flatMap(feature => Object.keys(feature.properties))])]
+  const popupFields = [...new Set([...(dataset?.fields?.map(field => field.name) ?? []), ...(featureData.readSnapshot()[draft.datasetId] ?? []).slice(0, 100).flatMap(feature => Object.keys(feature.properties))])]
   function reload(): void {
     setBase(structuredClone(current)); setDraft(structuredClone(current))
     setBaseDataset(structuredClone(dataset)); setSourceCrs(dataset?.kind === 'vector' ? dataset.sourceCrs ?? '' : ''); setError('')
@@ -128,7 +131,7 @@ function LayerPropertyWindow({ id, onClose }: { id: string; onClose(): void }) {
       {metadata('数据集 ID', 'dataset.id', <code>{draft.datasetId}</code>)}
       {metadata('数据类型', 'dataset.kind', dataset ? ({ vector: '本地矢量', wms: 'WMS 影像', wmts: 'WMTS 瓦片', wfs: 'WFS 只读快照' }[dataset.kind]) : '数据集已删除')}
       {metadata('数据来源', 'source.path source.url', <code style={{ overflowWrap: 'anywhere' }}>{sourceLocation}</code>)}
-      {metadata('显示坐标系', 'project.crs', project.crs)}
+      {metadata('显示坐标系', 'project.crs', requireMapContent(project).crs)}
       {metadata('内部要素坐标系', 'geometry.crs', 'EPSG:4326')}
       {metadata('已加载要素', 'geometry.count', datasetFeatures.length)}
       {metadata('几何类型', 'geometry.type', dataset?.kind === 'wms' || dataset?.kind === 'wmts' ? '服务影像，无本地几何' : geometrySummary)}

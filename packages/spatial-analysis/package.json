@@ -16,14 +16,23 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json && esbuild src/index.ts --bundle --format=esm --platform=neutral --target=es2022 --outfile=dist/index.js",
+    "build": "tsc -p tsconfig.json && esbuild src/index.ts --bundle --format=esm --platform=neutral --main-fields=module,main --target=es2022 --outfile=dist/index.js",
     "test": "vitest run",
     "benchmark": "node examples/benchmark.mjs",
     "test:consumer": "node examples/consumer.mjs && tsc --noEmit --strict --target es2022 --module nodenext --moduleResolution nodenext examples/consumer.ts"
   },
   "dependencies": {
     "@turf/area": "7.3.4",
+    "@turf/boolean-valid": "7.3.4",
+    "@turf/buffer": "7.3.4",
+    "@turf/centroid": "7.3.4",
+    "@turf/difference": "7.3.4",
+    "@turf/envelope": "7.3.4",
+    "@turf/flatten": "7.3.4",
+    "@turf/intersect": "7.3.4",
+    "@turf/kinks": "7.3.4",
     "@turf/length": "7.3.4",
+    "@turf/union": "7.3.4",
     "@types/geojson": "7946.0.16",
     "jsep": "1.4.0",
     "jsts": "2.7.1"

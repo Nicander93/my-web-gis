@@ -1,6 +1,6 @@
 import TileLayer from 'ol/layer/Tile'
 import TileWMS from 'ol/source/TileWMS'
-import type { WmsDataset } from '@desktop-webgis/gis-core'
+import type { WmsDataset } from '@desktop-webgis/project'
 
 export const GIS_WMS_EXTENT_KEY = 'gisBboxWgs84'
 export const GIS_WMS_LAYER_ID_KEY = 'gisLayerId'

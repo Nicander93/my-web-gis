@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 test.use({ actionTimeout: 15_000, screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
-async function snapshot(page: Page) { return page.evaluate(async () => (await import('/src/stores/project.store.ts')).useProjectStore.getState().getSnapshot()) }
+async function snapshot(page: Page) { return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() }) }
 
 test('local resource relocation previews directory changes, cancels and supports undo/redo', async ({ page }, info) => {
   test.setTimeout(120_000)
@@ -31,23 +31,23 @@ test('local resource relocation previews directory changes, cancels and supports
   await dialog.getByRole('textbox', { name: '资源新位置' }).fill('E:/new/models')
   await dialog.getByRole('button', { name: '应用重定位', exact: true }).click()
   const after = await snapshot(page)
-  expect(after.project.city?.nodes).toEqual(before.project.city?.nodes)
-  expect(Object.values(after.project.city!.assets).map(asset => asset.reference)).toEqual([
+  expect(after.project.content.scene?.nodes).toEqual(before.project.content.scene?.nodes)
+  expect(Object.values(after.project.content.scene!.assets).map(asset => asset.reference)).toEqual([
     { kind: 'absolute', path: 'E:/new/models/tower.glb' }, { kind: 'absolute', path: 'E:/new/models/nested/tree.glb' }, { kind: 'absolute', path: 'D:/old/models-other/keep.glb' }
   ])
   await page.getByRole('button', { name: '撤销', exact: true }).click()
   expect(await snapshot(page)).toEqual(before)
   await page.getByRole('button', { name: '重做', exact: true }).click()
   expect(await snapshot(page)).toEqual(after)
-  const camera = await page.evaluate(async () => (await import('/src/features/scene3d/scene3d-runtime-host.ts')).getLiveSceneCamera())
+  const camera = await page.evaluate(async () => (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneCamera())
   const download = page.waitForEvent('download')
   await page.getByRole('button', { name: '保存项目', exact: true }).click()
   const path = info.outputPath('relocated.webgis.json')
   await (await download).saveAs(path)
   const saved = JSON.parse(readFileSync(path, 'utf8'))
-  expect(saved.project.city.assets).toEqual(after.project.city!.assets)
-  const { camera: savedCamera, ...savedScene } = saved.project.city
-  const { camera: _storedCamera, ...expectedScene } = after.project.city!
+  expect(saved.project.content.scene.assets).toEqual(after.project.content.scene!.assets)
+  const { camera: savedCamera, ...savedScene } = saved.project.content.scene
+  const { camera: _storedCamera, ...expectedScene } = after.project.content.scene!
   expect(savedScene).toEqual(expectedScene)
   // Cesium's live camera can differ by floating-point rounding between frames.
   expect(camera).not.toBeNull()
@@ -57,5 +57,5 @@ test('local resource relocation previews directory changes, cancels and supports
   const chooser = page.waitForEvent('filechooser')
   await page.getByRole('menuitem', { name: /^打开/ }).click()
   await (await chooser).setFiles(path)
-  expect((await snapshot(page)).project.city).toEqual(saved.project.city)
+  expect((await snapshot(page)).project.content.scene).toEqual(saved.project.content.scene)
 })

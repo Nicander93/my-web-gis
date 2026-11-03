@@ -9,13 +9,13 @@ import {
   WFS_DEFAULT_MAX_FEATURES,
   WFS_PHASE_MAX_FEATURES
 } from '@desktop-webgis/ogc-io'
-import type { DatasetKind, ServiceAuthMode, ServiceSource } from '@desktop-webgis/gis-core'
-import { canPersistCredentialsSafely } from '@/services/credentials'
+import type { DatasetKind, ServiceAuthMode, ServiceSource } from '@desktop-webgis/project'
+import { canPersistCredentialsSafely } from '@/platform/credentials'
 import {
   connectService,
   type ConnectAuthForm,
   type ConnectServiceSuccess
-} from '@/services/service-connect'
+} from '@/exchange/service-connect'
 
 export interface ServiceLayerAddRequest {
   name: string

@@ -1,4 +1,4 @@
-import { applyFieldFilter, cloneValue, type DatasetField, type FieldFilterCondition, type GisFeature } from '@desktop-webgis/gis-core'
+import { applyFieldFilter, cloneValue, type DatasetField, type FieldFilterCondition, type GisFeature } from '@desktop-webgis/project'
 import { compileFieldExpression, type FieldValue } from '@desktop-webgis/spatial-analysis'
 
 export type FieldCalculationScope = 'all' | 'table' | 'layer-filtered' | 'selected'

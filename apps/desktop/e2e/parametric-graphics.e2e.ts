@@ -2,8 +2,8 @@ import { expect, test, type Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 
 test.use({ actionTimeout: 15_000, screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
-async function snapshot(page: Page) { return page.evaluate(async () => (await import('/src/stores/project.store.ts')).useProjectStore.getState().getSnapshot()) }
-async function native(page: Page, id: string) { return page.evaluate(async id => (await import('/src/features/scene3d/scene3d-runtime-host.ts')).getLiveSceneDiagnostics(id)?.presentation?.graphic, id) }
+async function snapshot(page: Page) { return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() }) }
+async function native(page: Page, id: string) { return page.evaluate(async id => (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneDiagnostics(id)?.presentation?.graphic, id) }
 
 for (const [type,label] of [['rectangle','矩形'],['ellipse','椭圆']] as const) {
   test(`${type} two-corner draw, fixed controls, cancel, atomic history and file reopen`, async ({ page }, info) => {
@@ -16,11 +16,11 @@ for (const [type,label] of [['rectangle','矩形'],['ellipse','椭圆']] as cons
     await page.getByRole('button', { name: `绘制${label}`, exact: true }).click()
     const canvas = page.locator('.scene3d-canvas__viewport canvas'), bounds = (await canvas.boundingBox())!
     await page.mouse.click(bounds.x + bounds.width * .46,bounds.y + bounds.height * .46)
-    expect((await snapshot(page)).project.city?.nodes).toHaveLength(0)
+    expect((await snapshot(page)).project.content.scene?.nodes).toHaveLength(0)
     await page.mouse.move(bounds.x + bounds.width * .54,bounds.y + bounds.height * .54)
     await page.mouse.click(bounds.x + bounds.width * .54,bounds.y + bounds.height * .54)
-    await expect.poll(async () => (await snapshot(page)).project.city?.nodes.length).toBe(1)
-    const before = await snapshot(page), node = before.project.city!.nodes[0]
+    await expect.poll(async () => (await snapshot(page)).project.content.scene?.nodes.length).toBe(1)
+    const before = await snapshot(page), node = before.project.content.scene!.nodes[0]
     if (node.type !== 'graphic') throw new Error('Expected graphic')
     expect(node.geometry.type).toBe(type); expect(node.geometry.positions).toHaveLength(2)
     await expect.poll(() => native(page,node.id)).toHaveProperty(type)
@@ -33,7 +33,7 @@ for (const [type,label] of [['rectangle','矩形'],['ellipse','椭圆']] as cons
     await page.getByRole('button', { name: `绘制${label}`, exact: true }).click()
     await page.mouse.click(bounds.x + bounds.width * .5,bounds.y + bounds.height * .5)
     await page.keyboard.press('Escape')
-    expect((await snapshot(page)).project.city?.nodes).toEqual(before.project.city?.nodes)
+    expect((await snapshot(page)).project.content.scene?.nodes).toEqual(before.project.content.scene?.nodes)
     await page.locator('.scene3d-layer-row__select').filter({ hasText: node.name }).click()
     await page.getByRole('tab', { name: '编辑', exact: true }).click()
     await page.getByRole('button', { name: '编辑顶点', exact: true }).click()
@@ -45,30 +45,30 @@ for (const [type,label] of [['rectangle','矩形'],['ellipse','椭圆']] as cons
     await page.getByRole('spinbutton', { name: '顶点经度（度）', exact: true }).fill(String(longitude))
     await page.getByRole('button', { name: '预览坐标', exact: true }).click()
     await expect.poll(() => native(page,node.id)).not.toEqual(originalNative)
-    expect((await snapshot(page)).project.city?.nodes).toEqual(before.project.city?.nodes)
+    expect((await snapshot(page)).project.content.scene?.nodes).toEqual(before.project.content.scene?.nodes)
     await page.keyboard.press('Escape')
     await expect.poll(() => native(page,node.id)).toEqual(originalNative)
     await page.getByRole('button', { name: '编辑顶点', exact: true }).click()
     await page.getByRole('spinbutton', { name: '顶点经度（度）', exact: true }).fill(String(longitude))
     await page.getByRole('button', { name: '预览坐标', exact: true }).click()
     await page.keyboard.press('Enter')
-    await expect.poll(async () => (await snapshot(page)).project.city?.nodes).not.toEqual(before.project.city?.nodes)
+    await expect.poll(async () => (await snapshot(page)).project.content.scene?.nodes).not.toEqual(before.project.content.scene?.nodes)
     const after = await snapshot(page)
     await page.getByRole('button', { name: '撤销', exact: true }).click()
-    expect((await snapshot(page)).project.city?.nodes).toEqual(before.project.city?.nodes)
+    expect((await snapshot(page)).project.content.scene?.nodes).toEqual(before.project.content.scene?.nodes)
     await page.getByRole('button', { name: '重做', exact: true }).click()
-    expect((await snapshot(page)).project.city?.nodes).toEqual(after.project.city?.nodes)
+    expect((await snapshot(page)).project.content.scene?.nodes).toEqual(after.project.content.scene?.nodes)
     const download = page.waitForEvent('download')
     await page.getByRole('button', { name: '保存项目', exact: true }).click()
     const path = info.outputPath(`${type}.webgis.json`)
     await (await download).saveAs(path)
     const saved = JSON.parse(readFileSync(path,'utf8'))
-    expect(saved.project.city.nodes[0].geometry.type).toBe(type)
+    expect(saved.project.content.scene.nodes[0].geometry.type).toBe(type)
     await page.getByRole('button', { name: '文件', exact: true }).click()
     const chooser = page.waitForEvent('filechooser')
     await page.getByRole('menuitem', { name: /^打开/ }).click()
     await (await chooser).setFiles(path)
-    expect((await snapshot(page)).project.city?.nodes).toEqual(saved.project.city.nodes)
+    expect((await snapshot(page)).project.content.scene?.nodes).toEqual(saved.project.content.scene.nodes)
     await expect.poll(() => native(page,node.id)).toHaveProperty(type)
   })
 }

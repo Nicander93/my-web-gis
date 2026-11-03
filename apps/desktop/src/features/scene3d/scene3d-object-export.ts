@@ -1,5 +1,5 @@
-import type { ProjectSnapshot } from '@desktop-webgis/gis-core'
-import { compileProjectToScene } from '../scene/compile-project'
+import type { ProjectSnapshot } from '@desktop-webgis/project'
+import { compileProjectToScene } from '@/exchange/compile-project'
 
 /** Export selected objects as a reopenable scene, retaining referenced groups/assets. */
 export function compileSceneObjectExport(snapshot: ProjectSnapshot, ids: readonly string[]) {

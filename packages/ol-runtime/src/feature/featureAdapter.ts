@@ -1,4 +1,4 @@
-import type { GisFeature } from '@desktop-webgis/gis-core'
+import type { GisFeature } from '@desktop-webgis/project'
 import Feature from 'ol/Feature'
 import GeoJSON from 'ol/format/GeoJSON'
 import type Geometry from 'ol/geom/Geometry'
@@ -24,6 +24,17 @@ export function toOlFeature(feature: GisFeature, projection = 'EPSG:3857'): Feat
   olFeature.setId(feature.id)
   olFeature.set('domainFeatureId', feature.id)
   return olFeature
+}
+
+/** Keep the OL Feature instance for tools/selection; only replace geometry and domain properties. */
+export function applyGisFeature(olFeature: Feature<Geometry>, feature: GisFeature, projection = 'EPSG:3857'): void {
+  const next = toOlFeature(feature, projection)
+  olFeature.setGeometry(next.getGeometry() ?? undefined)
+  const properties = { ...next.getProperties() }
+  delete properties.geometry
+  olFeature.setProperties(properties)
+  olFeature.setId(feature.id)
+  olFeature.set('domainFeatureId', feature.id)
 }
 
 export function fromOlFeature(feature: Feature<Geometry>, projection = 'EPSG:3857'): GisFeature {

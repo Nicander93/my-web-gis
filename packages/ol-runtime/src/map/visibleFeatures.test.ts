@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { applyFieldFilter, type GisFeature, type Layer } from '@desktop-webgis/gis-core'
-import { createDefaultLayerStyle } from '@desktop-webgis/gis-core'
+import { applyFieldFilter, type GisFeature, type Layer } from '@desktop-webgis/project'
+import { createDefaultLayerStyle } from '@desktop-webgis/project'
 
 /**
  * Map↔table linkage contract: ol-runtime syncLayers uses the same applyFieldFilter

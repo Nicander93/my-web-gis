@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 
 test.use({ actionTimeout: 15_000, screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
 async function snapshot(page: Page) {
-  return page.evaluate(async () => (await import('/src/stores/project.store.ts')).useProjectStore.getState().getSnapshot())
+  return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() })
 }
 async function setup(page: Page) {
   await page.route('**/*tile.openstreetmap.org/**', route => route.abort())
@@ -34,18 +34,18 @@ test('real GeoLibre worker preserves typed data, creates one undoable layer and 
     if (url.hostname !== '127.0.0.1' && !url.hostname.endsWith('tile.openstreetmap.org') && url.protocol.startsWith('http')) remote.push(request.url())
   })
   const panel = await setup(page)
-  const before = await snapshot(page), source = before.project.layers[0]
+  const before = await snapshot(page), source = before.project.content.layers[0]
   const inputs = before.featuresByDataset[source.datasetId]
   await panel.getByRole('button', { name: '生成结果图层', exact: true }).click()
   await expect(page.locator('.layer-name-button').filter({ hasText: '简化道路' })).toBeVisible({ timeout: 60_000 })
   const after = await snapshot(page)
-  expect(after.project.layers).toHaveLength(2)
+  expect(after.project.content.layers).toHaveLength(2)
   expect(after.featuresByDataset[source.datasetId]).toEqual(inputs)
-  const result = after.project.layers.find(layer => layer.name === '简化道路')!
+  const result = after.project.content.layers.find(layer => layer.name === '简化道路')!
   const rows = after.featuresByDataset[result.datasetId]
   expect(rows).toHaveLength(inputs.length)
   await expect.poll(async () => page.evaluate(async id => {
-    const runtime = (await import('/src/features/map/map-runtime-host.ts')).getMapRuntime()
+    const runtime = (await import('/src/runtime/map-runtime-host.ts')).getMapRuntime()
     const layer = runtime?.registry.getVector(id)
     return { visible: layer?.getVisible(), geometries: layer?.getSource()?.getFeatures().map(feature => feature.getGeometry()?.getType()) }
   }, result.id)).toEqual({ visible: true, geometries: ['LineString', 'LineString'] })
@@ -56,7 +56,7 @@ test('real GeoLibre worker preserves typed data, creates one undoable layer and 
     expect(row.geometry.type).toBe('LineString')
     expect(row.geometry.coordinates).toEqual([inputs[index].geometry.coordinates[0], inputs[index].geometry.coordinates[2]])
   })
-  expect(after.project.datasets.find(dataset => dataset.id === result.datasetId)).toMatchObject({ processing: {
+  expect(after.project.content.datasets.find(dataset => dataset.id === result.datasetId)).toMatchObject({ processing: {
     engine: { id: 'geolibre-wasm', version: '1.7.1', tool: 'simplify_features' }, options: { tool: 'simplify', tolerance: .0001, unit: 'degrees' }
   } })
   expect(wasm.some(url => url.includes('geolibre-cli'))).toBe(true)
@@ -72,7 +72,7 @@ test('real GeoLibre worker preserves typed data, creates one undoable layer and 
   await (await downloading).saveAs(file)
   const saved = JSON.parse(readFileSync(file, 'utf8'))
   expect(saved.featuresByDataset).toEqual(after.featuresByDataset)
-  expect(saved.project.datasets).toEqual(after.project.datasets)
+  expect(saved.project.content.datasets).toEqual(after.project.content.datasets)
   await page.getByRole('button', { name: '文件', exact: true }).click()
   const choosing = page.waitForEvent('filechooser')
   await page.getByRole('menuitem', { name: /^打开/ }).click()
@@ -96,13 +96,15 @@ for (const action of ['cancel', 'replace'] as const) test(`${action} during real
     await expect.poll(() => requested, { timeout: 30_000 }).toBe(true)
     if (action === 'cancel') await panel.getByRole('button', { name: '取消处理', exact: true }).click()
     else await page.evaluate(async () => {
-      const store = (await import('/src/stores/project.store.ts')).useProjectStore.getState()
-      store.loadSnapshot(store.getSnapshot())
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+
+      const store = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+      projectSession.loadSnapshot(projectSession.getSnapshot())
     })
     release()
     if (action === 'cancel') await expect(panel.getByRole('button', { name: '生成结果图层', exact: true })).toBeEnabled()
     else await expect(panel).toBeHidden()
-    await expect.poll(async () => page.evaluate(async () => (await import('/src/stores/task-log.store.ts')).useTaskLogStore.getState().entries.some(task => task.title === '空间处理' && task.status === 'cancelled'))).toBe(true)
+    await expect.poll(async () => page.evaluate(async () => (await import('/src/view-state/task-log.store.ts')).useTaskLogStore.getState().entries.some(task => task.title === '空间处理' && task.status === 'cancelled'))).toBe(true)
     expect(await snapshot(page)).toEqual(before)
   } finally { release() }
 })

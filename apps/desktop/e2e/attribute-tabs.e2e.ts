@@ -1,14 +1,32 @@
 import { test, expect, type Page } from '@playwright/test'
 test.use({ actionTimeout: 15_000, screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
 
+test.afterEach(async ({ page }, info) => {
+  if (info.status === info.expectedStatus) return
+  const tasks = await page.evaluate(async () => {
+    const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
+      .filter(name => new URL(name).pathname === path).at(-1) ?? path
+    const { useTaskLogStore } = await import(active('/src/view-state/task-log.store.ts'))
+    const { useProjectStore } = await import(active('/src/session/project.store.ts'))
+    return { epoch: useProjectStore.getState().projectEpoch, entries: useTaskLogStore.getState().entries }
+  })
+  await info.attach('import-task-state', { contentType: 'application/json', body: JSON.stringify({ ...tasks, workers: page.workers().map(worker => worker.url()) }) })
+})
+
 async function editingState(page: Page) {
   return page.evaluate(async () => {
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+
+    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-edits.ts').at(-1) ?? '/src/session/project-edits.ts')
+
+    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/view-state/layer-view.store.ts').at(-1) ?? '/src/view-state/layer-view.store.ts')).useLayerViewStore.getState()
+
     const currentModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .findLast(url => new URL(url).pathname === path) ?? path
-    const project = (await import(currentModule('/src/stores/project.store.ts'))).useProjectStore.getState()
-    const workbench = (await import(currentModule('/src/stores/workbench.store.ts'))).useWorkbenchStore.getState()
-    return { snapshot: project.getSnapshot(), dirty: project.dirty, undo: project.canUndoEdit(), redo: project.canRedoEdit(),
-      selectedLayerId: project.selectedLayerId, selection: project.selection, editLayerId: workbench.editLayerId, tableLayerId: workbench.tableLayerId }
+    const project = (await import(currentModule('/src/session/project.store.ts'))).useProjectStore.getState()
+    const workbench = (await import(currentModule('/src/view-state/workbench.store.ts'))).useWorkbenchStore.getState()
+    return { snapshot: projectSession.getSnapshot(), dirty: project.dirty, undo: projectEdits.canUndo(), redo: projectEdits.canRedo(),
+      selectedLayerId: selectionSession.selectedLayerId, selection: selectionSession.selection, editLayerId: workbench.editLayerId, tableLayerId: workbench.tableLayerId }
   })
 }
 
@@ -184,23 +202,27 @@ test('table editing respects another tab, parent locks and remote read-only snap
   await page.getByRole('tab', { name: 'editable-second', exact: true }).click()
   const secondId = (await editingState(page)).tableLayerId
   await page.evaluate(async id => {
+    const { layerConfigurationCommands } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/commands/layer-configuration.commands.ts').at(-1) ?? '/src/commands/layer-configuration.commands.ts')
+
     const moduleUrl = performance.getEntriesByType('resource').map(entry => entry.name)
-      .findLast(url => new URL(url).pathname === '/src/stores/project.store.ts') ?? '/src/stores/project.store.ts'
+      .findLast(url => new URL(url).pathname === '/src/session/project.store.ts') ?? '/src/session/project.store.ts'
     const state = (await import(moduleUrl)).useProjectStore.getState()
-    const group = state.createGroup('locked group', [id])
-    state.setGroupLocked(group, true)
+    const group = layerConfigurationCommands.createGroup('locked group', [id])
+    layerConfigurationCommands.setGroupLocked(group, true)
   }, secondId)
   await expect(panel().getByRole('button', { name: '开始属性编辑', exact: true })).toBeDisabled()
   await panel().locator('.attr-edit-toggle').hover()
   await expect(page.getByRole('tooltip')).toContainText('图层或父文件夹已锁定')
   expect((await editingState(page)).editLayerId).toBeNull()
   await page.evaluate(async () => {
+    const { layerContentCommands } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/commands/layer-content.commands.ts').at(-1) ?? '/src/commands/layer-content.commands.ts')
+
     const currentModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .findLast(url => new URL(url).pathname === path) ?? path
-    const state = (await import(currentModule('/src/stores/project.store.ts'))).useProjectStore.getState()
-    const service = state.addServiceLayer({ name: '只读 WFS', kind: 'wfs', source: { type: 'wfs',
+    const state = (await import(currentModule('/src/session/project.store.ts'))).useProjectStore.getState()
+    const service = layerContentCommands.addServiceLayer({ name: '只读 WFS', kind: 'wfs', source: { type: 'wfs',
       url: 'https://example.invalid/wfs', version: '2.0.0', typeName: 'stations', outputFormat: 'application/json', authMode: 'none' } })
-    const { layerCommands } = await import(currentModule('/src/app/commands/layer.commands.ts'))
+    const { layerCommands } = await import(currentModule('/src/commands/layer.commands.ts'))
     layerCommands.openAttributeTable(service.layerId)
   })
   await expect(panel().getByRole('button', { name: '开始属性编辑', exact: true })).toBeDisabled()

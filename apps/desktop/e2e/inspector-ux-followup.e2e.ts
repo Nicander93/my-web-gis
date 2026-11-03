@@ -11,11 +11,13 @@ test.beforeEach(async ({ page }) => {
 
 async function seedLocalLayer(page: Page) {
   return page.evaluate(async () => {
+    const { layerContentCommands } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/commands/layer-content.commands.ts').at(-1) ?? '/src/commands/layer-content.commands.ts')
+
     const moduleUrl = performance.getEntriesByType('resource').map(entry => entry.name)
-      .findLast(url => new URL(url).pathname === '/src/stores/project.store.ts') ?? '/src/stores/project.store.ts'
+      .findLast(url => new URL(url).pathname === '/src/session/project.store.ts') ?? '/src/session/project.store.ts'
     const { useProjectStore } = await import(moduleUrl)
     const store = useProjectStore.getState()
-    store.addLayer('stations-source.geojson', '站点结果', [
+    layerContentCommands.addLayer('stations-source.geojson', '站点结果', [
       { id: 'station-a', type: 'Feature', geometry: { type: 'Point', coordinates: [116, 39] }, properties: { name: '甲站' } },
       { id: 'station-b', type: 'Feature', geometry: { type: 'Point', coordinates: [116.01, 39] }, properties: { name: '乙站' } }
     ], 'point', {
@@ -25,17 +27,23 @@ async function seedLocalLayer(page: Page) {
       engine: { id: 'test-processing', version: '1.0', tool: 'buffer' },
       completedAt: '2026-10-23T00:00:00.000Z'
     })
-    return useProjectStore.getState().project.layers.at(-1)!.id
+    return useProjectStore.getState().project.content.layers.at(-1)!.id
   })
 }
 
 async function seedWfsLayer(page: Page) {
   return page.evaluate(async () => {
+    const { datasetConfigurationCommands } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/commands/dataset-configuration.commands.ts').at(-1) ?? '/src/commands/dataset-configuration.commands.ts')
+
+    const { layerContentCommands } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/commands/layer-content.commands.ts').at(-1) ?? '/src/commands/layer-content.commands.ts')
+
+    const { featureCommands } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/commands/feature.commands.ts').at(-1) ?? '/src/commands/feature.commands.ts')
+
     const moduleUrl = performance.getEntriesByType('resource').map(entry => entry.name)
-      .findLast(url => new URL(url).pathname === '/src/stores/project.store.ts') ?? '/src/stores/project.store.ts'
+      .findLast(url => new URL(url).pathname === '/src/session/project.store.ts') ?? '/src/session/project.store.ts'
     const { useProjectStore } = await import(moduleUrl)
     const store = useProjectStore.getState()
-    const layer = store.addServiceLayer({
+    const layer = layerContentCommands.addServiceLayer({
       name: 'WFS 站点快照', kind: 'wfs', source: {
         type: 'wfs', url: 'https://gis.example.test/geoserver/wfs', version: '2.0.0',
         typeName: 'demo:stations', outputFormat: 'application/json', srsName: 'EPSG:4326',
@@ -44,10 +52,10 @@ async function seedWfsLayer(page: Page) {
       }
     })
     if (!layer) throw new Error('WFS fixture could not be added')
-    store.setDatasetFeatures(layer.datasetId, [
+    featureCommands.replaceDatasetFeatures(layer.datasetId, [
       { id: 'wfs-station-1', type: 'Feature', geometry: { type: 'Point', coordinates: [116, 39] }, properties: { name: 'WFS 甲站' } }
     ])
-    store.patchWfsServiceSource(layer.datasetId, { loadedCount: 1 })
+    datasetConfigurationCommands.patchWfsServiceSource(layer.datasetId, { loadedCount: 1 })
     return layer.layerId
   })
 }
@@ -60,12 +68,16 @@ async function openInspector(page: Page) {
 
 async function projectState(page: Page) {
   return page.evaluate(async () => {
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+
+    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-edits.ts').at(-1) ?? '/src/session/project-edits.ts')
+
     const moduleUrl = performance.getEntriesByType('resource').map(entry => entry.name)
-      .findLast(url => new URL(url).pathname === '/src/stores/project.store.ts') ?? '/src/stores/project.store.ts'
+      .findLast(url => new URL(url).pathname === '/src/session/project.store.ts') ?? '/src/session/project.store.ts'
     const store = (await import(moduleUrl)).useProjectStore.getState()
     return {
-      snapshot: store.getSnapshot(), dirty: store.dirty,
-      undo: store.canUndoEdit(), redo: store.canRedoEdit()
+      snapshot: projectSession.getSnapshot(), dirty: store.dirty,
+      undo: projectEdits.canUndo(), redo: projectEdits.canRedo()
     }
   })
 }

@@ -26,7 +26,7 @@ test('generated Cesium module mounts independently with native resources and cle
   }
   const generatedModule = generateCesiumModule(document)
   await writeFile(outputPath, generatedModule, 'utf8')
-  const projectName = testInfo.project.name.replace(/[^a-z\d-]/gi, '-')
+  const projectName = testInfo.project.metadata.name.replace(/[^a-z\d-]/gi, '-')
   const servedModulePath = resolve('apps/desktop/.artifacts/cesium-native-export', `${projectName}-${process.pid}`, 'native-scene.mjs')
   await mkdir(dirname(servedModulePath), { recursive: true })
   await writeFile(servedModulePath, generatedModule, 'utf8')

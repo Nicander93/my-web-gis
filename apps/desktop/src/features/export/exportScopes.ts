@@ -1,10 +1,11 @@
+import { requireMapContent } from '@desktop-webgis/project'
 import {
   applyFieldFilter,
   cloneValue,
   sortFeatures,
   type GisFeature
-} from '@desktop-webgis/gis-core'
-import type { Layer, Project, SelectionState } from '@desktop-webgis/gis-core'
+} from '@desktop-webgis/project'
+import type { Layer, Project, SelectionState } from '@desktop-webgis/project'
 
 /** Four export scopes per plan §4.2. */
 export type ExportScope = 'all' | 'layer-filter' | 'selection' | 'table-result'
@@ -114,5 +115,5 @@ export function defaultTableView(): TableViewState {
 
 export function findLayer(project: Project, layerId: string | null): Layer | null {
   if (!layerId) return null
-  return project.layers.find((l) => l.id === layerId) ?? null
+  return requireMapContent(project).layers.find((l) => l.id === layerId) ?? null
 }

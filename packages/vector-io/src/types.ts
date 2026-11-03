@@ -1,4 +1,24 @@
-import type { GeoJsonFeatureCollection, JsonValue } from '@desktop-webgis/scene-schema'
+export type JsonPrimitive = string | number | boolean | null
+export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue }
+export type GeoJsonPosition = number[]
+export type GeoJsonGeometry =
+  | { type: 'Point'; coordinates: GeoJsonPosition }
+  | { type: 'MultiPoint'; coordinates: GeoJsonPosition[] }
+  | { type: 'LineString'; coordinates: GeoJsonPosition[] }
+  | { type: 'MultiLineString'; coordinates: GeoJsonPosition[][] }
+  | { type: 'Polygon'; coordinates: GeoJsonPosition[][] }
+  | { type: 'MultiPolygon'; coordinates: GeoJsonPosition[][][] }
+  | { type: 'GeometryCollection'; geometries: GeoJsonGeometry[] }
+export interface GeoJsonFeature {
+  type: 'Feature'
+  id?: string | number
+  geometry: GeoJsonGeometry | null
+  properties: Record<string, JsonValue> | null
+}
+export interface GeoJsonFeatureCollection {
+  type: 'FeatureCollection'
+  features: GeoJsonFeature[]
+}
 
 export interface VectorImportWarning {
   code: string

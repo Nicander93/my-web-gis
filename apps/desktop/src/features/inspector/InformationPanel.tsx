@@ -1,18 +1,20 @@
+import { useFeaturesByDataset } from '@/data/feature-data'
+import { requireMapContent } from '@desktop-webgis/project'
 import { Select } from 'antd'
 import { useState } from 'react'
-import { useProjectStore } from '@/stores/project.store'
-import { Button } from '@/components/ui/Button'
-import { layerCommands } from '@/app/commands/layer.commands'
-import { useInformationStore } from '@/stores/information.store'
+import { useProjectStore } from '@/session/project.store'
+import { Button } from '@/ui/Button'
+import { layerCommands } from '@/commands/layer.commands'
+import { useInformationStore } from '@/view-state/information.store'
 
 export function InformationPanel() {
   const epoch = useProjectStore(state => state.projectEpoch)
   const project = useProjectStore(state => state.project)
-  const features = useProjectStore(state => state.featuresByDataset)
+  const features = useFeaturesByDataset()
   const information = useInformationStore()
   const [selected, setSelected] = useState('')
   const results = information.epoch === epoch ? information.results.flatMap(result => {
-    const layer = project.layers.find(item => item.id === result.layerId)
+    const layer = requireMapContent(project).layers.find(item => item.id === result.layerId)
     const feature = layer && features[layer.datasetId]?.find(item => item.id === result.featureId)
     return layer && feature ? [{ layer, feature, key: `${layer.id}:${feature.id}` }] : []
   }) : []

@@ -64,8 +64,8 @@ test('draws and manages persistent native clipping ranges without reloading the 
   expect(tilesetRequests).toBe(1)
 
   const stored = await page.evaluate(async () => {
-    const { useProjectStore } = await import('/src/stores/project.store.ts')
-    const node = useProjectStore.getState().project.city?.nodes.find(item => item.type === '3dtiles')
+    const { useProjectStore } = await import('/src/session/project.store.ts')
+    const node = useProjectStore.getState().project.content.scene?.nodes.find(item => item.type === '3dtiles')
     return node?.type === '3dtiles' ? node.effects : undefined
   })
   expect(stored).toEqual([expect.objectContaining({ kind: 'clip-polygon', enabled: true, mode: 'keep-inside' })])
@@ -94,8 +94,8 @@ test('flattens real tileset geometry at a configurable ellipsoid height and rest
   const restored = await canvasPixels(page)
   expect(await changedPixels(page, before, restored)).toBeLessThan(await changedPixels(page, before, flattened))
   const stored = await page.evaluate(async () => {
-    const { useProjectStore } = await import('/src/stores/project.store.ts')
-    const node = useProjectStore.getState().project.city?.nodes.find(item => item.type === '3dtiles')
+    const { useProjectStore } = await import('/src/session/project.store.ts')
+    const node = useProjectStore.getState().project.content.scene?.nodes.find(item => item.type === '3dtiles')
     return node?.type === '3dtiles' ? node.effects : undefined
   })
   expect(stored).toEqual([expect.objectContaining({ kind: 'flatten-polygon', enabled: false, height: 0 })])
@@ -107,7 +107,7 @@ test('flattens real tileset geometry at a configurable ellipsoid height and rest
   const projectPath = testInfo.outputPath('tileset-flatten.webgis.json')
   await (await download).saveAs(projectPath)
   const saved = JSON.parse(readFileSync(projectPath, 'utf8'))
-  expect(saved.project.city.nodes.find((node: { type: string }) => node.type === '3dtiles').effects)
+  expect(saved.project.content.scene.nodes.find((node: { type: string }) => node.type === '3dtiles').effects)
     .toEqual([expect.objectContaining({ kind: 'flatten-polygon', enabled: true, height: 0 })])
 
   await page.getByRole('button', { name: '文件', exact: true }).click()
@@ -183,7 +183,7 @@ test('keeps flatten shaders isolated across differently transformed tilesets', a
   await west.locator('.scene3d-layer-row__select').click()
   await page.getByRole('switch', { name: '启用压平范围 1' }).click()
   const state = await page.evaluate(async () => {
-    const nodes = (await import('/src/stores/project.store.ts')).useProjectStore.getState().project.city?.nodes ?? []
+    const nodes = (await import('/src/session/project.store.ts')).useProjectStore.getState().project.content.scene?.nodes ?? []
     return nodes.filter(node => node.type === '3dtiles').map(node => ({ id: node.id, transform: node.transform, effects: node.effects }))
   })
   expect(state).toEqual([

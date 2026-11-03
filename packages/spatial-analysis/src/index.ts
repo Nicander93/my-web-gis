@@ -14,6 +14,8 @@ export type { MeasurementOptions, MeasurementFieldOptions } from './measurements
 export { compileFieldExpression, calculateField } from './field-calculation.js'
 export type { FieldValue, FieldCalculationOptions, CompiledFieldExpression } from './field-calculation.js'
 export { mergePolygonGeometries, splitPolygonGeometry } from './topology-edits.js'
+export { processFeatures, requiresOverlay, requiresPolygon } from './processing.js'
+export type { OverlayTool, ProcessingTool, GeometryProcessingOptions, ProcessingOptions, ProcessingResult } from './processing.js'
 
 export type AnalysisGeometry = Point | MultiPoint | LineString | MultiLineString | Polygon | MultiPolygon
 

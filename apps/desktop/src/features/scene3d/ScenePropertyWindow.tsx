@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Alert, Button, Input, InputNumber, Select, Switch } from 'antd'
-import { PropertyWindow } from '@/components/ui/PropertyWindow'
-import { PropertyField, PropertyGroup, PropertyVector3 } from '@/components/ui/PropertyFields'
+import { PropertyWindow } from '@/ui/PropertyWindow'
+import { PropertyField, PropertyGroup, PropertyVector3 } from '@/ui/PropertyFields'
 import { attributeRows, parseAttributeRows } from './graphic-attributes'
 import type { AttributeRow, AttributeType } from './graphic-attributes'
 import { TilesetEffectsDraft } from './TilesetEffectsDraft'
@@ -11,7 +11,7 @@ import { TilesetStyleDraft } from './TilesetStyleDraft'
 import { TilesetParameterFields } from './TilesetParameterFields'
 import { getCesiumSceneNodeState, TILESET_PARAMETER_DESCRIPTORS } from '@desktop-webgis/cesium-scene-schema'
 import type { CesiumScene, CesiumSceneNode, GeoPosition } from '@desktop-webgis/cesium-scene-schema'
-import '@/components/ui/property-window.css'
+import '@/ui/property-window.css'
 
 interface Props {
   initial: CesiumSceneNode

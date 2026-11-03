@@ -1,3 +1,7 @@
+import { layerContentCommands } from '@/commands/layer-content.commands'
+import { projectEdits } from '@/session/project-edits'
+import { featureData } from '@/data/feature-data'
+import { requireMapContent } from '@desktop-webgis/project'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createProject,
@@ -5,17 +9,17 @@ import {
   serializeProjectSnapshot,
   capabilitiesForDataset,
   type GisFeature
-} from '@desktop-webgis/gis-core'
-import { useProjectStore } from '@/stores/project.store'
-import { useSessionStore } from '@/stores/session.store'
-import { getLayerCapabilities, layerCommands } from '@/app/commands/layer.commands'
+} from '@desktop-webgis/project'
+import { useProjectStore } from '@/session/project.store'
+import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { getLayerCapabilities, layerCommands } from '@/commands/layer.commands'
 import {
   _resetCredentialsForTests,
   _setSecureCredentialBackendForTests,
   getSessionCredential,
   putSessionCredential
-} from '@/services/credentials'
-import { connectService } from '@/services/service-connect'
+} from '@/platform/credentials'
+import { connectService } from '@/exchange/service-connect'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -34,18 +38,11 @@ function feat(id: string): GisFeature {
 }
 
 function resetStores(): void {
-  useProjectStore.getState()._resetAttributeHistoryForTests()
+  projectEdits.clear()
   layerCommands._resetStyleHistoryForTests()
-  useSessionStore.setState({ sessions: {} })
+  useLayerViewStore.setState({ sessions: {} })
   _resetCredentialsForTests()
-  useProjectStore.setState({
-    project: createProject('P15 test'),
-    featuresByDataset: {},
-    dirty: false,
-    selectedLayerId: null,
-    selection: { layerId: null, featureIds: [] },
-    lastSelectionCountAfterFilter: null
-  })
+  useProjectStore.setState({ project: createProject('P15 test'), dirty: false }); featureData.replaceAll({}); useLayerViewStore.setState({ selectedLayerId: null, selection: { layerId: null, featureIds: [] }, lastSelectionCountAfterFilter: null })
 }
 
 describe('P15 service description / capabilities / connect', () => {
@@ -55,19 +52,19 @@ describe('P15 service description / capabilities / connect', () => {
 
   it('old vector projects still open after P15 types', () => {
     const store = useProjectStore.getState()
-    store.addLayer('ds-a', 'A', [feat('a1')], 'point')
+    layerContentCommands.addLayer('ds-a', 'A', [feat('a1')], 'point')
     const snap = {
       project: useProjectStore.getState().project,
-      featuresByDataset: useProjectStore.getState().featuresByDataset
+      featuresByDataset: featureData.readSnapshot()
     }
     const restored = parseProjectSnapshot(serializeProjectSnapshot(snap))
-    expect(restored.project.datasets[0]?.kind).toBe('vector')
-    expect(restored.project.layers).toHaveLength(1)
+    expect(requireMapContent(restored.project).datasets[0]?.kind).toBe('vector')
+    expect(requireMapContent(restored.project).layers).toHaveLength(1)
   })
 
   it('service layer round-trip persists credentialRef only (no token value)', () => {
     const key = putSessionCredential({ kind: 'bearer', value: 'SUPER-SECRET' })
-    const result = useProjectStore.getState().addServiceLayer({
+    const result = layerContentCommands.addServiceLayer({
       name: 'Cities WMS',
       kind: 'wms',
       source: {
@@ -83,14 +80,14 @@ describe('P15 service description / capabilities / connect', () => {
 
     const snap = {
       project: useProjectStore.getState().project,
-      featuresByDataset: useProjectStore.getState().featuresByDataset
+      featuresByDataset: featureData.readSnapshot()
     }
     const json = serializeProjectSnapshot(snap)
     expect(json).not.toContain('SUPER-SECRET')
     expect(json).toContain(key)
 
     const restored = parseProjectSnapshot(json)
-    const ds = restored.project.datasets.find((d) => d.kind === 'wms')
+    const ds = requireMapContent(restored.project).datasets.find((d) => d.kind === 'wms')
     expect(ds?.kind).toBe('wms')
     if (ds?.kind === 'wms') {
       expect(ds.source.credentialRef?.key).toBe(key)
@@ -100,7 +97,7 @@ describe('P15 service description / capabilities / connect', () => {
   })
 
   it('WMS/WMTS layers cannot export or edit geometry via capabilities', () => {
-    const added = useProjectStore.getState().addServiceLayer({
+    const added = layerContentCommands.addServiceLayer({
       name: 'Ortho',
       kind: 'wmts',
       source: {
@@ -129,14 +126,14 @@ describe('P15 service description / capabilities / connect', () => {
     expect(caps.canEditGeometry).toBe(false)
     expect(caps.canAttributeTable).toBe(false)
 
-    const layer = useProjectStore.getState().project.layers.find((l) => l.id === added.layerId)!
+    const layer = requireMapContent(useProjectStore.getState().project).layers.find((l) => l.id === added.layerId)!
     expect(layer.editable).toBe(false)
-    const dataset = useProjectStore.getState().project.datasets.find((d) => d.id === layer.datasetId)
+    const dataset = requireMapContent(useProjectStore.getState().project).datasets.find((d) => d.id === layer.datasetId)
     expect(capabilitiesForDataset(dataset).editGeometry).toBe(false)
   })
 
   it('failed connect creates no empty layer', async () => {
-    const before = useProjectStore.getState().project.layers.length
+    const before = requireMapContent(useProjectStore.getState().project).layers.length
     const fetchImpl = vi.fn(async () => new Response('nope', { status: 500 })) as unknown as typeof fetch
     // Bypass connectService's native bridge by calling with a bad URL through mocked global fetch
     // connectService uses fetchTextPreferNative — stub fetch to fail.
@@ -153,7 +150,7 @@ describe('P15 service description / capabilities / connect', () => {
     } finally {
       globalThis.fetch = originalFetch
     }
-    expect(useProjectStore.getState().project.layers.length).toBe(before)
+    expect(requireMapContent(useProjectStore.getState().project).layers.length).toBe(before)
   })
 
   it('persists credentials only after a successful connect', async () => {
@@ -210,12 +207,12 @@ describe('P15 service description / capabilities / connect', () => {
       if (result.ok) {
         expect(result.selectable.length).toBeGreaterThan(0)
       }
-      expect(useProjectStore.getState().project.layers).toHaveLength(0)
+      expect(requireMapContent(useProjectStore.getState().project).layers).toHaveLength(0)
 
       // User selects one layer only
       if (result.ok) {
         const layer = result.selectable[0]!
-        useProjectStore.getState().addServiceLayer({
+        layerContentCommands.addServiceLayer({
           name: layer.title || layer.name,
           kind: 'wms',
           source: {
@@ -227,8 +224,8 @@ describe('P15 service description / capabilities / connect', () => {
           }
         })
       }
-      expect(useProjectStore.getState().project.layers).toHaveLength(1)
-      expect(useProjectStore.getState().project.datasets[0]?.kind).toBe('wms')
+      expect(requireMapContent(useProjectStore.getState().project).layers).toHaveLength(1)
+      expect(requireMapContent(useProjectStore.getState().project).datasets[0]?.kind).toBe('wms')
     } finally {
       globalThis.fetch = originalFetch
     }

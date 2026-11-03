@@ -1,5 +1,5 @@
 import type { PopupDefinition } from '@desktop-webgis/scene-schema'
-import { layerCommands } from '@/app/commands/layer.commands'
+import { layerCommands } from '@/commands/layer.commands'
 
 /** Field choices are applied as one scene command; clearing all fields removes the popup. */
 export function PopupFields({ layerId, fields, popup }: { layerId: string; fields: string[]; popup?: PopupDefinition }) {

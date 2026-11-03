@@ -403,5 +403,3 @@ export function parseCesiumScene(input: unknown): CesiumScene {
 }
 
 export { getCesiumSceneNodeState, getCesiumSceneGroupState, getCesiumSceneDescendantIds, moveCesiumSceneNodes, moveCesiumSceneGroup, removeCesiumSceneGroup } from './groups.js'
-
-export * from './compat-city.js'

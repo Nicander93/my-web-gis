@@ -30,7 +30,7 @@ import {
   getSessionCredential,
   hydrateCredentialsFromRefs,
   type SecureCredentialBackend
-} from '@/services/credentials'
+} from '@/platform/credentials'
 
 const LIVE = process.env.DESKTOP_WEBGIS_LIVE_KEYCHAIN === '1'
 const PROBE = process.env.DESKTOP_WEBGIS_KEYCHAIN_PROBE?.trim() || ''

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import type {} from '../src/cartography-webgl/main'
+import type {} from '@/cartography-webgl/main'
 
 test('Viewer opts into GPU and retains Canvas for interactive nodes without modifying the scene', async ({ page }) => {
   let interactive = false
@@ -30,7 +30,7 @@ test('WebGL draws real features, preserves source counts, falls back and dispose
   await page.goto('/cartography-webgl.html')
   await page.waitForFunction(() => !!window.cartographyWebGL)
   const results = []
-  const directory = resolve('../../docs/design/2d-cartography-p6')
+  const directory = resolve('../test-results/cartography-p6')
   await mkdir(directory, { recursive: true })
   for (const mode of ['circle', 'line', 'fill', 'road'] as const) {
     for (const renderer of ['canvas', 'webgl'] as const) {

@@ -9,7 +9,11 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./coordinate-transform": { "types": "./dist/coordinate-transform.d.ts", "import": "./dist/coordinate-transform.js" },
+    "./csv": { "types": "./dist/csv.d.ts", "import": "./dist/csv.js" },
+    "./dxf": { "types": "./dist/dxf.d.ts", "import": "./dist/dxf.js" },
+    "./shapefile": { "types": "./dist/shapefile.d.ts", "import": "./dist/shapefile.js" }
   },
   "files": [
     "dist",
@@ -22,7 +26,6 @@
     "test:consumer": "node examples/consumer.mjs && tsc --noEmit --strict --skipLibCheck --target es2022 --module nodenext --moduleResolution nodenext examples/consumer.ts"
   },
   "dependencies": {
-    "@desktop-webgis/scene-schema": "workspace:*",
     "@mapbox/shp-write": "0.4.3",
     "dxf-parser": "1.1.2",
     "fflate": "^0.8.3",

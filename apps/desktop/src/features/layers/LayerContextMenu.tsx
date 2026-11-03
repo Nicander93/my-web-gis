@@ -12,16 +12,23 @@ import {
   RefreshCw,
   ArrowUp,
   ArrowDown,
-  Upload
+  Upload,
+  LockKeyhole,
+  LockKeyholeOpen,
+  Save,
+  RotateCcw
 } from 'lucide-react'
+import { findGroupForLayer, getLayerGroupState } from '@desktop-webgis/project'
+import { useProjectStore } from '@/session/project.store'
 import { LayerPopupMenu } from './LayerPopupMenu'
-import { MenuItem } from '@/app/header/menus/MenuItem'
-import { MenuSeparator } from '@/app/header/menus/MenuSeparator'
-import { openPropertyWindow } from '@/features/inspector/property-window-request'
+import { MenuItem } from '@/ui/MenuItem'
+import { MenuSeparator } from '@/ui/MenuSeparator'
+import { openPropertyWindow } from '@/view-state/property-window-request'
 import {
   getLayerCapabilities,
   layerCommands
-} from '@/app/commands/layer.commands'
+} from '@/commands/layer.commands'
+import { useFeatureEditState } from '@/data/feature-data'
 
 export interface LayerContextMenuProps {
   layerId: string
@@ -40,6 +47,11 @@ export function LayerContextMenu({
   onRequestRename
 }: LayerContextMenuProps) {
   const caps = getLayerCapabilities(layerId)
+  const project = useProjectStore(state => state.project)
+  const layer = project.content.kind === 'map2d' ? project.content.layers.find(layer => layer.id === layerId) : undefined
+  const parentLocked = project.content.kind === 'map2d' && getLayerGroupState(project, findGroupForLayer(project, layerId)?.id).locked
+  const editState = useFeatureEditState()
+  const pending = layer ? editState.datasets.find(dataset => dataset.datasetId === layer.datasetId)?.pendingCount ?? 0 : 0
 
   function run(action: () => void): void {
     action()
@@ -93,6 +105,18 @@ export function LayerContextMenu({
       />
       <MenuSeparator />
       <MenuItem
+        icon={Save}
+        label="保存数据"
+        disabled={!pending}
+        onClick={() => run(() => { void layerCommands.saveData(layerId) })}
+      />
+      <MenuItem
+        icon={RotateCcw}
+        label="放弃数据编辑"
+        disabled={!pending}
+        onClick={() => run(() => layerCommands.discardData(layerId))}
+      />
+      <MenuItem
         icon={Download}
         label="导出"
         disabled={!caps.canExport}
@@ -115,15 +139,23 @@ export function LayerContextMenu({
       <MenuSeparator />
       <MenuItem
         icon={ArrowUp}
+        disabled={!caps.canRename}
         label="上移图层"
         onClick={() => run(() => layerCommands.moveUp(layerId))}
       />
       <MenuItem
         icon={ArrowDown}
+        disabled={!caps.canRename}
         label="下移图层"
         onClick={() => run(() => layerCommands.moveDown(layerId))}
       />
       <MenuSeparator />
+      <MenuItem
+        icon={layer?.locked ? LockKeyholeOpen : LockKeyhole}
+        label={layer?.locked ? '解锁图层' : '锁定图层'}
+        disabled={!layer || parentLocked}
+        onClick={() => run(() => layerCommands.setLocked(layerId, !layer?.locked))}
+      />
       <MenuItem
         icon={Trash2}
         label="移除"

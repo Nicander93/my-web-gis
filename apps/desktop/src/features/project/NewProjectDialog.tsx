@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { Box, Map } from 'lucide-react'
-import { EditorDialog } from '@/components/ui/EditorDialog'
-import { Button } from '@/components/ui/Button'
-import { projectCommands } from '@/app/commands/project.commands'
-import { useProjectStore } from '@/stores/project.store'
-import type { ProjectType } from '@/services/project-type'
-import { resolveSceneDrafts } from '@/features/inspector/scene-draft-guard'
-import { discardRecoveryOnReplacement } from '@/services/recovery-tracking'
+import { EditorDialog } from '@/ui/EditorDialog'
+import { Button } from '@/ui/Button'
+import { projectCommands } from '@/commands/project.commands'
+import { useProjectStore } from '@/session/project.store'
+import type { ProjectType } from '@/session/project-type'
+import { resolveSceneDrafts } from '@/session/scene-draft-guard'
+import { discardRecoveryOnReplacement } from '@/session/recovery-tracking'
 
 interface NewProjectDialogProps { onClose(): void }
 

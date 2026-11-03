@@ -99,5 +99,3 @@ export class SceneEffects {
     this.viewer.scene.postProcessStages.bloom.enabled = this.original.bloom
   }
 }
-
-export * from './compat-city.js'

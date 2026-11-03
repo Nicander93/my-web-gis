@@ -1,5 +1,5 @@
 import { zip } from '@mapbox/shp-write'
-import type { GeoJsonFeatureCollection } from '@desktop-webgis/scene-schema'
+import type { GeoJsonFeatureCollection } from './types.js'
 import shp from 'shpjs'
 import { unzipSync } from 'fflate'
 import { createCoordinateTransform } from './coordinate-transform.js'

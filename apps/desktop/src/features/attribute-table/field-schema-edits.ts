@@ -1,4 +1,5 @@
-import { cloneValue, getEffectiveLocked, type DatasetContent, type DatasetField, type GisFeature, type Layer, type Project } from '@desktop-webgis/gis-core'
+import { remapLayerFieldReferences, requireMapContent } from '@desktop-webgis/project'
+import { cloneValue, getEffectiveLocked, type DatasetContent, type DatasetField, type GisFeature, type Layer, type Project } from '@desktop-webgis/project'
 import { resolveDatasetFields, validateFieldName, validateFieldValue } from './field-edits'
 
 export type FieldSchemaEdit =
@@ -24,10 +25,10 @@ function expressionReferencesField(value: unknown, name: string): boolean {
 
 function cartographyReferencesField(project: Project, layers: readonly Layer[], name: string): boolean {
   const layerIds = new Set(layers.map((layer) => layer.id))
-  const styleIds = new Set(project.cartography?.bindings
+  const styleIds = new Set(requireMapContent(project).cartography?.bindings
     .filter((binding) => layerIds.has(binding.gisLayerId))
     .flatMap((binding) => binding.styleLayerIds) ?? [])
-  for (const style of project.cartography?.styleLayers ?? []) {
+  for (const style of requireMapContent(project).cartography?.styleLayers ?? []) {
     if (!styleIds.has(style.id)) continue
     const candidate = style as unknown as Record<string, unknown>
     const metadata = candidate.metadata
@@ -58,37 +59,16 @@ export function getFieldReferences(project: Project, layers: readonly Layer[], n
 }
 
 function remapConfig(layer: Layer, from: string, to?: string): NonNullable<DatasetContent['layers']>[number] {
-  let style = cloneValue(layer.style)
-  if ('mode' in style) {
-    if (style.label?.field === from) {
-      if (to) style.label.field = to
-      else delete style.label
-    }
-    if (style.mode !== 'single' && style.field === from) {
-      if (to) style.field = to
-      else style = { mode: 'single', symbol: style.fallback, ...(style.label ? { label: style.label } : {}) }
-    }
-  }
-  const interaction = cloneValue(layer.interaction)
-  if (interaction?.popup) {
-    if (interaction.popup.titleField === from) {
-      if (to) interaction.popup.titleField = to
-      else delete interaction.popup.titleField
-    }
-    interaction.popup.fields = interaction.popup.fields.flatMap((field) => field.field === from
-      ? to ? [{ ...field, field: to }] : [] : [field])
-  }
-  return { id: layer.id, style, interaction, filter: layer.filter?.flatMap((condition) => condition.field === from
-    ? to ? [{ ...condition, field: to }] : [] : [cloneValue(condition)]) }
+  return remapLayerFieldReferences({ id: layer.id, style: layer.style, interaction: layer.interaction, filter: layer.filter }, new Map([[from, to]]))
 }
 
 /** Builds data and all shared-layer reference changes before touching history. */
 export function prepareFieldSchemaEdit(project: Project, datasetId: string, features: readonly GisFeature[], edit: FieldSchemaEdit): {
   before: DatasetContent; after: DatasetContent; change: { before?: string; after?: string }
 } {
-  const dataset = project.datasets.find((item) => item.id === datasetId)
+  const dataset = requireMapContent(project).datasets.find((item) => item.id === datasetId)
   if (!dataset || dataset.kind !== 'vector') throw new Error('只允许修改本地矢量数据集字段')
-  const layers = project.layers.filter((layer) => layer.datasetId === datasetId)
+  const layers = requireMapContent(project).layers.filter((layer) => layer.datasetId === datasetId)
   const locked = layers.find((layer) => getEffectiveLocked(project, layer.id))
   if (locked) throw new Error(`共享数据集的图层 ${locked.name} 已锁定，请先解除锁定`)
   const fields = resolveDatasetFields(features, dataset.fields)

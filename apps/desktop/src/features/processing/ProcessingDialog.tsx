@@ -1,3 +1,6 @@
+import { useFeaturesByDataset } from '@/data/feature-data'
+import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { requireMapContent } from '@desktop-webgis/project'
 import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { InputNumber } from 'antd'
@@ -6,20 +9,20 @@ import {
   requiresOverlay,
   requiresPolygon,
   type ProcessingOptions
-} from '@desktop-webgis/gis-core'
-import { useProjectStore } from '@/stores/project.store'
+} from '@desktop-webgis/project'
+import { useProjectStore } from '@/session/project.store'
 import {
   resolveProcessingInput,
   type ProcessingScope
-} from '@/services/processing'
-import { processingCommands } from '@/app/commands/processing.commands'
-import { emitCommandStatus } from '@/app/commands/status'
-import { layerCommands } from '@/app/commands/layer.commands'
+} from '@/commands/processing-run'
+import { processingCommands } from '@/commands/processing.commands'
+import { emitCommandStatus } from '@/platform/command-status'
+import { layerCommands } from '@/commands/layer.commands'
 import {
   checkLayerGeometry,
   selectGeometryIssues,
   type GeometryCheckResult
-} from '@/app/commands/geometry-check.commands'
+} from '@/commands/geometry-check.commands'
 import type {
   GeometryIssue,
   MeasurementOptions
@@ -44,13 +47,13 @@ export function ProcessingDialog({
   docked?: boolean
 }) {
   const project = useProjectStore((s) => s.project)
-  const featuresByDataset = useProjectStore((s) => s.featuresByDataset)
-  const selection = useProjectStore((s) => s.selection)
-  const selectedLayerId = useProjectStore((s) => s.selectedLayerId)
-  const vectorLayers = project.layers.filter(
+  const featuresByDataset = useFeaturesByDataset()
+  const selection = useLayerViewStore((s) => s.selection)
+  const selectedLayerId = useLayerViewStore((s) => s.selectedLayerId)
+  const vectorLayers = requireMapContent(project).layers.filter(
     (layer) =>
       capabilitiesForDataset(
-        project.datasets.find((dataset) => dataset.id === layer.datasetId)
+        requireMapContent(project).datasets.find((dataset) => dataset.id === layer.datasetId)
       ).exportVector
   )
   const polygonLayers = vectorLayers.filter((layer) => {
@@ -265,7 +268,7 @@ export function ProcessingDialog({
   useEffect(() => {
     if (tool === 'check-geometry') controller.current?.abort()
     setGeometryReport(null)
-  }, [layerId, scope, tool, featuresByDataset, project.id])
+  }, [layerId, scope, tool, featuresByDataset, project.metadata.id])
 
   function inspectIssues(issue?: GeometryIssue): void {
     if (!geometryReport) return
@@ -289,7 +292,7 @@ export function ProcessingDialog({
     expression,
     featuresByDataset,
     selection,
-    project.id
+    project.metadata.id
   ])
 
   function fieldOptions(): ProcessingOptions {

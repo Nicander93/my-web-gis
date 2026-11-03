@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
 async function snapshot(page: Page) {
-  return page.evaluate(async () => (await import('/src/stores/project.store.ts')).useProjectStore.getState().getSnapshot())
+  return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() })
 }
 async function importLayer(page: Page, name: string) {
   await page.getByRole('tab', { name: '数据', exact: true }).click()
@@ -19,13 +19,16 @@ test('2D property window keeps a fixed layer, atomic history and folder membersh
   await importLayer(page, 'Alpha')
   await importLayer(page, 'Beta')
   await page.evaluate(async () => {
-    const store = (await import('/src/stores/project.store.ts')).useProjectStore.getState()
-    const alpha = store.project.layers.find(layer => layer.name === 'Alpha')!
-    const style = store.getNormalizedLayerStyle(alpha.id)!
+    const { layerConfigurationQueries } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/layer-configuration-query.ts').at(-1) ?? '/src/session/layer-configuration-query.ts')
+    const { layerConfigurationCommands } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/commands/layer-configuration.commands.ts').at(-1) ?? '/src/commands/layer-configuration.commands.ts')
+
+    const store = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+    const alpha = store.project.content.layers.find(layer => layer.name === 'Alpha')!
+    const style = layerConfigurationQueries.getNormalizedLayerStyle(alpha.id)!
     if (style.mode !== 'single') throw new Error('Fixture requires a single symbol')
-    store.setLayerStyle(alpha.id, { mode: 'categorized', field: 'label', categories: [{ value: 'Alpha', label: '分类 A', symbol: style.symbol }], fallback: style.symbol })
+    layerConfigurationCommands.setLayerStyle(alpha.id, { mode: 'categorized', field: 'label', categories: [{ value: 'Alpha', label: '分类 A', symbol: style.symbol }], fallback: style.symbol })
   })
-  const originalStyle = (await snapshot(page)).project.layers.find(layer => layer.name === 'Alpha')?.style
+  const originalStyle = (await snapshot(page)).project.content.layers.find(layer => layer.name === 'Alpha')?.style
   const alpha = page.locator('.layer-item').filter({ hasText: 'Alpha' })
   await alpha.click({ button: 'right' })
   await page.getByRole('menuitem', { name: '完整属性', exact: true }).click()
@@ -34,15 +37,15 @@ test('2D property window keeps a fixed layer, atomic history and folder membersh
   await dialog.getByRole('spinbutton', { name: '不透明度', exact: true }).fill('40')
   await page.locator('.layer-name-button').filter({ hasText: 'Beta' }).click()
   await expect(dialog).toBeVisible()
-  expect((await snapshot(page)).project.layers.find(layer => layer.name === 'Alpha')?.opacity).toBe(1)
+  expect((await snapshot(page)).project.content.layers.find(layer => layer.name === 'Alpha')?.opacity).toBe(1)
   await dialog.getByRole('button', { name: '应用', exact: true }).click()
-  await expect.poll(async () => (await snapshot(page)).project.layers.find(layer => layer.name === 'Applied Alpha')?.opacity).toBe(.4)
-  expect((await snapshot(page)).project.layers.find(layer => layer.name === 'Applied Alpha')?.style).toEqual(originalStyle)
+  await expect.poll(async () => (await snapshot(page)).project.content.layers.find(layer => layer.name === 'Applied Alpha')?.opacity).toBe(.4)
+  expect((await snapshot(page)).project.content.layers.find(layer => layer.name === 'Applied Alpha')?.style).toEqual(originalStyle)
   await dialog.getByRole('textbox', { name: '图层名称', exact: true }).fill('Discard')
   await dialog.getByRole('button', { name: '取消', exact: true }).click()
   await page.getByRole('tab', { name: '编辑', exact: true }).click()
   await page.getByRole('button', { name: '撤销', exact: true }).click()
-  await expect.poll(async () => (await snapshot(page)).project.layers.find(layer => layer.name === 'Alpha')?.opacity).toBe(1)
+  await expect.poll(async () => (await snapshot(page)).project.content.layers.find(layer => layer.name === 'Alpha')?.opacity).toBe(1)
   await page.getByRole('button', { name: '新建组', exact: true }).click()
   const before = await snapshot(page)
   await page.getByRole('button', { name: '组操作：新建组', exact: true }).click()
@@ -52,7 +55,7 @@ test('2D property window keeps a fixed layer, atomic history and folder membersh
   await folder.getByRole('switch', { name: '显示文件夹', exact: true }).click()
   await folder.getByRole('button', { name: '确定', exact: true }).click()
   const applied = await snapshot(page)
-  expect(applied.project.groups[0]).toMatchObject({ name: 'Folder draft', visible: false, layerIds: before.project.groups[0].layerIds })
+  expect(applied.project.content.groups[0]).toMatchObject({ name: 'Folder draft', visible: false, layerIds: before.project.content.groups[0].layerIds })
   expect(applied.featuresByDataset).toEqual(before.featuresByDataset)
   await page.getByRole('button', { name: '撤销', exact: true }).click()
   await expect(page.getByRole('button', { name: '组操作：新建组', exact: true })).toBeVisible()
@@ -74,13 +77,13 @@ test('3D folder window preserves fixed target and grouped objects', async ({ pag
   await dialog.getByRole('textbox', { name: '文件夹名称', exact: true }).fill('Renamed folder')
   await page.locator('.scene3d-layer-row__select').first().click()
   await dialog.getByRole('button', { name: '应用', exact: true }).click()
-  await expect.poll(async () => (await snapshot(page)).project.city?.groups?.[0].name).toBe('Renamed folder')
-  expect((await snapshot(page)).project.city?.nodes).toEqual(before.project.city?.nodes)
+  await expect.poll(async () => (await snapshot(page)).project.content.scene?.groups?.[0].name).toBe('Renamed folder')
+  expect((await snapshot(page)).project.content.scene?.nodes).toEqual(before.project.content.scene?.nodes)
   await dialog.getByRole('textbox', { name: '文件夹名称', exact: true }).fill('Discard')
   await dialog.getByRole('button', { name: '取消', exact: true }).click()
-  expect((await snapshot(page)).project.city?.groups?.[0].name).toBe('Renamed folder')
+  expect((await snapshot(page)).project.content.scene?.groups?.[0].name).toBe('Renamed folder')
   await page.getByRole('button', { name: '撤销', exact: true }).click()
-  await expect.poll(async () => (await snapshot(page)).project.city?.groups?.[0].name).toBe('Scene folder')
+  await expect.poll(async () => (await snapshot(page)).project.content.scene?.groups?.[0].name).toBe('Scene folder')
 })
 
 test('full properties stage real tileset flatten parameters as one undoable operation', async ({ page }, info) => {
@@ -96,7 +99,7 @@ test('full properties stage real tileset flatten parameters as one undoable oper
   const bounds = (await page.locator('.scene3d-canvas__viewport canvas').boundingBox())!
   for (const [x, y] of [[.43,.38],[.57,.38],[.58,.62],[.42,.62]]) await page.mouse.click(bounds.x + bounds.width * x, bounds.y + bounds.height * y)
   await page.keyboard.press('Enter')
-  const before = (await snapshot(page)).project.city?.nodes[0]
+  const before = (await snapshot(page)).project.content.scene?.nodes[0]
   expect(before?.type).toBe('3dtiles')
   await row.locator('.scene3d-layer-row__select').click({ button: 'right' })
   await page.getByRole('menuitem', { name: '完整属性', exact: true }).click()
@@ -104,12 +107,12 @@ test('full properties stage real tileset flatten parameters as one undoable oper
   await dialog.getByRole('menuitem', { name: '裁剪与压平', exact: true }).click()
   await dialog.getByRole('spinbutton', { name: '压平目标高程 1', exact: true }).fill('15')
   await dialog.getByRole('switch', { name: '启用效果 1', exact: true }).click()
-  expect((await snapshot(page)).project.city?.nodes[0]).toEqual(before)
+  expect((await snapshot(page)).project.content.scene?.nodes[0]).toEqual(before)
   await dialog.getByRole('button', { name: '应用', exact: true }).click()
-  await expect.poll(async () => (await snapshot(page)).project.city?.nodes[0]).toMatchObject({ effects: [{ height: 15, enabled: false }] })
+  await expect.poll(async () => (await snapshot(page)).project.content.scene?.nodes[0]).toMatchObject({ effects: [{ height: 15, enabled: false }] })
   await dialog.getByRole('spinbutton', { name: '压平目标高程 1', exact: true }).fill('25')
   await dialog.getByRole('button', { name: '取消', exact: true }).click()
-  await expect.poll(async () => (await snapshot(page)).project.city?.nodes[0]).toMatchObject({ effects: [{ height: 15, enabled: false }] })
+  await expect.poll(async () => (await snapshot(page)).project.content.scene?.nodes[0]).toMatchObject({ effects: [{ height: 15, enabled: false }] })
   await page.getByRole('button', { name: '撤销', exact: true }).click()
-  await expect.poll(async () => (await snapshot(page)).project.city?.nodes[0]).toEqual(before)
+  await expect.poll(async () => (await snapshot(page)).project.content.scene?.nodes[0]).toEqual(before)
 })

@@ -12,7 +12,7 @@ import {
   switchStyleMode
 } from './style-draft'
 import { useCartographyEditor } from './useCartographyEditor'
-import { layerCommands } from '@/app/commands/layer.commands'
+import { layerCommands } from '@/commands/layer.commands'
 import './cartography-editor.css'
 import { SymbolEditor } from './SymbolEditor'
 import { SymbolLibrary } from './SymbolLibrary'

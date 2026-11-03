@@ -17,7 +17,7 @@ export const useSceneRenderPreferences = create<RenderPreferences>()(persist(set
   quality: { ...defaultRenderQuality },
   setQuality: quality => set({ quality })
 }), {
-  name: 'desktop-webgis.city-render-quality',
+  name: 'desktop-webgis.scene-render-quality',
   merge: (stored, current) => {
     const quality = stored && typeof stored === 'object' && 'quality' in stored ? stored.quality : undefined
     return { ...current, quality: isRenderQuality(quality) ? quality : { ...defaultRenderQuality } }

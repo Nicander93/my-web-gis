@@ -4,7 +4,7 @@ import type {
   GeoJsonFeatureCollection,
   GeoJsonGeometry,
   JsonValue
-} from '@desktop-webgis/scene-schema'
+} from './types.js'
 import type {
   DxfDocumentLike,
   DxfEntity,

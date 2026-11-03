@@ -31,13 +31,13 @@ async function select(page: Page, label: string, text: string) {
 async function inspect(page: Page, id: string) {
   return page.evaluate(async id => {
     const loaded = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(loaded('/src/stores/project.store.ts')) as typeof import('../src/stores/project.store')
-    const { getMapRuntime } = await import(loaded('/src/features/map/map-runtime-host.ts')) as typeof import('../src/features/map/map-runtime-host')
-    const state = useProjectStore.getState(), binding = state.project.cartography.bindings.find(binding => binding.gisLayerId === id)!
+    const { useProjectStore } = await import(loaded('/src/session/project.store.ts')) as typeof import('@/session/project.store')
+    const { getMapRuntime } = await import(loaded('/src/runtime/map-runtime-host.ts')) as typeof import('@/runtime/map-runtime-host')
+    const state = useProjectStore.getState(), binding = state.project.content.cartography.bindings.find(binding => binding.gisLayerId === id)!
     const native = getMapRuntime()?.registry.getVector(id), feature = native?.getSource()?.getFeatures()[0]
     const result = feature ? native?.getStyleFunction()?.(feature, getMapRuntime()!.getMap().getView().getResolution()!) : undefined
     const styles = result ? Array.isArray(result) ? result : [result] : []
-    return { layers: structuredClone(state.project.cartography.styleLayers.filter(layer => binding.styleLayerIds.includes(layer.id))), assets: structuredClone(state.project.cartography.assets ?? []), widths: styles.map(style => style.getStroke()?.getWidth() ?? null), texts: styles.map(style => style.getText()?.getFont() ?? null), images: styles.map(style => ({ size: style.getImage()?.getSize(), state: style.getImage()?.getImageState() })) }
+    return { layers: structuredClone(state.project.content.cartography.styleLayers.filter(layer => binding.styleLayerIds.includes(layer.id))), assets: structuredClone(state.project.content.cartography.assets ?? []), widths: styles.map(style => style.getStroke()?.getWidth() ?? null), texts: styles.map(style => style.getText()?.getFont() ?? null), images: styles.map(style => ({ size: style.getImage()?.getSize(), state: style.getImage()?.getImageState() })) }
   }, id)
 }
 
@@ -96,7 +96,7 @@ test('safe SVG survives resource import, actual icon rendering, save and project
   const path = info.outputPath('portable-svg.webgis.json')
   await (await download).saveAs(path)
   const saved = JSON.parse(readFileSync(path, 'utf8'))
-  expect(saved.project.cartography.assets).toEqual(before.assets)
+  expect(saved.project.content.cartography.assets).toEqual(before.assets)
   await page.getByRole('button', { name: '文件', exact: true }).click()
   const reopen = page.waitForEvent('filechooser')
   await page.getByRole('menuitem', { name: /^打开/ }).click()
@@ -138,11 +138,13 @@ test(`${format} GeoServer wizard publishes against the isolated real server and 
   await expect(dialog.getByRole('button', { name: '加载已发布 WMS', exact: true })).toBeVisible()
   expect(mutations).toBe(1)
   const persisted = await page.evaluate(async () => {
-    const path = '/src/stores/project.store.ts', url = performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(url) as typeof import('../src/stores/project.store')
-    return { project: useProjectStore.getState().getSnapshot(), local: Object.fromEntries(Object.entries(localStorage)) }
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+
+    const path = '/src/session/project.store.ts', url = performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
+    const { useProjectStore } = await import(url) as typeof import('@/session/project.store')
+    return { project: projectSession.getSnapshot(), local: Object.fromEntries(Object.entries(localStorage)) }
   })
-  const link = persisted.project.project.layers.find(layer => layer.id === 'roads')!.publishedStyle!
+  const link = persisted.project.project.content.layers.find(layer => layer.id === 'roads')!.publishedStyle!
   expect(link.remoteFormat).toBe(format)
   expect(link.lastPublishedHash).toMatch(/^[a-f\d]{64}$/)
   expect(JSON.stringify(persisted)).not.toContain('Basic ')
@@ -154,7 +156,7 @@ test(`${format} GeoServer wizard publishes against the isolated real server and 
   const path = info.outputPath('published-style.webgis.json')
   await (await download).saveAs(path)
   const saved = readFileSync(path, 'utf8')
-  expect(JSON.parse(saved).project.layers.find((layer: { id: string }) => layer.id === 'roads').publishedStyle).toEqual(link)
+  expect(JSON.parse(saved).project.content.layers.find((layer: { id: string }) => layer.id === 'roads').publishedStyle).toEqual(link)
   expect(saved).not.toContain(Buffer.from('admin:geoserver').toString('base64'))
   await page.unrouteAll({ behavior: 'wait' })
 })

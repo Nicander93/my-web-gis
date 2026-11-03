@@ -1,0 +1,20 @@
+{
+  "project": {
+    "id": "legacy-map", "version": 1, "name": "旧二维工程", "crs": "EPSG:3857",
+    "datasets": [
+      {"id":"local","name":"河流","kind":"vector","source":{"type":"geojson-file","path":"./data/rivers.geojson"},"sourceCrs":"EPSG:4326","fields":[{"name":"name","type":"string"}]},
+      {"id":"service","name":"底图服务","kind":"wms","source":{"type":"wms","url":"https://example.invalid/wms","version":"1.3.0","layerNames":["rivers"],"authMode":"bearer","credentialRef":{"key":"fixture-service"}}}
+    ],
+    "layers": [
+      {"id":"river","datasetId":"local","name":"河流","visible":true,"opacity":0.7,"editable":true,"style":{"kind":"line","stroke":"#123456","fill":"#ffffff","width":2,"pointRadius":4},"filter":[{"field":"name","op":"eq","value":"已编辑河流"}]},
+      {"id":"wms","datasetId":"service","name":"服务","visible":false,"opacity":1,"editable":false,"style":{"kind":"mixed","stroke":"#000000","fill":"#ffffff","width":1,"pointRadius":4}}
+    ],
+    "groups": [{"id":"folder","name":"河网","visible":true,"layerIds":["river"]}],
+    "rootOrder": [{"type":"group","id":"folder"},{"type":"layer","id":"wms"}],
+    "mapState": {"center":[1000,2000],"zoom":8,"rotation":0.2},
+    "basemap":{"type":"osm"}, "settings":{"workspaceType":"2d"}
+  },
+  "featuresByDataset": {
+    "local":[{"id":"river-1","geometry":{"type":"LineString","coordinates":[[116,39],[116.1,39.2]]},"properties":{"name":"已编辑河流","level":2},"metadata":{"sourceId":7,"sourceCrs":"EPSG:4326"}}]
+  }
+}

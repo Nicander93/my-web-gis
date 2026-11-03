@@ -5,8 +5,12 @@ import { expect } from '@playwright/test'
 
 async function state(page) {
   return page.evaluate(async () => {
-    const store = (await import('/src/stores/project.store.ts')).useProjectStore.getState()
-    return { snapshot: store.getSnapshot(), dirty: store.dirty, undo: store.canUndoEdit(), redo: store.canRedoEdit() }
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+
+    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-edits.ts').at(-1) ?? '/src/session/project-edits.ts')
+
+    const store = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+    return { snapshot: projectSession.getSnapshot(), dirty: store.dirty, undo: projectEdits.canUndo(), redo: projectEdits.canRedo() }
   })
 }
 
@@ -142,7 +146,7 @@ export async function verifyNativeSimplification(page, report, output, saveTo) {
   }, inputPath)
   await page.getByRole('button', { name: '确认导入', exact: true }).click()
   report.fileDrop = { nativeEventBridge: true, nativeFilesystemRead: true, physicalOsDrag: 'Not verified: native drag event emitted by test' }
-  const initialCenter = await page.evaluate(async () => (await import('/src/features/map/map-runtime-host.ts')).getMapRuntime().getMap().getView().getCenter())
+  const initialCenter = await page.evaluate(async () => (await import('/src/runtime/map-runtime-host.ts')).getMapRuntime().getMap().getView().getCenter())
   const bounds = await page.getByTestId('map-runtime-viewport').boundingBox()
   for (const button of ['middle', 'left']) {
     await page.mouse.move(bounds.x + bounds.width * .55, bounds.y + bounds.height * .55)
@@ -152,9 +156,9 @@ export async function verifyNativeSimplification(page, report, output, saveTo) {
     await page.mouse.up({ button })
     if (button === 'left') await page.keyboard.up('Space')
   }
-  assert.notDeepEqual(await page.evaluate(async () => (await import('/src/features/map/map-runtime-host.ts')).getMapRuntime().getMap().getView().getCenter()), initialCenter)
+  assert.notDeepEqual(await page.evaluate(async () => (await import('/src/runtime/map-runtime-host.ts')).getMapRuntime().getMap().getView().getCenter()), initialCenter)
   report.scenarios.push({ name: 'Native file-drop event bridge reads a local path; middle and space-left navigation', passed: true })
-  const before = await state(page), source = before.snapshot.project.layers[0]
+  const before = await state(page), source = before.snapshot.project.content.layers[0]
   const input = before.snapshot.featuresByDataset[source.datasetId][0]
   await page.getByRole('tab', { name: '分析', exact: true }).click()
   await page.getByRole('button', { name: '空间处理', exact: true }).click()
@@ -164,7 +168,7 @@ export async function verifyNativeSimplification(page, report, output, saveTo) {
   await panel.getByLabel('结果图层名称', { exact: true }).fill('原生简化')
   await panel.getByRole('button', { name: '生成结果图层', exact: true }).click()
   await expect(page.locator('.layer-name-button').filter({ hasText: '原生简化' })).toBeVisible({ timeout: 60_000 })
-  const after = await state(page), layer = after.snapshot.project.layers.find(layer => layer.name === '原生简化')
+  const after = await state(page), layer = after.snapshot.project.content.layers.find(layer => layer.name === '原生简化')
   assert.ok(layer)
   const result = after.snapshot.featuresByDataset[layer.datasetId][0]
   assert.deepEqual(result.geometry.coordinates, [input.geometry.coordinates[0], input.geometry.coordinates[2]])
@@ -177,7 +181,7 @@ export async function verifyNativeSimplification(page, report, output, saveTo) {
   assert.deepEqual((await state(page)).snapshot, after.snapshot)
   const saved = await saveTo(join(output, 'native-simplified.webgis.json'))
   assert.deepEqual(saved.featuresByDataset, JSON.parse(JSON.stringify(after.snapshot.featuresByDataset)))
-  const processing = saved.project.datasets.find(dataset => dataset.id === layer.datasetId).processing
+  const processing = saved.project.content.datasets.find(dataset => dataset.id === layer.datasetId).processing
   assert.deepEqual(processing.engine, { id: 'geolibre-wasm', version: '1.7.1', tool: 'simplify_features' })
   assert.deepEqual(wasmResponses, [200])
   report.geolibre = { engine: processing.engine, options: processing.options, wasmResponses, inputVertices: 3, outputVertices: 2 }

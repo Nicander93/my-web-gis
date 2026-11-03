@@ -23,8 +23,8 @@ const scene = {
 
 async function nativeState(page: Page) {
   return page.evaluate(async () => {
-    const moduleUrl = performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/features/map/map-runtime-host.ts').at(-1)
-    const { getMapRuntime } = await import(moduleUrl ?? '/src/features/map/map-runtime-host.ts') as typeof import('../src/features/map/map-runtime-host')
+    const moduleUrl = performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/runtime/map-runtime-host.ts').at(-1)
+    const { getMapRuntime } = await import(moduleUrl ?? '/src/runtime/map-runtime-host.ts') as typeof import('@/runtime/map-runtime-host')
     const runtime = getMapRuntime()
     const lower = runtime?.registry.getVector('lower'), upper = runtime?.registry.getVector('upper')
     if (!lower || !upper) return { runtime: Boolean(runtime), ids: runtime?.registry.entries().map(([id]) => id) }
@@ -55,9 +55,9 @@ test('standard styles survive scene import, node deletion undo, project save and
   await expect.poll(() => nativeState(page)).toEqual(expected)
   await page.evaluate(async () => {
     const loaded = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { createMapPropertyPreview, getMapRuntime } = await import(loaded('/src/features/map/map-runtime-host.ts')) as typeof import('../src/features/map/map-runtime-host')
-    const { useProjectStore } = await import(loaded('/src/stores/project.store.ts')) as typeof import('../src/stores/project.store')
-    const state = useProjectStore.getState(), base = state.project.layers.find(layer => layer.id === 'upper')!
+    const { createMapPropertyPreview, getMapRuntime } = await import(loaded('/src/runtime/map-runtime-host.ts')) as typeof import('@/runtime/map-runtime-host')
+    const { useProjectStore } = await import(loaded('/src/session/project.store.ts')) as typeof import('@/session/project.store')
+    const state = useProjectStore.getState(), base = state.project.content.layers.find(layer => layer.id === 'upper')!
     const preview = createMapPropertyPreview(base, state.projectEpoch)
     try {
       if (!preview.update({ ...base, opacity: 0.3 })) throw new Error('Expected property preview')
@@ -70,8 +70,8 @@ test('standard styles survive scene import, node deletion undo, project save and
   })
   await expect.poll(() => nativeState(page)).toEqual(expected)
   await page.evaluate(async () => {
-    const moduleUrl = performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/features/scene/project-scene-controller.ts').at(-1)
-    const { createProjectSceneController } = await import(moduleUrl ?? '/src/features/scene/project-scene-controller.ts') as typeof import('../src/features/scene/project-scene-controller')
+    const moduleUrl = performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/runtime/project-scene-controller.ts').at(-1)
+    const { createProjectSceneController } = await import(moduleUrl ?? '/src/runtime/project-scene-controller.ts') as typeof import('@/runtime/project-scene-controller')
     const controller = createProjectSceneController()
     try { controller.removeNode('upper') } finally { controller.dispose() }
   })
@@ -83,8 +83,8 @@ test('standard styles survive scene import, node deletion undo, project save and
   const path = info.outputPath('standard.webgis.json')
   await (await download).saveAs(path)
   const saved = JSON.parse(readFileSync(path, 'utf8'))
-  expect(saved.project.version).toBe(2)
-  expect(saved.project.cartography).toEqual(drawing)
+  expect(saved.project.metadata.formatVersion).toBe(3)
+  expect(saved.project.content.cartography).toEqual(drawing)
   await page.getByRole('button', { name: '文件', exact: true }).click()
   const reopen = page.waitForEvent('filechooser')
   await page.getByRole('menuitem', { name: /^打开/ }).click()

@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 
 async function diagnostics(page: Page) {
-  return page.evaluate(async () => (await import('/src/features/scene3d/scene3d-runtime-host.ts')).getLiveSceneDiagnostics())
+  return page.evaluate(async () => (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneDiagnostics())
 }
 
 test('500 independent graphics share one native container and retain scoped batch edits', async ({ page }, testInfo) => {
@@ -46,7 +46,7 @@ test('500 independent graphics share one native container and retain scoped batc
   await expect(inspector.getByText('已选择 10 个对象', { exact: false })).toBeVisible()
   await inspector.getByRole('button', { name: '全部隐藏', exact: true }).click()
   const state = await page.evaluate(async () => {
-    const graphics = (await import('/src/stores/project.store.ts')).useProjectStore.getState().project.city?.nodes.filter(node => node.type === 'graphic') ?? []
+    const graphics = (await import('/src/session/project.store.ts')).useProjectStore.getState().project.content.scene?.nodes.filter(node => node.type === 'graphic') ?? []
     return { hidden: graphics.filter(node => !node.visible).map(node => node.id), untouched: graphics.slice(10).every(node => node.visible) }
   })
   expect(state).toEqual({ hidden: Array.from({ length: 10 }, (_, index) => `poi-${index}`), untouched: true })
@@ -57,8 +57,8 @@ test('500 independent graphics share one native container and retain scoped batc
   const path = testInfo.outputPath('500-poi.webgis.json')
   await (await download).saveAs(path)
   const saved = JSON.parse(readFileSync(path, 'utf8'))
-  expect(saved.project.city.nodes).toHaveLength(500)
-  expect(saved.project.city.nodes[499]).toMatchObject({ id: 'poi-499', style: { color: '#d18b47', pointSize: 8 }, geometry: { positions: [[116.3956,39.90865,0]] } })
+  expect(saved.project.content.scene.nodes).toHaveLength(500)
+  expect(saved.project.content.scene.nodes[499]).toMatchObject({ id: 'poi-499', style: { color: '#d18b47', pointSize: 8 }, geometry: { positions: [[116.3956,39.90865,0]] } })
 
   await page.getByRole('button', { name: '文件', exact: true }).click()
   const reopen = page.waitForEvent('filechooser')

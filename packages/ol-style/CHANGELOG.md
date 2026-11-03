@@ -15,6 +15,6 @@
 
 ### 发布准备说明
 
-- 包内不含 Desktop / gis-core / 工作区私有运行时依赖
+- 包内不含 Desktop / project / 工作区私有运行时依赖
 - `files` 仅包含 `dist`、`LICENSE`、`CHANGELOG.md`、`README.md`
 - 本版本未执行 npm publish；以 `pnpm pack` + 工作区外消费者校验为准

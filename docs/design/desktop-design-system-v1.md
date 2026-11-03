@@ -1,12 +1,12 @@
 # Desktop 设计系统 V1
 
-本轮建立在已有 React / Ant Design / CSS 语义色板上。原型提供布局和工作流参考，产品继续使用灰白、低饱和绿色以及 Segoe UI / 微软雅黑。实施范围和证据见 [执行记录](../plans/2d-ux-productization-implementation.md)。
+本轮建立在已有 React / Ant Design / CSS 语义色板上。原型提供布局和工作流参考，产品继续使用灰白、低饱和绿色以及 Segoe UI / 微软雅黑。工作台原型见 [prototypes/workbench](../prototypes/workbench/desktop-webgis-2d-final.html)。
 
 ## 代码构成
 
 | 层 | 代码入口 | 职责 |
 | --- | --- | --- |
-| Token | `apps/desktop/src/styles/tokens.css` | 语义颜色、字号、控件/行/Tab 高度、间距和窗口层级。主题与密度的值只在这里定义。 |
+| Token | `apps/desktop/src/styles/tokens.css` | 语义颜色、字号、控件/行/Tab 高度、间距和窗口层级的默认值；运行时尺寸由 `DesktopUiProvider` 按本机偏好计算。 |
 | 组件库主题 | `components/ui/DesktopUiProvider.tsx` | 将 Token 传给 Ant Design，响应本机偏好和系统主题变化。 |
 | 通用交互组件 | `components/ui/Button.tsx`、`ModelessWindow.tsx`、既有 `EditorDialog.tsx` | 按钮变体、焦点、非模态窗移动/缩放/关闭和模态焦点边界。基础组件不引用 GIS Store 或 OpenLayers。 |
 | 工作区组合 | `app/Workspace.tsx`、`BottomPanel.tsx`、`docking/` | 组合功能面板、独立窗口和布局；底部用于属性表，右侧工作面板互斥。 |
@@ -18,20 +18,22 @@
 
 | Token | 紧凑（默认） | 标准 |
 | --- | --- | --- |
-| `--font-size-ui` | 默认 12px，可设 11–14px | 与字号设置共用 |
-| `--control-height` | 28px | 30px |
-| `--control-icon-height` | 26px | 28px |
-| `--desktop-row-height` | 28px | 30px |
-| `--tab-height` | 30px | 32px |
-| `--menu-height` | 34px | 36px |
-| `--status-height` | 24px | 26px |
+| `--font-size-ui` | 默认 12px，可设 8–14px | 与字号设置共用 |
+| `--control-height` | 26px | 28px |
+| `--control-icon-height` | 24px | 26px |
+| `--desktop-row-height` | 26px | 28px |
+| `--tab-height` | 28px | 30px |
+| `--menu-height` | 32px | 34px |
+| `--status-height` | 22px | 24px |
 | `--space-group` / `--space-field` | 8px / 6px | 10px / 8px |
 
 控件悬停与按下保持相同几何尺寸；选中/焦点使用背景、颜色和 inset 线表达，不改变字体、边框宽度或布局。图标操作保留可点击区域、名称和 Tooltip。密度由真实控件尺寸控制。
 
+上述尺寸以 12px 为 100% 基准。字号滑块显示 8–14px 及相应比例；控件、图标、间距和窗口随比例调整，地图画布与数据符号仍按自身规则渲染。已保存的自定义停靠尺寸按比例显示，拖动后仍以基准尺寸保存。
+
 界面按任务分层：工作面板入口 → 面板标签 → 分组字段 → 参数。面板标题不在内容里重复。低频导出与发布放入图层上下文菜单及样式菜单；软件设置直接打开独立设置窗口，原业务命令保留于“操作”菜单。
 
-独立非模态窗通过 React Portal 挂载在 `document.body`，保留 React/Ant Design 上下文，避免受到停靠面板的层叠或裁剪影响；移动/缩放边界预留底部状态栏。停靠属性表按实际打开的左右停靠面板预留空间，最大化/浮动窗口避开最右侧工具栏；地图画布保持原有尺寸，窗口布局不重建地图实例。
+独立非模态窗通过 React Portal 挂载在 `document.body`，保留 React/Ant Design 上下文，避免受到停靠面板的层叠或裁剪影响；移动/缩放边界预留底部状态栏。二维属性表停靠在底部时横跨侧栏下方，左右面板在表格上方结束；最大化/浮动窗口避开最右侧工具栏。地图画布保持原有尺寸，窗口布局不重建地图实例。
 
 ## 状态边界
 

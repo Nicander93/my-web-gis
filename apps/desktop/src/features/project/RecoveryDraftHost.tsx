@@ -1,17 +1,20 @@
+import { projectSession } from '@/session/project-session'
+import { requireMapContent } from '@desktop-webgis/project'
 import { useEffect, useState } from 'react'
 import { Alert } from 'antd'
 import { isTauri } from '@tauri-apps/api/core'
-import { parseProjectSnapshot, serializeProjectSnapshot } from '@desktop-webgis/gis-core'
-import { EditorDialog } from '@/components/ui/EditorDialog'
-import { Button } from '@/components/ui/Button'
-import { useProjectStore, getProjectContentVersion } from '@/stores/project.store'
-import { projectRecovery, recoveryOwner, type RecoveryCandidate } from '@/services/project-recovery'
-import { startRecoveryTracking } from '@/services/recovery-tracking'
-import { readTextFile } from '@/services/files'
-import { setCurrentProjectPath, setProjectResourceBasePath } from '@/services/project-io'
-import { resolveProjectResourceReferences } from '@/services/project-resource-references'
-import { collectCredentialRefKeys, hydrateCredentialsFromRefs } from '@/services/credentials'
-import { emitCommandStatus } from '@/app/commands/status'
+import { parseProjectSnapshot, serializeProjectSnapshot } from '@desktop-webgis/project'
+import { EditorDialog } from '@/ui/EditorDialog'
+import { Button } from '@/ui/Button'
+import { useProjectStore, getProjectContentVersion } from '@/session/project.store'
+import { projectRecovery, recoveryOwner, type RecoveryCandidate } from '@/session/project-recovery'
+import { startRecoveryTracking } from '@/session/recovery-tracking'
+import { readTextFile } from '@/platform/files'
+import { setCurrentProjectPath, setProjectResourceBasePath } from '@/session/project-io'
+import { resolveProjectResourceReferences } from '@/session/project-resource-references'
+import { collectCredentialRefKeys, hydrateCredentialsFromRefs } from '@/platform/credentials'
+import { emitCommandStatus } from '@/platform/command-status'
+import { hasUnsavedProjectWork } from '@/session/unsaved-work'
 
 interface Candidate extends RecoveryCandidate { comparison?: string }
 
@@ -61,15 +64,15 @@ export function RecoveryDraftHost() {
     setBusy(true); setError('')
     const epoch = useProjectStore.getState().projectEpoch, version = getProjectContentVersion()
     try {
-      if (useProjectStore.getState().dirty) throw new Error('当前项目已有修改，请先保存，再重启处理恢复草稿')
-      await projectRecovery.write(entry.draft.snapshot, entry.draft.sourcePath, recoveryOwner(epoch + 1), entry)
-      if (epoch !== useProjectStore.getState().projectEpoch || version !== getProjectContentVersion() || useProjectStore.getState().dirty) throw new Error('恢复期间工程已改变，当前内容已保留；草稿仍在缓存中')
-      useProjectStore.getState().loadSnapshot(entry.draft.snapshot)
+      if (hasUnsavedProjectWork()) throw new Error('当前项目已有修改，请先保存，再重启处理恢复草稿')
+      await projectRecovery.write(entry.draft.snapshot, entry.draft.sourcePath, recoveryOwner(epoch + 1), entry, entry.draft.dataSessions)
+      if (epoch !== useProjectStore.getState().projectEpoch || version !== getProjectContentVersion() || hasUnsavedProjectWork()) throw new Error('恢复期间工程已改变，当前内容已保留；草稿仍在缓存中')
+      projectSession.loadSnapshot(entry.draft.snapshot, entry.draft.dataSessions)
       setCurrentProjectPath(null)
       if (isTauri()) setProjectResourceBasePath(entry.draft.sourcePath)
       useProjectStore.getState().setDirty(true)
       setHidden(true)
-      void hydrateCredentialsFromRefs(collectCredentialRefKeys(entry.draft.snapshot.project.datasets.filter((dataset) => dataset.kind !== 'vector')))
+      void hydrateCredentialsFromRefs(collectCredentialRefKeys(entry.draft.snapshot.project.content.kind === 'map2d' ? entry.draft.snapshot.project.content.datasets.filter((dataset) => dataset.kind !== 'vector') : []))
         .catch(() => emitCommandStatus('草稿已恢复；部分服务凭据尚未加载，请重新连接服务'))
       emitCommandStatus('已恢复未保存副本，请保存项目；正式文件未覆盖')
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
@@ -79,9 +82,9 @@ export function RecoveryDraftHost() {
   return <EditorDialog title="发现恢复草稿" busy={busy} onClose={() => setHidden(true)}>
     <div className="dialog-body recovery-drafts">
       <p>以下草稿保存在本机独立缓存。恢复后仍需保存项目；舍弃只删除所选草稿。</p>
-      {entries.map((entry) => <section key={entry.key} className="recovery-draft" aria-label={entry.draft?.snapshot.project.name ?? '无法读取的恢复草稿'}>
-        <strong>{entry.draft?.snapshot.project.name ?? '无法读取的恢复草稿'}</strong>
-        {entry.draft && <p>{entry.draft.snapshot.project.city ? '三维场景' : '二维地图'} · {new Date(entry.draft.updatedAt).toLocaleString('zh-CN')}
+      {entries.map((entry) => <section key={entry.key} className="recovery-draft" aria-label={entry.draft?.snapshot.project.metadata.name ?? '无法读取的恢复草稿'}>
+        <strong>{entry.draft?.snapshot.project.metadata.name ?? '无法读取的恢复草稿'}</strong>
+        {entry.draft && <p>{entry.draft.snapshot.project.content.scene ? '三维场景' : '二维地图'} · {new Date(entry.draft.updatedAt).toLocaleString('zh-CN')}
           {entry.draft.sourcePath && <><br /><span>{entry.draft.sourcePath}</span></>}</p>}
         {entry.comparison && <p>{entry.comparison}</p>}
         {entry.error && <Alert type="warning" title={entry.error} />}

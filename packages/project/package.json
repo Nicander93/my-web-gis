@@ -1,0 +1,39 @@
+{
+  "name": "@desktop-webgis/project",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./geojson": {
+      "types": "./dist/data/geojson.d.ts",
+      "import": "./dist/data/geojson.js"
+    },
+    "./id": {
+      "types": "./dist/id.d.ts",
+      "import": "./dist/id.js"
+    },
+    "./dataset-file": {
+      "types": "./dist/data/dataset-file.d.ts",
+      "import": "./dist/data/dataset-file.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@desktop-webgis/cesium-scene-schema": "workspace:*",
+    "@desktop-webgis/ol-style": "workspace:*",
+    "@desktop-webgis/spatial-analysis": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

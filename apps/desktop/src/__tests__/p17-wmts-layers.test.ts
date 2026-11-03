@@ -1,19 +1,24 @@
+import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
+import { layerContentCommands } from '@/commands/layer-content.commands'
+import { projectEdits } from '@/session/project-edits'
+import { featureData } from '@/data/feature-data'
+import { requireMapContent } from '@desktop-webgis/project'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   createProject,
   parseProjectSnapshot,
   serializeProjectSnapshot,
   capabilitiesForDataset
-} from '@desktop-webgis/gis-core'
+} from '@desktop-webgis/project'
 import {
   listSelectableLayers,
   parseCapabilitiesXml,
   resolveWmtsLayerOptions
 } from '@desktop-webgis/ogc-io'
-import { useProjectStore } from '@/stores/project.store'
-import { useSessionStore } from '@/stores/session.store'
-import { getLayerCapabilities, layerCommands } from '@/app/commands/layer.commands'
-import { _resetCredentialsForTests } from '@/services/credentials'
+import { useProjectStore } from '@/session/project.store'
+import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { getLayerCapabilities, layerCommands } from '@/commands/layer.commands'
+import { _resetCredentialsForTests } from '@/platform/credentials'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -24,18 +29,11 @@ const fixturesDir = join(
 )
 
 function resetStores(): void {
-  useProjectStore.getState()._resetAttributeHistoryForTests()
+  projectEdits.clear()
   layerCommands._resetStyleHistoryForTests()
-  useSessionStore.setState({ sessions: {} })
+  useLayerViewStore.setState({ sessions: {} })
   _resetCredentialsForTests()
-  useProjectStore.setState({
-    project: createProject('P17 test'),
-    featuresByDataset: {},
-    dirty: false,
-    selectedLayerId: null,
-    selection: { layerId: null, featureIds: [] },
-    lastSelectionCountAfterFilter: null
-  })
+  useProjectStore.setState({ project: createProject('P17 test'), dirty: false }); featureData.replaceAll({}); useLayerViewStore.setState({ selectedLayerId: null, selection: { layerId: null, featureIds: [] }, lastSelectionCountAfterFilter: null })
 }
 
 describe('P17 WMTS layers', () => {
@@ -62,7 +60,7 @@ describe('P17 WMTS layers', () => {
     expect(resolved.ok).toBe(true)
     if (!resolved.ok) return
 
-    const added = useProjectStore.getState().addServiceLayer({
+    const added = layerContentCommands.addServiceLayer({
       name: ortho.title || ortho.name,
       kind: 'wmts',
       source: {
@@ -84,16 +82,16 @@ describe('P17 WMTS layers', () => {
     })!
     expect(added).toBeTruthy()
 
-    const layer = useProjectStore.getState().project.layers.find((l) => l.id === added.layerId)!
+    const layer = requireMapContent(useProjectStore.getState().project).layers.find((l) => l.id === added.layerId)!
     expect(layer.editable).toBe(false)
-    useProjectStore.getState().setLayerOpacity(added.layerId, 0.55)
+    layerConfigurationCommands.setLayerOpacity(added.layerId, 0.55)
 
     const snap = {
       project: useProjectStore.getState().project,
-      featuresByDataset: useProjectStore.getState().featuresByDataset
+      featuresByDataset: featureData.readSnapshot()
     }
     const restored = parseProjectSnapshot(serializeProjectSnapshot(snap))
-    const ds = restored.project.datasets.find((d) => d.kind === 'wmts')
+    const ds = requireMapContent(restored.project).datasets.find((d) => d.kind === 'wmts')
     expect(ds?.kind).toBe('wmts')
     if (ds?.kind === 'wmts') {
       expect(ds.source.tileMatrixSet).toBe('CustomNonNumeric512')
@@ -103,7 +101,7 @@ describe('P17 WMTS layers', () => {
       expect(ds.source.bboxWgs84?.[0]).toBe(-180)
       expect(JSON.stringify(ds.source)).not.toMatch(/token|secret|bearer/i)
     }
-    expect(restored.project.layers[0]?.opacity).toBe(0.55)
+    expect(requireMapContent(restored.project).layers[0]?.opacity).toBe(0.55)
   })
 
   it('does not expose attribute table / style for WMTS', () => {
@@ -116,7 +114,7 @@ describe('P17 WMTS layers', () => {
     expect(resolved.ok).toBe(true)
     if (!resolved.ok) return
 
-    const added = useProjectStore.getState().addServiceLayer({
+    const added = layerContentCommands.addServiceLayer({
       name: 'Coast',
       kind: 'wmts',
       source: {
@@ -138,9 +136,9 @@ describe('P17 WMTS layers', () => {
     expect(caps.canAttributeTable).toBe(false)
     expect(caps.canStyle).toBe(false)
     expect(caps.canRetry).toBe(true)
-    const dataset = useProjectStore
+    const dataset = requireMapContent(useProjectStore
       .getState()
-      .project.datasets.find((d) => d.id === added.datasetId)
+      .project).datasets.find((d) => d.id === added.datasetId)
     expect(capabilitiesForDataset(dataset).queryAttributes).toBe(false)
   })
 

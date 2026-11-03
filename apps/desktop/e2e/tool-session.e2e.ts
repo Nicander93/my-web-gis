@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 test.use({ actionTimeout: 15_000, screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
-async function snapshot(page: Page) { return page.evaluate(async () => (await import('/src/stores/project.store.ts')).useProjectStore.getState().getSnapshot()) }
-async function diagnostics(page: Page) { return page.evaluate(async () => (await import('/src/features/scene3d/scene3d-runtime-host.ts')).getLiveSceneDiagnostics()) }
+async function snapshot(page: Page) { return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() }) }
+async function diagnostics(page: Page) { return page.evaluate(async () => (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneDiagnostics()) }
 async function clickGround(page: Page, x: number, y: number) {
   const bounds = (await page.locator('.scene3d-canvas__viewport canvas').boundingBox())!
   await page.mouse.click(bounds.x + bounds.width * x, bounds.y + bounds.height * y)
@@ -57,18 +57,20 @@ test('reopening the same project cancels old drawing and cannot commit a late co
   await clickGround(page, .46, .51); await clickGround(page, .54, .49)
   await expect(page.locator('.scene3d-drawing-bar')).toContainText('2 个顶点')
   await page.evaluate(async () => {
-    const store = (await import('/src/stores/project.store.ts')).useProjectStore.getState()
-    store.loadSnapshot(store.getSnapshot())
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+
+    const store = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+    projectSession.loadSnapshot(projectSession.getSnapshot())
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
   })
   const reopened = await snapshot(page)
   await expect(page.locator('.scene3d-drawing-bar')).toHaveCount(0)
   await page.keyboard.press('Enter')
   expect(await snapshot(page)).toEqual(reopened)
-  expect(reopened.project.city?.nodes).toHaveLength(0)
+  expect(reopened.project.content.scene?.nodes).toHaveLength(0)
   await page.getByRole('button', { name: '绘制点', exact: true }).click()
   await clickGround(page, .5, .5)
-  await expect.poll(async () => (await snapshot(page)).project.city?.nodes.length).toBe(1)
+  await expect.poll(async () => (await snapshot(page)).project.content.scene?.nodes.length).toBe(1)
   await page.keyboard.press('Escape')
   await expect(page.locator('.scene3d-drawing-bar')).toHaveCount(0)
   await expect.poll(async () => (await diagnostics(page))?.graphicObjects).toBe(1)
@@ -79,8 +81,8 @@ test('locking or reopening a graphic cancels its vertex preview and a new sessio
   await page.getByRole('button', { name: '绘制线', exact: true }).click()
   await clickGround(page, .46, .51); await clickGround(page, .54, .49)
   await page.keyboard.press('Enter')
-  await expect.poll(async () => (await snapshot(page)).project.city?.nodes.length).toBe(1)
-  const before = await snapshot(page), node = before.project.city!.nodes[0]
+  await expect.poll(async () => (await snapshot(page)).project.content.scene?.nodes.length).toBe(1)
+  const before = await snapshot(page), node = before.project.content.scene!.nodes[0]
   if (node.type !== 'graphic') throw new Error('Expected graphic')
   await page.getByRole('tab', { name: '编辑', exact: true }).click()
   async function preview() {
@@ -90,25 +92,27 @@ test('locking or reopening a graphic cancels its vertex preview and a new sessio
     await page.getByRole('button', { name: '预览坐标', exact: true }).click()
   }
   await preview()
-  expect((await snapshot(page)).project.city?.nodes[0]).toEqual(node)
+  expect((await snapshot(page)).project.content.scene?.nodes[0]).toEqual(node)
   await page.evaluate(async id => (await import('/src/features/scene3d/scene3d-commands.ts')).setSceneNodesLocked([id], true), node.id)
   await expect(page.getByRole('button', { name: '应用修改', exact: true })).toHaveCount(0)
-  expect((await snapshot(page)).project.city?.nodes[0]).toEqual({ ...node, locked: true })
+  expect((await snapshot(page)).project.content.scene?.nodes[0]).toEqual({ ...node, locked: true })
   await page.getByRole('button', { name: '撤销', exact: true }).click()
   await preview()
   await page.evaluate(async () => {
-    const store = (await import('/src/stores/project.store.ts')).useProjectStore.getState()
-    store.loadSnapshot(store.getSnapshot())
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+
+    const store = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+    projectSession.loadSnapshot(projectSession.getSnapshot())
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
   })
   await expect(page.getByRole('button', { name: '应用修改', exact: true })).toHaveCount(0)
-  expect((await snapshot(page)).project.city?.nodes[0]).toEqual(node)
+  expect((await snapshot(page)).project.content.scene?.nodes[0]).toEqual(node)
   await page.locator('.scene3d-layer-row__select').filter({ hasText: node.name }).click()
   await preview()
   await page.getByRole('button', { name: '应用修改', exact: true }).click()
-  const committed = (await snapshot(page)).project.city!.nodes[0]
+  const committed = (await snapshot(page)).project.content.scene!.nodes[0]
   expect(committed).not.toEqual(node)
   await page.getByRole('button', { name: '撤销', exact: true }).click()
-  expect((await snapshot(page)).project.city?.nodes[0]).toEqual(node)
+  expect((await snapshot(page)).project.content.scene?.nodes[0]).toEqual(node)
   await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled()
 })

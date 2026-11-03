@@ -10,16 +10,31 @@ async function openTileset(page: Page) {
   const row = page.locator('.scene3d-layer-row').filter({ hasText: '建筑场景' })
   await expect(row.locator('small')).toHaveText('3D Tiles', { timeout: 30_000 })
   await row.locator('.scene3d-layer-row__select').click()
-  const id = await page.evaluate(async () => (await import('/src/stores/project.store.ts')).useProjectStore.getState().project.city!.nodes[0].id)
+  const id = await page.evaluate(async () => (await import('/src/session/project.store.ts')).useProjectStore.getState().project.content.scene!.nodes[0].id)
   return { row, id, inspector: page.getByRole('complementary', { name: '检查器面板' }), rail: page.getByRole('navigation', { name: '右侧工作面板' }) }
 }
 
 async function node(page: Page) {
-  return page.evaluate(async () => (await import('/src/stores/project.store.ts')).useProjectStore.getState().project.city!.nodes[0])
+  return page.evaluate(async () => (await import('/src/session/project.store.ts')).useProjectStore.getState().project.content.scene!.nodes[0])
 }
 async function presentation(page: Page, id: string) {
-  return page.evaluate(async id => (await import('/src/features/scene3d/scene3d-runtime-host.ts')).getLiveSceneDiagnostics(id)?.presentation?.tileset, id)
+  return page.evaluate(async id => (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneDiagnostics(id)?.presentation?.tileset, id)
 }
+
+test('3D scene tree keeps its full height when the 2D attribute table was open', async ({ page }) => {
+  await page.route('**/*tile.openstreetmap.org/**', route => route.abort())
+  await page.goto('/')
+  await page.getByRole('button', { name: /^三维场景/ }).click()
+  await expect(page.locator('.scene3d-footer__state')).toHaveText('就绪', { timeout: 30_000 })
+  await page.evaluate(async () => {
+    ;(await import('/src/view-state/workspace.store.ts')).useWorkspaceStore.getState().setBottomOpen(true)
+    ;(await import('/src/view-state/preferences.store.ts')).usePreferencesStore.getState().update({ fontSize: 8 })
+  })
+  const tree = (await page.getByRole('complementary', { name: '场景对象面板' }).boundingBox())!
+  const workspace = (await page.locator('.scene3d-workspace__body').boundingBox())!
+  expect(tree.y + tree.height).toBeCloseTo(workspace.y + workspace.height, 0)
+  await expect(page.getByRole('complementary', { name: '属性表面板' })).toHaveCount(0)
+})
 
 test('3D workrail, searchable API parameters and runtime-only actions share the desktop interaction model', async ({ page }) => {
   const { inspector, rail, id } = await openTileset(page)
@@ -46,9 +61,9 @@ test('3D workrail, searchable API parameters and runtime-only actions share the 
   await page.getByRole('button', { name: '重做', exact: true }).click()
   await expect.poll(() => node(page)).toMatchObject({ maximumScreenSpaceError: 8 })
   await rail.getByRole('button', { name: '场景', exact: true }).click()
-  const snapshot = await page.evaluate(async () => JSON.stringify((await import('/src/stores/project.store.ts')).useProjectStore.getState().getSnapshot()))
+  const snapshot = await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return JSON.stringify(projectSession.getSnapshot()) })
   await inspector.getByRole('switch', { name: '使用屏幕原生像素（高 DPI）', exact: true }).click()
-  expect(await page.evaluate(async () => JSON.stringify((await import('/src/stores/project.store.ts')).useProjectStore.getState().getSnapshot()))).toBe(snapshot)
+  expect(await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return JSON.stringify(projectSession.getSnapshot()) })).toBe(snapshot)
   await rail.getByRole('button', { name: '场景', exact: true }).click()
   await expect(inspector).toBeHidden()
 })

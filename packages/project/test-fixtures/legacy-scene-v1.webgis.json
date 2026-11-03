@@ -1,0 +1,18 @@
+{
+  "project": {
+    "id":"legacy-scene","version":1,"name":"旧三维工程","crs":"EPSG:3857",
+    "datasets":[],"layers":[],"groups":[],"rootOrder":[],
+    "mapState":{"center":[0,0],"zoom":2,"rotation":0},"basemap":{"type":"osm"},"settings":{"workspaceType":"3d"},
+    "description":"保留场景资产和显示配置",
+    "sceneDisplay":{"theme":{"colorScheme":"dark"}},
+    "city":{
+      "version":2,"camera":{"position":[116.391,39.907,850],"heading":10,"pitch":-48,"roll":0},
+      "assets":{"building":{"type":"3dtiles","url":"./assets/tileset.json"}},
+      "nodes":[{"id":"building-node","name":"建筑","type":"3dtiles","asset":"building","visible":true,"transform":{"translation":[0,0,0],"rotation":[0,0,0],"scale":1}}],
+      "effects":{"fog":0.2,"bloom":false}
+    }
+  },
+  "featuresByDataset":{}
+}
+
+

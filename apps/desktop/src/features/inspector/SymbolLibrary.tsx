@@ -1,13 +1,16 @@
+import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
+import { projectConfiguration } from '@/session/project-configuration'
+import { requireMapContent } from '@desktop-webgis/project'
 import { useState } from 'react'
 import { Alert, Button, Input, Modal, Popconfirm, Select, Space, Table, Tabs, Upload } from 'antd'
 import { isTauri } from '@tauri-apps/api/core'
-import { createId, getEffectiveLocked, getLayerCartography, setLayerCartography } from '@desktop-webgis/gis-core'
+import { createId, getEffectiveLocked, getLayerCartography, setLayerCartography } from '@desktop-webgis/project'
 import { BUILTIN_SYMBOL_PRESETS, instantiateSymbolPreset, parseSymbolPreset, type SymbolPreset } from '@desktop-webgis/ol-style/symbol-library'
 import { createStyleAsset, verifyStyleAssets, type ProjectStyleAsset } from '@desktop-webgis/ol-style/style-assets'
-import { useProjectStore } from '@/stores/project.store'
-import { downloadProject } from '@/services/browser-project-files'
-import { pickSaveFile, writeTextFile } from '@/services/files'
-import { finishStyleInteraction } from './style-interaction'
+import { useProjectStore } from '@/session/project.store'
+import { downloadProject } from '@/platform/browser-project-files'
+import { pickSaveFile, writeTextFile } from '@/platform/files'
+import { finishStyleInteraction } from '@/session/style-interaction'
 import { readPersonalSymbolLibrary, writePersonalSymbolLibrary, type PersonalSymbolLibrary } from './symbol-library-store'
 import { importSymbolPresetBundle, serializeSymbolPresetBundle } from './symbol-library-bundle'
 import { SymbolPreview } from './SymbolPreview'
@@ -60,7 +63,7 @@ export function SymbolLibrary({ layerId, onClose }: { layerId: string; onClose: 
     const store = useProjectStore.getState()
     if (getEffectiveLocked(store.project, layerId) || !getLayerCartography(store.project, layerId)) throw new Error('当前图层已删除或锁定')
     finishStyleInteraction(layerId)
-    return store.getSnapshot()
+    return { project: projectConfiguration.getSnapshot(), featuresByDataset: {} }
   }
   async function apply(preset: SymbolPreset) {
     const epoch = useProjectStore.getState().projectEpoch
@@ -69,20 +72,20 @@ export function SymbolLibrary({ layerId, onClose }: { layerId: string; onClose: 
     const snapshot = currentSnapshot()
     const fragment = getLayerCartography(snapshot.project, layerId)!
     snapshot.project = setLayerCartography(snapshot.project, layerId, instantiateSymbolPreset(preset, fragment.binding.styleSourceId, () => createId('drawing')))
-    snapshot.project.cartography!.assets = [...new Map([...(snapshot.project.cartography!.assets ?? []), ...preset.assets].map(asset => [asset.id, structuredClone(asset)])).values()]
-    if (!useProjectStore.getState().applySnapshotAsEdit(snapshot, '选择符号预设')) throw new Error('符号未应用')
+    requireMapContent(snapshot.project).cartography!.assets = [...new Map([...(requireMapContent(snapshot.project).cartography!.assets ?? []), ...preset.assets].map(asset => [asset.id, structuredClone(asset)])).values()]
+    if (!projectConfiguration.apply(snapshot.project, '选择符号预设')) throw new Error('符号未应用')
     await persist({ ...library, recent: [preset.id, ...library.recent.filter(id => id !== preset.id)].slice(0, 20) })
   }
   async function saveCurrent() {
     const epoch = useProjectStore.getState().projectEpoch
     const snapshot = currentSnapshot(), fragment = getLayerCartography(snapshot.project, layerId)!
-    const styleFingerprint = JSON.stringify({ layers: fragment.styleLayers, assets: snapshot.project.cartography?.assets ?? [] })
-    const preset: SymbolPreset = { id: createId('personal-symbol'), name: name.trim() || '我的符号', category: category === 'line' || category === 'polygon' ? category : 'point', tags: ['自定义'], attribution: { source, license }, layers: fragment.styleLayers.map(layer => ({ ...structuredClone(layer), ...('source' in layer ? { source: 'preset' } : {}) })), assets: structuredClone(snapshot.project.cartography!.assets ?? []) }
+    const styleFingerprint = JSON.stringify({ layers: fragment.styleLayers, assets: requireMapContent(snapshot.project).cartography?.assets ?? [] })
+    const preset: SymbolPreset = { id: createId('personal-symbol'), name: name.trim() || '我的符号', category: category === 'line' || category === 'polygon' ? category : 'point', tags: ['自定义'], attribution: { source, license }, layers: fragment.styleLayers.map(layer => ({ ...structuredClone(layer), ...('source' in layer ? { source: 'preset' } : {}) })), assets: structuredClone(requireMapContent(snapshot.project).cartography!.assets ?? []) }
     await verifyStyleAssets(preset.assets)
     const latest = useProjectStore.getState()
     const latestFragment = getLayerCartography(latest.project, layerId)
     if (latest.projectEpoch !== epoch || getEffectiveLocked(latest.project, layerId) || !latestFragment
-        || styleFingerprint !== JSON.stringify({ layers: latestFragment.styleLayers, assets: latest.project.cartography?.assets ?? [] })) throw new Error('工程、图层或样式在校验期间已改变，请重新保存符号')
+        || styleFingerprint !== JSON.stringify({ layers: latestFragment.styleLayers, assets: requireMapContent(latest.project).cartography?.assets ?? [] })) throw new Error('工程、图层或样式在校验期间已改变，请重新保存符号')
     await persist({ ...library, presets: [...library.presets, preset] })
   }
   async function importAsset(file: File) {
@@ -96,8 +99,8 @@ export function SymbolLibrary({ layerId, onClose }: { layerId: string; onClose: 
     else { const image = new Image(); image.src = asset.dataUrl; await image.decode() }
     if (epoch !== useProjectStore.getState().projectEpoch) throw new Error('工程已切换，请重新导入')
     const snapshot = currentSnapshot()
-    snapshot.project.cartography!.assets = [...new Map([...(snapshot.project.cartography!.assets ?? []), asset].map(item => [item.id, item])).values()]
-    useProjectStore.getState().applySnapshotAsEdit(snapshot, '导入符号资源')
+    requireMapContent(snapshot.project).cartography!.assets = [...new Map([...(requireMapContent(snapshot.project).cartography!.assets ?? []), asset].map(item => [item.id, item])).values()]
+    projectConfiguration.apply(snapshot.project, '导入符号资源')
   }
 
   async function importBundle(file: File) {
@@ -120,7 +123,7 @@ export function SymbolLibrary({ layerId, onClose }: { layerId: string; onClose: 
     } else {
       layers.push({ id: createId('drawing'), source: fragment.binding.styleSourceId, type: 'symbol', layout: { 'icon-image': asset.id, 'icon-size': 1 } })
     }
-    useProjectStore.getState().setLayerCartography(layerId, layers)
+    layerConfigurationCommands.setLayerCartography(layerId, layers)
   }
   return <>
     <Modal open title="选择符号" width={880} onCancel={onClose} footer={<Button onClick={onClose}>关闭</Button>}>
@@ -162,7 +165,7 @@ export function SymbolLibrary({ layerId, onClose }: { layerId: string; onClose: 
         columns={[{ title: '我的符号', dataIndex: 'name' }, { title: '操作', render: (_, preset) => <Space><Button disabled={busy} onClick={() => void run(() => exportPreset(preset))}>导出</Button><Button danger disabled={busy} onClick={() => void run(async () => { await persist({ ...library, presets: library.presets.filter(item => item.id !== preset.id) }); setSelectedPresetIds(ids => ids.filter(id => id !== preset.id)) })}>删除</Button></Space> }]}
       />
       <Space wrap style={{ marginBlock: 12 }}><Input aria-label="资源来源" value={source} onChange={event => setSource(event.target.value)} /><Input aria-label="资源许可" value={license} onChange={event => setLicense(event.target.value)} /><Input aria-label="字体名称" placeholder="WOFF2 字体名称" value={fontFamily} onChange={event => setFontFamily(event.target.value)} /><Upload accept=".svg,.png,.woff2" showUploadList={false} beforeUpload={file => { void run(() => importAsset(file)); return false }}><Button disabled={locked || busy}>导入项目资源</Button></Upload></Space>
-      <Table rowKey="id" size="small" dataSource={project.cartography?.assets ?? []} pagination={{ pageSize: 5 }} columns={[{ title: '项目资源', dataIndex: 'name' }, { title: '格式', dataIndex: 'mimeType' }, { title: '内容哈希', render: (_, asset) => asset.contentHash.slice(0, 12) }, { title: '操作', render: (_, asset) => <Button disabled={locked || busy} onClick={() => void run(() => useAsset(asset))}>用于当前图层</Button> }]} />
+      <Table rowKey="id" size="small" dataSource={requireMapContent(project).cartography?.assets ?? []} pagination={{ pageSize: 5 }} columns={[{ title: '项目资源', dataIndex: 'name' }, { title: '格式', dataIndex: 'mimeType' }, { title: '内容哈希', render: (_, asset) => asset.contentHash.slice(0, 12) }, { title: '操作', render: (_, asset) => <Button disabled={locked || busy} onClick={() => void run(() => useAsset(asset))}>用于当前图层</Button> }]} />
       <Space wrap><Input aria-label="色带名称" value={rampName} onChange={event => setRampName(event.target.value)} /><Input aria-label="色带颜色" value={rampColors} onChange={event => setRampColors(event.target.value)} /><Button disabled={busy} onClick={() => void run(async () => { const colors = rampColors.split(',').map(color => color.trim()); if (colors.length < 2 || colors.length > 32 || colors.some(color => !/^#[a-f\d]{6}$/i.test(color))) throw new Error('色带需要 2–32 个逗号分隔的十六进制颜色'); await persist({ ...library, colorRamps: [...library.colorRamps, { id: createId('ramp'), name: rampName, colors }] }) })}>保存色带</Button></Space>
       <Table rowKey="id" size="small" dataSource={library.colorRamps} pagination={{ pageSize: 3 }} columns={[{ title: '我的色带', dataIndex: 'name' }, { title: '颜色', render: (_, ramp) => ramp.colors.join(' → ') }]} />
     </Modal>}

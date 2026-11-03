@@ -107,7 +107,7 @@ async function waitForSceneView() {
   if (await page.locator('.scene3d-canvas__viewport canvas').count()) {
     let previous, stable = 0
     await poll(async () => {
-      const camera = await page.evaluate(async () => (await import('/src/features/scene3d/scene3d-runtime-host.ts')).getLiveSceneCamera())
+      const camera = await page.evaluate(async () => (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneCamera())
       const values = camera && [...camera.position, camera.heading, camera.pitch, camera.roll]
       if (values && previous && values.every((value, index) => Math.abs(value - previous[index]) < (index === 2 ? 1e-5 : 1e-8))) stable++
       else stable = 0
@@ -118,7 +118,7 @@ async function waitForSceneView() {
 }
 async function saveTo(path) {
   await waitForSceneView()
-  await page.evaluate(async (file) => (await import('/src/services/project-io.ts')).setCurrentProjectPath(file), path)
+  await page.evaluate(async (file) => (await import('/src/session/project-io.ts')).setCurrentProjectPath(file), path)
   await page.getByRole('button', { name: '保存项目', exact: true }).click()
   await expect(page.locator('.project-dirty')).toHaveCount(0)
   await poll(async () => (await entries()).length === 0, 'Native save did not clear the acknowledged recovery draft')
@@ -303,9 +303,9 @@ try {
   await page.getByRole('button', { name: '属性表', exact: true }).click()
   await expect(page.locator('.attribute-table-tab-panel:visible tbody')).toContainText('42')
   const restored2d = await saveTo(join(output, 'restored-2d.webgis.json'))
-  assert.equal(restored2d.project.id, baseline2d.project.id)
-  assert.deepEqual(restored2d.project.layers, draft2d.snapshot.project.layers)
-  assert.deepEqual(restored2d.project.datasets, draft2d.snapshot.project.datasets)
+  assert.equal(restored2d.project.metadata.id, baseline2d.project.metadata.id)
+  assert.deepEqual(restored2d.project.content.layers, draft2d.snapshot.project.content.layers)
+  assert.deepEqual(restored2d.project.content.datasets, draft2d.snapshot.project.content.datasets)
   assert.deepEqual(restored2d.featuresByDataset, draft2d.snapshot.featuresByDataset)
   assert.deepEqual(await readFile(formal2d), oldBytes)
   report.scenarios.push({ name: '2D native process termination, startup restore and native save', passed: true })
@@ -332,7 +332,7 @@ try {
   await mkdir(dirname(localModel), { recursive: true })
   await copyFile(resolve(desktop, '../../examples/city-3d/city-sample/tower.glb'), localModel)
   await page.evaluate(async ({ formal3d, localModel }) => {
-    const io = await import('/src/services/project-io.ts')
+    const io = await import('/src/session/project-io.ts')
     io.setCurrentProjectPath(formal3d)
     const commands = await import('/src/features/scene3d/scene3d-commands.ts')
     commands.updateScene('切换本地模型引用', scene => {
@@ -346,7 +346,7 @@ try {
   await expect(row.locator('small')).toHaveText('模型', { timeout: 60_000 })
   await poll(async () => await modelPixels() > 100, 'Local referenced GLB pixels were not rendered')
   const baseline3d = await saveTo(formal3d)
-  const baselineAsset = Object.values(baseline3d.project.city.assets).find(asset => asset.reference)
+  const baselineAsset = Object.values(baseline3d.project.content.scene.assets).find(asset => asset.reference)
   assert.equal(baselineAsset.reference.kind, 'relative')
   assert.equal(baselineAsset.url, undefined)
   report.localModelReference = baselineAsset.reference
@@ -355,7 +355,7 @@ try {
   await page.getByRole('menuitem', { name: '对象属性', exact: true }).click()
   await page.getByRole('spinbutton', { name: '等比缩放', exact: true }).fill('2')
   await page.getByRole('spinbutton', { name: '等比缩放', exact: true }).press('Tab')
-  const draft3d = await draftWhere((draft) => draft.snapshot.project.city?.nodes.some((node) => node.name === 'Native Tower' && node.transform.scale === 2))
+  const draft3d = await draftWhere((draft) => draft.snapshot.project.content.scene?.nodes.some((node) => node.name === 'Native Tower' && node.transform.scale === 2))
   await crash(); assert.deepEqual(await readFile(formal3d), cityBytes)
   await launch(); await restore()
   await expect(page.locator('.scene3d-footer__state')).toHaveText('就绪', { timeout: 60_000 })
@@ -376,13 +376,13 @@ try {
   await page.getByRole('menuitem', { name: '对象属性', exact: true }).click()
   await expect(page.getByRole('spinbutton', { name: '等比缩放', exact: true })).toHaveValue('2')
   const restored3d = await saveTo(join(output, 'restored-3d.webgis.json'))
-  assert.equal(restored3d.project.id, baseline3d.project.id)
-  assert.deepEqual(restored3d.project.city.nodes, draft3d.snapshot.project.city.nodes)
+  assert.equal(restored3d.project.metadata.id, baseline3d.project.metadata.id)
+  assert.deepEqual(restored3d.project.content.scene.nodes, draft3d.snapshot.project.content.scene.nodes)
   const resolvedRestored = await page.evaluate(async ({ snapshot, path }) => {
-    const io = await import('/src/services/project-resource-references.ts')
+    const io = await import('/src/session/project-resource-references.ts')
     return io.resolveProjectResourceReferences(snapshot, path)
   }, { snapshot: restored3d, path: join(output, 'restored-3d.webgis.json') })
-  assert.deepEqual(resolvedRestored.project.city.assets, draft3d.snapshot.project.city.assets)
+  assert.deepEqual(resolvedRestored.project.content.scene.assets, draft3d.snapshot.project.content.scene.assets)
   assert.deepEqual(await readFile(formal3d), cityBytes)
   await page.screenshot({ path: join(output, 'native-scene3d-restored.png') })
   report.scenarios.push({ name: '3D real GLB transform, native process termination and restore', passed: true })
@@ -421,11 +421,11 @@ try {
   const flattened = await canvasPixels(), initialDifference = await changedPixels(before, flattened)
   assert.ok(initialDifference > 200, `Native flattening changed only ${initialDifference} pixels`)
   await page.screenshot({ path: join(output, 'native-tileset-flattened.png') })
-  const cameraBefore = await page.evaluate(async () => (await import('/src/features/scene3d/scene3d-runtime-host.ts')).getLiveSceneCamera())
+  const cameraBefore = await page.evaluate(async () => (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneCamera())
   await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
   await page.mouse.wheel(0, -500)
   await poll(async () => {
-    const current = await page.evaluate(async () => (await import('/src/features/scene3d/scene3d-runtime-host.ts')).getLiveSceneCamera())
+    const current = await page.evaluate(async () => (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneCamera())
     return current && cameraBefore && Math.abs(current.position[2] - cameraBefore.position[2]) > 1
   }, 'Native camera did not move while flattening was active')
   const quality = inspector.locator('.scene3d-property-group').filter({ hasText: '瓦片质量' }).getByRole('combobox').first()
@@ -438,7 +438,7 @@ try {
   assert.ok(restoredDifference > 200, `Disabling native flattening changed only ${restoredDifference} pixels`)
   await page.getByRole('switch', { name: '启用压平范围 1' }).click()
   const nativeFlatten = await saveTo(join(output, 'native-tileset-flatten.webgis.json'))
-  const savedTileset = nativeFlatten.project.city.nodes.find((node) => node.type === '3dtiles')
+  const savedTileset = nativeFlatten.project.content.scene.nodes.find((node) => node.type === '3dtiles')
   assert.deepEqual(savedTileset.effects.map(({ kind, enabled, height }) => ({ kind, enabled, height })), [{ kind: 'flatten-polygon', enabled: true, height: 0 }])
   report.nativeTilesetFlatten = { renderer, initialDifference, restoredDifference, maximumScreenSpaceError: savedTileset.maximumScreenSpaceError }
   report.scenarios.push({ name: '3D Tiles local flatten on native physical GPU, camera movement, LOD change and restore', passed: true })
@@ -447,11 +447,13 @@ try {
   report.error = error.stack ?? String(error)
   await page?.screenshot({ path: join(output, 'native-failure.png') }).catch(() => undefined)
   if (page) report.liveState = await page.evaluate(async () => {
-    const store = await import('/src/stores/project.store.ts')
-    const io = await import('/src/services/project-io.ts')
+    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/data/feature-data.ts').at(-1) ?? '/src/data/feature-data.ts')
+
+    const store = await import('/src/session/project.store.ts')
+    const io = await import('/src/session/project-io.ts')
     const state = store.useProjectStore.getState()
     return { dirty: state.dirty, version: store.getProjectContentVersion(), epoch: state.projectEpoch,
-      snapshot: io.createSnapshotFromState(state.project, state.featuresByDataset) }
+      snapshot: io.createSnapshotFromState(state.project, featureData.readSnapshot()) }
   }).catch(() => null)
   console.error(error); process.exitCode = 1
 } finally {

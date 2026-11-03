@@ -1,12 +1,12 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import 'ol/ol.css'
-import './styles/tokens.css'
-import './styles/app.css'
-import './styles/antd-workbench.css'
-import App from './app/App'
-import { DesktopUiProvider } from './components/ui/DesktopUiProvider'
-import './styles/desktop-ux.css'
+import './ui/styles/tokens.css'
+import './ui/styles/app.css'
+import './ui/styles/antd-workbench.css'
+import App from '@/shell/App'
+import { DesktopUiProvider } from '@/ui/DesktopUiProvider'
+import './ui/styles/desktop-ux.css'
 
 createRoot(document.getElementById('app')!).render(
   <StrictMode>

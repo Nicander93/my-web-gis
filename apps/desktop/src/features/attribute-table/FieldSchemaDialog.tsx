@@ -1,10 +1,13 @@
+import { projectEdits } from '@/session/project-edits'
+import { useFeaturesByDataset } from '@/data/feature-data'
+import { requireMapContent } from '@desktop-webgis/project'
 import { useState } from 'react'
 import { Alert, Button, Checkbox, Form, Input, InputNumber, Select, Space, Typography } from 'antd'
-import { capabilitiesForDataset, createId, getEffectiveLocked, SetDatasetContentCommand, type DatasetField } from '@desktop-webgis/gis-core'
-import { EditorDialog } from '@/components/ui/EditorDialog'
-import { useProjectStore } from '@/stores/project.store'
-import { useWorkbenchStore } from '@/stores/workbench.store'
-import { useSessionStore } from '@/stores/session.store'
+import { capabilitiesForDataset, createId, getEffectiveLocked, SetDatasetContentCommand, type DatasetField } from '@desktop-webgis/project'
+import { EditorDialog } from '@/ui/EditorDialog'
+import { useProjectStore } from '@/session/project.store'
+import { useWorkbenchStore } from '@/view-state/workbench.store'
+import { useLayerViewStore } from '@/view-state/layer-view.store'
 import { parseCellValue } from './field-edits'
 import { getFieldReferences, prepareFieldSchemaEdit, type FieldSchemaEdit } from './field-schema-edits'
 
@@ -13,12 +16,12 @@ export function FieldSchemaDialog({ layerId, mode, name, onClose }: {
   layerId: string; mode: 'add' | 'rename' | 'remove'; name?: string; onClose(): void
 }) {
   const project = useProjectStore((state) => state.project)
-  const featuresByDataset = useProjectStore((state) => state.featuresByDataset)
+  const featuresByDataset = useFeaturesByDataset()
   const editLayerId = useWorkbenchStore((state) => state.editLayerId)
-  const sessions = useSessionStore((state) => state.sessions)
-  const layer = project.layers.find((item) => item.id === layerId)
-  const dataset = project.datasets.find((item) => item.id === layer?.datasetId)
-  const affected = project.layers.filter((item) => item.datasetId === dataset?.id)
+  const sessions = useLayerViewStore((state) => state.sessions)
+  const layer = requireMapContent(project).layers.find((item) => item.id === layerId)
+  const dataset = requireMapContent(project).datasets.find((item) => item.id === layer?.datasetId)
+  const affected = requireMapContent(project).layers.filter((item) => item.datasetId === dataset?.id)
   const [newName, setNewName] = useState(mode === 'rename' ? name ?? '' : '')
   const [type, setType] = useState<DatasetField['type']>('string')
   const [nullable, setNullable] = useState(true)
@@ -45,16 +48,16 @@ export function FieldSchemaDialog({ layerId, mode, name, onClose }: {
         : mode === 'rename' ? { type: 'rename', from: name!, to: newName }
           : { type: 'remove', name: name!, clearReferences }
       const result = prepareFieldSchemaEdit(project, dataset.id, featuresByDataset[dataset.id] ?? [], edit)
-      if (!useProjectStore.getState().executeEditCommand(new SetDatasetContentCommand(
+      if (!projectEdits.execute(new SetDatasetContentCommand(
         createId('cmd'), title, dataset.id, result.before, result.after, result.change))) throw new Error('字段操作未应用')
       for (const item of affected) {
         const tableFilter = sessions[item.id]?.attributeTable?.filterDraft
         if (!tableFilter?.length) continue
         if (mode === 'rename' && name) {
-          useSessionStore.getState().setAttributeTableState(item.id, { filterDraft: tableFilter.map((condition) =>
+          useLayerViewStore.getState().setAttributeTableState(item.id, { filterDraft: tableFilter.map((condition) =>
             condition.field === name ? { ...condition, field: newName } : condition) })
         } else if (mode === 'remove' && clearReferences) {
-          useSessionStore.getState().setAttributeTableState(item.id, { filterDraft: tableFilter.filter((condition) => condition.field !== name) })
+          useLayerViewStore.getState().setAttributeTableState(item.id, { filterDraft: tableFilter.filter((condition) => condition.field !== name) })
         }
       }
       onClose()

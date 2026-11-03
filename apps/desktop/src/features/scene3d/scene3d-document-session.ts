@@ -1,7 +1,7 @@
 import { createCesiumDocumentRuntime, type CesiumDocumentRuntime, type CesiumSceneRuntimeOptions, type CesiumSceneRuntime, type ResourceReferenceResolver } from '@desktop-webgis/cesium-scene-runtime'
 import { bindSceneRuntime, type SceneController, type SceneRuntimeBinding } from '@desktop-webgis/scene-core'
-import type { ProjectSnapshot } from '@desktop-webgis/gis-core'
-import { createProjectSceneProjection, type ProjectSceneProjection } from '../scene/project-scene-document'
+import type { ProjectSnapshot } from '@desktop-webgis/project'
+import { createProjectSceneProjection, type ProjectSceneProjection } from '@/exchange/project-scene-document'
 
 export interface SceneDocumentState {
   status: 'loading' | 'ready' | 'error'

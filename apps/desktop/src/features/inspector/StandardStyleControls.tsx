@@ -1,8 +1,10 @@
+import { useFeaturesByDataset } from '@/data/feature-data'
+import { requireMapContent } from '@desktop-webgis/project'
 import { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, ColorPicker, InputNumber, Select } from 'antd'
-import { getEffectiveLocked, getLayerCartography } from '@desktop-webgis/gis-core'
-import { useProjectStore } from '@/stores/project.store'
-import { beginStyleInteraction, finishStyleInteraction } from './style-interaction'
+import { getEffectiveLocked, getLayerCartography } from '@desktop-webgis/project'
+import { useProjectStore } from '@/session/project.store'
+import { beginStyleInteraction, finishStyleInteraction } from '@/session/style-interaction'
 import { updateStandardStyleProperty } from './standard-style-properties'
 import { listAttributeFields } from './style-draft'
 
@@ -44,9 +46,9 @@ const paintParameters: Record<string, Parameter[]> = {
 export function StandardStyleControls({ layerId, labels = false, onEdit }: { layerId: string; labels?: boolean; onEdit(id: string): void }) {
   const project = useProjectStore(state => state.project)
   const epoch = useProjectStore(state => state.projectEpoch)
-  const rows = useProjectStore(state => state.featuresByDataset)
+  const rows = useFeaturesByDataset()
   const fragment = getLayerCartography(project, layerId)
-  const layer = project.layers.find(item => item.id === layerId)
+  const layer = requireMapContent(project).layers.find(item => item.id === layerId)
   const fields = useMemo(() => listAttributeFields(layer ? rows[layer.datasetId] ?? [] : []), [layer, rows])
   const [selectedId, setSelectedId] = useState('')
   const [error, setError] = useState('')

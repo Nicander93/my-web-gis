@@ -1,11 +1,14 @@
+import { projectEdits } from '@/session/project-edits'
+import { useFeaturesByDataset } from '@/data/feature-data'
+import { requireMapContent } from '@desktop-webgis/project'
 import { useMemo, useRef, useState } from 'react'
 import { AutoComplete, Checkbox, Input, Radio, Select, Table, Tag } from 'antd'
 import type { TextAreaRef } from 'antd/es/input/TextArea'
-import { Button } from '@/components/ui/Button'
-import { createId, SetDatasetContentCommand, type DatasetField, type FieldFilterCondition, type GisFeature } from '@desktop-webgis/gis-core'
-import { useProjectStore } from '@/stores/project.store'
-import { useWorkbenchStore } from '@/stores/workbench.store'
-import { capabilitiesForDataset, getEffectiveLocked } from '@desktop-webgis/gis-core'
+import { Button } from '@/ui/Button'
+import { createId, SetDatasetContentCommand, type DatasetField, type FieldFilterCondition, type GisFeature } from '@desktop-webgis/project'
+import { useProjectStore } from '@/session/project.store'
+import { useWorkbenchStore } from '@/view-state/workbench.store'
+import { capabilitiesForDataset, isDatasetLocked } from '@desktop-webgis/project'
 import { calculateTableField, previewTableField, resolveDatasetFields, resolveFieldCalculationTargets, type FieldCalculationPreviewRow, type FieldCalculationScope } from './field-edits'
 
 function formatPreviewValue(value: unknown): string {
@@ -20,10 +23,10 @@ export function FieldCalculator({ layerId, tableFeatures, selectedIds, onClose }
   layerId: string; tableFeatures: GisFeature[]; selectedIds: ReadonlySet<string>; onClose(): void
 }) {
   const project = useProjectStore((state) => state.project)
-  const featuresByDataset = useProjectStore((state) => state.featuresByDataset)
+  const featuresByDataset = useFeaturesByDataset()
   const editLayerId = useWorkbenchStore((state) => state.editLayerId)
-  const layer = project.layers.find((item) => item.id === layerId)
-  const dataset = project.datasets.find((item) => item.id === layer?.datasetId)
+  const layer = requireMapContent(project).layers.find((item) => item.id === layerId)
+  const dataset = requireMapContent(project).datasets.find((item) => item.id === layer?.datasetId)
   const features = dataset ? featuresByDataset[dataset.id] ?? [] : []
   const fields = resolveDatasetFields(features, dataset?.fields)
   const [mode, setMode] = useState<'create' | 'update'>('create')
@@ -38,7 +41,7 @@ export function FieldCalculator({ layerId, tableFeatures, selectedIds, onClose }
   const selectedField = mode === 'update' ? fields.find((field) => field.name === name) : undefined
   const targetField = selectedField ?? { name, type, nullable }
   const targets = resolveFieldCalculationTargets(scope, features, tableFeatures, layer?.filter ?? [], selectedIds)
-  const canEdit = !!dataset && editLayerId === layerId && !getEffectiveLocked(project, layerId) && capabilitiesForDataset(dataset).editGeometry
+  const canEdit = !!dataset && editLayerId === layerId && !isDatasetLocked(project, dataset.id) && capabilitiesForDataset(dataset).editGeometry
   const preview = useMemo(() => {
     if (!expression.trim() || !name.trim() || (mode === 'update' && !selectedField)) return { rows: [], error: '' }
     try {
@@ -69,7 +72,7 @@ export function FieldCalculator({ layerId, tableFeatures, selectedIds, onClose }
       const field = selectedField ?? { name, type, nullable }
       const result = calculateTableField(features, dataset.fields, field, expression,
         new Set(targets.map((feature) => feature.id)))
-      const ok = useProjectStore.getState().executeEditCommand(new SetDatasetContentCommand(
+      const ok = projectEdits.execute(new SetDatasetContentCommand(
         createId('cmd'), '字段计算', dataset.id, { fields: dataset.fields, features }, result))
       if (!ok) throw new Error('字段计算未应用')
       setMessage(`已计算 ${result.count} 条记录，可一步撤销`)

@@ -24,7 +24,17 @@ pub fn write_atomic(path: &Path, content: &[u8]) -> io::Result<()> {
     write_with(path, |file| file.write_all(content))
 }
 
+/// Publish complete staged bytes only if the destination is still absent.
+/// Hard-link publication is atomic and never replaces another file; unsupported filesystems fail.
+pub fn create_atomic(path: &Path, content: &[u8]) -> io::Result<()> {
+    write_with_mode(path, |file| file.write_all(content), true)
+}
+
 fn write_with(path: &Path, writer: impl FnOnce(&mut File) -> io::Result<()>) -> io::Result<()> {
+    write_with_mode(path, writer, false)
+}
+
+fn write_with_mode(path: &Path, writer: impl FnOnce(&mut File) -> io::Result<()>, create: bool) -> io::Result<()> {
     if path.file_name().is_none() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -72,9 +82,14 @@ fn write_with(path: &Path, writer: impl FnOnce(&mut File) -> io::Result<()>) -> 
     // Windows replacement must not depend on an open temporary-file handle.
     drop(file);
     written?;
-    fs::rename(&pending.path, path)?;
-    // A successful move relinquishes the staging path; never delete a later file at that name.
-    pending.committed = true;
+    if create {
+        fs::hard_link(&pending.path, path)?;
+        // Drop removes only the staging link; the published destination remains complete.
+    } else {
+        fs::rename(&pending.path, path)?;
+        // A successful move relinquishes the staging path; never delete a later file at that name.
+        pending.committed = true;
+    }
     Ok(())
 }
 
@@ -152,6 +167,44 @@ mod tests {
         write_atomic(&path, &[0, 255, 2, 0]).unwrap();
         assert_eq!(fs::read(&path).unwrap(), [0, 255, 2, 0]);
         assert_eq!(directory.entries(), 1);
+    }
+
+    #[test]
+    fn creates_complete_new_file_without_overwriting_existing_data() {
+        let directory = TestDirectory::new();
+        let path = directory.destination();
+        create_atomic(&path, "完整来源数据".as_bytes()).unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "完整来源数据");
+        assert_eq!(directory.entries(), 1);
+        assert!(create_atomic(&path, b"replacement").is_err());
+        assert_eq!(fs::read_to_string(&path).unwrap(), "完整来源数据");
+        assert_eq!(directory.entries(), 1);
+    }
+
+    #[test]
+    fn new_file_publication_loses_to_a_concurrent_creator_without_overwriting_it() {
+        let directory = TestDirectory::new();
+        let path = directory.destination();
+        let result = write_with_mode(&path, |file| {
+            file.write_all(b"staged source")?;
+            fs::write(&path, b"other creator")
+        }, true);
+        assert!(result.is_err());
+        assert_eq!(fs::read_to_string(&path).unwrap(), "other creator");
+        assert_eq!(directory.entries(), 1);
+    }
+
+    #[test]
+    fn failed_new_file_staging_publishes_nothing() {
+        let directory = TestDirectory::new();
+        let path = directory.destination();
+        let result = write_with_mode(&path, |file| {
+            file.write_all(b"partial")?;
+            Err(io::Error::new(io::ErrorKind::Other, "injected staging failure"))
+        }, true);
+        assert!(result.is_err());
+        assert!(!path.exists());
+        assert_eq!(directory.entries(), 0);
     }
 
     #[test]

@@ -1,9 +1,14 @@
+import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
+import { projectSession } from '@/session/project-session'
+import { projectEdits } from '@/session/project-edits'
+import { featureData } from '@/data/feature-data'
+import { requireMapContent } from '@desktop-webgis/project'
 import { beforeEach, expect, it } from 'vitest'
-import { createProject, createDefaultLayerStyle, parseProjectSnapshot, serializeProjectSnapshot } from '@desktop-webgis/gis-core'
-import { useProjectStore } from '@/stores/project.store'
-import { useSessionStore } from '@/stores/session.store'
-import { useWorkbenchStore } from '@/stores/workbench.store'
-import type { ImportResult } from '@/services/import'
+import { createProject, createDefaultLayerStyle, parseProjectSnapshot, serializeProjectSnapshot } from '@desktop-webgis/project'
+import { useProjectStore } from '@/session/project.store'
+import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { useWorkbenchStore } from '@/view-state/workbench.store'
+import type { ImportResult } from '@/exchange/import'
 import { commitLocalImport, prepareLocalImport } from './local-import-command'
 
 const result = (): ImportResult => ({ errors: [], layers: ['First', 'Second'].map((name) => ({ name,
@@ -12,58 +17,58 @@ const result = (): ImportResult => ({ errors: [], layers: ['First', 'Second'].ma
 
 beforeEach(() => {
   const project = createProject('Import')
-  project.datasets = [{ id: 'existing-data', name: 'Existing', kind: 'vector', source: { type: 'memory', label: 'Existing' } }]
-  project.layers = [{ id: 'existing', datasetId: 'existing-data', name: 'Existing', visible: true, opacity: 1,
+  requireMapContent(project).datasets = [{ id: 'existing-data', name: 'Existing', kind: 'vector', source: { type: 'memory', label: 'Existing' } }]
+  requireMapContent(project).layers = [{ id: 'existing', datasetId: 'existing-data', name: 'Existing', visible: true, opacity: 1,
     editable: false, style: createDefaultLayerStyle('point') }]
-  useProjectStore.getState().loadSnapshot({ project, featuresByDataset: { 'existing-data': [] } })
-  useProjectStore.getState().setSelectedLayer('existing')
+  projectSession.loadSnapshot({ project, featuresByDataset: { 'existing-data': [] } })
+  useLayerViewStore.getState().setSelectedLayer('existing')
   useWorkbenchStore.getState().setEditLayer('existing')
-  useSessionStore.getState().setAttributeTableState('existing', { searchQuery: 'draft', columnWidths: { code: 232 } })
+  useLayerViewStore.getState().setAttributeTableState('existing', { searchQuery: 'draft', columnWidths: { code: 232 } })
 })
 
 it('imports a whole selection as one history step while preserving existing edit targets and table sessions', () => {
-  const before = useProjectStore.getState().getSnapshot()
-  const session = useSessionStore.getState().sessions.existing
+  const before = projectSession.getSnapshot()
+  const session = useLayerViewStore.getState().sessions.existing
   const preview = result()
   commitLocalImport(preview)
-  const after = useProjectStore.getState().getSnapshot()
-  expect(after.project.layers).toHaveLength(3)
+  const after = projectSession.getSnapshot()
+  expect(requireMapContent(after.project).layers).toHaveLength(3)
   expect(useWorkbenchStore.getState().editLayerId).toBe('existing')
-  expect(useSessionStore.getState().sessions.existing).toEqual(session)
+  expect(useLayerViewStore.getState().sessions.existing).toEqual(session)
   expect(parseProjectSnapshot(serializeProjectSnapshot(after))).toEqual(after)
   preview.layers[0].features[0].properties.code = 'mutated preview'
-  expect(Object.values(useProjectStore.getState().featuresByDataset).flat()[0].properties.code).toBe('001')
-  expect(useProjectStore.getState().undoEdit()).toBe(true)
-  expect(useProjectStore.getState().getSnapshot()).toEqual(before)
-  expect(useProjectStore.getState().selectedLayerId).toBe('existing')
-  expect(useProjectStore.getState().canUndoEdit()).toBe(false)
-  expect(useSessionStore.getState().sessions.existing).toEqual(session)
-  expect(useProjectStore.getState().redoEdit()).toBe(true)
-  expect(useProjectStore.getState().getSnapshot()).toEqual(after)
+  expect(Object.values(featureData.readSnapshot()).flat()[0].properties.code).toBe('001')
+  expect(projectEdits.undo()).toBe(true)
+  expect(projectSession.getSnapshot()).toEqual(before)
+  expect(useLayerViewStore.getState().selectedLayerId).toBe('existing')
+  expect(projectEdits.canUndo()).toBe(false)
+  expect(useLayerViewStore.getState().sessions.existing).toEqual(session)
+  expect(projectEdits.redo()).toBe(true)
+  expect(projectSession.getSnapshot()).toEqual(after)
 })
 
 it('rejects a malformed second layer or batch error without writing the valid first layer', () => {
-  const before = useProjectStore.getState().getSnapshot(), session = useSessionStore.getState().sessions.existing
+  const before = projectSession.getSnapshot(), session = useLayerViewStore.getState().sessions.existing
   const bad = result(); bad.layers[1].features.push(bad.layers[1].features[0])
   expect(() => commitLocalImport(bad)).toThrow(/ID.*重复/)
   expect(() => commitLocalImport({ ...result(), errors: ['Second layer failed'] })).toThrow('Second layer failed')
-  expect(useProjectStore.getState().getSnapshot()).toEqual(before)
-  expect(useSessionStore.getState().sessions.existing).toEqual(session)
-  expect(useProjectStore.getState().canUndoEdit()).toBe(false)
+  expect(projectSession.getSnapshot()).toEqual(before)
+  expect(useLayerViewStore.getState().sessions.existing).toEqual(session)
+  expect(projectEdits.canUndo()).toBe(false)
 })
 
 it('rejects empty selections before any command is created', () => {
-  expect(() => prepareLocalImport(useProjectStore.getState().getSnapshot(), { layers: [], errors: [] })).toThrow(/没有可导入/)
-  expect(useProjectStore.getState().canUndoEdit()).toBe(false)
+  expect(() => prepareLocalImport(projectSession.getSnapshot(), { layers: [], errors: [] })).toThrow(/没有可导入/)
+  expect(projectEdits.canUndo()).toBe(false)
 })
 
 it('keeps earlier immediate styles and table sessions when undoing an import', () => {
-  useProjectStore.getState().setLayerStyle('existing', { mode: 'single', symbol: { type: 'circle', radius: 12 } })
-  const before = useProjectStore.getState().getSnapshot()
-  const session = structuredClone(useSessionStore.getState().sessions.existing)
+  layerConfigurationCommands.setLayerStyle('existing', { mode: 'single', symbol: { type: 'circle', radius: 12 } })
+  const before = projectSession.getSnapshot()
+  const session = structuredClone(useLayerViewStore.getState().sessions.existing)
   commitLocalImport(result())
-  expect(useProjectStore.getState().getHistoryBlockReason('undo')).toBeNull()
-  expect(useProjectStore.getState().undoEdit()).toBe(true)
-  expect(useProjectStore.getState().getSnapshot()).toEqual(before)
-  expect(useSessionStore.getState().sessions.existing).toEqual(session)
+  expect(projectEdits.getBlockReason('undo')).toBeNull()
+  expect(projectEdits.undo()).toBe(true)
+  expect(projectSession.getSnapshot()).toEqual(before)
+  expect(useLayerViewStore.getState().sessions.existing).toEqual(session)
 })
