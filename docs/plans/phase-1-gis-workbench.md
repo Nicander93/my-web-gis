@@ -123,6 +123,8 @@ rtk proxy pnpm --filter @desktop-webgis/desktop build
 
 ### A. 核对基线与工作台交互
 
+**→ [Batch A (P00–P02) 产品验收文档](./batch-a-acceptance.md)**
+
 #### P00 — 建立基线和验收样本
 
 - 前置：无。
