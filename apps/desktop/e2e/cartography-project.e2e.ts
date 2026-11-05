@@ -23,8 +23,8 @@ const scene = {
 
 async function nativeState(page: Page) {
   return page.evaluate(async () => {
-    const moduleUrl = performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/runtime/map-runtime-host.ts').at(-1)
-    const { getMapRuntime } = await import(moduleUrl ?? '/src/runtime/map-runtime-host.ts') as typeof import('@/runtime/map-runtime-host')
+    const moduleUrl = performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/engine-host/map-runtime-host.ts').at(-1)
+    const { getMapRuntime } = await import(moduleUrl ?? '/src/engine-host/map-runtime-host.ts') as typeof import('@/engine-host/map-runtime-host')
     const runtime = getMapRuntime()
     const lower = runtime?.registry.getVector('lower'), upper = runtime?.registry.getVector('upper')
     if (!lower || !upper) return { runtime: Boolean(runtime), ids: runtime?.registry.entries().map(([id]) => id) }
@@ -55,8 +55,8 @@ test('standard styles survive scene import, node deletion undo, project save and
   await expect.poll(() => nativeState(page)).toEqual(expected)
   await page.evaluate(async () => {
     const loaded = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { createMapPropertyPreview, getMapRuntime } = await import(loaded('/src/runtime/map-runtime-host.ts')) as typeof import('@/runtime/map-runtime-host')
-    const { useProjectStore } = await import(loaded('/src/session/project.store.ts')) as typeof import('@/session/project.store')
+    const { createMapPropertyPreview, getMapRuntime } = await import(loaded('/src/engine-host/map-runtime-host.ts')) as typeof import('@/engine-host/map-runtime-host')
+    const { useProjectStore } = await import(loaded('/src/project/project.store.ts')) as typeof import('@/project/project.store')
     const state = useProjectStore.getState(), base = state.project.content.layers.find(layer => layer.id === 'upper')!
     const preview = createMapPropertyPreview(base, state.projectEpoch)
     try {
@@ -70,8 +70,8 @@ test('standard styles survive scene import, node deletion undo, project save and
   })
   await expect.poll(() => nativeState(page)).toEqual(expected)
   await page.evaluate(async () => {
-    const moduleUrl = performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/runtime/project-scene-controller.ts').at(-1)
-    const { createProjectSceneController } = await import(moduleUrl ?? '/src/runtime/project-scene-controller.ts') as typeof import('@/runtime/project-scene-controller')
+    const moduleUrl = performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/engine-host/project-scene-controller.ts').at(-1)
+    const { createProjectSceneController } = await import(moduleUrl ?? '/src/engine-host/project-scene-controller.ts') as typeof import('@/engine-host/project-scene-controller')
     const controller = createProjectSceneController()
     try { controller.removeNode('upper') } finally { controller.dispose() }
   })

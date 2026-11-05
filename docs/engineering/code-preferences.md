@@ -1,37 +1,37 @@
 # 代码偏好与维护约定
 
-本文档存放项目级代码约定。它是详细规则，只有在涉及代码实现或评审时按需读取；通用规则仍以根目录 `AGENTS.md` 为准。
+本文存放项目级的代码约定。它是详细规则，只在涉及代码实现或评审时按需阅读；通用规则仍以根目录的 `AGENTS.md` 为准。
 
 ## 实现原则
 
-- 以最小功能闭环为优先，先解决当前需求，再考虑可复用抽象和边界扩展。
-- 保持模块职责清晰：应用壳层负责组合和编排，Feature 负责业务 UI，基础 UI 不依赖 GIS 业务。
-- 不为了迁移而机械翻译旧实现；迁移时保留已有 GIS packages 的边界，逐步接回能力。
-- 不引入当前任务不需要的框架、第三方库或通用框架层。
+- 优先做能闭环的最小功能，先解决当前需求，再考虑可复用的抽象和边界扩展。
+- 保持模块职责清晰：应用壳层负责组合和编排，功能组件负责业务界面，基础界面组件不依赖 GIS 业务。
+- 不为了迁移而机械翻译旧实现；迁移时保留已有 GIS 包的边界，逐步把能力接回来。
+- 不为当前任务引入不需要的框架、第三方库或通用框架层。
 
 ## TypeScript 与 React
 
-- 新的 Desktop UI 使用 React、TypeScript 和函数组件；优先使用明确的 props 和局部状态。
-- Zustand 只保存跨组件共享状态。布局状态与 GIS Project、选中要素、OpenLayers Runtime 等业务状态分开。
-- Command 表达完整的用户操作，负责调用 Store 或 Service；新代码放在哪一层见 [分层规则](../architecture/layers.md)。
-- UI 不直接散落操作 OpenLayers API；通过 runtime/service 或 command 连接外部能力。
-- 面板容器负责开关、尺寸、恢复入口和布局；具体 Feature 通过 `children` 注入，不让容器反向 import Feature。
+- 新的 Desktop 界面使用 React、TypeScript 和函数组件；优先使用明确的 props 和局部状态。
+- Zustand 只保存跨组件共享的状态。布局状态要与 GIS 项目、选中要素、OpenLayers 运行时等业务状态分开。
+- 命令表达一次完整的用户操作，负责调用 Store 或 Service；新代码放在哪一层见[分层规则](../architecture/layers.md)。
+- 界面里不要到处直接调用 OpenLayers API；操作外部能力统一走运行时、服务或命令。
+- 面板容器负责开关、尺寸、恢复入口和布局；具体功能通过 `children` 注入，不让容器反向 import 功能组件。
 
 ## Desktop 通用组件
 
-- 按用户 2026-10-13 补充要求，通用控件统一使用 Ant Design React（antd），主题与密度服从 [工作台原型](../prototypes/workbench/desktop-webgis-2d-final.html)。
-- 新增 Button/Input/Select/Checkbox/Form/Dropdown/Tabs/Modal/Table 等不再手写原生控件；既有控件按功能批次迁移。业务包装保持轻薄，不伪造 DOM 事件适配库组件。
-- Docking、地图画布、GIS 控制柄及系统文件对话框保留真实业务边界。
+- 按用户 2026-10-13 补充的要求，通用控件统一使用 Ant Design React（antd），主题和密度服从[工作台原型](../prototypes/workbench/desktop-webgis-2d-final.html)。
+- 新增的 Button、Input、Select、Checkbox、Form、Dropdown、Tabs、Modal、Table 等不再手写原生控件；已有控件按功能批次逐步迁移。业务侧的包装保持轻薄，不要伪造 DOM 事件去适配组件库。
+- Docking、地图画布、GIS 控制柄和系统文件对话框保留真实的业务边界。
 
 ## 注释与命名
 
-- 类、公开函数和非显然的关键逻辑添加简短注释，说明职责或原因。
-- 不为显然的赋值、简单 JSX 或逐行复述代码添加注释。
-- 命名优先表达用户意图和领域动作，避免使用空泛的 `Manager`、`Engine`、`Bus` 等抽象名。
+- 类、公开函数和非显然的关键逻辑加简短注释，说明职责或原因。
+- 不为显然的赋值、简单的 JSX 或逐行复述代码加注释。
+- 命名优先表达用户意图和领域动作，避免 `Manager`、`Engine`、`Bus` 这类空泛的抽象名。
 
 ## 验证与改动边界
 
-- 修改前后检查 Git 状态，避免覆盖其他任务的改动。
-- 优先运行受影响 package 的构建/测试；涉及 Desktop Shell 时至少运行 Desktop build。
-- 不把应用设置误写入 GIS Project，不让布局调整触发 Project Dirty 或 Undo/Redo。
-- 文档、图片和示例数据属于项目资料；整理目录时更新引用，不修改内容本身。
+- 改动前后检查 Git 状态，避免覆盖其它任务的改动。
+- 优先运行受影响包的构建和测试；涉及 Desktop 外壳时，至少跑一次 Desktop 的构建。
+- 不要把应用设置误写进 GIS 项目，也不要让布局调整触发项目的未保存标记或撤销记录。
+- 文档、图片和示例数据都是项目资料；整理目录时更新引用，但不修改内容本身。

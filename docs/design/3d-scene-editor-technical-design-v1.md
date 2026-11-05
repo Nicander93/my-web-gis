@@ -14,7 +14,7 @@
 4. **场景树**：管理可选择的业务对象、分组和资源；**不设置“场景基础”专属分组**。地形、底图可从场景设置访问，不伪造具有通用编辑语义的普通图层。
 5. **属性检查器**：原生 Cesium API 名称为主，按功能折叠，支持中英文检索；通用参数用 Schema 渲染，复杂项用专用编辑器。仅公开、在锁定 Cesium 版本下验证的 API 才显示为可编辑。
 6. **数据编辑**：保留既有三维点线面/标绘与 GLB/3D Tiles 整体变换能力；3D Tiles 源网格不做破坏性修改，裁剪、压平、样式等只保存项目配置。
-7. **工程与资源**：保留现有 ProjectSnapshot 和 v3 SceneDocument 投影架构；工程只保存外部资源引用，不新增资源打包工作流；已存在的独立归档能力不要求本轮删除。
+7. **项目与资源**：保留现有 ProjectSnapshot 和 v3 SceneDocument 投影架构；项目只保存外部资源引用，不新增资源打包工作流；已存在的独立归档能力不要求本轮删除。
 8. **复用出口**：项目保存、场景 JSON 与原生 CesiumJS 代码导出分开设计；代码导出不能隐式依赖自研 SDK，未覆盖能力必须显式报告。
 
 ## 1. 当前代码审查：已有与缺口
@@ -22,12 +22,12 @@
 | 领域 | 已确认的当前实现 | V1 目标 / 注意事项 |
 |---|---|---|
 | 桌面基础 | React 19、Ant Design 6.6.6、Zustand、Tauri 2；`DesktopUiProvider` 消费 `tokens.css` | 不引入 lil-gui、Tweakpane、Leva，不单独搭建三维 UI 主题 |
-| 工作台 | 二维 `Workspace.tsx`、三维 `SceneWorkspace.tsx`；双方已有 `LeftPanel`/`RightPanel`/`BottomPanel` 复用与 Ribbon | 保留独立业务视图，但统一窗口布局、工具栏密度、右侧入口和状态反馈 |
+| 工作台 | 二维 `Workspace2D.tsx`、三维 `Workspace3D.tsx`；双方已有 `LeftPanel`/`RightPanel`/`BottomPanel` 复用与 Ribbon | 保留独立业务视图，但统一窗口布局、工具栏密度、右侧入口和状态反馈 |
 | 二维 UX 重构 | `docs/design/desktop-design-system-v1.md`、`PropertyWindow`、`DockWindow`、右侧工作工具栏、固定目标与属性草稿 | 作为三维 UX 基准，不倒退成原型式大卡片和长表单 |
 | 场景管理 | `SceneTree`：分组、拖拽排序、多选、显隐、锁定、右键与加载状态 | 复用现有对象树，无需另建 Layer/SceneItem 通用框架 |
 | 场景属性 | `SceneInspector`：基本属性、质量、Transform、裁剪、压平、标绘、Popup；`ScenePropertyWindow`：草稿/应用/预览 | 增加 API 参数描述与专业样式入口，复用现有 PropertyWindow；保留固定目标、冲突保护 |
 | 几何与空间编辑 | `useSceneDrawing`、`useSceneGraphicEditing`、Cesium layer Draw/Edit sessions、TilesetEditor Gizmo | 不重写。关注工具互斥、可撤销提交、草稿退出与真实地理坐标精度 |
-| 场景协议 | `project.city` 的 `CesiumScene` v2；`scene-schema` 的 SceneDocument v3 以及项目投影适配 | **不要并行发明新的场景 JSON 结构**；新字段必须设计迁移和 schema/投影映射 |
+| 场景协议 | `project.content.scene` 的 `CesiumScene` v2；`scene-schema` 的 SceneDocument v3 以及项目投影适配 | **不要并行发明新的场景 JSON 结构**；新字段必须设计迁移和 schema/投影映射 |
 | 运行时 | `cesium-scene-runtime` 支持文档投影、更新、异步资源恢复、预览与诊断 | 扩展既有 Adapter；不要在 React 组件散写 Cesium setter |
 | 3D Tiles | `TilesetLayer` 有加载、显隐、质量/缓存、整体 Transform；Effects 包有裁剪与压平 | 当前 `TilesetNode` 只有部分配置字段；**缺少正式持久化原生 3D Tiles Style/条件规则和高覆盖参数 Schema** |
 | 样式和导出 | 现有场景 `.scene.json` 导出、所选对象导出；`scene-codegen` 当前面向 **OpenLayers** | **Cesium 原生代码生成不是现成的已完成能力**，需独立落地并验证；不要把场景 JSON 导出混同于原生 JS 代码导出 |
@@ -36,7 +36,7 @@
 
 ### 1.1 对之前设计讨论的修正
 
-- **取消**“新建 `SceneDocument` 作为唯一权威状态”的独立实施计划。当前 Desktop 以 `ProjectSnapshot.project.city` 维护编辑数据，使用 `createProjectSceneProjection()` 生成 v3 文档供 Runtime 消费。可逐步调整权威模型，但只能作为后续单独迁移项目，不能在场景编辑器 V1 中顺手替换。
+- **取消**“新建 `SceneDocument` 作为唯一权威状态”的独立实施计划。当前 Desktop 以 `ProjectSnapshot.project.content.scene` 维护编辑数据，使用 `createProjectSceneProjection()` 生成 v3 文档供 Runtime 消费。可逐步调整权威模型，但只能作为后续单独迁移项目，不能在场景编辑器 V1 中顺手替换。
 - **取消**“三维右侧 Inspector 默认强制展开”的建议。尊重当前 Workspace 持久化偏好，默认左开右关；用户显式打开属性/样式时才展开右面板，选择对象不强制弹出。
 - **取消**为了模仿 V2 HTML 原型而引入另一套浮动/扩展面板。优先复用现有 `PropertyWindow`（非模态、固定对象、草稿、校验、应用/取消）。
 - **纠正**参数层的事实判断：`apps/desktop/package.json` 声明 `cesium: ^1.145.0`，真实安装版须由 `pnpm-lock.yaml` 锁定结果确认。以前整理的 1.146 参数候选表**不能直接当作仓库可用 API 或已支持覆盖率**。
@@ -111,7 +111,7 @@ interface ParameterDescriptor<T = unknown> {
 
 ### 4.2 参数状态四分法
 
-- **运行时可改**：直接调用现有 Runtime Adapter，成功后提交工程配置。
+- **运行时可改**：直接调用现有 Runtime Adapter，成功后提交项目配置。
 - **创建时确定**：Inspector 标明“需重新加载”，编辑草稿批量应用；加载失败保留上次成功运行实例和错误提示。
 - **只读诊断**：如 BoundingSphere、瓦片/内存统计，不进入项目 JSON 和 Undo。
 - **方法/事件**：如缓存清理、加载进度；呈现为动作或诊断，而非持久化配置。
@@ -123,18 +123,18 @@ interface ParameterDescriptor<T = unknown> {
 ## 5. 3D Tiles 样式与选择
 
 - 使用 Cesium 原生 `Cesium3DTileStyle` JSON 为语义权威，支持基础色、属性条件规则与原生 JSON 编辑模式。
-- 场景工程存**可序列化的 Style 定义**，而非 Cesium 实例；不与二维 MapLibre / SLD 共用样式 AST。
+- 场景项目存**可序列化的 Style 定义**，而非 Cesium 实例；不与二维 MapLibre / SLD 共用样式 AST。
 - 简单条件可以表单化；复杂表达式直接写原生表达式。视觉模式不认识的合法配置必须保留，不做破坏性降级。
 - 按条件着色前必须读取当前数据实际提供的 Feature 元数据；数据无稳定要素属性时，给予清晰提示。
 - **选择高亮与持久样式分离**：现有 `TilesetLayer.setHighlighted()` 会临时替换 `tileset.style`。引入持久样式后必须保障样式修改、选择切换、瓦片加载以及取消高亮不会错误恢复过期的旧 style。
 - 原生 `Style JSON` 编辑采用 草稿 → 校验 → 预览 → 应用/取消；非法 JSON 或失败执行不覆盖最近成功生效的样式。
 
-## 6. 工程保存与资源引用
+## 6. 项目保存与资源引用
 
 ### 6.1 保留当前权威链
 
 ```text
-Desktop ProjectSnapshot（已保存工程的业务权威）
+Desktop ProjectSnapshot（已保存项目的业务权威）
   └─ project.city: CesiumScene v2（编辑器当前三维数据）
         ├─ Scene Commands / EditHistory
         └─ createProjectSceneProjection(snapshot)
@@ -143,26 +143,26 @@ Desktop ProjectSnapshot（已保存工程的业务权威）
                           └─ Cesium Viewer / Layers / Graphics
 ```
 
-新增参数先明确其最终工程归属。需要延伸 `CesiumScene` 时，提供解析、验证、迁移及 v3 投影映射，不让 UI 直接修改 v3 投影结果。任何全面以 v3 作为唯一工程真源的工作另立迁移设计和回归范围。
+新增参数先明确其最终项目归属。需要延伸 `CesiumScene` 时，提供解析、验证、迁移及 v3 投影映射，不让 UI 直接修改 v3 投影结果。任何全面以 v3 作为唯一项目真源的工作另立迁移设计和回归范围。
 
 ### 6.2 引用模式 A（已确定）
 
-- 不复制 3D Tiles、GLB、GeoJSON、影像、地形等外部资源到项目工程。
+- 不复制 3D Tiles、GLB、GeoJSON、影像、地形等外部资源到项目项目。
 - 本地路径在保存时按项目位置进行相对化；通过已有 `local-resource-session` 与资源重定位实现加载。
 - 3D Tiles 子瓦片 URI 必须相对其自身引用文件正确解析；不能只加载 `tileset.json` 即声称支持本地 Tileset。
-- 不将访问 Token 或密钥存入工程；已有外部凭据注入机制继续保留。
-- 用户自己绘制的 Graphic 几何、样式与小规模必要元数据是工程内容，不算打包外部文件。
+- 不将访问 Token 或密钥存入项目；已有外部凭据注入机制继续保留。
+- 用户自己绘制的 Graphic 几何、样式与小规模必要元数据是项目内容，不算打包外部文件。
 - 仓库当前存在场景归档相关服务。**本轮不新增资源打包功能，但不为了选择 A 删除已有兼容代码**。
 
 ## 7. 编辑事务、Undo/Redo、生命周期
 
 - 保留 `project.store` + `SetCesiumSceneCommand`；不新建单独 `SceneEditManager` 和历史堆栈。
 - **离散操作**（开关/选择器/分组/添加删除）：成功后一次 Command。
-- **连续编辑**（Slider、拖动 Gizmo、节点移动）：运行时临时预览；鼠标释放/完成时提交**一条历史**。取消、失焦异常和工程切换撤销临时状态。
-- **完整属性窗**：复用现有草稿、固定对象、工程 epoch、原值冲突检查和“重新载入”，`applyScenePropertyDraft` 负责原子更新。
+- **连续编辑**（Slider、拖动 Gizmo、节点移动）：运行时临时预览；鼠标释放/完成时提交**一条历史**。取消、失焦异常和项目切换撤销临时状态。
+- **完整属性窗**：复用现有草稿、固定对象、项目 epoch、原值冲突检查和“重新载入”，`applyScenePropertyDraft` 负责原子更新。
 - **异步创建/重建**：不得因为后续失败而让项目参数和已显示对象不一致；用当前 `createCesiumDocumentRuntime` 的候选资源准备及成功替换机制，不承诺其无法保证的任意 setter 完整回滚。
-- 工程保存只更改 dirty baseline，不清空 History；窗口位置/大小、临时拾取、诊断指标、仅本机性能偏好不进入工程或历史。
-- 特别关注现有 `SceneRenderSettings` 在 Zustand 本地 persist，而不是工程配置：**设备质量偏好（DPI/MSAA）与想导出复现的场景视觉参数必须分清**。需要复用的视觉参数应进入项目文档；设备特定选项默认不导出。
+- 项目保存只更改 dirty baseline，不清空 History；窗口位置/大小、临时拾取、诊断指标、仅本机性能偏好不进入项目或历史。
+- 特别关注现有 `SceneRenderSettings` 在 Zustand 本地 persist，而不是项目配置：**设备质量偏好（DPI/MSAA）与想导出复现的场景视觉参数必须分清**。需要复用的视觉参数应进入项目文档；设备特定选项默认不导出。
 
 ## 8. 开发复用与导出
 
@@ -170,7 +170,7 @@ Desktop ProjectSnapshot（已保存工程的业务权威）
 
 **目标**：
 
-1. **Project JSON**：继续编辑的桌面工程，用现有保存命令。
+1. **Project JSON**：继续编辑的桌面项目，用现有保存命令。
 2. **Scene JSON**：引用资源、可供现有 Scene Consumer/Viewer 恢复的配置，用当前协议，新增能力必须接通该消费者。
 3. **Native CesiumJS 代码**：新增功能，显式生成合法的 Cesium 初始化/对象赋值表达式。颜色、矩阵、样式与枚举用对应构造器生成，不隐式依赖本项目 SDK。未支持能力必须报告并可选择阻止导出，不能静默遗漏。
 
@@ -191,8 +191,8 @@ Desktop ProjectSnapshot（已保存工程的业务权威）
 
 1. **一致性**：二维和三维使用同一全局主题/字号/控件密度、窗口行为、右键操作原则、错误提示和保存/Undo 快捷键；各自 Ribbon 允许差异化。
 2. **无倒退**：二维制图、图层编辑、属性表、GeoServer 发布相关既有测试不因三维修改失败。
-3. **编辑安全**：被锁定、删除、切换工程或异步重建中的对象不能被过期草稿静默覆盖；撤销一次手势只需一次 Undo。
-4. **资源可移植**：工程移动目录时本地相对路径可恢复或显示重定位；大 Tileset 不复制数据；无凭据泄露。
+3. **编辑安全**：被锁定、删除、切换项目或异步重建中的对象不能被过期草稿静默覆盖；撤销一次手势只需一次 Undo。
+4. **资源可移植**：项目移动目录时本地相对路径可恢复或显示重定位；大 Tileset 不复制数据；无凭据泄露。
 5. **样式正确**：规则条件在有元数据的 Tileset 生效；高亮不破坏持久样式；未知复杂 Style 不丢失。
 6. **输出诚实**：场景 JSON 和原生 JS 明确标识支持范围，缺能力发出阻断或降级报告；生成代码可以在独立 Cesium 项目验证。
 7. **测试等级**：单元测试 + 集成测试 + 浏览器 E2E + Tauri/WebView2 实际资源验收分别报告，不混淆证据。

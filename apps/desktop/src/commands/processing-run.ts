@@ -1,10 +1,10 @@
 import { layerContentCommands } from '@/commands/layer-content.commands'
-import { featureData } from '@/data/feature-data'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { featureData } from '@/project/datasets/feature-data'
+import { useLayerViewStore } from '@/stores/layer-view.store'
 import { requireMapContent } from '@desktop-webgis/project'
 import { applyFieldFilter, capabilitiesForDataset, inferLayerStyleKind, type GisFeature, type Layer, type SelectionState, type ProcessingOptions, type ProcessingResult, type ProcessingRecord } from '@desktop-webgis/project'
-import { useProjectStore } from '@/session/project.store'
-import { runLoggedTask } from '@/view-state/task-log'
+import { useProjectStore } from '@/project/project.store'
+import { runLoggedTask } from '@/stores/task-log'
 
 export type ProcessingScope = 'all' | 'filtered' | 'selected'
 
@@ -16,7 +16,7 @@ export function resolveProcessingInput(layer: Layer, scope: ProcessingScope, all
   return filtered.filter(feature => ids.has(feature.id))
 }
 
-/** Resolve the same layer filter and selection semantics used by the map and table. */
+/** 解析出与地图和属性表一致的图层过滤和选择语义。 */
 export function processingInput(layerId: string, scope: ProcessingScope): GisFeature[] {
   const state = useProjectStore.getState(), stateFeatureData = featureData.readSnapshot()
   const layer = requireMapContent(state.project).layers.find(item => item.id === layerId)
@@ -26,12 +26,12 @@ export function processingInput(layerId: string, scope: ProcessingScope): GisFea
   return resolveProcessingInput(layer, scope, all, useLayerViewStore.getState().selection)
 }
 
-/** A worker per operation lets cancellation stop computation and release its memory. */
+/** 每个任务单独开一个 worker，取消时可以真正停止计算并释放内存。 */
 export function runProcessing(features: GisFeature[], options: ProcessingOptions, signal: AbortSignal, overlay: GisFeature[] = []): Promise<ProcessingResult> {
   return runProcessingWorker<ProcessingResult>({ features, options, overlay }, signal)
 }
 
-/** Shared worker lifecycle for read-only reports and result-producing operations. */
+/** 只读报告和产出结果的运算共用同一套 worker 生命周期。 */
 export function runProcessingWorker<T>(request: unknown, signal: AbortSignal): Promise<T> {
   const check = !!request && typeof request === 'object' && 'kind' in request && request.kind === 'check-geometry'
   return runLoggedTask(check ? '检查几何' : '空间处理', operation => executeProcessingWorker<T>(request, operation), signal, result => {
@@ -44,7 +44,7 @@ export function runProcessingWorker<T>(request: unknown, signal: AbortSignal): P
 function executeProcessingWorker<T>(request: unknown, signal: AbortSignal): Promise<T> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) { reject(new DOMException('已取消', 'AbortError')); return }
-    const worker = new Worker(new URL('@/features/processing/processing.worker.ts', import.meta.url), { type: 'module' })
+    const worker = new Worker(new URL('@/ui/panels/processing/processing.worker.ts', import.meta.url), { type: 'module' })
     const cleanup = () => {
       worker.terminate()
       worker.onmessage = null
@@ -68,7 +68,7 @@ function executeProcessingWorker<T>(request: unknown, signal: AbortSignal): Prom
   })
 }
 
-/** Commit only a completed result to the originating project, as an independent local layer. */
+/** 只把完成的结果提交回发起它的项目，并作为一个独立的本地图层。 */
 export function addProcessingResult(projectId: string, name: string, result: ProcessingResult, record?: ProcessingRecord): string {
   const state = useProjectStore.getState()
   if (state.project.metadata.id !== projectId) throw new Error('项目已切换，本次结果未添加。')

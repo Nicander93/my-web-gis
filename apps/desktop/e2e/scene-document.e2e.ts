@@ -118,7 +118,7 @@ test('full scene menu preserves filtered-out data and imports through shared und
   expect(await page.evaluate(async () => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { getFilteredFeatures } = await import(active('/src/session/feature-query.ts'))
+    const { getFilteredFeatures } = await import(active('/src/project/feature-query.ts'))
     return getFilteredFeatures('points').map(feature => feature.id)
   })).toEqual(['1'])
   await page.getByRole('button', { name: '文件', exact: true }).click()

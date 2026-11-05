@@ -1,12 +1,12 @@
-import { featureData } from '@/data/feature-data'
+import { featureData } from '@/project/datasets/feature-data'
 import { selectionCommands } from '@/commands/selection.commands'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
 import { requireMapContent } from '@desktop-webgis/project'
 import { cloneValue, type GisFeature } from '@desktop-webgis/project'
 import type { GeometryCheckReport, GeometryIssue } from '@desktop-webgis/spatial-analysis'
 import { processingInput, runProcessingWorker, type ProcessingScope } from '@/commands/processing-run'
-import { useProjectStore } from '@/session/project.store'
-import { zoomMapToFeature } from '@/runtime/map-runtime-host'
+import { useProjectStore } from '@/project/project.store'
+import { zoomMapToFeature } from '@/engine-host/map-runtime-host'
 import { emitCommandStatus } from '@/platform/command-status'
 
 export interface GeometryCheckResult {
@@ -22,7 +22,7 @@ function requireCurrent(result: GeometryCheckResult): void {
   if (state.project.metadata.id !== result.projectId || !requireMapContent(state.project).layers.some(layer => layer.id === result.layerId && layer.datasetId === result.datasetId) || stateFeatureData[result.datasetId] !== result.source) throw new Error('输入数据已变化，请重新检查。')
 }
 
-/** Diagnose a snapshot without adding datasets or modifying edit history. */
+/** 只诊断快照本身，不新增数据集，也不改动编辑历史。 */
 export async function checkLayerGeometry(layerId: string, scope: ProcessingScope, signal: AbortSignal): Promise<GeometryCheckResult> {
   const state = useProjectStore.getState(), stateFeatureData = featureData.readSnapshot()
   const input = processingInput(layerId, scope)
@@ -36,7 +36,7 @@ export async function checkLayerGeometry(layerId: string, scope: ProcessingScope
   return result
 }
 
-/** Selection is transient; changing it never dirties the project. */
+/** 选择是临时的，改变选择不会把项目标记为有未保存修改。 */
 export function selectGeometryIssues(result: GeometryCheckResult, issue?: GeometryIssue): void {
   requireCurrent(result)
   const ids = issue ? [issue.featureId] : [...new Set(result.report.issues.map(row => row.featureId))]

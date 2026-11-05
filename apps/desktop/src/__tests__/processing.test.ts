@@ -1,17 +1,17 @@
 import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
 import { layerContentCommands } from '@/commands/layer-content.commands'
-import { projectSession } from '@/session/project-session'
-import { projectEdits } from '@/session/project-edits'
-import { featureData } from '@/data/feature-data'
+import { projectSession } from '@/project/project-session'
+import { projectEdits } from '@/project/project-edits'
+import { featureData } from '@/project/datasets/feature-data'
 import { selectionCommands } from '@/commands/selection.commands'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
 import { requireMapContent } from '@desktop-webgis/project'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createProject, parseProjectSnapshot, processFeatures, serializeProjectSnapshot, type GisFeature, type ProcessingOptions } from '@desktop-webgis/project'
-import { useProjectStore } from '@/session/project.store'
+import { useProjectStore } from '@/project/project.store'
 import { addProcessingResult, processingInput, runProcessing } from '@/commands/processing-run'
 import { processingCommands } from '@/commands/processing.commands'
-import { executeProcessing } from '@/features/processing/executeProcessing'
+import { executeProcessing } from '@/ui/panels/processing/executeProcessing'
 
 const features: GisFeature[] = [1, 2, 3].map(value => ({ id: `f${value}`, geometry: { type: 'Point', coordinates: [116 + value / 10, 40] }, properties: { value } }))
 

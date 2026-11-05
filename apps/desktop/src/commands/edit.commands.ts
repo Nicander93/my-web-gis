@@ -1,15 +1,15 @@
-import { projectEdits } from '@/session/project-edits'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { projectEdits } from '@/project/project-edits'
+import { useLayerViewStore } from '@/stores/layer-view.store'
 import { requireMapContent } from '@desktop-webgis/project'
 import { emitCommandStatus } from '@/platform/command-status'
-import { finishStyleInteraction } from '@/session/style-interaction'
-import { useProjectStore } from '@/session/project.store'
-import { useWorkbenchStore } from '@/view-state/workbench.store'
+import { finishStyleInteraction } from '@/project/style-interaction'
+import { useProjectStore } from '@/project/project.store'
+import { useWorkbenchStore } from '@/stores/workbench.store'
 import { capabilitiesForDataset, isDatasetLocked } from '@desktop-webgis/project'
 import {
   isToolRuntimeMounted,
   setActiveEditTool
-} from '@/runtime/map-runtime-host'
+} from '@/engine-host/map-runtime-host'
 
 /** 编辑命令：撤销/重做走 EditHistory；绘制/修改/删除接入 OlToolRuntime。 */
 export const editCommands = {
@@ -21,7 +21,7 @@ export const editCommands = {
     }
     editCommands.beginLayer(layerId)
   },
-  /** Tables have their own target, independent of the layer selected in the tree. */
+  /** 属性表有自己独立的目标，不受图层树当前选中的图层影响。 */
   beginLayer(layerId: string): boolean {
     const state = useProjectStore.getState()
     const current = useWorkbenchStore.getState().editLayerId

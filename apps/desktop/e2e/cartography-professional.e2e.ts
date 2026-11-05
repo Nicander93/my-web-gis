@@ -31,8 +31,8 @@ async function select(page: Page, label: string, text: string) {
 async function inspect(page: Page, id: string) {
   return page.evaluate(async id => {
     const loaded = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(loaded('/src/session/project.store.ts')) as typeof import('@/session/project.store')
-    const { getMapRuntime } = await import(loaded('/src/runtime/map-runtime-host.ts')) as typeof import('@/runtime/map-runtime-host')
+    const { useProjectStore } = await import(loaded('/src/project/project.store.ts')) as typeof import('@/project/project.store')
+    const { getMapRuntime } = await import(loaded('/src/engine-host/map-runtime-host.ts')) as typeof import('@/engine-host/map-runtime-host')
     const state = useProjectStore.getState(), binding = state.project.content.cartography.bindings.find(binding => binding.gisLayerId === id)!
     const native = getMapRuntime()?.registry.getVector(id), feature = native?.getSource()?.getFeatures()[0]
     const result = feature ? native?.getStyleFunction()?.(feature, getMapRuntime()!.getMap().getView().getResolution()!) : undefined
@@ -138,10 +138,10 @@ test(`${format} GeoServer wizard publishes against the isolated real server and 
   await expect(dialog.getByRole('button', { name: '加载已发布 WMS', exact: true })).toBeVisible()
   expect(mutations).toBe(1)
   const persisted = await page.evaluate(async () => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
-    const path = '/src/session/project.store.ts', url = performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(url) as typeof import('@/session/project.store')
+    const path = '/src/project/project.store.ts', url = performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
+    const { useProjectStore } = await import(url) as typeof import('@/project/project.store')
     return { project: projectSession.getSnapshot(), local: Object.fromEntries(Object.entries(localStorage)) }
   })
   const link = persisted.project.project.content.layers.find(layer => layer.id === 'roads')!.publishedStyle!

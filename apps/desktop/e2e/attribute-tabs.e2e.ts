@@ -6,8 +6,8 @@ test.afterEach(async ({ page }, info) => {
   const tasks = await page.evaluate(async () => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useTaskLogStore } = await import(active('/src/view-state/task-log.store.ts'))
-    const { useProjectStore } = await import(active('/src/session/project.store.ts'))
+    const { useTaskLogStore } = await import(active('/src/stores/task-log.store.ts'))
+    const { useProjectStore } = await import(active('/src/project/project.store.ts'))
     return { epoch: useProjectStore.getState().projectEpoch, entries: useTaskLogStore.getState().entries }
   })
   await info.attach('import-task-state', { contentType: 'application/json', body: JSON.stringify({ ...tasks, workers: page.workers().map(worker => worker.url()) }) })
@@ -15,16 +15,16 @@ test.afterEach(async ({ page }, info) => {
 
 async function editingState(page: Page) {
   return page.evaluate(async () => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
-    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-edits.ts').at(-1) ?? '/src/session/project-edits.ts')
+    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-edits.ts').at(-1) ?? '/src/project/project-edits.ts')
 
-    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/view-state/layer-view.store.ts').at(-1) ?? '/src/view-state/layer-view.store.ts')).useLayerViewStore.getState()
+    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/stores/layer-view.store.ts').at(-1) ?? '/src/stores/layer-view.store.ts')).useLayerViewStore.getState()
 
     const currentModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .findLast(url => new URL(url).pathname === path) ?? path
-    const project = (await import(currentModule('/src/session/project.store.ts'))).useProjectStore.getState()
-    const workbench = (await import(currentModule('/src/view-state/workbench.store.ts'))).useWorkbenchStore.getState()
+    const project = (await import(currentModule('/src/project/project.store.ts'))).useProjectStore.getState()
+    const workbench = (await import(currentModule('/src/stores/workbench.store.ts'))).useWorkbenchStore.getState()
     return { snapshot: projectSession.getSnapshot(), dirty: project.dirty, undo: projectEdits.canUndo(), redo: projectEdits.canRedo(),
       selectedLayerId: selectionSession.selectedLayerId, selection: selectionSession.selection, editLayerId: workbench.editLayerId, tableLayerId: workbench.tableLayerId }
   })
@@ -205,7 +205,7 @@ test('table editing respects another tab, parent locks and remote read-only snap
     const { layerConfigurationCommands } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/commands/layer-configuration.commands.ts').at(-1) ?? '/src/commands/layer-configuration.commands.ts')
 
     const moduleUrl = performance.getEntriesByType('resource').map(entry => entry.name)
-      .findLast(url => new URL(url).pathname === '/src/session/project.store.ts') ?? '/src/session/project.store.ts'
+      .findLast(url => new URL(url).pathname === '/src/project/project.store.ts') ?? '/src/project/project.store.ts'
     const state = (await import(moduleUrl)).useProjectStore.getState()
     const group = layerConfigurationCommands.createGroup('locked group', [id])
     layerConfigurationCommands.setGroupLocked(group, true)
@@ -219,7 +219,7 @@ test('table editing respects another tab, parent locks and remote read-only snap
 
     const currentModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .findLast(url => new URL(url).pathname === path) ?? path
-    const state = (await import(currentModule('/src/session/project.store.ts'))).useProjectStore.getState()
+    const state = (await import(currentModule('/src/project/project.store.ts'))).useProjectStore.getState()
     const service = layerContentCommands.addServiceLayer({ name: '只读 WFS', kind: 'wfs', source: { type: 'wfs',
       url: 'https://example.invalid/wfs', version: '2.0.0', typeName: 'stations', outputFormat: 'application/json', authMode: 'none' } })
     const { layerCommands } = await import(currentModule('/src/commands/layer.commands.ts'))

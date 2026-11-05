@@ -1,27 +1,44 @@
-# Viewer scene documents
+# @desktop-webgis/viewer
 
-The read-only Viewer loads canonical SceneDocument v3, legacy SceneManifest v1/v2 and standalone CesiumScene v1/v2 through the shared schema migration. It uses `OlDocumentRuntime` for maps and `createCesiumDocumentRuntime` for native city content. There is no Desktop or React dependency.
+一个不依赖 React 和编辑器代码的轻量只读场景查看器。
 
-After workspace dependencies and package builds are available:
+## 用途
 
-```sh
+1. **静态发布运行端**：配合 `@desktop-webgis/scene-publisher`，把编辑器导出的 `SceneDocument` 打包成可以部署到任意静态服务器的网页应用。
+2. **跨端渲染验收宿主**：在 E2E 测试中加载编辑器导出的 v3 `SceneDocument`（包含二维地图和三维 Cesium 场景），验证独立运行时里的实际渲染和交互是否一致。
+
+## 架构图
+
+```mermaid
+flowchart TB
+  entry["src/main.ts<br/>解析 URL 参数 · 挂载主题与控件 · 图层开关与图例"]
+  loader["src/scene-document.ts<br/>loadViewerDocument（解析并升级 v1/v2/v3 场景）"]
+  controller["@desktop-webgis/scene-core<br/>SceneController + bindSceneRuntime"]
+
+  subgraph view2d ["二维地图路径（mode=2d）"]
+    olRuntime["@desktop-webgis/ol-scene-runtime<br/>OlDocumentRuntime（Canvas / WebGL）"]
+    olSel["src/selection.ts<br/>@desktop-webgis/ol-selection 点选高亮"]
+    olStyle["@desktop-webgis/ol-style<br/>buildLegendItems / 标准制图图例"]
+  end
+
+  subgraph view3d ["三维场景路径（src/viewer-3d.ts，mode=3d）"]
+    cesiumRuntime["@desktop-webgis/cesium-scene-runtime<br/>createCesiumDocumentRuntime"]
+  end
+
+  entry --> loader
+  entry --> controller
+  controller --> view2d
+  controller --> view3d
+  olRuntime --> olSel
+  olRuntime --> olStyle
+```
+
+## 运行与构建
+
+```bash
 pnpm --filter @desktop-webgis/viewer dev
 pnpm --filter @desktop-webgis/viewer exec tsc --noEmit
 pnpm --filter @desktop-webgis/viewer build
 ```
 
-Open `/?scene=./examples/v3/scene.json` for the supplied v3 point/Popup example. `scene` is resolved against the Viewer page; declared resource URLs are resolved against the final HTTP scene response URL, including redirects. Nested model/tileset references remain engine-managed and are not a downloadable resource bundle.
-
-Canonical files open their declared active view. `mode=2d` or `mode=3d` selects an engine, preferring the active view when it matches. Old mixed manifests retain their former default 3D opening behavior. Native city views offer a link to 2D when a map view exists.
-
-Map views offer a Canvas/WebGL selector; `renderer=webgl` opts into compatible non-interactive standard-style layers. This is a Viewer preference and reloads the page without changing scene content. Complex styles, labels, node filters and interactive nodes retain Canvas, with a status explanation. WebGL requires the pinned OL extensions, and context loss falls back to Canvas. The default stays Canvas: software SwiftShader browser samples do not justify automatic GPU selection or a physical-device speed claim.
-
-Map layer/group visibility, legend, widgets, theme and safe text/HTTP Popup fields remain available. Provider secrets come from optional `runtime-config.json` rather than the scene. Runtime-authenticated WMS/WMTS and GeoJSON need a transport adapter and are explicitly rejected by the v3 factory. WFS displays its saved cache. Unsupported engine objects remain in the document and are reported in the status area; required unknown extensions block loading.
-
-For map views, the layer list and legend are shown by default; `widgets.layerSwitcher: false` and `widgets.legend: false` explicitly disable them. The legend uses the same applied categories, breaks and fallback labels as Desktop, with scrollable groups. Desktop's **Export complete scene** downloads a v3 document that can be served unchanged and opened with `?scene=./document.json&mode=2d`. The Desktop-to-Viewer browser workflow is tested with `apps/desktop/playwright.publish.config.ts`; this is scene-file delivery, not a generated hosting bundle.
-
-Selectable map nodes use the shared `ol-selection` package in click-only mode, keeping drag-to-pan available. Accepted selection honors typed IDs, filters, visibility and locks. Visibility changes clear disallowed highlights. Selection is local view state; it does not change saved content or edit history. Page exit disposes the selection controller and owned runtime. Direct native mutations and camera navigation are not exported as document edits.
-
-Both map and city Viewer paths use `SceneController` as their writable content owner and `bindSceneRuntime` to project revisions. Visibility edits use controller APIs; map Popup definitions read controller content. Engine copies are applied projections, not a second writable content owner. Binding errors report failed rendering and do not roll back committed content. Cesium presentation edits reuse ready native objects and retain a navigated camera; resource changes prepare hidden replacements, with cancellation and late-resource cleanup. Leaving the page disposes the binding and owned runtime. Desktop migration and complete capability parity remain pending.
-
-Browser verification lives in `apps/desktop/e2e/viewer-document.e2e.ts` with the separate `playwright.viewer.config.ts`. It exercises real OL/Cesium browser rendering at 1024×680, 1440×900 and 1920×1080. It is not Windows native/DPI or hardware GPU acceptance. Full publication packaging, resource archives, broader capability parity and public tarball engine consumers remain implementation-plan work.
+打开 `/?scene=./examples/v3/scene.json` 可以预览内置的 v3 示例场景；用 `mode=2d` 或 `mode=3d` 切换视图模式，二维视图支持通过 `renderer=canvas|webgl` 切换矢量渲染器。

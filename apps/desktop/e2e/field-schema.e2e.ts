@@ -101,8 +101,8 @@ test('typed empty GeoJSON columns survive the real worker import and appear in t
   const result = await page.evaluate(async () => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(active('/src/session/project.store.ts'))
-    const { featureData } = await import(active('/src/data/feature-data.ts'))
+    const { useProjectStore } = await import(active('/src/project/project.store.ts'))
+    const { featureData } = await import(active('/src/project/datasets/feature-data.ts'))
     const project = useProjectStore.getState().project, dataset = project.content.datasets.find(dataset => dataset.name === 'typed-empty')!
     return { fields: dataset.fields, source: await featureData.readSourceFields(dataset.id), effective: featureData.getEffectiveFields(dataset.id),
       rows: featureData.getAll(dataset.id), pending: featureData.pendingCount(dataset.id) }
@@ -132,8 +132,8 @@ test('managed GeoJSON preserves stable IDs and original provenance through the r
   const result = await page.evaluate(async () => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(active('/src/session/project.store.ts'))
-    const { featureData } = await import(active('/src/data/feature-data.ts'))
+    const { useProjectStore } = await import(active('/src/project/project.store.ts'))
+    const { featureData } = await import(active('/src/project/datasets/feature-data.ts'))
     const dataset = useProjectStore.getState().project.content.datasets.find(dataset => dataset.name === 'managed')!
     return { fields: dataset.fields, source: await featureData.readSource(dataset.id), effective: featureData.getAll(dataset.id), pending: featureData.pendingCount(dataset.id) }
   })
@@ -159,8 +159,8 @@ test('field-add commit retains typed values and independent configuration undo',
   await page.getByRole('button', { name: '确认导入', exact: true }).click()
   await page.evaluate(async () => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { projectEdits } = await import(active('/src/session/project-edits.ts'))
-    const { useProjectStore } = await import(active('/src/session/project.store.ts'))
+    const { projectEdits } = await import(active('/src/project/project-edits.ts'))
+    const { useProjectStore } = await import(active('/src/project/project.store.ts'))
     const { layerConfigurationCommands } = await import(active('/src/commands/layer-configuration.commands.ts'))
     projectEdits.clear()
     layerConfigurationCommands.renameLayer(useProjectStore.getState().project.content.layers[0].id, 'Config kept')
@@ -178,9 +178,9 @@ test('field-add commit retains typed values and independent configuration undo',
   await expect(dialog).toHaveCount(0)
   const result = await page.evaluate(async () => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { commitDatasetEdits } = await import(active('/src/session/data-save.ts'))
-    const { useProjectStore } = await import(active('/src/session/project.store.ts'))
-    const { featureData } = await import(active('/src/data/feature-data.ts'))
+    const { commitDatasetEdits } = await import(active('/src/project/data-save.ts'))
+    const { useProjectStore } = await import(active('/src/project/project.store.ts'))
+    const { featureData } = await import(active('/src/project/datasets/feature-data.ts'))
     const id = useProjectStore.getState().project.content.datasets[0].id
     let captured: unknown
     await commitDatasetEdits(id, async (features, _signal, fields) => { captured = { features: structuredClone(features), fields: structuredClone(fields) } })

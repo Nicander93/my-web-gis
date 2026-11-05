@@ -1,5 +1,5 @@
 import { vi, describe, it, expect } from 'vitest'
-import { importCsvFile } from '@/exchange/import'
+import { importCsvFile } from '@/io/import'
 
 describe('CSV Import Service', () => {
   it('导入带有中文的 CSV 文件', async () => {
@@ -85,9 +85,9 @@ describe('CSV Import Service', () => {
   })
 })
 
-vi.mock('@/exchange/import-worker', async () => {
-  const parser = await import('@/exchange/import-parser')
-  return { runImportWorker: async (request: import('@/exchange/import-worker').ImportRequest) => {
+vi.mock('@/io/import-worker', async () => {
+  const parser = await import('@/io/import-parser')
+  return { runImportWorker: async (request: import('@/io/import-worker').ImportRequest) => {
     if (request.kind === 'geojson') return parser.importGeoJson(request.source, request.options)
     if (request.kind === 'csv') return parser.importCsvFile(request.source, request.options)
     if (request.kind === 'shapefile') return parser.importShapefileZip(request.source, request.options)

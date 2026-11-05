@@ -1,108 +1,119 @@
 # 代码分层与包边界
 
-本文档说明 Desktop 的目录分层、依赖方向，以及 `packages/` 中哪些包可以独立发布。新增或移动代码前先对照这里。目录迁移记录见 [分层计划](layering-plan.md)。
+本文说明 Desktop 的目录结构、真实的五层依赖关系，以及 `packages/` 下 `public` 与 `internal` 两类包的边界。新增或移动代码前先看这里。
 
-不使用“领域层”“Domain”之类的说法，目录和文档直接用职责命名。
+本文不使用“领域层”“Domain”这类说法，目录和文档直接按职责命名。
 
-## Desktop 目录
+## Desktop 目录与五层架构
+
+![Desktop 五层目录与依赖图](./desktop-layers.svg)
+
+`apps/desktop/src/` 下只有 **7 个顶层目录**，对应自上而下的 **5 层结构**。其中第 3 层和第 4 层各有两块平级的模块：
 
 ```text
 apps/desktop/src/
-  shell/        外壳与整体布局：App、Workspace、SceneWorkspace、Header、面板、docking、StatusBar
-  features/     各功能界面（按功能分子目录，保持现状）
-  commands/     用户操作入口：一个函数对应一次完整的用户操作
-  runtime/      地图与三维引擎宿主：创建引擎、把工程和数据交给引擎、收集引擎诊断
-  exchange/     外部格式与外部服务：导入、导出、WFS/GeoServer、场景文档/归档、代码导出
-  view-state/   界面状态：选择、属性表、检查器、工具、布局、任务记录；关掉工程即可丢弃
-  session/      工程会话：当前工程配置、单一编辑历史、工程保存、数据保存与放弃、恢复草稿
-  data/         要素数据运行时：Provider/Buffer 的持有者、要素订阅 hook、数据文件读写
-  platform/     运行环境：Tauri 与浏览器差异、文件与对话框、凭据、HTTP、资源路径、状态消息
-  ui/           通用组件与样式，不认识工程和要素
-  __tests__/    跨层集成测试（保持现状）
+  ui/                 第 1 层：界面层。React 组件与样式，只读订阅状态，修改通过 commands
+    workbench/          工作台外壳与布局：App、Workspace2D、Workspace3D、Header、左右下停靠框
+    panels/             各业务功能面板：map、scene3d、layers、inspector、attribute-table、editing、processing 等
+    components/         通用基础控件与样式，不认识项目和数据：Button、EditorDialog、ModelessWindow 等
+
+  commands/           第 2 层：命令层。用户操作入口，菜单、工具栏、快捷键和面板的写操作都从这里进
+
+  engine-host/        第 3 层左：引擎宿主层。创建 OpenLayers / Cesium 实例，把项目配置和数据同步给引擎
+  io/                 第 3 层右：导入导出与服务层。外部矢量格式、WFS/GeoServer 请求、项目转 SceneDocument、代码导出
+
+  stores/             第 4 层左：界面状态层。Zustand 里的临时界面状态：面板开合、选中集、属性表、当前工具，关掉项目即可丢弃
+  project/            第 4 层右：项目与数据层。当前项目配置（project.store）、唯一的撤销历史（project-edits）、保存与崩溃恢复
+    datasets/           要素数据运行时：每个数据源一个 MemoryFeatureProvider（基线）加一个 FeatureEditBuffer（未提交增量）
+
+  platform/           第 5 层：系统底座。Tauri 2 与浏览器的差异：本地文件与对话框、安全凭据、Native HTTP、资源路径
+  __tests__/          跨层集成测试
 ```
 
-`cartography-spike/`、`cartography-visual-baseline/`、`cartography-webgl/` 是独立 HTML 入口，不纳入分层检查。仓库脚本 `pnpm check:architecture` 会检查分层方向、`project` 包内部方向，以及可发布包是否只依赖可发布包。
+### 依赖规则与自动检查
 
-### 依赖方向
+仓库根目录提供两条检查命令：
 
-从上到下排列，每层只能依赖排在它下面的层：
+- `pnpm check:architecture`：先跑 `scripts/check-architecture.mjs`，再跑 **[dependency-cruiser](https://github.com/sverweij/dependency-cruiser)**（配置见 `.dependency-cruiser.cjs`）。两项一起校验 Desktop 内部各层的依赖方向、`packages/internal/project` 的内部方向，以及 `packages/public/*` 与 `packages/internal/*` 之间的边界。
+- `pnpm check:deadcode`：运行 **[Knip](https://knip.dev/)**（配置见 `knip.json`），检查整个 monorepo 里没被用到的文件、导出和多余依赖。
+
+各层的依赖边界如下。上层可以依赖下层，同一层内按职责隔离：
 
 ```text
-shell
-features
-commands
-runtime
-exchange
-view-state
-session
-data
-platform
+第 1 层  ui/workbench ──► ui/panels ──► ui/components
+              │               │               │
+              ▼               ▼               │ 只可依赖 stores / platform
+第 2 层  commands ◄───────────┘               │
+           │   │                              │
+     ┌─────┘   └─────┐                        │
+     ▼               ▼                        │
+第 3 层  engine-host ──► io                   │
+     │               │                        │
+     └───────┬───────┘                        ▼
+第 4 层  stores ────────► project ──► project/datasets
+             │               │                │
+             └───────────────┴────────┬───────┘
+                                      ▼
+第 5 层                           platform
 ```
-
-`ui` 不在这条链上：`shell` 和 `features` 可以用它；它自己只能依赖 `view-state`（读取界面密度、字号等偏好）和 `platform`。所有层都可以依赖 `packages/` 中的包。
 
 几条容易混淆的规则：
 
-- `features` 可以订阅 `session`、`data`、`view-state` 的状态，但修改工程或数据要通过 `commands`。
-- `session` 不认识 `view-state`。工程被替换、图层被删除后需要清理选择或属性表时，由 `session` 发出通知，`view-state` 或 `shell` 订阅后自己清理。
-- `data` 不认识 `session`。数据提交后改写历史属于 `session` 的职责。
-- `runtime` 不调用 `commands`，也不决定何时执行编辑；它把用户在地图上的操作交给上层回调。
+- `ui/panels` 可以订阅 `stores`、`project`、`project/datasets` 的状态，但改动项目或数据必须经过 `commands`。
+- `project` 不认识 `stores`（界面上的临时状态）。项目被替换或图层被删除后，需要清理选中集和属性表，这件事不写在 `project` 里：由 `project/session-events.ts` 发出通知，`stores/session-view-sync.ts` 订阅后自行清理。
+- `project/datasets` 不反向依赖外层的 `project`。数据提交之后改写撤销历史，是 `project/project-edits.ts` 的职责。
+- `engine-host` 和 `io` 都不调用 `commands`；`io` 不依赖 `engine-host`。
 
 ### 新代码放在哪里
 
 按顺序判断，第一个符合的就是答案：
 
-1. 只是一个可复用的界面控件，不知道工程是什么：`ui/`。
+1. 只是一个可复用的界面控件，不知道项目是什么：`ui/components/`。
 2. 只在桌面端和浏览器端有差别，或直接调用 Tauri：`platform/`。
-3. 读写要素行、Provider/Buffer：`data/`。
-4. 涉及工程配置、编辑历史、工程或数据的保存与恢复：`session/`。
-5. 关掉工程就可以丢弃的界面状态：`view-state/`。
-6. 处理外部文件格式或外部服务：`exchange/`。
-7. 创建或驱动 OpenLayers/Cesium 实例：`runtime/`。
+3. 读写要素行、Provider 或 Buffer：`project/datasets/`。
+4. 涉及项目配置、编辑历史、项目或数据的保存与恢复：`project/`。
+5. 关掉项目就可以丢弃的界面状态（Zustand store）：`stores/`。
+6. 处理外部文件格式、外部 OGC 服务，或把项目转成 `SceneDocument`：`io/`。
+7. 创建或驱动 OpenLayers / Cesium 实例：`engine-host/`。
 8. 用户能触发的一次完整操作：`commands/`。
-9. 某个功能的界面：`features/<功能>/`。
-10. 布局、面板、菜单栏这些把功能组合起来的部分：`shell/`。
+9. 某个业务功能的面板或弹窗：`ui/panels/<功能>/`。
+10. 工作台布局、停靠面板框、菜单栏这些把功能组合起来的部分：`ui/workbench/`。
 
-不跨层的纯计算函数放在使用它的层里；被多层用到且不依赖应用状态时，考虑放进对应的包。
+不跨层的纯计算函数放在使用它的层里；如果被多层使用又不依赖应用状态，考虑放进对应的包。
 
-## packages
+## `packages/` 目录结构
 
-### 可发布包与内部包
+`packages/` 在物理上分成 `packages/public/` 和 `packages/internal/` 两级：
 
-规则：**可发布包只能依赖可发布包**；内部包可以依赖任何包；任何包都不能依赖 `apps/`。是否可发布以 `package.json` 中有没有 `"private": true` 为准。
+- **`packages/public/*`（可发布的通用包，`private !== true`）**：只能依赖 `packages/public/*` 里的包，不认识 Desktop 的项目或应用状态。
+  - `ol-style`：样式契约、分类算法、MapLibre 标准制图和 SLD 编译（`ol` 为 peer 依赖）。
+  - `ol-selection`：OpenLayers 的点选与框选控制器（`ol` 为 peer 依赖）。
+  - `vector-io`：Shapefile、DXF、CSV、GeoJSON 的导入导出与重投影。
+  - `ogc-io`：WMS / WMTS / WFS 的 Capabilities 解析、请求构建，以及 SLD 与 GeoServer 协议。
+  - Cesium 套件：`cesium-scene-schema`、`cesium-layer`、`cesium-popup`、`cesium-measure`、`cesium-effects`、`cesium-tileset-edit`、`cesium-tileset-effects`。
+- **`packages/internal/*`（仓库内部包，`private: true`）**：供本仓库的 `apps/desktop` 和 `apps/viewer` 使用，可以依赖任意包，但不能反过来依赖 `apps/*`。
+  - `project`：项目配置、要素数据的 Provider/Buffer 和编辑历史。依赖 `ol-style`、`cesium-scene-schema`、`spatial-analysis`。
+  - `ol-runtime`：Desktop 的 OpenLayers 地图、图层注册表、选择与编辑工具运行时。
+  - `spatial-analysis`：几何诊断、测量、字段计算、叠加与空间连接分析。
+  - 场景文档套件：`scene-schema`、`scene-core`、`scene-publisher`、`scene-codegen`、`ol-scene-runtime`、`cesium-scene-runtime`。
 
-可发布（只要求达到可发布状态，不执行 `npm publish`）：
-
-- `ol-style`：依赖 `@maplibre/maplibre-gl-style-spec`、`ol-mapbox-style`、`@xmldom/xmldom`；`ol` 为 peer。
-- `ol-selection`：viewer 和 `ol-runtime` 共用；`ol` 为 peer。
-- `vector-io`：自带 GeoJSON 类型，不再依赖 `scene-schema`。
-- `ogc-io`：依赖 `ol-style`。
-- Cesium 套件：`cesium-scene-schema`、`cesium-layer`、`cesium-popup`、`cesium-measure`、`cesium-effects`、`cesium-tileset-edit`、`cesium-tileset-effects`。
-
-内部：
-
-- `project`：工程配置、要素数据和编辑历史。依赖 `ol-style`、`cesium-scene-schema`、`spatial-analysis`。
-- `ol-runtime`：依赖 `project`、`ol-style`、`ol-selection`、`ogc-io`、`ol-scene-runtime`。
-- `spatial-analysis`：几何处理与量算，含缓冲区、叠加等 turf/jsts 实现。
-- 场景文档套件：`scene-schema`、`scene-core`、`scene-publisher`、`scene-codegen`、`ol-scene-runtime`、`cesium-scene-runtime`。只给本仓库的 desktop 和 viewer 使用。
-
-### `project` 包的内部目录
+### `packages/internal/project` 的内部目录
 
 ```text
-packages/project/src/
+packages/internal/project/src/
   clone.ts, id.ts   基础工具，不依赖其它文件
   data/             要素与数据集：GisFeature/Geometry/DatasetField 等类型、Provider/Buffer、
                     MemoryFeatureStore、数据集字段与校验、GeoJSON 解析、字段身份、过滤、排序、统计
-  config/           工程配置：Project/Layer/Dataset 等类型、工程创建与格式迁移、图层树、样式、
-                    制图、字段引用重定位、数据源能力、工程分享、ProcessingRecord
+  config/           项目配置：Project/Layer/Dataset 等类型、项目创建与格式迁移、图层树、样式、
+                    制图、字段引用重定位、数据源能力、项目分享、ProcessingRecord
   history/          编辑历史与命令：EditHistory、配置命令、三维命令、编辑目标与锁定
   index.ts          对外导出，几何处理函数转自 spatial-analysis
 ```
 
-依赖方向：`history → config → data → 基础工具`。`data` 不能 import `config` 或 `history`。`config` 不能 import `history`。
+依赖方向是 `history → config → data → 基础工具`。`data` 不能 import `config` 或 `history`，`config` 不能 import `history`。
 
 ## 相关文档
 
 - [架构总览与架构图](README.md)
 - [数据与编辑架构](data-and-editing.md)
-- [分层与包边界整理计划](layering-plan.md)
+- [分层与包边界整理记录](layering-plan.md)

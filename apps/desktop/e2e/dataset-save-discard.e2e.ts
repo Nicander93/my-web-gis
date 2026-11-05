@@ -13,7 +13,7 @@ test('data tab discard restores one source and browser save stays pending', asyn
     const { layerContentCommands } = await import(active('/src/commands/layer-content.commands.ts'))
     const { featureCommands } = await import(active('/src/commands/feature.commands.ts'))
     const { layerConfigurationCommands } = await import(active('/src/commands/layer-configuration.commands.ts'))
-    const { useProjectStore } = await import(active('/src/session/project.store.ts'))
+    const { useProjectStore } = await import(active('/src/project/project.store.ts'))
     layerContentCommands.addLayer('a', 'Alpha', [{ id: 'row', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { value: 1 } }], 'point')
     layerContentCommands.addLayer('b', 'Beta', [{ id: 'row', geometry: { type: 'Point', coordinates: [1, 1] }, properties: { value: 1 } }], 'point')
     const layers = useProjectStore.getState().project.content.kind === 'map2d' ? useProjectStore.getState().project.content.layers : []
@@ -31,8 +31,8 @@ test('data tab discard restores one source and browser save stays pending', asyn
   await expect.poll(async () => page.evaluate(async () => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { featureData } = await import(active('/src/data/feature-data.ts'))
-    const { useProjectStore } = await import(active('/src/session/project.store.ts'))
+    const { featureData } = await import(active('/src/project/datasets/feature-data.ts'))
+    const { useProjectStore } = await import(active('/src/project/project.store.ts'))
     const project = useProjectStore.getState().project
     return {
       a: featureData.getById('a', 'row')?.properties.value,
@@ -48,21 +48,21 @@ test('data tab discard restores one source and browser save stays pending', asyn
   await expect.poll(async () => page.evaluate(async () => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { featureData } = await import(active('/src/data/feature-data.ts'))
+    const { featureData } = await import(active('/src/project/datasets/feature-data.ts'))
     return featureData.pendingCount('b')
   })).toBe(1)
   await page.getByRole('button', { name: '撤销', exact: true }).click()
   await expect.poll(async () => page.evaluate(async () => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { featureData } = await import(active('/src/data/feature-data.ts'))
+    const { featureData } = await import(active('/src/project/datasets/feature-data.ts'))
     return featureData.getById('b', 'row')?.properties.value
   })).toBe(1)
   await page.getByRole('button', { name: '撤销', exact: true }).click()
   await expect.poll(async () => page.evaluate(async () => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(active('/src/session/project.store.ts'))
+    const { useProjectStore } = await import(active('/src/project/project.store.ts'))
     const project = useProjectStore.getState().project
     return project.content.kind === 'map2d' ? project.content.layers.find(layer => layer.datasetId === 'a')?.name : null
   })).toBe('Alpha')

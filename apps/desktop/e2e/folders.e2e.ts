@@ -16,10 +16,10 @@ async function roundTrip(page: Page, info: TestInfo) {
   await (await download).saveAs(path)
   const saved = JSON.parse(readFileSync(path, 'utf8'))
   const current = await page.evaluate(async () => {
-    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/data/feature-data.ts').at(-1) ?? '/src/data/feature-data.ts')
+    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/datasets/feature-data.ts').at(-1) ?? '/src/project/datasets/feature-data.ts')
 
-    const { useProjectStore, getProjectContentVersion } = await import('/src/session/project.store.ts')
-    const { createSnapshotFromState } = await import('/src/session/project-io.ts')
+    const { useProjectStore, getProjectContentVersion } = await import('/src/project/project.store.ts')
+    const { createSnapshotFromState } = await import('/src/project/project-io.ts')
     const state = useProjectStore.getState()
     return { dirty: state.dirty, version: getProjectContentVersion(), snapshot: createSnapshotFromState(state.project, featureData.readSnapshot()) }
   })
@@ -51,9 +51,9 @@ test('2D nested folders retain datasets, order and inherited locks through file 
   const inner = page.locator('.layer-group-header').filter({ hasText: 'Inner' })
   await page.locator('.layer-item').filter({ hasText: 'nested' }).dragTo(inner)
   const state = await page.evaluate(async () => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
-    const { useProjectStore } = await import('/src/session/project.store.ts')
+    const { useProjectStore } = await import('/src/project/project.store.ts')
     return projectSession.getSnapshot()
   })
   const outer = state.project.content.groups.find(group => group.name === 'Outer')!, child = state.project.content.groups.find(group => group.name === 'Inner')!

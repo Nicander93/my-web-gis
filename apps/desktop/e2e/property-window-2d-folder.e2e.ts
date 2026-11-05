@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
 async function snapshot(page: Page) {
-  return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() })
+  return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts'); return projectSession.getSnapshot() })
 }
 async function importLayer(page: Page, name: string) {
   await page.getByRole('tab', { name: '数据', exact: true }).click()
@@ -19,10 +19,10 @@ test('2D property window keeps a fixed layer, atomic history and folder membersh
   await importLayer(page, 'Alpha')
   await importLayer(page, 'Beta')
   await page.evaluate(async () => {
-    const { layerConfigurationQueries } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/layer-configuration-query.ts').at(-1) ?? '/src/session/layer-configuration-query.ts')
+    const { layerConfigurationQueries } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/layer-configuration-query.ts').at(-1) ?? '/src/project/layer-configuration-query.ts')
     const { layerConfigurationCommands } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/commands/layer-configuration.commands.ts').at(-1) ?? '/src/commands/layer-configuration.commands.ts')
 
-    const store = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+    const store = (await import('/src/project/project.store.ts')).useProjectStore.getState()
     const alpha = store.project.content.layers.find(layer => layer.name === 'Alpha')!
     const style = layerConfigurationQueries.getNormalizedLayerStyle(alpha.id)!
     if (style.mode !== 'single') throw new Error('Fixture requires a single symbol')

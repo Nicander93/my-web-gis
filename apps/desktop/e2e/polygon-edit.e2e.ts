@@ -21,9 +21,9 @@ async function prepare(page: Page) {
 
 async function snapshot(page: Page) {
   return page.evaluate(async () => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
-    const { useProjectStore } = await import('/src/session/project.store.ts')
+    const { useProjectStore } = await import('/src/project/project.store.ts')
     return projectSession.getSnapshot()
   })
 }
@@ -128,9 +128,9 @@ test('a completed worker cannot overwrite data edited while computation was pend
   await page.evaluate(async () => {
     const { featureCommands } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/commands/feature.commands.ts').at(-1) ?? '/src/commands/feature.commands.ts')
 
-    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/data/feature-data.ts').at(-1) ?? '/src/data/feature-data.ts')
+    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/datasets/feature-data.ts').at(-1) ?? '/src/project/datasets/feature-data.ts')
 
-    const { useProjectStore } = await import('/src/session/project.store.ts')
+    const { useProjectStore } = await import('/src/project/project.store.ts')
     const state = useProjectStore.getState(), layer = state.project.content.layers[0]
     const feature = featureData.readSnapshot()[layer.datasetId][0]
     featureCommands.updateProperties(layer.id, feature.id, { ...feature.properties, value: 99 })

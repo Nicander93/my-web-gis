@@ -10,11 +10,13 @@ target/
 
 apps/desktop/dist/
 apps/desktop/src-tauri/target/
-packages/*/dist/
+packages/*/*/dist/
 
 *.tgz
-packages/ol-style/*.tgz
+packages/public/ol-style/*.tgz
 
 apps/desktop/test-results/
 apps/desktop/playwright-report/
+apps/desktop/e2e/test-results/
+apps/desktop/e2e/playwright-report/
 /.cache/cartography-geoserver/

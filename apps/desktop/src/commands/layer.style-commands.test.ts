@@ -1,9 +1,9 @@
-import { layerConfigurationQueries } from '@/session/layer-configuration-query'
-import { featureData } from '@/data/feature-data'
+import { layerConfigurationQueries } from '@/project/layer-configuration-query'
+import { featureData } from '@/project/datasets/feature-data'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createDefaultLayerStyle } from '@desktop-webgis/project'
-import { useProjectStore } from '@/session/project.store'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { useProjectStore } from '@/project/project.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
 import { layerCommands } from './layer.commands'
 
 describe('layerCommands.applyStyle undo', () => {

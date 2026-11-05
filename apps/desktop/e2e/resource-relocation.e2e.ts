@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 test.use({ actionTimeout: 15_000, screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
-async function snapshot(page: Page) { return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() }) }
+async function snapshot(page: Page) { return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts'); return projectSession.getSnapshot() }) }
 
 test('local resource relocation previews directory changes, cancels and supports undo/redo', async ({ page }, info) => {
   test.setTimeout(120_000)
@@ -10,7 +10,7 @@ test('local resource relocation previews directory changes, cancels and supports
   await page.getByRole('button', { name: /^三维场景/ }).click()
   await expect(page.locator('.scene3d-footer__state')).toHaveText('就绪', { timeout: 30_000 })
   await page.evaluate(async () => {
-    const { addSceneAsset } = await import('/src/features/scene3d/scene3d-commands.ts')
+    const { addSceneAsset } = await import('/src/ui/panels/scene3d/scene3d-commands.ts')
     addSceneAsset('model', { kind: 'absolute', path: 'D:/old/models/tower.glb' }, 'Tower')
     addSceneAsset('model', { kind: 'absolute', path: 'D:/old/models/nested/tree.glb' }, 'Tree')
     addSceneAsset('model', { kind: 'absolute', path: 'D:/old/models-other/keep.glb' }, 'Keep')
@@ -39,7 +39,7 @@ test('local resource relocation previews directory changes, cancels and supports
   expect(await snapshot(page)).toEqual(before)
   await page.getByRole('button', { name: '重做', exact: true }).click()
   expect(await snapshot(page)).toEqual(after)
-  const camera = await page.evaluate(async () => (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneCamera())
+  const camera = await page.evaluate(async () => (await import('/src/engine-host/scene3d-runtime-host.ts')).getLiveSceneCamera())
   const download = page.waitForEvent('download')
   await page.getByRole('button', { name: '保存项目', exact: true }).click()
   const path = info.outputPath('relocated.webgis.json')

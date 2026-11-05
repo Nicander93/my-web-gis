@@ -1,6 +1,6 @@
 import { layerContentCommands } from '@/commands/layer-content.commands'
-import { projectSession } from '@/session/project-session'
-import { projectEdits } from '@/session/project-edits'
+import { projectSession } from '@/project/project-session'
+import { projectEdits } from '@/project/project-edits'
 import { requireMapContent } from '@desktop-webgis/project'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -10,9 +10,9 @@ import { createProject, type MapState } from '@desktop-webgis/project'
 import { mapCommands } from '@/commands/map.commands'
 import { editCommands } from '@/commands/edit.commands'
 import { layerCommands } from '@/commands/layer.commands'
-import { useProjectStore } from '@/session/project.store'
-import { useWorkbenchStore } from '@/view-state/workbench.store'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { useProjectStore } from '@/project/project.store'
+import { useWorkbenchStore } from '@/stores/workbench.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
 import {
   _setMapRuntimeForTests,
   getActiveEditTool,
@@ -27,11 +27,11 @@ import {
   zoomMapToAll,
   zoomMapToLayer,
   retryMapServiceLayer
-} from '@/runtime/map-runtime-host'
+} from '@/engine-host/map-runtime-host'
 import type { OlMapRuntime } from '@desktop-webgis/ol-runtime'
 
-const mapFeatureDir = join(dirname(fileURLToPath(import.meta.url)), '../features/map')
-const mapRuntimeDir = join(dirname(fileURLToPath(import.meta.url)), '../runtime')
+const mapFeatureDir = join(dirname(fileURLToPath(import.meta.url)), '../ui/panels/map')
+const mapRuntimeDir = join(dirname(fileURLToPath(import.meta.url)), '../engine-host')
 
 function resetStores(): void {
   ;(globalThis as unknown as { window: EventTarget }).window = new EventTarget()

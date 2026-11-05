@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
 })
 
 test('projected Chinese shapefile ZIP imports only the two chosen source layers', async ({ page }, info) => {
-  const before = await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() })
+  const before = await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts'); return projectSession.getSnapshot() })
   const fixture = fileURLToPath(new URL('../../../examples/phase-1/projected-chinese-multi.zip', import.meta.url))
   await page.locator('input[type=file]').setInputFiles(fixture)
   const dialog = page.getByRole('dialog', { name: '添加数据', exact: true })
@@ -27,9 +27,9 @@ test('projected Chinese shapefile ZIP imports only the two chosen source layers'
   await expect(page.locator('.layer-name-button')).toHaveCount(2)
   await expect(page.locator('.layer-name-button')).not.toContainText(['excluded'])
   const state = await page.evaluate(async () => {
-    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/data/feature-data.ts').at(-1) ?? '/src/data/feature-data.ts')
+    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/datasets/feature-data.ts').at(-1) ?? '/src/project/datasets/feature-data.ts')
 
-    const { useProjectStore } = await import('/src/session/project.store.ts')
+    const { useProjectStore } = await import('/src/project/project.store.ts')
     const state = useProjectStore.getState()
     return state.project.content.layers.map(layer => ({ name: layer.name, features: featureData.readSnapshot()[layer.datasetId] }))
   })
@@ -39,12 +39,12 @@ test('projected Chinese shapefile ZIP imports only the two chosen source layers'
   expect(first.properties).toMatchObject({ 编号: '01', 名称: '北京站' })
   expect(first.geometry).toMatchObject({ coordinates: [expect.closeTo(116.4, 6), expect.closeTo(39.9, 6)] })
   expect(first.metadata?.sourceCrs).toBe('EPSG:3857')
-  const imported = await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() })
+  const imported = await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts'); return projectSession.getSnapshot() })
   await page.getByRole('button', { name: '撤销', exact: true }).click()
-  expect(await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() })).toEqual(before)
+  expect(await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts'); return projectSession.getSnapshot() })).toEqual(before)
   await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled()
   await page.getByRole('button', { name: '重做', exact: true }).click()
-  expect(await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() })).toEqual(imported)
+  expect(await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts'); return projectSession.getSnapshot() })).toEqual(imported)
   await page.locator('.layer-name-button').filter({ hasText: /^stations$/ }).click()
   await page.getByRole('tab', { name: '地图', exact: true }).click()
   await page.getByRole('button', { name: '属性表', exact: true }).click()
@@ -52,7 +52,7 @@ test('projected Chinese shapefile ZIP imports only the two chosen source layers'
   await expect(page.locator('.table-scroll')).toContainText('北京站')
   await page.getByRole('button', { name: '全图', exact: true }).click()
   await expect.poll(() => page.evaluate(async () => {
-    const { getMapRuntime } = await import('/src/runtime/map-runtime-host.ts')
+    const { getMapRuntime } = await import('/src/engine-host/map-runtime-host.ts')
     const runtime = getMapRuntime()!, map = runtime.getMap(), size = map.getSize()!
     return !map.getView().getAnimating() && runtime.registry.entries().filter(([, layer]) => 'getSource' in layer).every(([, layer]) => {
       const source = layer.getSource()
@@ -84,9 +84,9 @@ test('CSV preview identifies invalid coordinates and imports only valid records'
   await review.getByRole('button', { name: '确认导入', exact: true }).click()
   await expect(page.locator('.layer-name-button')).toHaveCount(1)
   const features = await page.evaluate(async () => {
-    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/data/feature-data.ts').at(-1) ?? '/src/data/feature-data.ts')
+    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/datasets/feature-data.ts').at(-1) ?? '/src/project/datasets/feature-data.ts')
 
-    const { useProjectStore } = await import('/src/session/project.store.ts')
+    const { useProjectStore } = await import('/src/project/project.store.ts')
     const state = useProjectStore.getState()
     return featureData.readSnapshot()[state.project.content.layers[0].datasetId]
   })
@@ -115,9 +115,9 @@ test('GeoJSON rejects malformed input and preserves duplicate source IDs and nul
   await expect(dialog).toContainText('重复')
   await dialog.getByRole('button', { name: '确认导入', exact: true }).click()
   const features = await page.evaluate(async () => {
-    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/data/feature-data.ts').at(-1) ?? '/src/data/feature-data.ts')
+    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/datasets/feature-data.ts').at(-1) ?? '/src/project/datasets/feature-data.ts')
 
-    const { useProjectStore } = await import('/src/session/project.store.ts')
+    const { useProjectStore } = await import('/src/project/project.store.ts')
     const state = useProjectStore.getState()
     return featureData.readSnapshot()[state.project.content.layers[0].datasetId]
   })
@@ -147,9 +147,9 @@ test('DXF requires coordinate configuration and retains curve approximation warn
   await expect(dialog).toContainText('2 个圆弧实体已近似为 64 段折线')
   await dialog.getByRole('button', { name: '确认导入', exact: true }).click()
   const features = await page.evaluate(async () => {
-    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/data/feature-data.ts').at(-1) ?? '/src/data/feature-data.ts')
+    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/datasets/feature-data.ts').at(-1) ?? '/src/project/datasets/feature-data.ts')
 
-    const { useProjectStore } = await import('/src/session/project.store.ts')
+    const { useProjectStore } = await import('/src/project/project.store.ts')
     const state = useProjectStore.getState()
     return featureData.readSnapshot()[state.project.content.layers[0].datasetId]
   })
@@ -175,9 +175,9 @@ test('DXF reports skipped bulged polylines before confirming supported entities'
   await expect(dialog).toContainText('跳过了 1 个不支持的 LWPOLYLINE 实体')
   await dialog.getByRole('button', { name: '确认导入', exact: true }).click()
   const features = await page.evaluate(async () => {
-    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/data/feature-data.ts').at(-1) ?? '/src/data/feature-data.ts')
+    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/datasets/feature-data.ts').at(-1) ?? '/src/project/datasets/feature-data.ts')
 
-    const { useProjectStore } = await import('/src/session/project.store.ts')
+    const { useProjectStore } = await import('/src/project/project.store.ts')
     const state = useProjectStore.getState()
     return featureData.readSnapshot()[state.project.content.layers[0].datasetId]
   })

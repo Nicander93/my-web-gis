@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
 async function names(page: Page) {
-  return page.evaluate(async () => (await import('/src/session/project.store.ts')).useProjectStore.getState().project.content.scene?.nodes.map(node => node.name))
+  return page.evaluate(async () => (await import('/src/project/project.store.ts')).useProjectStore.getState().project.content.scene?.nodes.map(node => node.name))
 }
 
 async function moveProperties(page: Page, dialog: import('@playwright/test').Locator, dx: number) {
@@ -80,6 +80,6 @@ test('modeless properties bind an ID, apply atomically, cancel drafts and pin th
   await second.getByRole('button', { name: '确定', exact: true }).click()
   await expect(second).toHaveCount(0)
   await expect.poll(() => names(page)).toEqual(['Final Alpha', 'Beta'])
-  const applied = await page.evaluate(async () => (await import('/src/session/project.store.ts')).useProjectStore.getState().project.content.scene?.nodes[0])
+  const applied = await page.evaluate(async () => (await import('/src/project/project.store.ts')).useProjectStore.getState().project.content.scene?.nodes[0])
   expect(applied).toMatchObject({ properties: { note: 'Object-bound draft' }, popup: { title: 'Alpha popup', fields: [{ field: 'name', label: '名称' }] } })
 })

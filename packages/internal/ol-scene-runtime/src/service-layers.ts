@@ -1,0 +1,106 @@
+/**
+ * ol-scene-runtime 使用的场景 WMS 和 WMTS 图层构建函数。
+ * 与桌面端 ol-runtime 的行为保持一致，但不引入项目的 Dataset 类型。
+ */
+import TileLayer from 'ol/layer/Tile.js'
+import TileWMS from 'ol/source/TileWMS.js'
+import WMTS from 'ol/source/WMTS.js'
+import WMTSTileGrid from 'ol/tilegrid/WMTS.js'
+import { get as getProjection } from 'ol/proj.js'
+import type { WmsSceneSource, WmtsSceneSource } from '@desktop-webgis/scene-schema'
+
+function assertFinite(value: number, label: string): number {
+  if (!Number.isFinite(value)) throw new Error(`${label} 无效`)
+  return value
+}
+
+/** 用持久化的场景 WMTS 矩阵构造 TileGrid，不靠猜 XYZ 缩放级别。 */
+export function buildSceneWmtsTileGrid(source: WmtsSceneSource): {
+  tileGrid: WMTSTileGrid
+  projectionCode: string
+} {
+  const declared = source.projection || source.supportedCrs || 'EPSG:3857'
+  const epsg = declared.match(/EPSG(?::|\/)(?:[^:\/]*[:\/])?(\d+)$/i)
+  const projectionCode = epsg ? `EPSG:${epsg[1]}` : declared
+  const projection = getProjection(projectionCode)
+  if (!projection) {
+    throw new Error(`WMTS 投影 “${projectionCode}” 不受支持`)
+  }
+  if (!source.tileMatrices.length) {
+    throw new Error(`WMTS Source 缺少 TileMatrix，无法静默改用其他矩阵`)
+  }
+
+  const metersPerUnit = projection.getMetersPerUnit() ?? 1
+  const scaleToResolution = (scaleDenominator: number): number => {
+    // OGC：resolution = scaleDenominator * 0.00028 / metersPerUnit（像素按 0.28 毫米计）
+    return (assertFinite(scaleDenominator, 'scaleDenominator') * 0.00028) / metersPerUnit
+  }
+
+  const sorted = [...source.tileMatrices].sort(
+    (a, b) => b.scaleDenominator - a.scaleDenominator
+  )
+  const resolutions = sorted.map((m) => scaleToResolution(m.scaleDenominator))
+  const matrixIds = sorted.map((m) => m.identifier)
+  const swap = projection.getAxisOrientation().startsWith('ne')
+  const origins = sorted.map(matrix => swap ? [matrix.topLeftCorner[1], matrix.topLeftCorner[0]] : [...matrix.topLeftCorner])
+  const tileSizes = sorted.map(matrix => [matrix.tileWidth, matrix.tileHeight] as [number, number])
+
+  const tileGrid = new WMTSTileGrid({
+    origins,
+    resolutions,
+    matrixIds,
+    tileSizes
+  })
+  return { tileGrid, projectionCode }
+}
+
+export function createSceneWmsLayer(
+  source: WmsSceneSource,
+  options: { visible?: boolean; opacity?: number; zIndex?: number } = {}
+): TileLayer<TileWMS> {
+  const params: Record<string, string> = {
+    LAYERS: source.layerNames.join(','),
+    STYLES: (source.styleNames ?? []).join(','),
+    FORMAT: source.format ?? 'image/png',
+    TRANSPARENT: source.transparent === false ? 'FALSE' : 'TRUE',
+    VERSION: source.version || '1.3.0'
+  }
+  return new TileLayer({
+    source: new TileWMS({
+      url: source.url,
+      params,
+      projection: source.crs,
+      crossOrigin: 'anonymous',
+      transition: 0
+    }),
+    visible: options.visible ?? true,
+    opacity: options.opacity ?? 1,
+    zIndex: options.zIndex
+  })
+}
+
+export function createSceneWmtsLayer(
+  source: WmtsSceneSource,
+  options: { visible?: boolean; opacity?: number; zIndex?: number } = {}
+): TileLayer<WMTS> {
+  const { tileGrid, projectionCode } = buildSceneWmtsTileGrid(source)
+  const urls = source.urls?.length ? source.urls : [source.url]
+  return new TileLayer({
+    source: new WMTS({
+      urls,
+      layer: source.layer,
+      matrixSet: source.tileMatrixSet,
+      format: source.format ?? 'image/png',
+      projection: projectionCode,
+      requestEncoding: source.requestEncoding || 'KVP',
+      tileGrid,
+      style: source.style ?? 'default',
+      crossOrigin: 'anonymous',
+      transition: 0,
+      wrapX: false
+    }),
+    visible: options.visible ?? true,
+    opacity: options.opacity ?? 1,
+    zIndex: options.zIndex
+  })
+}

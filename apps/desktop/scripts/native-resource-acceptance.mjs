@@ -146,7 +146,7 @@ async function waitForSceneView() {
   if (await page.locator('.scene3d-canvas__viewport canvas').count()) {
     let previous, stable = 0
     await poll(async () => {
-      const camera = await page.evaluate(async () => (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneCamera())
+      const camera = await page.evaluate(async () => (await import('/src/engine-host/scene3d-runtime-host.ts')).getLiveSceneCamera())
       const values = camera && [...camera.position, camera.heading, camera.pitch, camera.roll]
       if (values && previous && values.every((value, index) => Math.abs(value - previous[index]) < (index === 2 ? 1e-5 : 1e-8))) stable++
       else stable = 0
@@ -157,7 +157,7 @@ async function waitForSceneView() {
 }
 async function saveTo(path) {
   await waitForSceneView()
-  await page.evaluate(async (file) => (await import('/src/session/project-io.ts')).setCurrentProjectPath(file), path)
+  await page.evaluate(async (file) => (await import('/src/project/project-io.ts')).setCurrentProjectPath(file), path)
   await page.getByRole('button', { name: '保存项目', exact: true }).click()
   await expect(page.locator('.project-dirty')).toHaveCount(0)
   await poll(async () => (await entries()).length === 0, 'Native save did not clear the acknowledged recovery draft')
@@ -168,9 +168,9 @@ async function ready(name, label = '模型') {
   const row = page.locator('.scene3d-layer-row').filter({ hasText: name })
   await expect(row.locator('small')).toHaveText(label, { timeout: 60_000 })
   const diagnostics = await page.evaluate(async (name) => {
-    const state = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+    const state = (await import('/src/project/project.store.ts')).useProjectStore.getState()
     const node = state.project.content.scene.nodes.find(node => node.name === name)
-    return (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneDiagnostics(node.id)
+    return (await import('/src/engine-host/scene3d-runtime-host.ts')).getLiveSceneDiagnostics(node.id)
   }, name)
   assert.ok(diagnostics.presentation, 'Native resource must have a loaded layer')
   if (label === '模型') assert.ok(diagnostics.presentation.position, 'Native model must have a loaded model matrix')
@@ -271,8 +271,8 @@ try {
   await dialog.getByRole('button', { name: '取消', exact: true }).click()
   // Assigned fixture paths exercise native IPC and the production runtime, not the OS picker.
   await page.evaluate(async ({ source, projectPath }) => {
-    (await import('/src/session/project-io.ts')).setCurrentProjectPath(projectPath)
-    const commands = await import('/src/features/scene3d/scene3d-commands.ts')
+    (await import('/src/project/project-io.ts')).setCurrentProjectPath(projectPath)
+    const commands = await import('/src/ui/panels/scene3d/scene3d-commands.ts')
     commands.addSceneAsset('model', { kind: 'absolute', path: source }, 'Native external GLTF')
     const directory = source.slice(0, source.lastIndexOf('/'))
     commands.addSceneAsset('3dtiles', { kind: 'absolute', path: `${directory}/tileset.json` }, 'Native nested Tileset')
@@ -303,13 +303,13 @@ try {
   assert.ok(oldResourceUrl)
   assert.equal(await page.evaluate(async url => (await fetch(url)).status, oldResourceUrl), 403, 'A previous process directory lease must not survive restart')
   await page.evaluate(async path => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
     const text = await (await import('/src/platform/files.ts')).readTextFile(path)
     const snapshot = JSON.parse(text)
-    const resolved = (await import('/src/session/project-resource-references.ts')).resolveProjectResourceReferences(snapshot, path)
+    const resolved = (await import('/src/project/project-resource-references.ts')).resolveProjectResourceReferences(snapshot, path)
     ;projectSession.loadSnapshot(resolved)
-    ;(await import('/src/session/project-io.ts')).setCurrentProjectPath(path)
+    ;(await import('/src/project/project-io.ts')).setCurrentProjectPath(path)
   }, projectPath)
   await readyResources()
   await dependencies('原始资源 #%', reopenedResponses)
@@ -352,12 +352,12 @@ try {
   await mkdir(dirname(anotherPath), { recursive: true })
   const previousBytes = await readFile(projectPath)
   const copy = await page.evaluate(async path => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
-    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/data/feature-data.ts').at(-1) ?? '/src/data/feature-data.ts')
+    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/datasets/feature-data.ts').at(-1) ?? '/src/project/datasets/feature-data.ts')
 
-    const state = (await import('/src/session/project.store.ts')).useProjectStore.getState()
-    const io = await import('/src/session/project-io.ts')
+    const state = (await import('/src/project/project.store.ts')).useProjectStore.getState()
+    const io = await import('/src/project/project-io.ts')
     const before = structuredClone(projectSession.getSnapshot())
     await io.saveSnapshotToPath(path, io.createSnapshotFromState(state.project, featureData.readSnapshot()))
     return { before, after: projectSession.getSnapshot(), currentPath: io.getCurrentProjectPath() }
@@ -373,18 +373,18 @@ try {
   report.scenarios.push({ name: 'Cross-directory native snapshot save preserves working state, current file and original bytes; external reference rebased correctly', passed: true })
   // Opening a copied project must not silently authorize paths outside its directory.
   await page.evaluate(async ({ snapshot, path }) => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
     projectSession.loadSnapshot(snapshot)
-    ;(await import('/src/session/project-io.ts')).setCurrentProjectPath(path)
+    ;(await import('/src/project/project-io.ts')).setCurrentProjectPath(path)
   }, { snapshot: copySnapshot, path: anotherPath })
   await expect(page.locator('.scene3d-footer__state')).toHaveClass(/scene3d-footer__state--error/)
   const beforeAuthorization = await page.evaluate(async () => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
-    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-edits.ts').at(-1) ?? '/src/session/project-edits.ts')
+    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-edits.ts').at(-1) ?? '/src/project/project-edits.ts')
 
-    const state = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+    const state = (await import('/src/project/project.store.ts')).useProjectStore.getState()
     return { snapshot: projectSession.getSnapshot(), dirty: state.dirty, canUndo: projectEdits.canUndo(), canRedo: projectEdits.canRedo() }
   })
   await page.locator('.scene3d-layer-row').filter({ hasText: 'Native nested Tileset' }).locator('.scene3d-layer-row__select').click({ button: 'right' })
@@ -398,11 +398,11 @@ try {
   await readyResources()
   await dependencies('', authorizationResponses)
   const afterAuthorization = await page.evaluate(async () => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
-    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-edits.ts').at(-1) ?? '/src/session/project-edits.ts')
+    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-edits.ts').at(-1) ?? '/src/project/project-edits.ts')
 
-    const state = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+    const state = (await import('/src/project/project.store.ts')).useProjectStore.getState()
     return { snapshot: projectSession.getSnapshot(), dirty: state.dirty, canUndo: projectEdits.canUndo(), canRedo: projectEdits.canRedo() }
   })
   assert.deepEqual(afterAuthorization, beforeAuthorization)

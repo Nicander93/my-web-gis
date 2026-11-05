@@ -1,16 +1,16 @@
 import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
-import { projectSession } from '@/session/project-session'
-import { projectEdits } from '@/session/project-edits'
+import { projectSession } from '@/project/project-session'
+import { projectEdits } from '@/project/project-edits'
 import { requireMapContent } from '@desktop-webgis/project'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createDefaultLayerStyle, createProject, MemoryFeatureStore, UpdateGeometryCommand, type GisFeature } from '@desktop-webgis/project'
-import { useProjectStore } from '@/session/project.store'
-import { featureData } from '@/data/feature-data'
-import { createProjectSceneDocument } from '@/exchange/project-scene-document'
+import { useProjectStore } from '@/project/project.store'
+import { featureData } from '@/project/datasets/feature-data'
+import { createProjectSceneDocument } from '@/io/project-scene-document'
 
 afterEach(() => vi.restoreAllMocks())
 
-/** Characterization probe: report legacy costs without making those costs a required behavior. */
+/** 用于记录现状的探测：只报告遗留实现的开销，不把这种开销固化成必须的行为。 */
 describe('architecture refactor baseline', () => {
   it.each([100, 10_000])('measures configuration and single-feature operations with %i features', count => {
     const project = createProject('Baseline')

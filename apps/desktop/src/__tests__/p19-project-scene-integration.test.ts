@@ -1,9 +1,9 @@
 import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
-import { layerConfigurationQueries } from '@/session/layer-configuration-query'
+import { layerConfigurationQueries } from '@/project/layer-configuration-query'
 import { layerContentCommands } from '@/commands/layer-content.commands'
-import { projectSession } from '@/session/project-session'
-import { projectEdits } from '@/session/project-edits'
-import { featureData } from '@/data/feature-data'
+import { projectSession } from '@/project/project-session'
+import { projectEdits } from '@/project/project-edits'
+import { featureData } from '@/project/datasets/feature-data'
 import { requireMapContent } from '@desktop-webgis/project'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
@@ -15,9 +15,9 @@ import {
   serializeProjectSnapshot,
   findSecretLeaks
 } from '@desktop-webgis/project'
-import { compileProjectToScene } from '@/exchange/compile-project'
-import { useProjectStore } from '@/session/project.store'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { compileProjectToScene } from '@/io/compile-project'
+import { useProjectStore } from '@/project/project.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
 import { layerCommands } from '@/commands/layer.commands'
 import { editCommands } from '@/commands/edit.commands'
 
@@ -186,7 +186,7 @@ describe('P19 project + Scene integration', () => {
     expect(undone).toEqual(before)
   })
 
-  it('findSecretLeaks ignores credentialRef.key', () => {
+  it('findSecretLeaks 忽略s credentialRef.key', () => {
     const leaks = findSecretLeaks({
       source: { authMode: 'bearer', credentialRef: { key: 'abc' } }
     })

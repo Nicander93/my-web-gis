@@ -88,7 +88,7 @@ test('3D real tileset property frame keeps footer reachable, vector layout and A
   expect(vectors).toHaveLength(3)
   expect(new Set(vectors).size).toBe(1)
   expect(await height(dialog.getByRole('textbox', { name: '对象名称', exact: true }))).toBe(30)
-  const before = await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() })
+  const before = await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts'); return projectSession.getSnapshot() })
   await dialog.getByLabel('搜索属性字段', { exact: true }).fill('maximumScreenSpaceError')
   await expect(dialog.getByRole('spinbutton', { name: '屏幕误差（px）', exact: true })).toBeVisible()
   await expect(dialog.getByText('当前分类：样式与参数')).toBeVisible()
@@ -99,7 +99,7 @@ test('3D real tileset property frame keeps footer reachable, vector layout and A
     expect(await button.evaluate(node => { const b = node.getBoundingClientRect(); return node.contains(document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2)) })).toBe(true)
   }
   await dialog.getByRole('button', { name: '取消', exact: true }).click()
-  expect(await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() })).toEqual(before)
+  expect(await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts'); return projectSession.getSnapshot() })).toEqual(before)
   await info.attach('property-frame.json', { body: JSON.stringify({ vectorColumns: 3, nativeTileset: true, viewport: page.viewportSize() }), contentType: 'application/json' })
 })
 
@@ -110,7 +110,7 @@ test('independent POI icon draft preserves IME, cancel, history and saved projec
   await page.getByRole('button', { name: /^三维场景/ }).click()
   await expect(page.locator('.scene3d-footer__state')).toHaveText('就绪', { timeout: 30_000 })
   await page.evaluate(async () => {
-    const { updateScene } = await import('/src/features/scene3d/scene3d-commands.ts')
+    const { updateScene } = await import('/src/ui/panels/scene3d/scene3d-commands.ts')
     updateScene('POI 验收样本', scene => {
       scene.nodes.push({ type: 'graphic', id: 'visual-poi', name: '观测站 POI', visible: true, geometry: { type: 'point', heightMode: 'ground', positions: [[116.391, 39.907, 0]] }, properties: { code: 'BJ-018' }, style: { color: '#2f695b', width: 2, pointSize: 10 } })
       return scene
@@ -129,7 +129,7 @@ test('independent POI icon draft preserves IME, cancel, history and saved projec
   await dialog.getByRole('button', { name: '应用', exact: true }).click()
   await dialog.getByRole('spinbutton', { name: '图标宽度', exact: true }).fill('72')
   await dialog.getByRole('button', { name: '取消', exact: true }).click()
-  const poi = () => page.evaluate(async () => (await import('/src/session/project.store.ts')).useProjectStore.getState().project.content.scene!.nodes.find(node => node.id === 'visual-poi'))
+  const poi = () => page.evaluate(async () => (await import('/src/project/project.store.ts')).useProjectStore.getState().project.content.scene!.nodes.find(node => node.id === 'visual-poi'))
   expect(await poi()).toMatchObject({ style: { billboard: { width: 48 } } })
   await page.getByRole('button', { name: '撤销', exact: true }).click()
   expect(await poi()).not.toHaveProperty('style.billboard')

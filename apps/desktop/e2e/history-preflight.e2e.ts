@@ -4,10 +4,10 @@ async function state(page: Page) {
   return page.evaluate(async () => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(active('/src/session/project.store.ts'))
-    const { featureData } = await import(active('/src/data/feature-data.ts'))
-    const { projectEdits } = await import(active('/src/session/project-edits.ts'))
-    const { getMapRuntime } = await import(active('/src/runtime/map-runtime-host.ts'))
+    const { useProjectStore } = await import(active('/src/project/project.store.ts'))
+    const { featureData } = await import(active('/src/project/datasets/feature-data.ts'))
+    const { projectEdits } = await import(active('/src/project/project-edits.ts'))
+    const { getMapRuntime } = await import(active('/src/engine-host/map-runtime-host.ts'))
     const project = useProjectStore.getState().project, layer = project.content.layers[0], runtime = getMapRuntime()
     const source = runtime?.registry.getVector(layer.id)?.getSource(), geometry = source?.getFeatures()[0]?.getGeometry()
     const feature = source?.getFeatures()[0]
@@ -46,10 +46,10 @@ test('toolbar undo reports a current lock without consuming history, then succee
   await page.evaluate(async () => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(active('/src/session/project.store.ts'))
+    const { useProjectStore } = await import(active('/src/project/project.store.ts'))
     const { layerConfigurationCommands } = await import(active('/src/commands/layer-configuration.commands.ts'))
     const { featureCommands } = await import(active('/src/commands/feature.commands.ts'))
-    const { projectEdits } = await import(active('/src/session/project-edits.ts'))
+    const { projectEdits } = await import(active('/src/project/project-edits.ts'))
     const id = useProjectStore.getState().project.content.layers[0].id
     layerConfigurationCommands.createGroup('Group', [id]); projectEdits.clear()
     featureCommands.updateProperties(id, 'row', { value: 2 })
@@ -58,7 +58,7 @@ test('toolbar undo reports a current lock without consuming history, then succee
     await page.evaluate(async locked => {
       const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
         .filter(name => new URL(name).pathname === path).at(-1) ?? path
-      const { useProjectStore, commitProjectConfiguration } = await import(active('/src/session/project.store.ts'))
+      const { useProjectStore, commitProjectConfiguration } = await import(active('/src/project/project.store.ts'))
       const project = structuredClone(useProjectStore.getState().project)
       project.content.groups[0].locked = locked
       commitProjectConfiguration(project)
@@ -90,8 +90,8 @@ test('public root moves preserve locked siblings and update the tree and actual 
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
     const { layerContentCommands } = await import(active('/src/commands/layer-content.commands.ts'))
     const { layerConfigurationCommands } = await import(active('/src/commands/layer-configuration.commands.ts'))
-    const { useProjectStore } = await import(active('/src/session/project.store.ts'))
-    const { createProjectSceneController } = await import(active('/src/runtime/project-scene-controller.ts'))
+    const { useProjectStore } = await import(active('/src/project/project.store.ts'))
+    const { createProjectSceneController } = await import(active('/src/engine-host/project-scene-controller.ts'))
     layerContentCommands.addLayer('other', 'Other', [], 'point')
     const project = useProjectStore.getState().project, ids = project.content.rootOrder.map(entry => entry.id)
     layerConfigurationCommands.setLayerLocked(ids[0], true)
@@ -102,7 +102,7 @@ test('public root moves preserve locked siblings and update the tree and actual 
   })
   await expect(page.locator('.layer-name-button').first()).toContainText(moved.name)
   await expect.poll(async () => page.evaluate(async ({ id, sibling }) => {
-    const path = '/src/runtime/map-runtime-host.ts'
+    const path = '/src/engine-host/map-runtime-host.ts'
     const url = performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
     const { getMapRuntime } = await import(url), runtime = getMapRuntime()
     const layers: unknown[] = []
@@ -142,8 +142,8 @@ test('project replacement undo restores the original Provider and pending overla
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
     const { featureCommands } = await import(active('/src/commands/feature.commands.ts'))
-    const { projectSession } = await import(active('/src/session/project-session.ts'))
-    const { useProjectStore } = await import(active('/src/session/project.store.ts'))
+    const { projectSession } = await import(active('/src/project/project-session.ts'))
+    const { useProjectStore } = await import(active('/src/project/project.store.ts'))
     const id = useProjectStore.getState().project.content.layers[0].id
     featureCommands.updateProperties(id, 'row', { value: 9 })
     const replacement = projectSession.getSnapshot()
@@ -165,8 +165,8 @@ test('mixed snapshot data commit retains configuration undo and the actual map k
   const persisted = await page.evaluate(async () => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { projectSession } = await import(active('/src/session/project-session.ts'))
-    const { commitDatasetEdits } = await import(active('/src/session/data-save.ts'))
+    const { projectSession } = await import(active('/src/project/project-session.ts'))
+    const { commitDatasetEdits } = await import(active('/src/project/data-save.ts'))
     const snapshot = projectSession.getSnapshot()
     snapshot.project.content.layers[0].name = 'Saved name'
     snapshot.featuresByDataset.data[0].properties.value = 9
@@ -190,7 +190,7 @@ test('historical advanced style dependency retires after field deletion without 
   await page.evaluate(async () => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(active('/src/session/project.store.ts'))
+    const { useProjectStore } = await import(active('/src/project/project.store.ts'))
     const { layerConfigurationCommands } = await import(active('/src/commands/layer-configuration.commands.ts'))
     const project = useProjectStore.getState().project, layer = project.content.layers[0]
     const binding = project.content.cartography.bindings.find(item => item.gisLayerId === layer.id)!
@@ -212,7 +212,7 @@ test('historical advanced style dependency retires after field deletion without 
   await page.evaluate(async () => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { commitDatasetEdits } = await import(active('/src/session/data-save.ts'))
+    const { commitDatasetEdits } = await import(active('/src/project/data-save.ts'))
     await commitDatasetEdits('data', async () => {})
   })
   await page.getByRole('button', { name: '撤销', exact: true }).click()
@@ -228,10 +228,10 @@ test('resource schema commit restores the other project pending edits and replay
   await page.evaluate(async () => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { projectSession } = await import(active('/src/session/project-session.ts'))
+    const { projectSession } = await import(active('/src/project/project-session.ts'))
     const { featureCommands } = await import(active('/src/commands/feature.commands.ts'))
-    const { useProjectStore } = await import(active('/src/session/project.store.ts'))
-    const { commitDatasetEdits } = await import(active('/src/session/data-save.ts'))
+    const { useProjectStore } = await import(active('/src/project/project.store.ts'))
+    const { commitDatasetEdits } = await import(active('/src/project/data-save.ts'))
     featureCommands.updateProperties(useProjectStore.getState().project.content.layers[0].id, 'row', { value: 9 })
     const other = projectSession.getSnapshot()
     other.project.metadata.id = 'schema-project-b'
@@ -262,8 +262,8 @@ test('mixed schema snapshot commit retains configuration undo while the actual m
   const captured = await page.evaluate(async () => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { projectSession } = await import(active('/src/session/project-session.ts'))
-    const { commitDatasetEdits } = await import(active('/src/session/data-save.ts'))
+    const { projectSession } = await import(active('/src/project/project-session.ts'))
+    const { commitDatasetEdits } = await import(active('/src/project/data-save.ts'))
     const snapshot = projectSession.getSnapshot()
     snapshot.project.content.layers[0].name = 'Schema name'
     snapshot.project.content.datasets[0].fields = [{ name: 'count', type: 'number', nullable: false }]
@@ -292,11 +292,11 @@ test('public local locks end map editing and the context menu unlocks them witho
   const result = await page.evaluate(async () => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(active('/src/session/project.store.ts'))
-    const { useWorkbenchStore } = await import(active('/src/view-state/workbench.store.ts'))
+    const { useProjectStore } = await import(active('/src/project/project.store.ts'))
+    const { useWorkbenchStore } = await import(active('/src/stores/workbench.store.ts'))
     const { editCommands } = await import(active('/src/commands/edit.commands.ts'))
     const { featureCommands } = await import(active('/src/commands/feature.commands.ts'))
-    const { createProjectSceneController } = await import(active('/src/runtime/project-scene-controller.ts'))
+    const { createProjectSceneController } = await import(active('/src/engine-host/project-scene-controller.ts'))
     const id = useProjectStore.getState().project.content.layers[0].id, controller = createProjectSceneController()
     const began = editCommands.beginLayer(id)
     try {

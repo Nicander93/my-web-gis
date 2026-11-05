@@ -23,11 +23,11 @@ test('2D windows cover a stable full canvas and retain geometry outside project 
   const tools = await page.locator('.workbench-ribbon-commands').boundingBox()
   expect(root!.y - (tools!.y + tools!.height)).toBeLessThanOrEqual(2)
   const before = await page.evaluate(async () => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
-    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-edits.ts').at(-1) ?? '/src/session/project-edits.ts')
+    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-edits.ts').at(-1) ?? '/src/project/project-edits.ts')
 
-    const { useProjectStore } = await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/session/project.store.ts') ?? '/src/session/project.store.ts')
+    const { useProjectStore } = await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/project/project.store.ts') ?? '/src/project/project.store.ts')
     return { snapshot: projectSession.getSnapshot(), dirty: useProjectStore.getState().dirty, undo: projectEdits.canUndo() }
   })
   await windowMenu(page, '属性')
@@ -66,11 +66,11 @@ test('2D windows cover a stable full canvas and retain geometry outside project 
   await windowMenu(page, '属性表')
   expect(await viewport.boundingBox()).toEqual(original)
   const after = await page.evaluate(async () => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
-    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-edits.ts').at(-1) ?? '/src/session/project-edits.ts')
+    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-edits.ts').at(-1) ?? '/src/project/project-edits.ts')
 
-    const { useProjectStore } = await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/session/project.store.ts') ?? '/src/session/project.store.ts')
+    const { useProjectStore } = await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/project/project.store.ts') ?? '/src/project/project.store.ts')
     return { snapshot: projectSession.getSnapshot(), dirty: useProjectStore.getState().dirty, undo: projectEdits.canUndo() }
   })
   expect(after).toEqual(before)

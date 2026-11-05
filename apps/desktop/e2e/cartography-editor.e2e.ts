@@ -17,12 +17,12 @@ async function openMap(page: Page) {
 
 async function cartographyState(page: Page) {
   return page.evaluate(async () => {
-    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/view-state/layer-view.store.ts').at(-1) ?? '/src/view-state/layer-view.store.ts')).useLayerViewStore.getState()
+    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/stores/layer-view.store.ts').at(-1) ?? '/src/stores/layer-view.store.ts')).useLayerViewStore.getState()
 
     const loaded = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(loaded('/src/session/project.store.ts')) as typeof import('@/session/project.store')
-    const { getMapRuntime } = await import(loaded('/src/runtime/map-runtime-host.ts')) as typeof import('@/runtime/map-runtime-host')
-    const { useWorkbenchStore } = await import(loaded('/src/view-state/workbench.store.ts')) as typeof import('@/view-state/workbench.store')
+    const { useProjectStore } = await import(loaded('/src/project/project.store.ts')) as typeof import('@/project/project.store')
+    const { getMapRuntime } = await import(loaded('/src/engine-host/map-runtime-host.ts')) as typeof import('@/engine-host/map-runtime-host')
+    const { useWorkbenchStore } = await import(loaded('/src/stores/workbench.store.ts')) as typeof import('@/stores/workbench.store')
     const state = useProjectStore.getState()
     const layer = state.project.content.layers.find(item => item.id === (useWorkbenchStore.getState().inspectorLayerId ?? selectionSession.selectedLayerId))!
     const binding = state.project.content.cartography.bindings.find(item => item.gisLayerId === layer.id)!
@@ -103,7 +103,7 @@ test('switching layers preserves immediate edits without a draft dialog', async 
   await firstInput.blur()
   const firstLayer = await cartographyState(page)
   const names = await page.evaluate(async () => {
-    const { useProjectStore } = await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/session/project.store.ts') ?? '/src/session/project.store.ts')
+    const { useProjectStore } = await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/project/project.store.ts') ?? '/src/project/project.store.ts')
     return useProjectStore.getState().project.content.layers.map(layer => ({ id: layer.id, name: layer.name }))
   })
   await page.getByLabel('配置图层').click()
@@ -149,13 +149,13 @@ test('advanced expressions remain intact while safe sibling parameters stay edit
   await expect(page.getByRole('img', { name: 'Points符号预览', exact: true }).locator('..')).not.toHaveAttribute('title')
   const before = await page.evaluate(async () => {
     const loaded = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(loaded('/src/session/project.store.ts')) as typeof import('@/session/project.store')
+    const { useProjectStore } = await import(loaded('/src/project/project.store.ts')) as typeof import('@/project/project.store')
     return structuredClone(useProjectStore.getState().project.content.cartography)
   })
   await expect(panel.getByLabel('渲染方式')).toHaveCount(0)
   await panel.getByLabel('标准描边宽度', { exact: true }).fill('3')
   await panel.getByLabel('标准描边宽度', { exact: true }).blur()
-  const edited = await page.evaluate(async () => (await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/session/project.store.ts') ?? '/src/session/project.store.ts')).useProjectStore.getState().project.content.cartography)
+  const edited = await page.evaluate(async () => (await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/project/project.store.ts') ?? '/src/project/project.store.ts')).useProjectStore.getState().project.content.cartography)
   expect(edited!.styleLayers[0]!.paint!['circle-radius']).toEqual(before!.styleLayers[0]!.paint!['circle-radius'])
   expect(edited!.styleLayers[0]!.paint!['circle-stroke-width']).toBe(3)
   await page.getByRole('button', { name: '撤销', exact: true }).click()
@@ -163,7 +163,7 @@ test('advanced expressions remain intact while safe sibling parameters stay edit
   await expect(page.getByText('当前没有文字样式，可在专业标注编辑中添加。', { exact: true })).toBeVisible()
   const after = await page.evaluate(async () => {
     const loaded = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(loaded('/src/session/project.store.ts')) as typeof import('@/session/project.store')
+    const { useProjectStore } = await import(loaded('/src/project/project.store.ts')) as typeof import('@/project/project.store')
     return structuredClone(useProjectStore.getState().project.content.cartography)
   })
   expect(after).toEqual(before)

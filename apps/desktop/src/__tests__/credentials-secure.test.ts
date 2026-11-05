@@ -80,7 +80,7 @@ describe('secure credential persistence', () => {
     const key = putSessionCredential({ kind: 'bearer', value: 'BEARER-SECRET' })
     await persistCredentialSecurely(key)
 
-    // Simulate restart: clear memory but keep OS store
+    // 模拟重启：清空内存，但保留操作系统存储里的内容。
     const saved = backend.store.get(key)!
     _resetCredentialsForTests()
     _setSecureCredentialBackendForTests(memoryBackend())
@@ -110,14 +110,14 @@ describe('secure credential persistence', () => {
     expect(gets).toBe(0)
   })
 
-  it('deleteSessionCredential removes OS entry best-effort', async () => {
+  it('deleteSessionCredential removes OS entry 尽力而为', async () => {
     const backend = memoryBackend()
     _setSecureCredentialBackendForTests(backend)
     const key = putSessionCredential({ kind: 'bearer', value: 'gone' })
     await persistCredentialSecurely(key)
     expect(backend.store.has(key)).toBe(true)
     deleteSessionCredential(key)
-    // allow microtask for best-effort delete
+    // 留一个微任务，让尽力而为的删除有机会执行。
     await Promise.resolve()
     await new Promise((r) => setTimeout(r, 0))
     expect(getSessionCredential(key)).toBeUndefined()

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreUnresolved": ["^/src/", "^/e2e/"],
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/*.mjs"],
+      "project": ["scripts/**/*.mjs"]
+    },
+    "apps/desktop": {
+      "entry": [
+        "src/io/import.worker.ts",
+        "e2e/*.config.ts",
+        "e2e/**/*.e2e.ts",
+        "scripts/*.mjs",
+        "*.mjs"
+      ],
+      "project": ["src/**/*.{ts,tsx,css}", "e2e/**/*.ts", "scripts/**/*.mjs"]
+    },
+    "apps/viewer": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/public/*": {
+      "entry": ["src/*.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/internal/*": {
+      "entry": ["src/*.ts"],
+      "project": ["src/**/*.ts"]
+    }
+  }
+}

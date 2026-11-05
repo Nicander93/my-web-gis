@@ -12,13 +12,13 @@ async function draw(page: Page, tool: string, points: Array<[number, number]>) {
 
 async function measurementCount(page: Page): Promise<number> {
   return page.evaluate(async () => {
-    const nodes = (await import('/src/session/project.store.ts')).useProjectStore.getState().project.content.scene?.nodes ?? []
+    const nodes = (await import('/src/project/project.store.ts')).useProjectStore.getState().project.content.scene?.nodes ?? []
     return nodes.filter(node => node.type === 'graphic' && typeof node.properties.measurementKind === 'string').length
   })
 }
 
 async function projectDirty(page: Page): Promise<boolean> {
-  return page.evaluate(async () => (await import('/src/session/project.store.ts')).useProjectStore.getState().dirty)
+  return page.evaluate(async () => (await import('/src/project/project.store.ts')).useProjectStore.getState().dirty)
 }
 
 test.use({ screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })

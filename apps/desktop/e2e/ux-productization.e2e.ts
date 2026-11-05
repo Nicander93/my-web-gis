@@ -12,7 +12,7 @@ async function seed(page: Page) {
   return page.evaluate(async () => {
     const { layerContentCommands } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/commands/layer-content.commands.ts').at(-1) ?? '/src/commands/layer-content.commands.ts')
 
-    const { useProjectStore } = await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/session/project.store.ts') ?? '/src/session/project.store.ts')
+    const { useProjectStore } = await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/project/project.store.ts') ?? '/src/project/project.store.ts')
     layerContentCommands.addLayer('ux-points', '站点', [
       { id: 'station-a', type: 'Feature', geometry: { type: 'Point', coordinates: [116, 39] }, properties: { 名称: '甲站', 流量: 24 } },
       { id: 'station-b', type: 'Feature', geometry: { type: 'Point', coordinates: [116.01, 39] }, properties: { 名称: '乙站', 流量: 32 } }
@@ -23,12 +23,12 @@ async function seed(page: Page) {
 
 test('information rail preserves tools and selection; identify opens retained real results', async ({ page }) => {
   const id = await seed(page)
-  await page.evaluate(async () => (await import('/src/view-state/preferences.store.ts')).usePreferencesStore.getState().update({ fontSize: 8 }))
+  await page.evaluate(async () => (await import('/src/stores/preferences.store.ts')).usePreferencesStore.getState().update({ fontSize: 8 }))
   await page.evaluate(async id => {
-    const { useProjectStore } = await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/session/project.store.ts') ?? '/src/session/project.store.ts')
+    const { useProjectStore } = await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/project/project.store.ts') ?? '/src/project/project.store.ts')
     const { selectionCommands } = await import('/src/commands/selection.commands.ts')
     selectionCommands.setSelection({ layerId: id, featureIds: ['station-b'] })
-    const { getMapRuntime } = await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/runtime/map-runtime-host.ts') ?? '/src/runtime/map-runtime-host.ts')
+    const { getMapRuntime } = await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/engine-host/map-runtime-host.ts') ?? '/src/engine-host/map-runtime-host.ts')
     const runtime = getMapRuntime()!
     const feature = runtime.registry.getVector(id)!.getSource()!.getFeatureById('station-a')!
     const map = runtime.getMap()
@@ -38,39 +38,39 @@ test('information rail preserves tools and selection; identify opens retained re
   }, id)
   const rail = page.getByRole('navigation', { name: '右侧工作面板' })
   await page.getByRole('button', { name: '平移', exact: true }).click()
-  const tool = await page.evaluate(async () => (await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/runtime/map-runtime-host.ts') ?? '/src/runtime/map-runtime-host.ts')).getActiveEditTool())
+  const tool = await page.evaluate(async () => (await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/engine-host/map-runtime-host.ts') ?? '/src/engine-host/map-runtime-host.ts')).getActiveEditTool())
   await rail.getByRole('button', { name: '信息', exact: true }).click()
   await expect(page.getByText('暂无识别结果', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '窗口', exact: true }).click()
   await expect(page.getByRole('menuitemcheckbox', { name: '属性', exact: true })).toHaveAttribute('aria-checked', 'false')
   await page.keyboard.press('Escape')
-  expect(await page.evaluate(async () => (await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/runtime/map-runtime-host.ts') ?? '/src/runtime/map-runtime-host.ts')).getActiveEditTool())).toBe(tool)
+  expect(await page.evaluate(async () => (await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/engine-host/map-runtime-host.ts') ?? '/src/engine-host/map-runtime-host.ts')).getActiveEditTool())).toBe(tool)
   await rail.getByRole('button', { name: '信息', exact: true }).click()
   await page.getByRole('button', { name: '识别', exact: true }).click()
   const pixel = await page.evaluate(async id => {
-    const runtime = (await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/runtime/map-runtime-host.ts') ?? '/src/runtime/map-runtime-host.ts')).getMapRuntime()!
+    const runtime = (await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/engine-host/map-runtime-host.ts') ?? '/src/engine-host/map-runtime-host.ts')).getMapRuntime()!
     const geometry = runtime.registry.getVector(id)!.getSource()!.getFeatureById('station-a')!.getGeometry()!
     return runtime.getMap().getPixelFromCoordinate(geometry.getCoordinates())
   }, id)
   const viewport = await page.getByTestId('map-runtime-viewport').boundingBox()
   await page.mouse.click(viewport!.x + pixel[0], viewport!.y + pixel[1])
   await expect(page.locator('.information-panel')).toContainText('甲站')
-  const selection = await page.evaluate(async () => { const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/view-state/layer-view.store.ts').at(-1) ?? '/src/view-state/layer-view.store.ts')).useLayerViewStore.getState(); return selectionSession.selection })
+  const selection = await page.evaluate(async () => { const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/stores/layer-view.store.ts').at(-1) ?? '/src/stores/layer-view.store.ts')).useLayerViewStore.getState(); return selectionSession.selection })
   expect(selection).toEqual({ layerId: id, featureIds: ['station-b'] })
   await page.getByRole('button', { name: '平移', exact: true }).click()
   await rail.getByRole('button', { name: '属性', exact: true }).click()
   await expect(page.getByRole('tab', { name: '要素', exact: true })).toHaveCount(0)
   await rail.getByRole('button', { name: '信息', exact: true }).click()
   await expect(page.locator('.information-panel')).toContainText('甲站')
-  expect(await page.evaluate(async () => (await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/runtime/map-runtime-host.ts') ?? '/src/runtime/map-runtime-host.ts')).getActiveEditTool())).toBe('pan')
+  expect(await page.evaluate(async () => (await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/engine-host/map-runtime-host.ts') ?? '/src/engine-host/map-runtime-host.ts')).getActiveEditTool())).toBe('pan')
 })
 
 test('software appearance persists independently of project cartography and keeps controls reachable', async ({ page }) => {
   await seed(page)
   const before = await page.evaluate(async () => {
-    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-edits.ts').at(-1) ?? '/src/session/project-edits.ts')
+    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-edits.ts').at(-1) ?? '/src/project/project-edits.ts')
 
-    const state = (await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/session/project.store.ts') ?? '/src/session/project.store.ts')).useProjectStore.getState()
+    const state = (await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/project/project.store.ts') ?? '/src/project/project.store.ts')).useProjectStore.getState()
     return { cartography: state.project.content.cartography, dirty: state.dirty, undo: projectEdits.canUndo() }
   })
   await page.getByRole('button', { name: '设置', exact: true }).click()
@@ -121,9 +121,9 @@ test('software appearance persists independently of project cartography and keep
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--font-size-ui').trim())).toBe('14px')
   const after = await page.evaluate(async () => {
-    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-edits.ts').at(-1) ?? '/src/session/project-edits.ts')
+    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-edits.ts').at(-1) ?? '/src/project/project-edits.ts')
 
-    const state = (await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/session/project.store.ts') ?? '/src/session/project.store.ts')).useProjectStore.getState()
+    const state = (await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/project/project.store.ts') ?? '/src/project/project.store.ts')).useProjectStore.getState()
     return { cartography: state.project.content.cartography, dirty: state.dirty, undo: projectEdits.canUndo() }
   })
   expect(after).toEqual(before)
@@ -156,10 +156,10 @@ test('empty attribute table keeps the layer picker without an empty toolbar', as
 
 test('layer legends are view state and map filtering remains separate from table search', async ({ page }) => {
   const id = await seed(page)
-  const before = await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() })
+  const before = await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts'); return projectSession.getSnapshot() })
   await page.getByRole('button', { name: '展开站点图例', exact: true }).click()
   await expect(page.getByLabel('站点图例', { exact: true })).toBeVisible()
-  expect(await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() })).toEqual(before)
+  expect(await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts'); return projectSession.getSnapshot() })).toEqual(before)
   await page.evaluate(async id => (await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/commands/layer.commands.ts') ?? '/src/commands/layer.commands.ts')).layerCommands.openFilter(id), id)
   const filter = page.getByRole('dialog', { name: '图层过滤', exact: true })
   await filter.getByLabel('图层过滤字段', { exact: true }).click()
@@ -168,8 +168,8 @@ test('layer legends are view state and map filtering remains separate from table
   await filter.getByRole('button', { name: '添加', exact: true }).click()
   await filter.getByRole('button', { name: '应用图层过滤', exact: true }).click()
   const inclusion = () => page.evaluate(async id => {
-    const state = (await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/session/project.store.ts') ?? '/src/session/project.store.ts')).useProjectStore.getState()
-    const runtime = (await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/runtime/map-runtime-host.ts') ?? '/src/runtime/map-runtime-host.ts')).getMapRuntime()!
+    const state = (await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/project/project.store.ts') ?? '/src/project/project.store.ts')).useProjectStore.getState()
+    const runtime = (await import(performance.getEntriesByType('resource').map(entry => entry.name).findLast(url => new URL(url).pathname === '/src/engine-host/map-runtime-host.ts') ?? '/src/engine-host/map-runtime-host.ts')).getMapRuntime()!
     const source = runtime.registry.getVector(id)!.getSource()!
     return { filter: state.project.content.layers.find(layer => layer.id === id)!.filter,
       first: runtime.isFeatureIncluded(id, source.getFeatureById('station-a')!), second: runtime.isFeatureIncluded(id, source.getFeatureById('station-b')!) }
@@ -199,7 +199,7 @@ test('layer legends are view state and map filtering remains separate from table
 
 test('layer context menus open the existing SLD and GeoServer workflows without changing data', async ({ page }) => {
   await seed(page)
-  const before = await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() })
+  const before = await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts'); return projectSession.getSnapshot() })
   await page.getByRole('button', { name: '更多操作 站点', exact: true }).click()
   await page.getByRole('menuitem', { name: '导出 SLD…', exact: true }).click()
   const sld = page.getByRole('dialog', { name: '导出 SLD', exact: true })
@@ -210,5 +210,5 @@ test('layer context menus open the existing SLD and GeoServer workflows without 
   const publish = page.getByRole('dialog', { name: '发布“站点”到 GeoServer', exact: true })
   await expect(publish.getByText('GeoServer 根地址', { exact: true })).toBeVisible()
   await publish.locator('.ant-modal-footer').getByRole('button', { name: '关闭', exact: true }).click()
-  expect(await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() })).toEqual(before)
+  expect(await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts'); return projectSession.getSnapshot() })).toEqual(before)
 })

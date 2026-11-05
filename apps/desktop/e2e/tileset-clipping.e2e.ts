@@ -64,7 +64,7 @@ test('draws and manages persistent native clipping ranges without reloading the 
   expect(tilesetRequests).toBe(1)
 
   const stored = await page.evaluate(async () => {
-    const { useProjectStore } = await import('/src/session/project.store.ts')
+    const { useProjectStore } = await import('/src/project/project.store.ts')
     const node = useProjectStore.getState().project.content.scene?.nodes.find(item => item.type === '3dtiles')
     return node?.type === '3dtiles' ? node.effects : undefined
   })
@@ -94,7 +94,7 @@ test('flattens real tileset geometry at a configurable ellipsoid height and rest
   const restored = await canvasPixels(page)
   expect(await changedPixels(page, before, restored)).toBeLessThan(await changedPixels(page, before, flattened))
   const stored = await page.evaluate(async () => {
-    const { useProjectStore } = await import('/src/session/project.store.ts')
+    const { useProjectStore } = await import('/src/project/project.store.ts')
     const node = useProjectStore.getState().project.content.scene?.nodes.find(item => item.type === '3dtiles')
     return node?.type === '3dtiles' ? node.effects : undefined
   })
@@ -183,7 +183,7 @@ test('keeps flatten shaders isolated across differently transformed tilesets', a
   await west.locator('.scene3d-layer-row__select').click()
   await page.getByRole('switch', { name: '启用压平范围 1' }).click()
   const state = await page.evaluate(async () => {
-    const nodes = (await import('/src/session/project.store.ts')).useProjectStore.getState().project.content.scene?.nodes ?? []
+    const nodes = (await import('/src/project/project.store.ts')).useProjectStore.getState().project.content.scene?.nodes ?? []
     return nodes.filter(node => node.type === '3dtiles').map(node => ({ id: node.id, transform: node.transform, effects: node.effects }))
   })
   expect(state).toEqual([

@@ -21,7 +21,7 @@ test('column drag, keyboard, cancellation and rename retain per-table widths wit
   const panel = () => page.locator('.attribute-table-tab-panel:visible')
   const handle = () => panel().getByRole('separator', { name: '调整 value 列宽', exact: true })
   const header = () => panel().getByRole('columnheader', { name: 'value', exact: true })
-  const before = await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() })
+  const before = await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts'); return projectSession.getSnapshot() })
   await expect(handle()).toHaveAttribute('aria-valuenow', '160')
   const original = (await header().boundingBox())!
   const bounds = (await handle().boundingBox())!
@@ -42,7 +42,7 @@ test('column drag, keyboard, cancellation and rename retain per-table widths wit
   await handle().focus()
   await page.keyboard.press('Shift+ArrowRight')
   await expect(handle()).toHaveAttribute('aria-valuenow', '232')
-  expect(await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() })).toEqual(before)
+  expect(await page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts'); return projectSession.getSnapshot() })).toEqual(before)
   await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled()
   await page.screenshot({ path: info.outputPath('consistent-attribute-table.png') })
 

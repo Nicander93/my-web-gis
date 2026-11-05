@@ -14,7 +14,7 @@ async function seedLocalLayer(page: Page) {
     const { layerContentCommands } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/commands/layer-content.commands.ts').at(-1) ?? '/src/commands/layer-content.commands.ts')
 
     const moduleUrl = performance.getEntriesByType('resource').map(entry => entry.name)
-      .findLast(url => new URL(url).pathname === '/src/session/project.store.ts') ?? '/src/session/project.store.ts'
+      .findLast(url => new URL(url).pathname === '/src/project/project.store.ts') ?? '/src/project/project.store.ts'
     const { useProjectStore } = await import(moduleUrl)
     const store = useProjectStore.getState()
     layerContentCommands.addLayer('stations-source.geojson', '站点结果', [
@@ -40,7 +40,7 @@ async function seedWfsLayer(page: Page) {
     const { featureCommands } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/commands/feature.commands.ts').at(-1) ?? '/src/commands/feature.commands.ts')
 
     const moduleUrl = performance.getEntriesByType('resource').map(entry => entry.name)
-      .findLast(url => new URL(url).pathname === '/src/session/project.store.ts') ?? '/src/session/project.store.ts'
+      .findLast(url => new URL(url).pathname === '/src/project/project.store.ts') ?? '/src/project/project.store.ts'
     const { useProjectStore } = await import(moduleUrl)
     const store = useProjectStore.getState()
     const layer = layerContentCommands.addServiceLayer({
@@ -68,12 +68,12 @@ async function openInspector(page: Page) {
 
 async function projectState(page: Page) {
   return page.evaluate(async () => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
-    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-edits.ts').at(-1) ?? '/src/session/project-edits.ts')
+    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-edits.ts').at(-1) ?? '/src/project/project-edits.ts')
 
     const moduleUrl = performance.getEntriesByType('resource').map(entry => entry.name)
-      .findLast(url => new URL(url).pathname === '/src/session/project.store.ts') ?? '/src/session/project.store.ts'
+      .findLast(url => new URL(url).pathname === '/src/project/project.store.ts') ?? '/src/project/project.store.ts'
     const store = (await import(moduleUrl)).useProjectStore.getState()
     return {
       snapshot: projectSession.getSnapshot(), dirty: store.dirty,

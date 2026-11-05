@@ -70,8 +70,8 @@ async function addService(page: Page, type: string, layer: string) {
 
 async function nativeLayers(page: Page) {
   return page.evaluate(async () => {
-    const { getMapRuntime } = await import('/src/runtime/map-runtime-host.ts')
-    const { useProjectStore } = await import('/src/session/project.store.ts')
+    const { getMapRuntime } = await import('/src/engine-host/map-runtime-host.ts')
+    const { useProjectStore } = await import('/src/project/project.store.ts')
     const runtime = getMapRuntime(), project = useProjectStore.getState().project
     return project.content.layers.map(layer => ({ name: layer.name, opacity: runtime?.registry.get(layer.id)?.getOpacity(),
       type: runtime?.registry.get(layer.id)?.getSource()?.constructor.name,

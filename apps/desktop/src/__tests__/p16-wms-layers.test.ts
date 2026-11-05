@@ -1,7 +1,7 @@
 import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
 import { layerContentCommands } from '@/commands/layer-content.commands'
-import { projectEdits } from '@/session/project-edits'
-import { featureData } from '@/data/feature-data'
+import { projectEdits } from '@/project/project-edits'
+import { featureData } from '@/project/datasets/feature-data'
 import { requireMapContent } from '@desktop-webgis/project'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
@@ -11,8 +11,8 @@ import {
   capabilitiesForDataset,
   type GisFeature
 } from '@desktop-webgis/project'
-import { useProjectStore } from '@/session/project.store'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { useProjectStore } from '@/project/project.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
 import { getLayerCapabilities, layerCommands } from '@/commands/layer.commands'
 import { _resetCredentialsForTests } from '@/platform/credentials'
 import { listSelectableLayers, parseCapabilitiesXml } from '@desktop-webgis/ogc-io'
@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url'
 
 const fixturesDir = join(
   dirname(fileURLToPath(import.meta.url)),
-  '../../../../packages/ogc-io/fixtures'
+  '../../../../packages/public/ogc-io/fixtures'
 )
 
 function resetStores(): void {
@@ -35,7 +35,7 @@ function resetStores(): void {
 
 describe('P16 WMS layers', () => {
   beforeEach(() => {
-    // Commands emit status via window CustomEvent (jsdom-less vitest node env).
+    // 命令通过 window 上的 CustomEvent 发出状态（因为测试跑在没有 jsdom 的 node 环境里）。
     ;(globalThis as unknown as { window: { dispatchEvent: (event?: unknown) => boolean } }).window = {
       dispatchEvent: () => true
     }

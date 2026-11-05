@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { importGeoJson } from '@/exchange/import'
+import { importGeoJson } from '@/io/import'
 import { readBinaryFile } from '@/platform/files'
 
 vi.mock('@/platform/files', () => ({ readFile: vi.fn(), readBinaryFile: vi.fn() }))
@@ -73,9 +73,9 @@ describe('Import GeoJSON', () => {
   })
 })
 
-vi.mock('@/exchange/import-worker', async () => {
-  const parser = await import('@/exchange/import-parser')
-  return { runImportWorker: async (request: import('@/exchange/import-worker').ImportRequest) => {
+vi.mock('@/io/import-worker', async () => {
+  const parser = await import('@/io/import-parser')
+  return { runImportWorker: async (request: import('@/io/import-worker').ImportRequest) => {
     if (request.kind === 'geojson') return parser.importGeoJson(request.source, request.options)
     if (request.kind === 'csv') return parser.importCsvFile(request.source, request.options)
     if (request.kind === 'shapefile') return parser.importShapefileZip(request.source, request.options)

@@ -107,7 +107,7 @@ async function waitForSceneView() {
   if (await page.locator('.scene3d-canvas__viewport canvas').count()) {
     let previous, stable = 0
     await poll(async () => {
-      const camera = await page.evaluate(async () => (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneCamera())
+      const camera = await page.evaluate(async () => (await import('/src/engine-host/scene3d-runtime-host.ts')).getLiveSceneCamera())
       const values = camera && [...camera.position, camera.heading, camera.pitch, camera.roll]
       if (values && previous && values.every((value, index) => Math.abs(value - previous[index]) < (index === 2 ? 1e-5 : 1e-8))) stable++
       else stable = 0
@@ -118,7 +118,7 @@ async function waitForSceneView() {
 }
 async function saveTo(path) {
   await waitForSceneView()
-  await page.evaluate(async (file) => (await import('/src/session/project-io.ts')).setCurrentProjectPath(file), path)
+  await page.evaluate(async (file) => (await import('/src/project/project-io.ts')).setCurrentProjectPath(file), path)
   await page.getByRole('button', { name: '保存项目', exact: true }).click()
   await expect(page.locator('.project-dirty')).toHaveCount(0)
   await poll(async () => (await entries()).length === 0, 'Native save did not clear the acknowledged recovery draft')
@@ -332,9 +332,9 @@ try {
   await mkdir(dirname(localModel), { recursive: true })
   await copyFile(resolve(desktop, '../../examples/city-3d/city-sample/tower.glb'), localModel)
   await page.evaluate(async ({ formal3d, localModel }) => {
-    const io = await import('/src/session/project-io.ts')
+    const io = await import('/src/project/project-io.ts')
     io.setCurrentProjectPath(formal3d)
-    const commands = await import('/src/features/scene3d/scene3d-commands.ts')
+    const commands = await import('/src/ui/panels/scene3d/scene3d-commands.ts')
     commands.updateScene('切换本地模型引用', scene => {
       const node = scene.nodes.find(node => node.name === 'Native Tower')
       const asset = scene.assets[node.asset]
@@ -379,7 +379,7 @@ try {
   assert.equal(restored3d.project.metadata.id, baseline3d.project.metadata.id)
   assert.deepEqual(restored3d.project.content.scene.nodes, draft3d.snapshot.project.content.scene.nodes)
   const resolvedRestored = await page.evaluate(async ({ snapshot, path }) => {
-    const io = await import('/src/session/project-resource-references.ts')
+    const io = await import('/src/project/project-resource-references.ts')
     return io.resolveProjectResourceReferences(snapshot, path)
   }, { snapshot: restored3d, path: join(output, 'restored-3d.webgis.json') })
   assert.deepEqual(resolvedRestored.project.content.scene.assets, draft3d.snapshot.project.content.scene.assets)
@@ -421,11 +421,11 @@ try {
   const flattened = await canvasPixels(), initialDifference = await changedPixels(before, flattened)
   assert.ok(initialDifference > 200, `Native flattening changed only ${initialDifference} pixels`)
   await page.screenshot({ path: join(output, 'native-tileset-flattened.png') })
-  const cameraBefore = await page.evaluate(async () => (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneCamera())
+  const cameraBefore = await page.evaluate(async () => (await import('/src/engine-host/scene3d-runtime-host.ts')).getLiveSceneCamera())
   await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
   await page.mouse.wheel(0, -500)
   await poll(async () => {
-    const current = await page.evaluate(async () => (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneCamera())
+    const current = await page.evaluate(async () => (await import('/src/engine-host/scene3d-runtime-host.ts')).getLiveSceneCamera())
     return current && cameraBefore && Math.abs(current.position[2] - cameraBefore.position[2]) > 1
   }, 'Native camera did not move while flattening was active')
   const quality = inspector.locator('.scene3d-property-group').filter({ hasText: '瓦片质量' }).getByRole('combobox').first()
@@ -447,10 +447,10 @@ try {
   report.error = error.stack ?? String(error)
   await page?.screenshot({ path: join(output, 'native-failure.png') }).catch(() => undefined)
   if (page) report.liveState = await page.evaluate(async () => {
-    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/data/feature-data.ts').at(-1) ?? '/src/data/feature-data.ts')
+    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/datasets/feature-data.ts').at(-1) ?? '/src/project/datasets/feature-data.ts')
 
-    const store = await import('/src/session/project.store.ts')
-    const io = await import('/src/session/project-io.ts')
+    const store = await import('/src/project/project.store.ts')
+    const io = await import('/src/project/project-io.ts')
     const state = store.useProjectStore.getState()
     return { dirty: state.dirty, version: store.getProjectContentVersion(), epoch: state.projectEpoch,
       snapshot: io.createSnapshotFromState(state.project, featureData.readSnapshot()) }

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { useWorkspaceStore } from '@/view-state/workspace.store'
+import { useWorkspaceStore } from '@/stores/workspace.store'
 import { viewCommands } from './view.commands'
-import { useActivityPanelStore } from '@/view-state/activity-panel.store'
-import { useDockingStore } from '@/view-state/docking.store'
-import { useWorkbenchStore } from '@/view-state/workbench.store'
-import { getActiveEditTool } from '@/runtime/map-runtime-host'
+import { useActivityPanelStore } from '@/stores/activity-panel.store'
+import { useDockingStore } from '@/stores/docking.store'
+import { useWorkbenchStore } from '@/stores/workbench.store'
+import { getActiveEditTool } from '@/engine-host/map-runtime-host'
 
 describe('view commands', () => {
   beforeEach(() => {

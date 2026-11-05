@@ -1,11 +1,11 @@
 import { datasetConfigurationCommands } from '@/commands/dataset-configuration.commands'
 import { featureCommands } from '@/commands/feature.commands'
-import { featureData } from '@/data/feature-data'
+import { featureData } from '@/project/datasets/feature-data'
 import { requireMapContent } from '@desktop-webgis/project'
 import { emitCommandStatus } from '@/platform/command-status'
-import { useProjectStore } from '@/session/project.store'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
-import { loadWfsBoundedSnapshot } from '@/exchange/wfs-load'
+import { useProjectStore } from '@/project/project.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
+import { loadWfsBoundedSnapshot } from '@/io/wfs-load'
 import { parseWfsGmlFeatures } from '@desktop-webgis/ol-runtime'
 import type { ServiceDescription } from '@desktop-webgis/ogc-io'
 import type { ResolveWfsSelection } from '@desktop-webgis/ogc-io'
@@ -19,20 +19,20 @@ export interface StartWfsLoadInput {
   authMode: 'none' | 'query-token' | 'bearer'
   tokenParam?: string
   credentialRefKey?: string
-  /** When true, failure keeps previous features (refresh). */
+  /** 为 true 时表示这是一次刷新，失败要保留原有的要素。 */
   isRefresh?: boolean
 }
 
 /**
- * Start a bounded WFS snapshot load. Safe against cancel / delete / project switch.
- * Refresh failures keep the previous snapshot.
+ * 开始一次有界的 WFS 快照加载。取消、删除图层、切换项目时都能安全处理。
+ * 刷新失败时保留上一份快照。
  */
 export async function startWfsBoundedLoad(input: StartWfsLoadInput): Promise<void> {
   const session = useLayerViewStore.getState()
   const loadGeneration = session.wfsLoadGeneration
   const loadToken = `${loadGeneration}:${input.layerId}:${Date.now()}`
 
-  // Abort any prior load for this layer.
+  // 先中止这个图层上之前的加载。
   session.abortWfsLoad(input.layerId)
   const controller = new AbortController()
   session.setWfsAbort(input.layerId, controller)
@@ -52,9 +52,9 @@ export async function startWfsBoundedLoad(input: StartWfsLoadInput): Promise<voi
       parseGml: (body, opts) => parseWfsGmlFeatures(body, opts)
     })
 
-    // A resource edit can replace this same-ID layer without switching the whole project.
+    // 编辑资源时可能替换掉同 ID 的图层，但不会切换整个项目。
     if (controller.signal.aborted || useLayerViewStore.getState().wfsAbortByLayer[input.layerId] !== controller) return
-    // Stale if project switched or layer removed.
+    // 项目已切换或图层已被删除时视为过期。
     if (useLayerViewStore.getState().wfsLoadGeneration !== loadGeneration) {
       return
     }
@@ -71,11 +71,11 @@ export async function startWfsBoundedLoad(input: StartWfsLoadInput): Promise<voi
         return
       }
       if (input.isRefresh) {
-        // Keep previous snapshot on refresh failure.
+        // 刷新失败时保留上一份快照。
         emitCommandStatus(`WFS 刷新失败，已保留原快照：${result.message}`)
         return
       }
-      // First load with partial pages: apply partial as incomplete snapshot.
+      // 首次加载只拿到部分分页时，把这些部分结果作为不完整快照应用。
       if (result.partial) {
         applySnapshot(input.datasetId, result.partial.features, {
           loadedCount: result.partial.loadedCount,
@@ -141,7 +141,7 @@ function applySnapshot(
   datasetConfigurationCommands.patchWfsServiceSource(datasetId, meta)
 }
 
-/** Refresh an existing WFS layer snapshot using stored source + last known capabilities selection. */
+/** 用已保存的数据源和上次已知的 Capabilities 选择，刷新已有的 WFS 图层快照。 */
 export async function refreshWfsLayer(layerId: string): Promise<void> {
   const state = useProjectStore.getState()
   const layer = requireMapContent(state.project).layers.find((l) => l.id === layerId)
@@ -159,7 +159,7 @@ export async function refreshWfsLayer(layerId: string): Promise<void> {
   const viewExtent = useLayerViewStore.getState().mapViewExtentWgs84
   const extentMode = source.extentMode ?? 'view'
 
-  // Minimal ServiceDescription reconstructed from persisted source (no live catalog dump).
+  // 用持久化的数据源重建最小的 ServiceDescription，不保留在线目录的完整内容。
   const description: ServiceDescription = {
     service: 'WFS',
     version: source.version,

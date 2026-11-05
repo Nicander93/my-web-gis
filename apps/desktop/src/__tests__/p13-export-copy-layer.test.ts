@@ -1,9 +1,9 @@
 import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
 import { layerContentCommands } from '@/commands/layer-content.commands'
 import { featureCommands } from '@/commands/feature.commands'
-import { getLayerFeatures } from '@/session/feature-query'
-import { projectEdits } from '@/session/project-edits'
-import { featureData } from '@/data/feature-data'
+import { getLayerFeatures } from '@/project/feature-query'
+import { projectEdits } from '@/project/project-edits'
+import { featureData } from '@/project/datasets/feature-data'
 import { selectionCommands } from '@/commands/selection.commands'
 import { requireMapContent } from '@desktop-webgis/project'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -14,13 +14,13 @@ import {
   type GisFeature
 } from '@desktop-webgis/project'
 import { featuresToCsv } from '@desktop-webgis/vector-io'
-import { useProjectStore } from '@/session/project.store'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { useProjectStore } from '@/project/project.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
 import {
   countExportScopes,
   resolveExportFeatures,
   type TableViewState
-} from '@/features/export/exportScopes'
+} from '@/ui/panels/export/exportScopes'
 
 function feat(
   id: string,
@@ -105,7 +105,7 @@ describe('P13 export scopes / copy / CSV', () => {
     expect(parsed.features).toHaveLength(4)
     expect(parsed.features[0].geometry).toEqual(sample[0].geometry)
     expect(parsed.features[0].properties.note).toBe('=1+2')
-    // CSV guards formulas; GeoJSON must not
+    // CSV 需要对公式做防护，GeoJSON 则不能做。
     expect(text).toContain('"=1+2"')
     expect(text).not.toContain("'=1+2")
   })
@@ -132,7 +132,7 @@ describe('P13 export scopes / copy / CSV', () => {
 
     const copyLayerId = result!.layerId
     const copyDs = result!.datasetId
-    // mutate copy properties
+    // 修改副本的属性。
     const copyFeat = featureData.readSnapshot()[copyDs][0]
     featureCommands.updateProperties(copyLayerId, copyFeat.id, {
       ...copyFeat.properties,
@@ -144,7 +144,7 @@ describe('P13 export scopes / copy / CSV', () => {
         ?.properties.name
     ).toBe('COPY-EDIT')
 
-    // object identity must differ
+    // 对象身份必须不同。
     expect(featureData.readSnapshot()[copyDs][0]).not.toBe(
       featureData.readSnapshot()['ds-1'][0]
     )
@@ -153,8 +153,8 @@ describe('P13 export scopes / copy / CSV', () => {
   it('cancel path does not set Dirty (dialog open alone is a no-op)', () => {
     layerContentCommands.addLayer('ds-1', 'Cities', sample, 'point')
     useProjectStore.getState().setDirty(false)
-    // Opening/closing export dialog never calls store mutations; assert dirty stays false
-    // when only reading scopes.
+    // 打开或关闭导出对话框不会触发 Store 变更；断言未保存标记保持为 false。
+    // 只在读取范围时。
     const layerId = useLayerViewStore.getState().selectedLayerId!
     const layer = requireMapContent(useProjectStore.getState().project).layers.find((l) => l.id === layerId)!
     void resolveExportFeatures({

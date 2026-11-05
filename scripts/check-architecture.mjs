@@ -8,19 +8,28 @@ const posix = value => value.replaceAll('\\', '/')
 /** 已知违规；消失后必须从本列表删除。 */
 const KNOWN_VIOLATIONS = []
 
-const LAYER_RANK = {
-  shell: 0,
-  features: 1,
-  commands: 2,
-  runtime: 3,
-  exchange: 4,
-  'view-state': 5,
-  session: 6,
-  data: 7,
-  platform: 8
+/**
+ * Desktop 真实 DAG 分层规则（而非假线性排名）：
+ * - 第 1 层（界面层）：ui/workbench -> ui/panels -> ui/components
+ * - 第 2 层（命令层）：commands
+ * - 第 3 层（桥接层，平级并列）：engine-host、io
+ * - 第 4 层（状态与工程数据层）：stores -> project -> project/datasets
+ * - 第 5 层（系统底座层）：platform
+ */
+const ALLOWED_IMPORTS = {
+  'ui/workbench': new Set(['ui/panels', 'ui/components', 'commands', 'engine-host', 'io', 'stores', 'project', 'project/datasets', 'platform']),
+  'ui/panels': new Set(['ui/components', 'commands', 'engine-host', 'io', 'stores', 'project', 'project/datasets', 'platform']),
+  'ui/components': new Set(['stores', 'platform']),
+  commands: new Set(['engine-host', 'io', 'stores', 'project', 'project/datasets', 'platform']),
+  'engine-host': new Set(['io', 'stores', 'project', 'project/datasets', 'platform']),
+  io: new Set(['stores', 'project', 'project/datasets', 'platform']),
+  stores: new Set(['project', 'project/datasets', 'platform']),
+  project: new Set(['project/datasets', 'platform']),
+  'project/datasets': new Set(['platform']),
+  platform: new Set([])
 }
-const LAYERS = new Set([...Object.keys(LAYER_RANK), 'ui'])
-const SKIP_DIR = new Set(['cartography-spike', 'cartography-visual-baseline', 'cartography-webgl', '__tests__'])
+
+const SKIP_DIR = new Set(['__tests__'])
 
 function walk(dir, acc = []) {
   if (!fs.existsSync(dir)) return acc
@@ -45,16 +54,19 @@ function importsOf(text) {
 }
 
 function layerOf(rel) {
-  const first = posix(rel).split('/')[0]
-  return LAYERS.has(first) ? first : null
+  const parts = posix(rel).split('/')
+  if (parts[0] === 'ui' && (parts[1] === 'workbench' || parts[1] === 'panels' || parts[1] === 'components')) {
+    return `ui/${parts[1]}`
+  }
+  if (parts[0] === 'project' && parts[1] === 'datasets') {
+    return 'project/datasets'
+  }
+  return parts[0] in ALLOWED_IMPORTS ? parts[0] : null
 }
 
 function allowedDesktop(fromLayer, toLayer) {
   if (!fromLayer || !toLayer || fromLayer === toLayer) return true
-  if (toLayer === 'ui') return fromLayer === 'shell' || fromLayer === 'features'
-  if (fromLayer === 'ui') return toLayer === 'view-state' || toLayer === 'platform'
-  if (!(fromLayer in LAYER_RANK) || !(toLayer in LAYER_RANK)) return true
-  return LAYER_RANK[fromLayer] < LAYER_RANK[toLayer]
+  return ALLOWED_IMPORTS[fromLayer]?.has(toLayer) ?? false
 }
 
 function resolveDesktopImport(fromFile, spec, srcRoot) {
@@ -98,7 +110,7 @@ function checkDesktop() {
 }
 
 function checkProject() {
-  const srcRoot = path.join(root, 'packages/project/src')
+  const srcRoot = path.join(root, 'packages/internal/project/src')
   const found = new Set()
   const banned = {
     data: ['config', 'history'],
@@ -126,10 +138,14 @@ function checkProject() {
 function workspacePackages() {
   const packagesRoot = path.join(root, 'packages')
   const result = new Map()
-  for (const name of fs.readdirSync(packagesRoot)) {
-    const manifestPath = path.join(packagesRoot, name, 'package.json')
-    if (!fs.existsSync(manifestPath)) continue
-    result.set(name, JSON.parse(fs.readFileSync(manifestPath, 'utf8')))
+  for (const tier of ['public', 'internal']) {
+    const tierDir = path.join(packagesRoot, tier)
+    if (!fs.existsSync(tierDir)) continue
+    for (const name of fs.readdirSync(tierDir)) {
+      const manifestPath = path.join(tierDir, name, 'package.json')
+      if (!fs.existsSync(manifestPath)) continue
+      result.set(`${tier}/${name}`, { tier, manifest: JSON.parse(fs.readFileSync(manifestPath, 'utf8')) })
+    }
   }
   return result
 }
@@ -137,15 +153,21 @@ function workspacePackages() {
 function checkPackages() {
   const found = new Set()
   const packages = workspacePackages()
-  const byName = new Map([...packages.values()].map(manifest => [manifest.name, manifest]))
-  for (const [dir, manifest] of packages) {
+  const byName = new Map([...packages.values()].map(entry => [entry.manifest.name, entry]))
+  for (const [dir, { tier, manifest }] of packages) {
+    if (tier === 'public' && manifest.private === true) {
+      found.add(`packages/${dir} sits in public/ but has private: true`)
+    }
+    if (tier === 'internal' && manifest.private !== true) {
+      found.add(`packages/${dir} sits in internal/ but lacks private: true`)
+    }
     const deps = { ...manifest.dependencies, ...manifest.peerDependencies }
     for (const dep of Object.keys(deps)) {
       if (dep.startsWith('apps/') || dep.includes('/apps/')) found.add(`${manifest.name} -> ${dep}`)
       if (!dep.startsWith('@desktop-webgis/')) continue
       const target = byName.get(dep)
       if (!target) continue
-      if (manifest.private !== true && target.private === true) {
+      if (tier === 'public' && target.tier !== 'public') {
         found.add(`${manifest.name} -> ${dep}`)
       }
     }

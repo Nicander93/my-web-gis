@@ -2,14 +2,14 @@ import { expect, test, type Page } from '@playwright/test'
 
 async function replaceProject(page: Page, type: '2d' | '3d') {
   return page.evaluate(async type => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
-    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-edits.ts').at(-1) ?? '/src/session/project-edits.ts')
+    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-edits.ts').at(-1) ?? '/src/project/project-edits.ts')
 
     const loaded = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(loaded('/src/session/project.store.ts')) as typeof import('@/session/project.store')
-    const { createEditorProject } = await import(loaded('/src/session/project-type.ts')) as typeof import('@/session/project-type')
+    const { useProjectStore } = await import(loaded('/src/project/project.store.ts')) as typeof import('@/project/project.store')
+    const { createEditorProject } = await import(loaded('/src/project/project-type.ts')) as typeof import('@/project/project-type')
     const previousEpoch = useProjectStore.getState().projectEpoch
     const project = createEditorProject(type, `Replacement ${type}`)
     // Reopening a project may retain its ID; epoch, rather than identity, owns the old runtime.

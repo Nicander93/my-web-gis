@@ -1,23 +1,23 @@
 import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
 import { layerContentCommands } from '@/commands/layer-content.commands'
-import { projectEdits } from '@/session/project-edits'
-import { featureData } from '@/data/feature-data'
+import { projectEdits } from '@/project/project-edits'
+import { featureData } from '@/project/datasets/feature-data'
 import { requireMapContent } from '@desktop-webgis/project'
-import { openActivityPanel } from '@/view-state/activity-panel.store'
+import { openActivityPanel } from '@/stores/activity-panel.store'
 import { emitCommandStatus } from '@/platform/command-status'
 import { projectCommands } from './project.commands'
-import { useWorkspaceStore } from '@/view-state/workspace.store'
-import { useProjectStore } from '@/session/project.store'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
-import { useWorkbenchStore } from '@/view-state/workbench.store'
+import { useWorkspaceStore } from '@/stores/workspace.store'
+import { useProjectStore } from '@/project/project.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
+import { useWorkbenchStore } from '@/stores/workbench.store'
 import {
   isMapRuntimeMounted,
   retryMapServiceLayer,
   zoomMapToLayer
-} from '@/runtime/map-runtime-host'
+} from '@/engine-host/map-runtime-host'
 import { refreshWfsLayer } from '@/commands/wfs.commands'
-import { projectConfiguration } from '@/session/project-configuration'
-import { requestDatasetSave } from '@/session/unsaved-work'
+import { projectConfiguration } from '@/project/project-configuration'
+import { requestDatasetSave } from '@/project/unsaved-work'
 import type { PopupDefinition } from '@desktop-webgis/scene-schema'
 import {
   capabilitiesForDataset,
@@ -25,8 +25,8 @@ import {
   getEffectiveLocked, isDatasetLocked
 } from '@desktop-webgis/project'
 import type { LayerStyle } from '@desktop-webgis/ol-style'
-import { finishStyleInteraction } from '@/session/style-interaction'
-import { openLayerFilterWindow } from '@/view-state/layer-filter-request'
+import { finishStyleInteraction } from '@/project/style-interaction'
+import { openLayerFilterWindow } from '@/stores/layer-filter-request'
 
 function requireSelectedLayerId(): string | null {
   const layerId = useLayerViewStore.getState().selectedLayerId
@@ -37,7 +37,7 @@ function requireSelectedLayerId(): string | null {
   return layerId
 }
 
-/** Capabilities for gating context-menu / edit / export (from Dataset kind flags). */
+/** 根据数据集类型的标记，判断右键菜单、编辑和导出是否可用。 */
 export function getLayerCapabilities(layerId: string | null): {
   exists: boolean
   isVector: boolean
@@ -110,7 +110,7 @@ export function getLayerCapabilities(layerId: string | null): {
   }
 }
 
-/** 配置目标变化前处理未应用草稿，浏览图层不触发配置切换。 */
+/** 配置目标变化之前先处理未应用的草稿；仅仅浏览图层不会触发配置切换。 */
 function openInspector(id: string, tab: 'layer' | 'style' | 'label'): void {
   finishStyleInteraction()
   const workbench = useWorkbenchStore.getState()
@@ -119,7 +119,7 @@ function openInspector(id: string, tab: 'layer' | 'style' | 'label'): void {
   useWorkspaceStore.getState().setRightOpen(true)
 }
 
-/** 图层相关命令，供 Header 按钮与 Layer Context Menu 共用。 */
+/** 图层相关的命令，供 Header 按钮和图层右键菜单共用。 */
 export const layerCommands = {
   setLocked(layerId: string, locked: boolean): void {
     layerConfigurationCommands.setLayerLocked(layerId, locked)
@@ -181,7 +181,7 @@ export const layerCommands = {
     emitCommandStatus('缩放到图层（地图运行时未挂载）')
   },
 
-  /** Re-request WMS/WMTS imagery, or refresh WFS snapshot (failure keeps previous). */
+  /** 重新请求 WMS/WMTS 影像，或刷新 WFS 快照；失败时保留原有的内容。 */
   retryServiceLayer(layerId?: string | null): void {
     const id = layerId ?? useLayerViewStore.getState().selectedLayerId
     if (!id) {
@@ -339,7 +339,7 @@ export const layerCommands = {
     }
   },
 
-  /** Open export dialog in export mode (no copy primary). */
+  /** 以导出模式打开导出对话框，主操作不是复制。 */
   export(layerId?: string | null): void {
     const id = layerId ?? useLayerViewStore.getState().selectedLayerId
     if (!id) {
@@ -350,7 +350,7 @@ export const layerCommands = {
     projectCommands.exportData(id, 'export')
   },
 
-  /** Open export dialog in copy mode. */
+  /** 以复制模式打开导出对话框。 */
   copyToLocalLayer(layerId?: string | null): void {
     const id = layerId ?? useLayerViewStore.getState().selectedLayerId
     if (!id) {
@@ -382,7 +382,7 @@ export const layerCommands = {
     }
 
     const after = cloneValue(style)
-    // setLayerStyle records a SetLayerStyleCommand on the unified EditHistory.
+    // setLayerStyle 会在统一的 EditHistory 上记录一条 SetLayerStyleCommand。
     layerConfigurationCommands.setLayerStyle(layerId, after)
 
     emitCommandStatus('已应用样式')
@@ -415,7 +415,7 @@ export const layerCommands = {
     return projectEdits.canRedo()
   },
 
-  /** 测试用：清空样式撤销栈 */
+  /** 测试用：清空样式的撤销栈 */
   _resetStyleHistoryForTests(): void {
     projectEdits.clear?.()
   }

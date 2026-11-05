@@ -1,17 +1,17 @@
 import { layerContentCommands } from '@/commands/layer-content.commands'
-import { projectSession } from '@/session/project-session'
-import { featureData } from '@/data/feature-data'
+import { projectSession } from '@/project/project-session'
+import { featureData } from '@/project/datasets/feature-data'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { createProject } from '@desktop-webgis/project'
 import { parseCapabilitiesXml, resolveWfsLoadOptions } from '@desktop-webgis/ogc-io'
-import { useProjectStore } from '@/session/project.store'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
-import { createProjectSceneController } from '@/runtime/project-scene-controller'
+import { useProjectStore } from '@/project/project.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
+import { createProjectSceneController } from '@/engine-host/project-scene-controller'
 import { startWfsBoundedLoad, type StartWfsLoadInput } from './wfs.commands'
-import { loadWfsBoundedSnapshot, type WfsLoadResult } from '@/exchange/wfs-load'
+import { loadWfsBoundedSnapshot, type WfsLoadResult } from '@/io/wfs-load'
 
-vi.mock('@/exchange/wfs-load', () => ({ loadWfsBoundedSnapshot: vi.fn() }))
+vi.mock('@/io/wfs-load', () => ({ loadWfsBoundedSnapshot: vi.fn() }))
 vi.mock('@/platform/command-status', () => ({ emitCommandStatus: vi.fn() }))
 beforeEach(() => {
   vi.mocked(loadWfsBoundedSnapshot).mockReset()
@@ -20,7 +20,7 @@ beforeEach(() => {
 afterEach(() => useLayerViewStore.getState().abortAllWfsLoads())
 
 function setup(): { input: StartWfsLoadInput; result: WfsLoadResult } {
-  const description = parseCapabilitiesXml(readFileSync(new URL('../../../../packages/ogc-io/fixtures/wfs-2.0.0-capabilities.xml', import.meta.url), 'utf8'), {
+  const description = parseCapabilitiesXml(readFileSync(new URL('../../../../packages/public/ogc-io/fixtures/wfs-2.0.0-capabilities.xml', import.meta.url), 'utf8'), {
     shareableUrl: 'https://example.com/geoserver/wfs', hint: 'WFS'
   })
   const added = layerContentCommands.addServiceLayer({ name: 'Parks', kind: 'wfs', source: {

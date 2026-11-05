@@ -1,14 +1,14 @@
 import { AddDatasetLayerCommand, cloneValue, createDefaultLayerStyle, createId, dissolveLayerGroup, getEffectiveLocked, getLayerGroupState, normalizeLayerTree,
   reconcileProjectCartography, RemoveLayerContentCommand, requireMapContent, SetLayerTreeCommand, snapshotLayerTree,
   type Dataset, type DatasetKind, type EditCommand, type GisFeature, type Layer, type ProcessingRecord, type Project, type ProjectEditContext, type ServiceSource } from '@desktop-webgis/project'
-import { useProjectStore } from '@/session/project.store'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
-import { featureData } from '@/data/feature-data'
-import { projectEdits } from '@/session/project-edits'
+import { useProjectStore } from '@/project/project.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
+import { featureData } from '@/project/datasets/feature-data'
+import { projectEdits } from '@/project/project-edits'
 
 type StyleKind = 'point' | 'line' | 'polygon' | 'mixed'
 
-/** Application operations own layer/dataset creation and deletion in the sole edit history. */
+/** 图层和数据集的增删属于应用级操作，统一记录在同一条编辑历史里。 */
 export const layerContentCommands = {
   addLayer(datasetId: string, name: string, features: GisFeature[], styleKind: StyleKind, processing?: ProcessingRecord): void {
     addLocalLayer(datasetId, name, features, styleKind, processing)

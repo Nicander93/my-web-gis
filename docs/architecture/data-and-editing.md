@@ -1,51 +1,51 @@
 # 数据与编辑架构
 
-本文档是 Desktop WebGIS **数据与编辑架构** 的说明。实施合同见 [重构计划 V1.0](../archive/refactor-2026-11/refactor-plan-v1.md)。阶段记录见 `docs/archive/refactor-2026-11/refactor-stage-*.md` 与 [交接记录](../archive/refactor-2026-11/refactor-handoff-2026-11-02.md)。
+本文说明 Desktop WebGIS 的数据与编辑架构。当初的实施约定见[重构计划 V1.0](../archive/refactor-2026-11/refactor-plan-v1.md)，阶段记录见 `docs/archive/refactor-2026-11/refactor-stage-*.md` 和[交接记录](../archive/refactor-2026-11/refactor-handoff-2026-11-02.md)。
 
-## 谁做什么
+## 各部分负责什么
 
-| 对象 | 职责 | 不是 |
+| 对象 | 职责 | 不负责 |
 | --- | --- | --- |
-| `Project` | 可序列化的工程配置：`metadata + content(map2d\|scene3d)` | 要素行仓库 |
-| `ProjectStore` | 当前工程配置状态、epoch、configRevision、配置 dirty | 全量 Feature / 选择 / 引擎控制 |
-| `RuntimeFeatureData` | 每源 MemoryFeatureProvider + FeatureEditBuffer；兼容行缓存 | 第二套 Undo 历史 |
-| `FeatureEditState` | 活动源 pending/saving；`retained`/`unsavedCount` 覆盖历史保留源 | 第二份行数据 |
-| 工程 Save | 只写配置；已绑定源用 storage 引用；未绑定源嵌入 **原始 Provider** 行 | 提交 Buffer / 写入有效行快照 |
-| 数据 Save | `commitDatasetEdits` / `saveBoundDataset`：成功才清 Buffer，不改配置 dirty | 工程 Ctrl+S |
+| `Project` | 可序列化的项目配置：`metadata` 加 `content`（`map2d` 或 `scene3d`） | 存储要素行 |
+| `ProjectStore` | 当前项目配置、`epoch`、`configRevision`，以及配置是否有未保存修改 | 全部要素、选中集、引擎控制 |
+| `RuntimeFeatureData` | 每个数据源一个 `MemoryFeatureProvider` 加一个 `FeatureEditBuffer`，另有一份兼容用的行缓存 | 另开一套撤销历史 |
+| `FeatureEditState` | 活动数据源的 pending/saving 计数；`retained` 与 `unsavedCount` 把历史中保留的数据源也算进去 | 再存一份行数据 |
+| 项目保存 | 只写配置。已绑定的数据源写成 storage 引用，未绑定的数据源嵌入 **Provider 里的原始行** | 提交 Buffer，或写入编辑后的有效行 |
+| 数据保存 | `commitDatasetEdits` / `saveBoundDataset`，成功后才清空 Buffer，不改变配置的未保存状态 | 等同于工程的 Ctrl+S |
 
 ## 两类保存
 
-1. **Ctrl+S / 工程保存**：`createConfigurationSnapshot`。绑定源省略 `featuresByDataset` 键（打开时按引用加载）；未绑定源写入原始源。pending 仍留在 Buffer，状态栏可提示“数据编辑尚未提交”。
-2. **数据提交**：工具栏/图层菜单的「保存数据」走 `requestDatasetSave`（已绑定则 `saveBoundDataset`，未绑定则先建托管文件再提交）。关闭确认里的 `requestUnsavedWorkSave` 仍只提交已绑定活动源。无绑定或仅历史保留源的 pending 不能靠工程保存清掉。
+1. **Ctrl+S 保存项目**：走 `createConfigurationSnapshot`。已绑定的数据源不写 `featuresByDataset` 字段，打开时按引用重新读取；未绑定的数据源写入 Provider 中的原始行。Buffer 里的增量仍然保留，状态栏会提示“数据编辑尚未提交”。
+2. **提交数据**：工具栏或图层菜单里的「保存数据」走 `requestDatasetSave`。已绑定的数据源直接调 `saveBoundDataset`，未绑定的先创建托管文件再提交。关闭项目时的确认框走 `requestUnsavedWorkSave`，它只提交已绑定的活动数据源。没有绑定文件的数据源，或只在历史里保留的数据源，其增量无法通过保存项目清掉。
 
-「放弃数据」按源 `discardDatasetEdits`：预检历史后丢掉该源 Buffer 与对应数据命令，还原字段声明，其它源和配置 Undo 保留。
+「放弃数据」按数据源调用 `discardDatasetEdits`：先检查历史，再丢弃该数据源的 Buffer 和对应的数据命令，并还原字段声明。其它数据源和配置的撤销记录都保留。
 
-标题“未保存”只反映配置 dirty。数据未提交看图层编辑状态和 `unsavedCount`。
+标题栏上的“未保存”只表示配置有改动。数据有没有提交，要看图层编辑状态和 `unsavedCount`。
 
 ## 恢复草稿
 
-- v1：有效行快照（兼容）。重开后有效行成为新基线，无 pending。
-- v2：`dataSessions` 保存原始源 + `FeatureEditBatch`。重开后恢复 Provider 基线并回放 pending。
-- 失败/取消不覆盖当前工程；与已绑定文件基线不一致时数据保存仍拒绝覆盖。
+- v1：保存编辑后的有效行快照，用于兼容旧版本。重新打开后有效行成为新基线，没有待提交的增量。
+- v2：`dataSessions` 保存原始数据源加 `FeatureEditBatch`。重新打开时先恢复 Provider 基线，再回放未提交的增量。
+- 恢复失败或被取消时不会覆盖当前项目。与已绑定文件的基线不一致时，数据保存仍然会拒绝覆盖。
 
 ## 地图同步
 
-`OlMapRuntime.syncDocument` 在投影不变时 **原地 patch** 已有 `VectorSource` 的要素，保留 Source 与 OL Feature 实例，供 Draw/Modify 继续引用。坐标系变更、换源、故障恢复仍走重建路径。
+当投影没有变化时，`OlMapRuntime.syncDocument` 直接修改已有 `VectorSource` 里的要素，保留 Source 和 OL Feature 实例，绘制和修改工具手里的引用一直有效。坐标系变化、切换数据源和故障恢复仍然走整层重建。
 
-## 性能与未完成 Provider
+## 性能数据与尚未支持的场景
 
-| 证据 | 范围 | 结论 |
+| 依据 | 范围 | 结论 |
 | --- | --- | --- |
-| `architecture-baseline.test.ts` | 100 / 10_000 要素 | 配置显隐/样式不复制要素进 Store；10k 场景投影约 70ms |
-| 同上 | 100_000 要素 | 显隐/单点几何仍不拷进 Store（<1ms）；`captureActiveSessions` 会拷原始源，约 0.1–0.4s |
-| 同上 | 1_000_000 要素 | `loadSnapshot` 约 15–19s；显隐 + edit-state 约 0.6ms。未测场景投影、范围查询、地图交互 |
-| 单要素 Source patch | OL 运行时测试 | 改行不换 Source、保留 Feature 引用 |
+| `architecture-baseline.test.ts` | 100 和 10 000 个要素 | 切换图层显隐或改样式都不会把要素复制进 Store；1 万个要素的场景投影约 70ms |
+| 同上 | 100 000 个要素 | 显隐和单点几何仍然不复制进 Store（小于 1ms）；`captureActiveSessions` 会复制原始数据源，约 0.1 到 0.4 秒 |
+| 同上 | 1 000 000 个要素 | `loadSnapshot` 约 15 到 19 秒；显隐加 edit-state 约 0.6ms。场景投影、范围查询和地图交互没有测 |
+| 单要素 Source patch | OL 运行时测试 | 改一行的数据不换 Source，Feature 引用保持有效 |
 
-未实现或不保证：WFS 默认可写、远端 CAS、空间索引百万级查询、浏览器本地 sidecar 通用写。
+尚未实现或无法保证的部分：WFS 默认可写、远端 CAS、百万级数据量的空间索引查询、浏览器端的通用本地 sidecar 写入。
 
-## 阅读顺序
+## 延伸阅读
 
-1. [重构计划 V1.0](../archive/refactor-2026-11/refactor-plan-v1.md) — 目标与完成定义  
-2. [阶段 1](../archive/refactor-2026-11/refactor-stage-1.md) → [2](../archive/refactor-2026-11/refactor-stage-2.md) → [3](../archive/refactor-2026-11/refactor-stage-3.md) — 实施记录  
-3. [项目恢复草稿](project-recovery.md) — 恢复产品说明  
-4. 代码入口：`session/project-session.ts`、`session/project-edits.ts`、`data/feature-data-runtime.ts`、`session/project-save.ts`、`session/unsaved-work.ts`、`session/dataset-storage.ts`
+1. [重构计划 V1.0](../archive/refactor-2026-11/refactor-plan-v1.md)：目标与完成标准
+2. [阶段 1](../archive/refactor-2026-11/refactor-stage-1.md) → [2](../archive/refactor-2026-11/refactor-stage-2.md) → [3](../archive/refactor-2026-11/refactor-stage-3.md)：实施记录
+3. [项目恢复草稿](project-recovery.md)：恢复功能的产品说明
+4. 代码入口：`project/project-session.ts`、`project/project-edits.ts`、`project/datasets/feature-data-runtime.ts`、`project/project-save.ts`、`project/unsaved-work.ts`、`project/dataset-storage.ts`

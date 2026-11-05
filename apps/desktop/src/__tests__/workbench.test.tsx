@@ -1,15 +1,15 @@
-import { layerConfigurationQueries } from '@/session/layer-configuration-query'
+import { layerConfigurationQueries } from '@/project/layer-configuration-query'
 import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
 import { layerContentCommands } from '@/commands/layer-content.commands'
-import { projectSession } from '@/session/project-session'
-import { projectEdits } from '@/session/project-edits'
+import { projectSession } from '@/project/project-session'
+import { projectEdits } from '@/project/project-edits'
 import { requireMapContent } from '@desktop-webgis/project'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createProject, type GisFeature } from '@desktop-webgis/project'
-import { useProjectStore } from '@/session/project.store'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
-import { useWorkbenchStore } from '@/view-state/workbench.store'
-import { useWorkspaceStore } from '@/view-state/workspace.store'
+import { useProjectStore } from '@/project/project.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
+import { useWorkbenchStore } from '@/stores/workbench.store'
+import { useWorkspaceStore } from '@/stores/workspace.store'
 import { layerCommands } from '@/commands/layer.commands'
 import { editCommands } from '@/commands/edit.commands'
 import { selectionCommands } from '@/commands/selection.commands'
@@ -17,7 +17,7 @@ import {
   mountMapRuntime,
   unmountMapRuntime,
   setActiveEditTool
-} from '@/runtime/map-runtime-host'
+} from '@/engine-host/map-runtime-host'
 
 const mocks = vi.hoisted(() => ({ activate: vi.fn(), deactivate: vi.fn(), syncSelection: vi.fn() }))
 vi.mock('@desktop-webgis/ol-runtime', async (importOriginal) => ({

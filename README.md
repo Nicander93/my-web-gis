@@ -1,78 +1,50 @@
 # Desktop WebGIS
 
-Lightweight 2D desktop GIS workspace based on Tauri 2, React, TypeScript and OpenLayers.
+一个基于 Tauri 2、React、TypeScript、OpenLayers 和 Cesium 的桌面 WebGIS 工作台，同时提供一套可复用的 GIS 包。
 
-The desktop also supports independent Cesium 3D projects. Two-dimensional maps and three-dimensional scenes are exclusive project types.
+## 1. 从桌面界面到渲染引擎
 
-The shared shell uses **File / Window / Settings / Help**, task tabs and one compact tool row. Panels overlay the full map viewport. Drag a panel title to float it, use its docking selector to move it to an edge, or maximize it. Closed panels reopen from **Window**; **Window → Reset layout** restores the default. Floating title bars support arrow keys (Shift for larger steps); focused resize handles support arrow keys; Esc cancels an active window drag. Layout is saved locally and never changes project data or undo history.
+![全栈架构图](./docs/architecture/fullstack-architecture.svg)
 
-## What is included
+## 2. Desktop 内部的目录与五层依赖
 
-- `packages/project`: project, dataset, layer, feature, selection, GeoJSON, edit commands and undo/redo history.
-- `packages/ol-runtime`: OpenLayers map runtime, layer registry, feature adapter, selection runtime and edit tool runtime.
-- `packages/scene-schema` / `scene-core`: versioned JSON scene contract and immutable scene operations.
-- `packages/ol-scene-runtime`: public OpenLayers adapter for XYZ, Tianditu, Google Map Tiles and GeoJSON scenes.
-- `packages/scene-publisher`: static Viewer artifact builder and `scene-publish` CLI.
-- `packages/vector-io`: SHP ZIP and ASCII DXF import plus Shapefile export.
-- `packages/scene-codegen`: OpenLayers ESM code generation without embedded provider secrets.
-- `apps/desktop`: React Desktop shell with a map-first workspace, overlay panels, Ribbon-style header and lightweight commands; GIS capabilities are being reconnected incrementally.
-- `apps/viewer`: framework-independent static Scene Viewer for URL publishing.
-- `examples`: sample GeoJSON files for manual import testing.
+![Desktop 五层目录与依赖图](./docs/architecture/desktop-layers.svg)
 
-## Main workflows
+## 目录结构
 
-- New/Open/Save/Save As project.
-- Import `.geojson`, zipped Shapefile or ASCII `.dxf` as dataset and layer.
-- Create empty point, line and polygon layers and draw immediately.
-- Switch OpenStreetMap, Tianditu and Google Map Tiles basemaps with runtime-only credentials.
-- Toggle, rename, reorder and activate layers.
-- Select features from map or table.
-- Edit attribute values inline.
-- Draw Point, LineString and Polygon.
-- Modify geometry and delete selected features.
-- Undo and redo edit commands.
-- Export active layer as GeoJSON or zipped Shapefile.
-- Export/import Scene JSON, generate OpenLayers ESM code and build a static Viewer artifact.
-- Switch application/published-scene themes and apply local or model-backed smart cartography.
+- **`apps/desktop`**：桌面的主应用（Tauri 2 加 React），支持二维地图（`Workspace2D`）和三维场景（`Workspace3D`）两类独立的项目。内部按五层组织：`ui/{workbench,panels,components}` → `commands` → `engine-host` 与 `io` → `stores` 与 `project/{.,datasets}` → `platform`。
+- **`apps/viewer`**：不依赖框架的轻量只读查看器。它配合 `scene-publisher` 生成可以静态部署的网页，同时也作为 E2E 浏览器测试中的独立渲染验收端。
+- **`packages/public/*`**：11 个可以独立发布的通用 GIS 和三维能力包，不依赖内部包或应用状态：
+  - 二维与 IO：`ol-style`、`ol-selection`、`vector-io`、`ogc-io`
+  - 三维 Cesium：`cesium-scene-schema`、`cesium-layer`、`cesium-popup`、`cesium-measure`、`cesium-effects`、`cesium-tileset-edit`、`cesium-tileset-effects`
+- **`packages/internal/*`**：9 个服务于本仓库编辑与发布流程的内部包：
+  - 项目与分析：`project`、`ol-runtime`、`spatial-analysis`
+  - 场景文档套件：`scene-schema`、`scene-core`、`ol-scene-runtime`、`cesium-scene-runtime`、`scene-publisher`、`scene-codegen`
+- **`examples/`**：示例矢量数据（`examples/rivers.geojson`、`examples/stations.geojson`、`examples/spatial-processing/`），以及演示外部项目如何使用这些包的例子（`examples/city-3d/consumer`）。
 
-## Run
+## 常用命令
 
 ```bash
+# 安装依赖
 pnpm install
+
+# 启动桌面端的 Web 开发服务
 pnpm dev
+
+# 启动 Tauri 桌面应用
+pnpm tauri dev
+
+# 检查分层与包边界（check-architecture.mjs 加 dependency-cruiser）
+pnpm check:architecture
+
+# 检查没用到的代码和多余依赖（Knip）
+pnpm check:deadcode
+
+# 全量构建与测试
+pnpm build
+pnpm test
 ```
 
-Then open the local Vite URL. For desktop mode, run `pnpm tauri dev` from the repository root.
+## 文档索引
 
-The native shell is scaffolded in `apps/desktop/src-tauri`. Existing GIS packages remain framework-agnostic so the React shell can reconnect them in stages.
-
-## Sample data
-
-Use:
-
-- `examples/rivers.geojson`
-- `examples/stations.geojson`
-
-## Project documents
-
-- [`docs/README.md`](docs/README.md): project document index and reading order.
-- [`docs/architecture/`](docs/architecture/): architecture overview, layering rules, data and editing model.
-- [`docs/engineering/code-preferences.md`](docs/engineering/code-preferences.md): code and maintenance conventions.
-- [`docs/assets/`](docs/assets/): UI reference images.
-
-## Current verification note
-
-Verified locally:
-
-- all 30 Vitest tests across 12 test files;
-- strict TypeScript builds for all packages;
-- TypeScript and production React desktop build;
-- Tauri debug build;
-- production static Viewer build;
-- real `scene-publish` artifact with file hashes and a public URL;
-- native ESM imports and `npm pack --dry-run` for all seven public packages;
-- `cargo fmt --check` for the Tauri shell.
-
-Pending external verification:
-
-- `cargo check --offline` for the Tauri shell cannot run until the `tauri` crate is present in the local Cargo registry cache. Rust desktop compilation still needs one successful Cargo dependency download.
+详见 [`docs/README.md`](docs/README.md) 和 [`docs/architecture/README.md`](docs/architecture/README.md)。

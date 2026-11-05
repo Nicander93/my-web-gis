@@ -3,7 +3,7 @@ test.use({ screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: f
 
 async function pointCount(page: import('@playwright/test').Page): Promise<number> {
   return page.evaluate(async () => {
-    const nodes = (await import('/src/session/project.store.ts')).useProjectStore.getState().project.content.scene?.nodes ?? []
+    const nodes = (await import('/src/project/project.store.ts')).useProjectStore.getState().project.content.scene?.nodes ?? []
     return nodes.filter(node => node.type === 'graphic' && node.geometry.type === 'point').length
   })
 }

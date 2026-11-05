@@ -1,7 +1,7 @@
 import { assertNoSecretValues, cloneValue, requireMapContent, type ServiceSource } from '@desktop-webgis/project'
-import { commitProjectConfiguration, useProjectStore } from '@/session/project.store'
+import { commitProjectConfiguration, useProjectStore } from '@/project/project.store'
 
-/** Service load facts update the serialized definition without creating a user edit or touching rows. */
+/** 服务加载得到的信息只更新序列化后的定义，不产生用户编辑，也不碰行数据。 */
 export const datasetConfigurationCommands = {
   patchWfsServiceSource(datasetId: string, patch: Partial<Extract<ServiceSource, { type: 'wfs' }>>): void {
     const { project } = useProjectStore.getState(), content = requireMapContent(project)

@@ -4,10 +4,10 @@ import { createId, cloneValue, intersectSelectionIds, isLegacyStyle, migrateLega
   SetLayerVisibleCommand, snapshotLayerTree, getLayerCartography, requireMapContent,
   type LayerTreeEntry, type FieldFilterCondition, type CartographyState } from '@desktop-webgis/project'
 import type { LayerStyle } from '@desktop-webgis/ol-style'
-import { useProjectStore } from '@/session/project.store'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
-import { getFilteredFeatures } from '@/session/feature-query'
-import { projectEdits } from '@/session/project-edits'
+import { useProjectStore } from '@/project/project.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
+import { getFilteredFeatures } from '@/project/feature-query'
+import { projectEdits } from '@/project/project-edits'
 
 interface LayerConfigurationCommands {
   setLayerStyle(layerId: string, style: LayerStyle, transactionId?: string): void
@@ -39,7 +39,7 @@ function reconvergeSelection(layerId: string): void {
   session.setSelectionState({ layerId, featureIds })
 }
 
-/** Configuration use cases prepare a complete edit before the single Application transaction publishes it. */
+/** 配置类的用例先准备好一次完整的修改，再由应用的单一事务统一发布。 */
 export const layerConfigurationCommands: LayerConfigurationCommands = {
   setLayerStyle: (layerId, style, transactionId) => {
     const state = useProjectStore.getState()
@@ -75,7 +75,7 @@ export const layerConfigurationCommands: LayerConfigurationCommands = {
     const operators = new Set(['eq', 'neq', 'contains', 'lt', 'lte', 'gt', 'gte', 'is-empty', 'is-not-empty'])
     if (!Array.isArray(after) || after.some(condition => !condition || typeof condition.field !== 'string' || !condition.field.trim() ||
       !operators.has(condition.op) || typeof condition.value === 'number' && !Number.isFinite(condition.value))) throw new Error('图层过滤条件无效')
-    // Skip no-op to avoid polluting history when reconverging after attribute edits.
+    // 跳过没有实际变化的操作，避免属性编辑后重新收敛时污染历史。
     if (JSON.stringify(before) === JSON.stringify(after)) {
       reconvergeSelection(layerId)
       return

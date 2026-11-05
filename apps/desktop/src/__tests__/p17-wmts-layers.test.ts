@@ -1,7 +1,7 @@
 import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
 import { layerContentCommands } from '@/commands/layer-content.commands'
-import { projectEdits } from '@/session/project-edits'
-import { featureData } from '@/data/feature-data'
+import { projectEdits } from '@/project/project-edits'
+import { featureData } from '@/project/datasets/feature-data'
 import { requireMapContent } from '@desktop-webgis/project'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
@@ -15,8 +15,8 @@ import {
   parseCapabilitiesXml,
   resolveWmtsLayerOptions
 } from '@desktop-webgis/ogc-io'
-import { useProjectStore } from '@/session/project.store'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { useProjectStore } from '@/project/project.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
 import { getLayerCapabilities, layerCommands } from '@/commands/layer.commands'
 import { _resetCredentialsForTests } from '@/platform/credentials'
 import { readFileSync } from 'node:fs'
@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url'
 
 const fixturesDir = join(
   dirname(fileURLToPath(import.meta.url)),
-  '../../../../packages/ogc-io/fixtures'
+  '../../../../packages/public/ogc-io/fixtures'
 )
 
 function resetStores(): void {

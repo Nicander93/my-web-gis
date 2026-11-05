@@ -49,7 +49,7 @@ export async function pickDirectory(): Promise<string | null> {
   return typeof selected === 'string' ? selected : null
 }
 
-/** Native adapter checks the canonical path remains within the selected directory. */
+/** 原生适配器会检查规范化后的路径仍然在所选目录内。 */
 export async function readSceneResourceFile(directory: string, path: string): Promise<Uint8Array> {
   return new Uint8Array(await invoke<number[]>('read_scene_resource', { directory, path }))
 }
@@ -58,7 +58,7 @@ export async function writeTextFile(path: string, content: string): Promise<void
   await invoke('write_text_path', { path, content })
 }
 
-/** Stage complete bytes and publish only at a still-absent destination; never overwrite. */
+/** 先把完整的字节准备好，只在目标仍然不存在时才发布；永远不覆盖。 */
 export async function createTextFile(path: string, content: string): Promise<void> {
   await invoke('create_text_path', { path, content })
 }

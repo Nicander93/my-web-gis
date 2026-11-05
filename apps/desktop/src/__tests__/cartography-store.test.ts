@@ -1,7 +1,7 @@
 import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
 import { layerContentCommands } from '@/commands/layer-content.commands'
-import { projectSession } from '@/session/project-session'
-import { projectEdits } from '@/session/project-edits'
+import { projectSession } from '@/project/project-session'
+import { projectEdits } from '@/project/project-edits'
 import { requireMapContent } from '@desktop-webgis/project'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
@@ -13,7 +13,7 @@ import {
   type CartographyState
 } from '@desktop-webgis/project'
 import type { LayerStyle } from '@desktop-webgis/ol-style'
-import { useProjectStore } from '@/session/project.store'
+import { useProjectStore } from '@/project/project.store'
 
 type CartographyLayer = CartographyState['styleLayers'][number]
 type CircleColor = NonNullable<Extract<CartographyLayer, { type: 'circle' }>['paint']>['circle-color']

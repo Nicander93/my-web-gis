@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 test.use({ actionTimeout: 15_000, screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
-async function snapshot(page: Page) { return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() }) }
+async function snapshot(page: Page) { return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts'); return projectSession.getSnapshot() }) }
 async function importRows(page: Page, name: string) {
   await page.getByRole('tab', { name: '数据', exact: true }).click()
   await page.getByRole('region', { name: '二维功能区' }).getByRole('button', { name: '添加数据', exact: true }).click()
@@ -67,7 +67,7 @@ test('real import logs, error filtering, clipboard and separate diagnostics keep
   await expect(tasks.getByRole('region', { name: '任务详情' })).toContainText('等待确认导入')
   await tasks.getByRole('button', { name: '复制任务详情', exact: true }).click()
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('解析完成：1 个图层，1 个要素')
-  await page.evaluate(async () => { await (await import('/src/exchange/import.ts')).importGeoJson(new File(['bad JSON'], 'broken.json')) })
+  await page.evaluate(async () => { await (await import('/src/io/import.ts')).importGeoJson(new File(['bad JSON'], 'broken.json')) })
   await tasks.getByRole('combobox', { name: '任务状态筛选' }).click()
   await page.getByRole('option', { name: '失败', exact: true }).click()
   await expect(tasks.getByRole('button', { name: '导入数据', exact: true })).toHaveCount(0)
@@ -92,7 +92,7 @@ test('log cancellation terminates a real import and clearing preserves active ta
   const before = await snapshot(page)
   try {
     await page.evaluate(async () => {
-      const { importGeoJson } = await import('/src/exchange/import.ts')
+      const { importGeoJson } = await import('/src/io/import.ts')
       void importGeoJson(new File(['{"type":"Point","coordinates":[116,39]}'], 'pending.json')).catch(() => {})
     })
     const tasks = page.getByRole('dialog', { name: '任务中心' })
@@ -116,7 +116,7 @@ test('3D resource failures appear in both diagnostics and task logs and navigate
   await page.getByRole('button', { name: /^三维场景/ }).click()
   await expect(page.locator('.scene3d-footer__state')).toHaveText('就绪', { timeout: 30_000 })
   await page.route('**/missing.glb', route => route.fulfill({ status: 404, body: 'missing' }))
-  await page.evaluate(async () => { (await import('/src/features/scene3d/scene3d-commands.ts')).addSceneAsset('model', `${location.origin}/missing.glb`, 'Missing model') })
+  await page.evaluate(async () => { (await import('/src/ui/panels/scene3d/scene3d-commands.ts')).addSceneAsset('model', `${location.origin}/missing.glb`, 'Missing model') })
   await open(page, '任务中心')
   const tasks = page.getByRole('dialog', { name: '任务中心' })
   await expect(tasks.getByRole('row').filter({ hasText: '加载资源：Missing model' })).toContainText('失败', { timeout: 30_000 })

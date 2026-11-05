@@ -7,10 +7,10 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@desktop-webgis/project": ["../../packages/project/src/index.ts"],
-      "@desktop-webgis/ol-runtime": ["../../packages/ol-runtime/src/index.ts"],
-      "@desktop-webgis/ogc-io": ["../../packages/ogc-io/src/index.ts"],
-      "@desktop-webgis/ogc-io/*": ["../../packages/ogc-io/src/*"]
+      "@desktop-webgis/project": ["../../packages/internal/project/src/index.ts"],
+      "@desktop-webgis/ol-runtime": ["../../packages/internal/ol-runtime/src/index.ts"],
+      "@desktop-webgis/ogc-io": ["../../packages/public/ogc-io/src/index.ts"],
+      "@desktop-webgis/ogc-io/*": ["../../packages/public/ogc-io/src/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"]

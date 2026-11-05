@@ -2,16 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import View from 'ol/View'
 import { transform } from 'ol/proj'
 import { createDefaultLayerStyle, createProject, requireMapContent } from '@desktop-webgis/project'
-import { registerMapProjections } from '@/runtime/map-projections'
-import { featureData } from '@/data/feature-data'
-import { projectEdits } from '@/session/project-edits'
-import { projectSession } from '@/session/project-session'
-import { useProjectStore } from '@/session/project.store'
-import { useWorkbenchStore } from '@/view-state/workbench.store'
+import { registerMapProjections } from '@/engine-host/map-projections'
+import { featureData } from '@/project/datasets/feature-data'
+import { projectEdits } from '@/project/project-edits'
+import { projectSession } from '@/project/project-session'
+import { useProjectStore } from '@/project/project.store'
+import { useWorkbenchStore } from '@/stores/workbench.store'
 import { viewCommands } from './view.commands'
 
 const probe = vi.hoisted(() => ({ runtime: vi.fn(), status: vi.fn() }))
-vi.mock('@/runtime/map-runtime-host', () => ({ getMapRuntime: probe.runtime }))
+vi.mock('@/engine-host/map-runtime-host', () => ({ getMapRuntime: probe.runtime }))
 vi.mock('@/platform/command-status', () => ({ emitCommandStatus: probe.status }))
 registerMapProjections()
 

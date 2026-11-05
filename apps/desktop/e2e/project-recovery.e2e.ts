@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
-import type { RecoveryDraft } from '@/session/project-recovery'
+import type { RecoveryDraft } from '@/project/project-recovery'
 
 async function drafts(page: Page): Promise<RecoveryDraft[]> {
   return page.evaluate(() => new Promise((resolve, reject) => {

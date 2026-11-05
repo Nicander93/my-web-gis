@@ -20,12 +20,12 @@ async function drop(page: Page, target: string, names = ['roads.geojson']) {
 }
 async function state(page: Page) {
   return page.evaluate(async () => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
-    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/view-state/layer-view.store.ts').at(-1) ?? '/src/view-state/layer-view.store.ts')).useLayerViewStore.getState()
+    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/stores/layer-view.store.ts').at(-1) ?? '/src/stores/layer-view.store.ts')).useLayerViewStore.getState()
 
-    const host = await import('/src/runtime/map-runtime-host.ts')
-    const store = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+    const host = await import('/src/engine-host/map-runtime-host.ts')
+    const store = (await import('/src/project/project.store.ts')).useProjectStore.getState()
     return { center: host.getMapRuntime()!.getMap().getView().getCenter(), snapshot: projectSession.getSnapshot(), selection: selectionSession.selection, tool: host.getActiveEditTool() }
   })
 }
@@ -84,9 +84,9 @@ test('middle and space-left pan preserve selection and an unfinished drawing', a
   await drop(page, '[data-testid=map-runtime-viewport]')
   await page.getByRole('button', { name: '确认导入', exact: true }).click()
   await page.evaluate(async () => {
-    const { getLayerFeatures } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/feature-query.ts').at(-1) ?? '/src/session/feature-query.ts')
+    const { getLayerFeatures } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/feature-query.ts').at(-1) ?? '/src/project/feature-query.ts')
 
-    const store = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+    const store = (await import('/src/project/project.store.ts')).useProjectStore.getState()
     const layer = store.project.content.layers[0]
     const { selectionCommands } = await import('/src/commands/selection.commands.ts')
     selectionCommands.setSelection({ layerId: layer.id, featureIds: getLayerFeatures(layer.id).map(row => row.id) })
@@ -103,7 +103,7 @@ test('middle and space-left pan preserve selection and an unfinished drawing', a
   expect(spaced.center).not.toEqual(middle.center)
   expect(spaced.selection).toEqual(before.selection)
   expect(spaced.snapshot).toEqual(before.snapshot)
-  await page.evaluate(async () => { (await import('/src/runtime/map-runtime-host.ts')).setActiveEditTool('draw-line') })
+  await page.evaluate(async () => { (await import('/src/engine-host/map-runtime-host.ts')).setActiveEditTool('draw-line') })
   const box = (await page.getByTestId('map-runtime-viewport').boundingBox())!
   await page.mouse.click(box.x + box.width * .48, box.y + box.height * .5)
   await drag(page, 'middle')

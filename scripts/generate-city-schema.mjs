@@ -31,8 +31,8 @@ defs.cityGraphic.properties.geometry.allOf = ['point','polyline','polygon'].map(
 defs.cityScene.allOf = [{ if: { properties: { version: { const: 1 } } }, then: { not: { anyOf: [{ required: ['lighting'] }, { required: ['groups'] }] }, properties: { nodes: { items: { allOf: [{ not: { required: ['groupId'] } }], not: { properties: { type: { const: 'graphic' } }, required: ['type'] } } } } } }]
 const schema = { $schema: 'https://json-schema.org/draft/2020-12/schema', title: 'CityScene v2 (v1 compatible)', ...ref('cityScene'), $defs: defs }
 defs.cityWater.required.push('color')
-await writeFile(new URL('../packages/cesium-scene-schema/city.schema.json', import.meta.url), JSON.stringify(schema, null, 2) + '\n')
-const scenePath = new URL('../packages/scene-schema/scene.schema.json', import.meta.url)
+await writeFile(new URL('../packages/public/cesium-scene-schema/city.schema.json', import.meta.url), JSON.stringify(schema, null, 2) + '\n')
+const scenePath = new URL('../packages/internal/scene-schema/scene.schema.json', import.meta.url)
 const scene = JSON.parse(await readFile(scenePath, 'utf8'))
 scene.properties.city = ref('cityScene')
 Object.assign(scene.$defs, defs)

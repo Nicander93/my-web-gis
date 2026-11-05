@@ -1,7 +1,7 @@
-import { featureData } from '@/data/feature-data'
+import { featureData } from '@/project/datasets/feature-data'
 import { requireMapContent } from '@desktop-webgis/project'
 import { cloneValue, requiresOverlay, type ProcessingOptions, type ProcessingRecord } from '@desktop-webgis/project'
-import { useProjectStore } from '@/session/project.store'
+import { useProjectStore } from '@/project/project.store'
 import { addProcessingResult, processingInput, runProcessing, type ProcessingScope } from '@/commands/processing-run'
 
 let openProcessingDialog: (() => void) | null = null
@@ -22,7 +22,7 @@ export function registerProcessingDialog(callback: (() => void) | null): void {
 export const processingCommands = {
   open(): void { openProcessingDialog?.() },
 
-  /** Preview the first five scoped inputs without adding a layer or changing project history. */
+  /** 只预览范围内前五个输入，不添加图层，也不改动项目历史。 */
   async preview(args: Omit<ProcessingRequest, 'name' | 'overlay'>): Promise<{ values: unknown[]; total: number }> {
     if (!['measure-area', 'measure-length', 'measure-perimeter', 'calculate-field'].includes(args.options.tool)) throw new Error('此工具不支持字段预览。')
     const state = useProjectStore.getState(), stateFeatureData = featureData.readSnapshot()
@@ -38,7 +38,7 @@ export const processingCommands = {
     return { values: result.features.map(feature => feature.properties[field ?? '']), total: input.length }
   },
 
-  /** Snapshot input and commit only after successful, uncancelled computation. */
+  /** 先对输入做快照，计算成功且未被取消之后才提交结果。 */
   async run(args: ProcessingRequest): Promise<{ layerId: string; inputCount: number; outputCount: number }> {
     const projectId = useProjectStore.getState().project.metadata.id
     const sourceLayer = requireMapContent(useProjectStore.getState().project).layers.find(layer => layer.id === args.layerId)

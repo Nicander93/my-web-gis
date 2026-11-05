@@ -1,19 +1,19 @@
 /**
- * Opt-in Scene I **true process restart** credential re-verify.
+ * 可选运行：场景 I 的**真实进程重启**凭据复验。
  *
- * Gate: DESKTOP_WEBGIS_LIVE_KEYCHAIN=1
- * Probe: DESKTOP_WEBGIS_KEYCHAIN_PROBE (set by run-ui-restart-reverify.mjs)
+ * 开关：设置 DESKTOP_WEBGIS_LIVE_KEYCHAIN=1 才会运行。
+ * 探测程序：由 run-ui-restart-reverify.mjs 设置 DESKTOP_WEBGIS_KEYCHAIN_PROBE。
  *
- * What this proves:
- *   Writer OS process persists via the same keyring service as the Tauri desktop app
- *   (`desktop-webgis` / Windows Credential Manager), then **exits completely**.
+ * 这能证明什么：
+ *   写入进程通过和 Tauri 桌面应用相同的钥匙串服务来持久化
+ *   （`desktop-webgis` 或 Windows 凭据管理器），然后**彻底退出进程**。
  *   A **fresh** process (new PID, empty session vault — never calls wipeSessionMemoryOnly)
- *   hydrates via hydrateCredentialsFromRefs / ensureCredentialLoaded.
+ *   通过 hydrateCredentialsFromRefs 和 ensureCredentialLoaded 加载。
  *
- * What this does NOT prove:
- *   Full Tauri GUI window quit + relaunch, offline project open UI, live tokenized OGC.
+ * 这不能证明什么：
+ *   完整的 Tauri 窗口退出再启动、离线打开项目的界面，以及带 token 的真实 OGC 服务。
  *
- * Phase mode (child vitest invocation):
+ * 阶段模式（由父进程调用 vitest）：
  *   DESKTOP_WEBGIS_UI_RESTART_PHASE=hydrate — only the hydrate reader case runs.
  */
 import { spawnSync } from 'node:child_process'
@@ -106,7 +106,7 @@ describe.skipIf(!LIVE || !isHydrateChild)(
       _resetCredentialsForTests()
       _setSecureCredentialBackendForTests(probeBackend())
 
-      // Fresh process vault must be empty before hydrate.
+      // 补全之前，新进程里的凭据库必须是空的。
       expect(getSessionCredential(HYDRATE_KEY)).toBeUndefined()
 
       const refs = collectCredentialRefKeys([
@@ -119,7 +119,7 @@ describe.skipIf(!LIVE || !isHydrateChild)(
       expect(loaded?.value.length).toBe(HYDRATE_VALUE_LEN)
       expect(getSessionCredential(HYDRATE_KEY)?.value.length).toBe(HYDRATE_VALUE_LEN)
 
-      // Machine-readable result for orchestrator (no secret value).
+      // 给编排脚本用的机器可读结果，不含密钥值。
       const result = {
         ok: true,
         readerPid: process.pid,
@@ -145,7 +145,7 @@ describe.skipIf(!LIVE || isHydrateChild)(
         try {
           await backend.delete(key)
         } catch {
-          // best-effort cleanup
+          // 尽力而为 cleanup
         }
       }
       _resetCredentialsForTests()
@@ -166,7 +166,7 @@ describe.skipIf(!LIVE || isHydrateChild)(
 
       const probe = requireProbe()
 
-      // --- Phase 1: separate Node writer process persists then exits ---
+      // --- 阶段 1：独立的 Node 写入进程完成持久化后退出 ---
       const writer = spawnSync(
         process.execPath,
         [writerChildPath, probe, key, payload, handshakePath],
@@ -186,19 +186,19 @@ describe.skipIf(!LIVE || isHydrateChild)(
       expect(handshake.kind).toBe(kind)
       expect(handshake.writerPid).toBeGreaterThan(0)
       expect(handshake.writerPid).not.toBe(process.pid)
-      // Writer must be dead (true process exit, not wipeSessionMemoryOnly).
+      // 写入进程必须真的结束（真正退出进程，而不是只调用 wipeSessionMemoryOnly）。
       expect(processAlive(handshake.writerPid)).toBe(false)
 
-      // Probe get from yet another short-lived process (process-level CM read).
+      // 再从另一个短命进程里探测读取结果（进程级的凭据管理器读取）。
       const probeGet = spawnSync(probe, ['get', key], { encoding: 'utf8' })
       expect(probeGet.status).toBe(0)
       const rawFromProbe = probeGet.stdout ?? ''
       const parsedProbe = JSON.parse(rawFromProbe) as { kind: string; value: string }
       expect(parsedProbe.kind).toBe(kind)
       expect(parsedProbe.value.length).toBe(secret.length)
-      // Do not log secret
+      // 不要记录密钥。
 
-      // --- Phase 2: fresh vitest process hydrates via credentials.ts ---
+      // --- 阶段 2：新的 vitest 进程通过 credentials.ts 补全凭据 ---
       const vitestBin = join(
         desktopRoot,
         '..',
@@ -249,14 +249,14 @@ describe.skipIf(!LIVE || isHydrateChild)(
       expect(hydrateResult.readerPid).not.toBe(handshake.writerPid)
       expect(hydrateResult.readerPid).not.toBe(process.pid)
 
-      // Cleanup handshake file (CM entry cleaned in afterEach).
+      // 清理用于握手的文件；凭据条目在 afterEach 里清理。
       try {
         unlinkSync(handshakePath)
       } catch {
-        // ignore
+        // 忽略
       }
 
-      // Persist a small orchestrator summary for evidence (no secrets).
+      // 保存一份精简的编排摘要作为证据，不含密钥。
       const summaryPath = join(
         tmpdir(),
         `scene-i-ui-restart-summary-${process.pid}.json`

@@ -1,25 +1,25 @@
-import { projectSession } from '@/session/project-session'
-import { featureData } from '@/data/feature-data'
+import { projectSession } from '@/project/project-session'
+import { featureData } from '@/project/datasets/feature-data'
 import { requireMapContent } from '@desktop-webgis/project'
-import { createEditorProject } from '@/session/project-type'
+import { createEditorProject } from '@/project/project-type'
 import { isTauri } from '@tauri-apps/api/core'
-import type { ProjectType } from '@/session/project-type'
-import { openSceneDocument, saveSceneDocument } from '@/exchange/scene-document-io'
-import { saveSceneArchive } from '@/exchange/scene-archive-io'
-import { createProjectSceneDocument } from '@/exchange/project-scene-document'
+import type { ProjectType } from '@/project/project-type'
+import { openSceneDocument, saveSceneDocument } from '@/io/scene-document-io'
+import { saveSceneArchive } from '@/io/scene-archive-io'
+import { createProjectSceneDocument } from '@/io/project-scene-document'
 import { replaceSceneDocumentAsEdit } from '@/commands/scene-document.commands'
-import { getLiveSceneCamera } from '@/runtime/scene3d-runtime-host'
-import { resolveSceneDrafts } from '@/session/scene-draft-guard'
+import { getLiveSceneCamera } from '@/engine-host/scene3d-runtime-host'
+import { resolveSceneDrafts } from '@/project/scene-draft-guard'
 import { emitCommandStatus } from '@/platform/command-status'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
-import { useProjectStore, getProjectContentVersion } from '@/session/project.store'
-import { requestProjectSave } from '@/session/project-save'
-import { hasUnsavedProjectWork, requestUnsavedWorkSave } from '@/session/unsaved-work'
+import { useLayerViewStore } from '@/stores/layer-view.store'
+import { useProjectStore, getProjectContentVersion } from '@/project/project.store'
+import { requestProjectSave } from '@/project/project-save'
+import { hasUnsavedProjectWork, requestUnsavedWorkSave } from '@/project/unsaved-work'
 import {
   createSnapshotFromState,
   openSnapshotFromDisk,
   setCurrentProjectPath
-} from '@/session/project-io'
+} from '@/project/project-io'
 import {
   clearSessionCredentials,
   collectCredentialRefKeys,
@@ -156,12 +156,12 @@ export const projectCommands = {
 
   async saveProject(): Promise<void> { await requestProjectSave() },
 
-  /** Close/open confirmation: configuration plus bound data commits. Ctrl+S stays configuration-only. */
+  /** 关闭或打开项目时的确认：提交配置并提交已绑定的数据。Ctrl+S 仍然只保存配置。 */
   saveProjectAndConfirm(): Promise<boolean> { return requestUnsavedWorkSave() },
 
   async saveProjectAs(): Promise<void> { await requestProjectSave(true) },
 
-  /** Test/helper: clear session credentials (never written to project). */
+  /** 测试和辅助用：清空会话中的凭据，凭据不会写进项目。 */
   clearCredentialsForTests(): void {
     clearSessionCredentials()
   },

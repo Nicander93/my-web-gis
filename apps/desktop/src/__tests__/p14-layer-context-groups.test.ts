@@ -1,9 +1,9 @@
 import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
-import { layerConfigurationQueries } from '@/session/layer-configuration-query'
+import { layerConfigurationQueries } from '@/project/layer-configuration-query'
 import { layerContentCommands } from '@/commands/layer-content.commands'
-import { projectSession } from '@/session/project-session'
-import { projectEdits } from '@/session/project-edits'
-import { featureData } from '@/data/feature-data'
+import { projectSession } from '@/project/project-session'
+import { projectEdits } from '@/project/project-edits'
+import { featureData } from '@/project/datasets/feature-data'
 import { selectionCommands } from '@/commands/selection.commands'
 import { requireMapContent } from '@desktop-webgis/project'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -16,8 +16,8 @@ import {
   serializeProjectSnapshot,
   type GisFeature
 } from '@desktop-webgis/project'
-import { useProjectStore } from '@/session/project.store'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { useProjectStore } from '@/project/project.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
 import { getLayerCapabilities, layerCommands } from '@/commands/layer.commands'
 import { registerExportDataCallback } from '@/commands/project.commands'
 
@@ -73,7 +73,7 @@ describe('P14 layer context menu / groups', () => {
     const [a, b, c] = ids
     layerConfigurationCommands.setLayerVisible(b!, false)
     layerConfigurationCommands.createGroup('G', [b!, c!])
-    // createGroup prepends the group; move ungrouped A below by moving group stays first.
+    // createGroup 会把分组插到最前面；要让未分组的 A 排到下面，移动分组后它仍然在最前。
     const snap = {
       project: useProjectStore.getState().project,
       featuresByDataset: featureData.readSnapshot()
@@ -168,7 +168,7 @@ describe('P14 layer context menu / groups', () => {
 
   it('export and copy commands register distinct dialog modes', () => {
     const calls: Array<{ layerId: string | null | undefined; mode?: string }> = []
-    // Wire via projectCommands registration
+    // 通过 projectCommands 的注册来接入。
     registerExportDataCallback({
       openDialog: (layerId, mode) => {
         calls.push({ layerId, mode })

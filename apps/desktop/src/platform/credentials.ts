@@ -1,7 +1,7 @@
 /**
- * Session / device credential vault for service auth.
- * NEVER write token values into Project, Scene, fixtures, or logs.
- * Persists only CredentialRef.key on Dataset; values live here (memory)
+ * 用于服务认证的会话和设备级凭据库。
+ * 永远不要把 token 的值写进项目、场景、测试夹具或日志。
+ * Dataset 上只持久化 CredentialRef.key；具体的值存在这里的内存里。
  * or in platform secure store when available (Tauri → OS keychain).
  */
 
@@ -10,13 +10,13 @@ export type CredentialKind = 'query-token' | 'bearer' | 'http-authorization'
 export interface StoredCredential {
   key: string
   kind: CredentialKind
-  /** Query param name when kind is query-token. */
+  /** kind 为 query-token 时使用的查询参数名。 */
   param?: string
   /** Secret value — memory only (and OS keychain when persisted). */
   value: string
 }
 
-/** Injectable secure-store backend (Tauri invoke or vitest mock). */
+/** 可注入的安全存储后端（Tauri invoke 或测试里的 mock）。 */
 export interface SecureCredentialBackend {
   isAvailable(): boolean
   set(key: string, payload: string): Promise<void>
@@ -33,7 +33,7 @@ interface PersistedCredentialPayload {
 const memory = new Map<string, StoredCredential>()
 let seq = 0
 
-/** Test / override backend. `undefined` = auto-detect Tauri; `null` = force unavailable. */
+/** 测试或覆盖用的后端。`undefined` 表示自动探测 Tauri，`null` 表示强制不可用。 */
 let injectedBackend: SecureCredentialBackend | null | undefined = undefined
 let tauriBackendPromise: Promise<SecureCredentialBackend | null> | null = null
 
@@ -73,7 +73,7 @@ async function createTauriBackend(): Promise<SecureCredentialBackend | null> {
 
 function resolveBackendSync(): SecureCredentialBackend | null {
   if (injectedBackend !== undefined) return injectedBackend
-  // Sync path cannot load invoke; availability for canPersist uses isTauriRuntime.
+  // 同步路径无法加载 invoke；canPersist 是否可用改由 isTauriRuntime 判断。
   return null
 }
 
@@ -118,11 +118,11 @@ async function deleteSecureBestEffort(key: string): Promise<void> {
     if (!backend?.isAvailable()) return
     await backend.delete(key)
   } catch {
-    // best-effort
+    // 尽力而为
   }
 }
 
-/** Store a credential in session memory; returns a reference key for Dataset.credentialRef. */
+/** 把凭据存进会话内存，返回一个键供 Dataset.credentialRef 使用。 */
 export function putSessionCredential(input: {
   kind: CredentialKind
   value: string
@@ -143,7 +143,7 @@ export function getSessionCredential(key: string): StoredCredential | undefined 
   return memory.get(key)
 }
 
-/** Existing bearer records contain the token; explicit HTTP records contain the complete header. */
+/** 已有的 bearer 记录里存的是 token；显式 HTTP 记录里存的是完整的请求头。 */
 export function credentialAuthorization(credential: StoredCredential): string | undefined {
   if (credential.kind === 'bearer') return `Bearer ${credential.value}`
   if (credential.kind === 'http-authorization' && /^(Basic|Bearer) [^\r\n]+$/.test(credential.value)) return credential.value
@@ -151,8 +151,8 @@ export function credentialAuthorization(credential: StoredCredential): string | 
 }
 
 /**
- * Ensure credential is in session memory, loading from OS secure store on miss.
- * Existing sync callers of getSessionCredential still work after hydrate.
+ * 确保凭据已经在会话内存里，缺的时候从操作系统的安全存储加载。
+ * 补全之后，原有同步调用 getSessionCredential 的代码仍然可用。
  */
 export async function ensureCredentialLoaded(
   key: string
@@ -176,17 +176,17 @@ export function clearSessionCredentials(): void {
 }
 
 /**
- * Wipe in-memory vault only; OS secure store is untouched.
- * Models process death / app restart (memory gone, Credential Manager still holds payload).
- * Do not confuse with clearSessionCredentials, which also deletes OS entries.
+ * 只清空内存里的凭据库，操作系统的安全存储不受影响。
+ * 模拟进程结束或应用重启：内存没了，凭据管理器中仍有数据。
+ * 不要和 clearSessionCredentials 混淆，后者会连操作系统里的条目一起删除。
  */
 export function wipeSessionMemoryOnly(): void {
   memory.clear()
 }
 
 /**
- * Persist StoredCredential already in memory into the OS secure store.
- * Returns true on success. Never uses localStorage.
+ * 把已经在内存里的 StoredCredential 持久化到操作系统的安全存储。
+ * 成功时返回 true。从不使用 localStorage。
  */
 export async function persistCredentialSecurely(key: string): Promise<boolean> {
   const cred = memory.get(key)
@@ -202,8 +202,8 @@ export async function persistCredentialSecurely(key: string): Promise<boolean> {
 }
 
 /**
- * Load credential from OS secure store into session memory.
- * Returns the hydrated credential, or undefined when missing / unavailable.
+ * 从操作系统的安全存储把凭据加载进会话内存。
+ * 返回补全后的凭据；缺失或不可用时返回 undefined。
  */
 export async function loadCredentialSecurely(
   key: string
@@ -224,7 +224,7 @@ export async function loadCredentialSecurely(
   }
 }
 
-/** True when running under Tauri (or a test backend that reports available). */
+/** 在 Tauri 下运行（或测试后端报告可用）时为 true。 */
 export function canPersistCredentialsSafely(): boolean {
   if (injectedBackend !== undefined) {
     return injectedBackend?.isAvailable() ?? false
@@ -233,15 +233,15 @@ export function canPersistCredentialsSafely(): boolean {
 }
 
 /**
- * Hydrate all credentialRef keys found on project datasets into session memory.
- * Best-effort; does not invent secrets when OS store has no entry.
+ * 把项目数据集上出现的所有 credentialRef 键都加载进会话内存。
+ * 尽力而为；操作系统存储里没有条目时，不凭空编造密钥。
  */
 export async function hydrateCredentialsFromRefs(keys: Iterable<string>): Promise<void> {
   const unique = [...new Set([...keys].filter(Boolean))]
   await Promise.all(unique.map((key) => loadCredentialSecurely(key)))
 }
 
-/** Collect credentialRef.key values from a project-like datasets list. */
+/** 从类似项目的数据集列表里收集 credentialRef.key 的值。 */
 export function collectCredentialRefKeys(
   datasets: ReadonlyArray<{ kind?: string; source?: { type?: string; credentialRef?: { key?: string } } }>
 ): string[] {
@@ -253,7 +253,7 @@ export function collectCredentialRefKeys(
   return keys
 }
 
-/** Test helper: inject mock backend (`null` = force no persist). */
+/** 测试辅助。: inject mock backend (`null` = force no persist). */
 export function _setSecureCredentialBackendForTests(
   backend: SecureCredentialBackend | null | undefined
 ): void {
@@ -261,7 +261,7 @@ export function _setSecureCredentialBackendForTests(
   tauriBackendPromise = null
 }
 
-/** Test helper */
+/** 测试辅助。 */
 export function _resetCredentialsForTests(): void {
   memory.clear()
   seq = 0

@@ -4,11 +4,11 @@ async function mapState(page: Page) {
   return page.evaluate(async () => {
     const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
 
-    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/view-state/layer-view.store.ts').at(-1) ?? '/src/view-state/layer-view.store.ts')).useLayerViewStore.getState()
+    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/stores/layer-view.store.ts').at(-1) ?? '/src/stores/layer-view.store.ts')).useLayerViewStore.getState()
 
     // Observe the live runtime; selection is changed only by actual mouse/keyboard input.
-    const host = await import(activeModule('/src/runtime/map-runtime-host.ts'))
-    const store = await import(activeModule('/src/session/project.store.ts'))
+    const host = await import(activeModule('/src/engine-host/map-runtime-host.ts'))
+    const store = await import(activeModule('/src/project/project.store.ts'))
     const state = store.useProjectStore.getState()
     const runtime = host.getMapRuntime()!
     const map = runtime.getMap()
@@ -25,7 +25,7 @@ async function waitForMapResize(page: Page) {
   await expect.poll(() => page.evaluate(async () => {
     const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
 
-    const host = await import(activeModule('/src/runtime/map-runtime-host.ts'))
+    const host = await import(activeModule('/src/engine-host/map-runtime-host.ts'))
     const map = host.getMapRuntime()!.getMap()
     const viewport = map.getViewport()
     const size = map.getSize()
@@ -34,7 +34,7 @@ async function waitForMapResize(page: Page) {
   await page.evaluate(async () => {
     const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
 
-    const host = await import(activeModule('/src/runtime/map-runtime-host.ts'))
+    const host = await import(activeModule('/src/engine-host/map-runtime-host.ts'))
     const map = host.getMapRuntime()!.getMap()
     await new Promise(resolve => { map.once('rendercomplete', resolve); map.render() })
   })
@@ -126,10 +126,10 @@ test('map selectable policy preserves table selection and location, and follows 
   await expect.poll(() => page.evaluate(async () => {
     const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
 
-    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/view-state/layer-view.store.ts').at(-1) ?? '/src/view-state/layer-view.store.ts')).useLayerViewStore.getState()
+    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/stores/layer-view.store.ts').at(-1) ?? '/src/stores/layer-view.store.ts')).useLayerViewStore.getState()
 
-    const host = await import(activeModule('/src/runtime/map-runtime-host.ts'))
-    const { useProjectStore } = await import(activeModule('/src/session/project.store.ts'))
+    const host = await import(activeModule('/src/engine-host/map-runtime-host.ts'))
+    const { useProjectStore } = await import(activeModule('/src/project/project.store.ts'))
     return host.getMapRuntime()!.isLayerSelectable(selectionSession.selectedLayerId!)
   })).toBe(false)
   await waitForMapResize(page)
@@ -171,7 +171,7 @@ test('popup fields are safe, independent of map selection, and close when filter
     await expect.poll(() => page.evaluate(async () => {
     const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
 
-      const { getMapRuntime } = await import(activeModule('/src/runtime/map-runtime-host.ts'))
+      const { getMapRuntime } = await import(activeModule('/src/engine-host/map-runtime-host.ts'))
       return getMapRuntime()!.getMap().getView().getAnimating()
     })).toBe(false)
     const state = await mapState(page), pixel = state.positions[index].pixel
@@ -180,7 +180,7 @@ test('popup fields are safe, independent of map selection, and close when filter
     await page.evaluate(async () => {
     const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
 
-      const { getMapRuntime } = await import(activeModule('/src/runtime/map-runtime-host.ts'))
+      const { getMapRuntime } = await import(activeModule('/src/engine-host/map-runtime-host.ts'))
       const pending = window as Window & { __popupClick?: Promise<void> }
       pending.__popupClick = new Promise(resolve => getMapRuntime()!.getMap().once('singleclick', () => resolve()))
     })
@@ -214,10 +214,10 @@ test('popup fields are safe, independent of map selection, and close when filter
   await page.evaluate(async () => {
     const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
 
-    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/view-state/layer-view.store.ts').at(-1) ?? '/src/view-state/layer-view.store.ts')).useLayerViewStore.getState()
+    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/stores/layer-view.store.ts').at(-1) ?? '/src/stores/layer-view.store.ts')).useLayerViewStore.getState()
 
-    const { createProjectSceneController } = await import(activeModule('/src/runtime/project-scene-controller.ts'))
-    const { useProjectStore } = await import(activeModule('/src/session/project.store.ts'))
+    const { createProjectSceneController } = await import(activeModule('/src/engine-host/project-scene-controller.ts'))
+    const { useProjectStore } = await import(activeModule('/src/project/project.store.ts'))
     const state = useProjectStore.getState(), controller = createProjectSceneController()
     try { controller.transaction('Popup safety fixture', draft => {
       const node = draft.nodes.find(item => item.id === selectionSession.selectedLayerId)
@@ -248,10 +248,10 @@ test('popup fields are safe, independent of map selection, and close when filter
   await page.evaluate(async () => {
     const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
 
-    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/view-state/layer-view.store.ts').at(-1) ?? '/src/view-state/layer-view.store.ts')).useLayerViewStore.getState()
+    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/stores/layer-view.store.ts').at(-1) ?? '/src/stores/layer-view.store.ts')).useLayerViewStore.getState()
 
-    const { createProjectSceneController } = await import(activeModule('/src/runtime/project-scene-controller.ts'))
-    const { useProjectStore } = await import(activeModule('/src/session/project.store.ts'))
+    const { createProjectSceneController } = await import(activeModule('/src/engine-host/project-scene-controller.ts'))
+    const { useProjectStore } = await import(activeModule('/src/project/project.store.ts'))
     const controller = createProjectSceneController()
     try { controller.transaction('Exclude popup feature', draft => {
       const node = draft.nodes.find(item => item.id === selectionSession.selectedLayerId)
@@ -276,17 +276,17 @@ test('domestic view projections keep selection, CSV coordinates and document his
   const picker = page.getByRole('combobox', { name: '地图视图投影', exact: true })
   await picker.selectOption('EPSG:4527')
   const read = () => page.evaluate(async () => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
-    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/data/feature-data.ts').at(-1) ?? '/src/data/feature-data.ts')
+    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/datasets/feature-data.ts').at(-1) ?? '/src/project/datasets/feature-data.ts')
 
     const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
 
-    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/view-state/layer-view.store.ts').at(-1) ?? '/src/view-state/layer-view.store.ts')).useLayerViewStore.getState()
+    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/stores/layer-view.store.ts').at(-1) ?? '/src/stores/layer-view.store.ts')).useLayerViewStore.getState()
 
-    const { getMapRuntime } = await import(activeModule('/src/runtime/map-runtime-host.ts'))
-    const { useProjectStore } = await import(activeModule('/src/session/project.store.ts'))
-    const { createProjectSceneDocument } = await import(activeModule('/src/exchange/project-scene-document.ts'))
+    const { getMapRuntime } = await import(activeModule('/src/engine-host/map-runtime-host.ts'))
+    const { useProjectStore } = await import(activeModule('/src/project/project.store.ts'))
+    const { createProjectSceneDocument } = await import(activeModule('/src/io/project-scene-document.ts'))
     const state = useProjectStore.getState(), runtime = getMapRuntime()!, view = runtime.getMap().getView()
     const layer = state.project.content.layers.find(item => item.id === selectionSession.selectedLayerId)!
     return { code: view.getProjection().getCode(), stored: state.project.content.crs,
@@ -302,14 +302,14 @@ test('domestic view projections keep selection, CSV coordinates and document his
   expect(projected.selection).toEqual(['point-0'])
   await expect(page.locator('.table-scroll tbody tr')).toHaveCount(1)
   const exported = await page.evaluate(async () => {
-    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/data/feature-data.ts').at(-1) ?? '/src/data/feature-data.ts')
+    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/datasets/feature-data.ts').at(-1) ?? '/src/project/datasets/feature-data.ts')
 
     const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
 
-    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/view-state/layer-view.store.ts').at(-1) ?? '/src/view-state/layer-view.store.ts')).useLayerViewStore.getState()
+    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/stores/layer-view.store.ts').at(-1) ?? '/src/stores/layer-view.store.ts')).useLayerViewStore.getState()
 
-    const { useProjectStore } = await import(activeModule('/src/session/project.store.ts'))
-    const { serializeVectorExport } = await import(activeModule('/src/features/export/serializeVectorExport.ts'))
+    const { useProjectStore } = await import(activeModule('/src/project/project.store.ts'))
+    const { serializeVectorExport } = await import(activeModule('/src/ui/panels/export/serializeVectorExport.ts'))
     const state = useProjectStore.getState(), layer = state.project.content.layers.find(item => item.id === selectionSession.selectedLayerId)!
     const content = serializeVectorExport(featureData.readSnapshot()[layer.datasetId], 'coordinate-csv', state.project.content.crs).content
     const [header, first] = content.trim().split(/\r?\n/).map(line => line.split(','))
@@ -319,15 +319,15 @@ test('domestic view projections keep selection, CSV coordinates and document his
   expect(exported.x).toBeCloseTo(projected.point[0], 3)
   expect(exported.y).toBeCloseTo(projected.point[1], 3)
   const restored = await page.evaluate(async () => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
-    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/data/feature-data.ts').at(-1) ?? '/src/data/feature-data.ts')
+    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/datasets/feature-data.ts').at(-1) ?? '/src/project/datasets/feature-data.ts')
 
     const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
 
-    const { createProjectFromSceneDocument } = await import(activeModule('/src/exchange/project-scene-document.ts'))
-    const { useProjectStore } = await import(activeModule('/src/session/project.store.ts'))
-    const { createProjectSceneDocument } = await import(activeModule('/src/exchange/project-scene-document.ts'))
+    const { createProjectFromSceneDocument } = await import(activeModule('/src/io/project-scene-document.ts'))
+    const { useProjectStore } = await import(activeModule('/src/project/project.store.ts'))
+    const { createProjectSceneDocument } = await import(activeModule('/src/io/project-scene-document.ts'))
     const snapshot = createProjectFromSceneDocument(JSON.parse(JSON.stringify(createProjectSceneDocument(projectSession.getSnapshot()))))
     return { code: snapshot.project.content.crs, geometry: Object.values(snapshot.featuresByDataset)[0][0].geometry }
   })
@@ -354,13 +354,13 @@ test('table keyboard keeps input history local, commits outside IME, and locates
   await page.getByRole('tab', { name: '编辑', exact: true }).click()
   await page.getByRole('button', { name: '开始编辑', exact: true }).click()
   const read = () => page.evaluate(async () => {
-    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/data/feature-data.ts').at(-1) ?? '/src/data/feature-data.ts')
+    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/datasets/feature-data.ts').at(-1) ?? '/src/project/datasets/feature-data.ts')
 
     const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
 
-    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/view-state/layer-view.store.ts').at(-1) ?? '/src/view-state/layer-view.store.ts')).useLayerViewStore.getState()
+    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/stores/layer-view.store.ts').at(-1) ?? '/src/stores/layer-view.store.ts')).useLayerViewStore.getState()
 
-    const { useProjectStore } = await import(activeModule('/src/session/project.store.ts'))
+    const { useProjectStore } = await import(activeModule('/src/project/project.store.ts'))
     const state = useProjectStore.getState(), layer = state.project.content.layers.find(item => item.id === selectionSession.selectedLayerId)!
     return (featureData.readSnapshot()[layer.datasetId] ?? []).map(item => ({ id: item.id, name: item.properties.name }))
   })
@@ -409,11 +409,11 @@ test('escape from a focused map cancels the unfinished drawing without changing 
   await page.evaluate(async () => {
     const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
 
-    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/view-state/layer-view.store.ts').at(-1) ?? '/src/view-state/layer-view.store.ts')).useLayerViewStore.getState()
+    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/stores/layer-view.store.ts').at(-1) ?? '/src/stores/layer-view.store.ts')).useLayerViewStore.getState()
 
-    const { createProjectSceneController } = await import(activeModule('/src/runtime/project-scene-controller.ts'))
-    const { useProjectStore } = await import(activeModule('/src/session/project.store.ts'))
-    const { setActiveEditTool } = await import(activeModule('/src/runtime/map-runtime-host.ts'))
+    const { createProjectSceneController } = await import(activeModule('/src/engine-host/project-scene-controller.ts'))
+    const { useProjectStore } = await import(activeModule('/src/project/project.store.ts'))
+    const { setActiveEditTool } = await import(activeModule('/src/engine-host/map-runtime-host.ts'))
     const controller = createProjectSceneController()
     try { controller.transaction('Line drawing fixture', draft => {
       const node = draft.nodes.find(item => item.id === selectionSession.selectedLayerId)
@@ -425,7 +425,7 @@ test('escape from a focused map cancels the unfinished drawing without changing 
   const sketchCount = () => page.evaluate(async () => {
     const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
 
-    const { getMapRuntime } = await import(activeModule('/src/runtime/map-runtime-host.ts'))
+    const { getMapRuntime } = await import(activeModule('/src/engine-host/map-runtime-host.ts'))
     const draw = getMapRuntime()!.getMap().getInteractions().getArray().find(item => 'getOverlay' in item)
     return draw && 'getOverlay' in draw && typeof draw.getOverlay === 'function'
       ? draw.getOverlay().getSource().getFeatures().length : -1
@@ -449,10 +449,10 @@ test('public scene display edits preserve selection and table through toolbar un
   const exported = await page.evaluate(async () => {
     const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
 
-    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/view-state/layer-view.store.ts').at(-1) ?? '/src/view-state/layer-view.store.ts')).useLayerViewStore.getState()
+    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/stores/layer-view.store.ts').at(-1) ?? '/src/stores/layer-view.store.ts')).useLayerViewStore.getState()
 
-    const { createProjectSceneController } = await import(activeModule('/src/runtime/project-scene-controller.ts'))
-    const { useProjectStore } = await import(activeModule('/src/session/project.store.ts'))
+    const { createProjectSceneController } = await import(activeModule('/src/engine-host/project-scene-controller.ts'))
+    const { useProjectStore } = await import(activeModule('/src/project/project.store.ts'))
     const controller = createProjectSceneController(), id = selectionSession.selectedLayerId!
     try { controller.setNodeOpacity(id, 0.4); return controller.getDocument().nodes.find(node => node.id === id) }
     finally { controller.dispose() }
@@ -479,14 +479,14 @@ test('drawing commits through document replacement and toolbar undo preserves th
   await page.mouse.click(bounds.x + 120, bounds.y + 100)
   await expect.poll(async () => (await mapState(page)).positions.length).toBe(4)
   const snapshot = () => page.evaluate(async () => {
-    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/data/feature-data.ts').at(-1) ?? '/src/data/feature-data.ts')
+    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/datasets/feature-data.ts').at(-1) ?? '/src/project/datasets/feature-data.ts')
 
     const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
 
-    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/view-state/layer-view.store.ts').at(-1) ?? '/src/view-state/layer-view.store.ts')).useLayerViewStore.getState()
+    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/stores/layer-view.store.ts').at(-1) ?? '/src/stores/layer-view.store.ts')).useLayerViewStore.getState()
 
-    const { useProjectStore } = await import(activeModule('/src/session/project.store.ts'))
-    const { useWorkbenchStore } = await import(activeModule('/src/view-state/workbench.store.ts'))
+    const { useProjectStore } = await import(activeModule('/src/project/project.store.ts'))
+    const { useWorkbenchStore } = await import(activeModule('/src/stores/workbench.store.ts'))
     const state = useProjectStore.getState(), layer = state.project.content.layers.find(item => item.id === selectionSession.selectedLayerId)!
     return { count: featureData.readSnapshot()[layer.datasetId].length, target: useWorkbenchStore.getState().editLayerId, layer: layer.id }
   })
@@ -505,7 +505,7 @@ test('public view edits reproject native features and toolbar undo restores the 
   await page.evaluate(async () => {
     const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
 
-    const { createProjectSceneController } = await import(activeModule('/src/runtime/project-scene-controller.ts'))
+    const { createProjectSceneController } = await import(activeModule('/src/engine-host/project-scene-controller.ts'))
     const controller = createProjectSceneController()
     try { controller.setView('map', { type: '2d', projection: 'EPSG:4326', center: [116.4, 39.9], zoom: 8 }) }
     finally { controller.dispose() }
@@ -513,10 +513,10 @@ test('public view edits reproject native features and toolbar undo restores the 
   const read = () => page.evaluate(async () => {
     const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
 
-    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/view-state/layer-view.store.ts').at(-1) ?? '/src/view-state/layer-view.store.ts')).useLayerViewStore.getState()
+    const selectionSession = (await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/stores/layer-view.store.ts').at(-1) ?? '/src/stores/layer-view.store.ts')).useLayerViewStore.getState()
 
-    const { getMapRuntime } = await import(activeModule('/src/runtime/map-runtime-host.ts'))
-    const { useProjectStore } = await import(activeModule('/src/session/project.store.ts'))
+    const { getMapRuntime } = await import(activeModule('/src/engine-host/map-runtime-host.ts'))
+    const { useProjectStore } = await import(activeModule('/src/project/project.store.ts'))
     const runtime = getMapRuntime()!, view = runtime.getMap().getView()
     const layer = runtime.registry.getVector(selectionSession.selectedLayerId!)!
     const point = layer.getSource()!.getFeatureById('point-0')!

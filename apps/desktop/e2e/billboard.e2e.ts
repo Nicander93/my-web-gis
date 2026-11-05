@@ -2,8 +2,8 @@ import { expect, test, type Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 
 test.use({ actionTimeout: 15_000, screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
-async function snapshot(page: Page) { return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() }) }
-async function native(page: Page, id: string) { return page.evaluate(async id => (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneDiagnostics(id)?.presentation?.graphic, id) }
+async function snapshot(page: Page) { return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts'); return projectSession.getSnapshot() }) }
+async function native(page: Page, id: string) { return page.evaluate(async id => (await import('/src/engine-host/scene3d-runtime-host.ts')).getLiveSceneDiagnostics(id)?.presentation?.graphic, id) }
 
 test('billboard placement, embedded image draft, preview, cancel, undo and saved-project reopen', async ({ page }, info) => {
   test.setTimeout(120_000)

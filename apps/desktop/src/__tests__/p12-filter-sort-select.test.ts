@@ -1,9 +1,9 @@
 import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
 import { layerContentCommands } from '@/commands/layer-content.commands'
 import { featureCommands } from '@/commands/feature.commands'
-import { getFilteredFeatures } from '@/session/feature-query'
-import { projectEdits } from '@/session/project-edits'
-import { featureData } from '@/data/feature-data'
+import { getFilteredFeatures } from '@/project/feature-query'
+import { projectEdits } from '@/project/project-edits'
+import { featureData } from '@/project/datasets/feature-data'
 import { selectionCommands } from '@/commands/selection.commands'
 import { requireMapContent } from '@desktop-webgis/project'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -14,8 +14,8 @@ import {
   sortFeatures,
   type GisFeature
 } from '@desktop-webgis/project'
-import { useProjectStore } from '@/session/project.store'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { useProjectStore } from '@/project/project.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
 
 function feat(id: string, properties: Record<string, unknown>): GisFeature {
   return {
@@ -51,7 +51,7 @@ describe('P12 set semantics / filter / selection', () => {
     expect(useLayerViewStore.getState().selection.featureIds).toEqual(['f-b'])
     expect(useLayerViewStore.getState().lastSelectionCountAfterFilter).toBe(1)
 
-    // same helper the map runtime uses
+    // 和地图运行时用的是同一个辅助函数。
     const layer = requireMapContent(useProjectStore.getState().project).layers.find((l) => l.id === layerId)!
     expect(applyFieldFilter(sample, layer.filter).map((f) => f.id)).toEqual(['f-b', 'f-c'])
   })
@@ -73,11 +73,11 @@ describe('P12 set semantics / filter / selection', () => {
     const sorted = sortFeatures(getFilteredFeatures(layerId), [
       { field: 'pop', direction: 'desc' }
     ])
-    // nulls first on desc, then 30, 20, 10
+    // 降序时空值排在最前，然后是 30、20、10。
     expect(sorted.map((f) => f.id)).toEqual(['f-d', 'f-b', 'f-c', 'f-a'])
     const page = sorted.slice(0, 2)
     expect(page.map((f) => f.id)).toEqual(['f-d', 'f-b'])
-    // selection still keyed by Feature ID after sort/page
+    // 排序或翻页之后，选择仍然以要素 ID 为键。
     expect(useLayerViewStore.getState().selection.featureIds).toEqual(['f-c'])
   })
 
@@ -87,7 +87,7 @@ describe('P12 set semantics / filter / selection', () => {
     useLayerViewStore.getState().setAttributeTableState(layerId, { selectedOnly: true })
     expect(useLayerViewStore.getState().getLayerSession(layerId).attributeTable?.selectedOnly).toBe(true)
     expect(useLayerViewStore.getState().selection.featureIds).toEqual([])
-    // F unchanged
+    // F 保持不变。
     expect(getFilteredFeatures(layerId)).toHaveLength(4)
   })
 

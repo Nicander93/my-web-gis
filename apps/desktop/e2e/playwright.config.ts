@@ -1,0 +1,43 @@
+import { defineConfig } from '@playwright/test'
+import { fileURLToPath } from 'node:url'
+
+const desktopRoot = fileURLToPath(new URL('..', import.meta.url))
+
+export default defineConfig({
+  testDir: '.',
+  testMatch: '**/*.e2e.ts',
+  testIgnore: ['**/viewer-document.e2e.ts', '**/desktop-viewer-workflow.e2e.ts', '**/geolibre-production.e2e.ts'],
+  outputDir: '../test-results',
+  workers: 1,
+  timeout: 45_000,
+  use: {
+    baseURL: 'http://127.0.0.1:5173',
+    screenshot: 'only-on-failure',
+    trace: 'retain-on-failure',
+    launchOptions: {
+      executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE,
+      args: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
+        ? [
+            '--no-sandbox',
+            '--disable-dev-shm-usage',
+            '--use-gl=angle',
+            '--use-angle=swiftshader',
+            '--enable-unsafe-swiftshader'
+          ]
+        : []
+    }
+  },
+  projects: [
+    { name: 'desktop', use: { viewport: { width: 1440, height: 900 } } },
+    { name: 'compact', use: { viewport: { width: 1024, height: 680 } } },
+    { name: 'laptop', use: { viewport: { width: 1366, height: 768 } } },
+    { name: 'wide', use: { viewport: { width: 1920, height: 1080 } } }
+  ],
+  webServer: {
+    command: 'pnpm dev',
+    cwd: desktopRoot,
+    url: 'http://127.0.0.1:5173',
+    reuseExistingServer: !process.env.CI,
+    timeout: 30_000
+  }
+})

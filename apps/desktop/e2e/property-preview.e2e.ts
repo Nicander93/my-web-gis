@@ -3,20 +3,20 @@ import { createCesiumScene, createTransform } from '@desktop-webgis/cesium-scene
 
 async function content(page: Page) {
   return page.evaluate(async () => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
-    const module = await import('/src/session/project.store.ts')
+    const module = await import('/src/project/project.store.ts')
     return { snapshot: projectSession.getSnapshot(), version: module.getProjectContentVersion() }
   })
 }
 async function opacity(page: Page, id: string) {
-  return page.evaluate(async id => (await import('/src/runtime/map-runtime-host.ts')).getMapRuntime()?.registry.get(id)?.getOpacity(), id)
+  return page.evaluate(async id => (await import('/src/engine-host/map-runtime-host.ts')).getMapRuntime()?.registry.get(id)?.getOpacity(), id)
 }
 async function presentation(page: Page, id: string) {
-  return page.evaluate(async id => (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneDiagnostics(id)?.presentation, id)
+  return page.evaluate(async id => (await import('/src/engine-host/scene3d-runtime-host.ts')).getLiveSceneDiagnostics(id)?.presentation, id)
 }
 async function pendingPropertyEdits(page: Page) {
-  return page.evaluate(async () => (await import('/src/ui/pending-property-edits.ts')).hasPendingPropertyEdits())
+  return page.evaluate(async () => (await import('/src/ui/components/pending-property-edits.ts')).hasPendingPropertyEdits())
 }
 test.use({ screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
 test.beforeEach(async ({ page }) => {

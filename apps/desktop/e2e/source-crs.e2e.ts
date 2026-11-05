@@ -11,7 +11,7 @@ test('source CRS assignment keeps coordinates, supports cancel, undo/redo and sa
   await page.getByRole('region', { name: '二维功能区' }).getByRole('button', { name: '添加数据', exact: true }).click()
   await page.locator('input[type=file]').setInputFiles({ name: 'crs.geojson', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: { code: '001' }, geometry: { type: 'Point', coordinates: [116.4, 39.9, 10] } }] })) })
   await page.getByRole('button', { name: '确认导入', exact: true }).click()
-  const snapshot = () => page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() })
+  const snapshot = () => page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts'); return projectSession.getSnapshot() })
   const before = await snapshot(), datasetId = before.project.content.layers[0].datasetId
   async function open() {
     await page.locator('.layer-item').filter({ hasText: 'crs' }).click({ button: 'right' })

@@ -1,6 +1,6 @@
 import { layerContentCommands } from '@/commands/layer-content.commands'
-import { projectEdits } from '@/session/project-edits'
-import { featureData } from '@/data/feature-data'
+import { projectEdits } from '@/project/project-edits'
+import { featureData } from '@/project/datasets/feature-data'
 import { requireMapContent } from '@desktop-webgis/project'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -10,8 +10,8 @@ import {
   capabilitiesForDataset,
   type GisFeature
 } from '@desktop-webgis/project'
-import { useProjectStore } from '@/session/project.store'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { useProjectStore } from '@/project/project.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
 import { getLayerCapabilities, layerCommands } from '@/commands/layer.commands'
 import {
   _resetCredentialsForTests,
@@ -19,13 +19,13 @@ import {
   getSessionCredential,
   putSessionCredential
 } from '@/platform/credentials'
-import { connectService } from '@/exchange/service-connect'
+import { connectService } from '@/io/service-connect'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const fixtureXml = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), '../../../../packages/ogc-io/fixtures/wms-1.3.0-capabilities.xml'),
+  join(dirname(fileURLToPath(import.meta.url)), '../../../../packages/public/ogc-io/fixtures/wms-1.3.0-capabilities.xml'),
   'utf8'
 )
 
@@ -135,7 +135,7 @@ describe('P15 service description / capabilities / connect', () => {
   it('failed connect creates no empty layer', async () => {
     const before = requireMapContent(useProjectStore.getState().project).layers.length
     const fetchImpl = vi.fn(async () => new Response('nope', { status: 500 })) as unknown as typeof fetch
-    // Bypass connectService's native bridge by calling with a bad URL through mocked global fetch
+    // 用错误的 URL 配合 mock 过的全局 fetch，绕过 connectService 的原生桥接。
     // connectService uses fetchTextPreferNative — stub fetch to fail.
     const originalFetch = globalThis.fetch
     globalThis.fetch = fetchImpl
@@ -209,7 +209,7 @@ describe('P15 service description / capabilities / connect', () => {
       }
       expect(requireMapContent(useProjectStore.getState().project).layers).toHaveLength(0)
 
-      // User selects one layer only
+      // 用户只能选择一个图层。
       if (result.ok) {
         const layer = result.selectable[0]!
         layerContentCommands.addServiceLayer({

@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 test.use({ actionTimeout: 15_000, screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
 async function snapshot(page: Page) { return page.evaluate(async () => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
  const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path; return projectSession.getSnapshot() }) }
 async function upload(page: Page, name: string) {
   await page.locator('input[type=file]').setInputFiles({ name: `${name}.geojson`, mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({
@@ -44,11 +44,11 @@ test('cancel and project replacement terminate pending workers without importing
   await upload(page, 'old-project')
   await expect(page.getByRole('button', { name: '取消读取', exact: true })).toBeVisible()
   await page.evaluate(async () => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
     const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
 
-    const store = (await import(activeModule('/src/session/project.store.ts'))).useProjectStore.getState()
+    const store = (await import(activeModule('/src/project/project.store.ts'))).useProjectStore.getState()
     const next = projectSession.getSnapshot(); next.project.metadata.id = 'replacement'; projectSession.loadSnapshot(next)
   })
   const replacement = await snapshot(page)
@@ -63,8 +63,8 @@ test('large GeoJSON and CSV preview/parse use real workers while the main thread
   const result = await page.evaluate(async () => {
     const activeModule = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === path).at(-1) ?? path
 
-    const { importGeoJson, importCsvFile, inspectDxfLayers } = await import(activeModule('/src/exchange/import.ts'))
-    const { runImportTask } = await import(activeModule('/src/exchange/import-worker.ts'))
+    const { importGeoJson, importCsvFile, inspectDxfLayers } = await import(activeModule('/src/io/import.ts'))
+    const { runImportTask } = await import(activeModule('/src/io/import-worker.ts'))
     let ticks = 0
     const timer = setInterval(() => ticks++, 0)
     try {

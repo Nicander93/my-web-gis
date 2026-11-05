@@ -1,7 +1,7 @@
-import { projectSession } from '@/session/project-session'
+import { projectSession } from '@/project/project-session'
 import { describe, expect, it } from 'vitest'
-import { useSnappingStore } from '@/view-state/snapping.store'
-import { useProjectStore } from '@/session/project.store'
+import { useSnappingStore } from '@/stores/snapping.store'
+import { useProjectStore } from '@/project/project.store'
 
 describe('snapping preferences', () => {
   it('validates tolerance and disables empty modes without changing project data', () => {

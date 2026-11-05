@@ -1,8 +1,8 @@
 import { emitCommandStatus } from '@/platform/command-status'
-import { useWorkbenchStore } from '@/view-state/workbench.store'
+import { useWorkbenchStore } from '@/stores/workbench.store'
 import { createId, requireMapContent, SetMapInitialViewCommand } from '@desktop-webgis/project'
-import { useProjectStore } from '@/session/project.store'
-import { projectEdits } from '@/session/project-edits'
+import { useProjectStore } from '@/project/project.store'
+import { projectEdits } from '@/project/project-edits'
 import {
   clearMapSelection,
   getLiveMapState,
@@ -11,9 +11,9 @@ import {
   setActiveEditTool,
   zoomMapBy,
   zoomMapToAll
-} from '@/runtime/map-runtime-host'
+} from '@/engine-host/map-runtime-host'
 
-/** 地图操作命令：接入 OlMapRuntime / OlSelectionRuntime 后驱动真实视图与选择。 */
+/** 地图操作命令：接入 OlMapRuntime 和 OlSelectionRuntime 后，驱动真实的视图与选择。 */
 export const mapCommands = {
   setInitialView(): void {
     const project = useProjectStore.getState().project

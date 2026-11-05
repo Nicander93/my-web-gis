@@ -5,11 +5,11 @@ import { expect } from '@playwright/test'
 
 async function state(page) {
   return page.evaluate(async () => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
-    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-edits.ts').at(-1) ?? '/src/session/project-edits.ts')
+    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-edits.ts').at(-1) ?? '/src/project/project-edits.ts')
 
-    const store = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+    const store = (await import('/src/project/project.store.ts')).useProjectStore.getState()
     return { snapshot: projectSession.getSnapshot(), dirty: store.dirty, undo: projectEdits.canUndo(), redo: projectEdits.canRedo() }
   })
 }
@@ -110,7 +110,7 @@ export async function verifyNativeLayout(page, report, output, saveTo) {
   await creating.getByRole('button', { name: '创建项目', exact: true }).click()
   await expect(page.locator('.scene3d-footer__state')).toHaveText('就绪', { timeout: 60_000 })
   await page.evaluate(async () => {
-    (await import('/src/features/scene3d/scene3d-commands.ts')).updateScene('布局验收对象', scene => {
+    (await import('/src/ui/panels/scene3d/scene3d-commands.ts')).updateScene('布局验收对象', scene => {
       scene.nodes.push({ id: 'scale-point', name: 'Scaled Point', type: 'graphic', visible: true, geometry: { type: 'point', heightMode: 'ground', positions: [[116.391, 39.907, 0]] }, properties: {}, style: { color: '#2f7655', width: 3, pointSize: 8 } })
       return scene
     })
@@ -146,7 +146,7 @@ export async function verifyNativeSimplification(page, report, output, saveTo) {
   }, inputPath)
   await page.getByRole('button', { name: '确认导入', exact: true }).click()
   report.fileDrop = { nativeEventBridge: true, nativeFilesystemRead: true, physicalOsDrag: 'Not verified: native drag event emitted by test' }
-  const initialCenter = await page.evaluate(async () => (await import('/src/runtime/map-runtime-host.ts')).getMapRuntime().getMap().getView().getCenter())
+  const initialCenter = await page.evaluate(async () => (await import('/src/engine-host/map-runtime-host.ts')).getMapRuntime().getMap().getView().getCenter())
   const bounds = await page.getByTestId('map-runtime-viewport').boundingBox()
   for (const button of ['middle', 'left']) {
     await page.mouse.move(bounds.x + bounds.width * .55, bounds.y + bounds.height * .55)
@@ -156,7 +156,7 @@ export async function verifyNativeSimplification(page, report, output, saveTo) {
     await page.mouse.up({ button })
     if (button === 'left') await page.keyboard.up('Space')
   }
-  assert.notDeepEqual(await page.evaluate(async () => (await import('/src/runtime/map-runtime-host.ts')).getMapRuntime().getMap().getView().getCenter()), initialCenter)
+  assert.notDeepEqual(await page.evaluate(async () => (await import('/src/engine-host/map-runtime-host.ts')).getMapRuntime().getMap().getView().getCenter()), initialCenter)
   report.scenarios.push({ name: 'Native file-drop event bridge reads a local path; middle and space-left navigation', passed: true })
   const before = await state(page), source = before.snapshot.project.content.layers[0]
   const input = before.snapshot.featuresByDataset[source.datasetId][0]

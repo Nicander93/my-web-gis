@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 test.use({ actionTimeout: 15_000, screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
-async function snapshot(page: Page) { return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() }) }
-async function diagnostics(page: Page) { return page.evaluate(async () => (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneDiagnostics()) }
+async function snapshot(page: Page) { return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts'); return projectSession.getSnapshot() }) }
+async function diagnostics(page: Page) { return page.evaluate(async () => (await import('/src/engine-host/scene3d-runtime-host.ts')).getLiveSceneDiagnostics()) }
 async function clickGround(page: Page, x: number, y: number) {
   const bounds = (await page.locator('.scene3d-canvas__viewport canvas').boundingBox())!
   await page.mouse.click(bounds.x + bounds.width * x, bounds.y + bounds.height * y)
@@ -57,9 +57,9 @@ test('reopening the same project cancels old drawing and cannot commit a late co
   await clickGround(page, .46, .51); await clickGround(page, .54, .49)
   await expect(page.locator('.scene3d-drawing-bar')).toContainText('2 个顶点')
   await page.evaluate(async () => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
-    const store = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+    const store = (await import('/src/project/project.store.ts')).useProjectStore.getState()
     projectSession.loadSnapshot(projectSession.getSnapshot())
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
   })
@@ -93,15 +93,15 @@ test('locking or reopening a graphic cancels its vertex preview and a new sessio
   }
   await preview()
   expect((await snapshot(page)).project.content.scene?.nodes[0]).toEqual(node)
-  await page.evaluate(async id => (await import('/src/features/scene3d/scene3d-commands.ts')).setSceneNodesLocked([id], true), node.id)
+  await page.evaluate(async id => (await import('/src/ui/panels/scene3d/scene3d-commands.ts')).setSceneNodesLocked([id], true), node.id)
   await expect(page.getByRole('button', { name: '应用修改', exact: true })).toHaveCount(0)
   expect((await snapshot(page)).project.content.scene?.nodes[0]).toEqual({ ...node, locked: true })
   await page.getByRole('button', { name: '撤销', exact: true }).click()
   await preview()
   await page.evaluate(async () => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
-    const store = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+    const store = (await import('/src/project/project.store.ts')).useProjectStore.getState()
     projectSession.loadSnapshot(projectSession.getSnapshot())
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
   })

@@ -1,13 +1,13 @@
 import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
 import { layerContentCommands } from '@/commands/layer-content.commands'
-import { projectSession } from '@/session/project-session'
-import { projectEdits } from '@/session/project-edits'
+import { projectSession } from '@/project/project-session'
+import { projectEdits } from '@/project/project-edits'
 import { selectionCommands } from '@/commands/selection.commands'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { createProject } from '@desktop-webgis/project'
-import { useProjectStore } from '@/session/project.store'
-import { useWorkbenchStore } from '@/view-state/workbench.store'
+import { useProjectStore } from '@/project/project.store'
+import { useWorkbenchStore } from '@/stores/workbench.store'
 import { editCommands } from './edit.commands'
 
 beforeEach(() => {

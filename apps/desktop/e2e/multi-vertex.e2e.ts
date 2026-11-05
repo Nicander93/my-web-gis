@@ -5,11 +5,11 @@ test.use({ screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: f
 
 const ring = [[116,39],[116.01,39],[116.01,39.01],[116,39.01],[116,39]]
 const hole = [[116.002,39.002],[116.002,39.004],[116.004,39.004],[116.004,39.002],[116.002,39.002]]
-async function snapshot(page: Page) { return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() }) }
+async function snapshot(page: Page) { return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts'); return projectSession.getSnapshot() }) }
 async function pixel(page: Page, midpoint = false) {
   return page.evaluate(async midpoint => {
-    const { getMapRuntime } = await import('/src/runtime/map-runtime-host.ts')
-    const { useProjectStore } = await import('/src/session/project.store.ts')
+    const { getMapRuntime } = await import('/src/engine-host/map-runtime-host.ts')
+    const { useProjectStore } = await import('/src/project/project.store.ts')
     const runtime = getMapRuntime()!, layer = useProjectStore.getState().project.content.layers[0]
     const feature = runtime.registry.getVector(layer.id)!.getSource()!.getFeatures().find(feature => feature.get('name') === 'A')!
     const geometry = feature.getGeometry() as unknown as { getCoordinates(): number[][][] }
@@ -53,16 +53,16 @@ test.beforeEach(async ({ page }) => {
   await page.getByRole('button', { name: '开始编辑', exact: true }).click()
   // Seed the same stable-ID selection produced by the table before entering Modify.
   await page.evaluate(async () => {
-    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/data/feature-data.ts').at(-1) ?? '/src/data/feature-data.ts')
+    const { featureData } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/datasets/feature-data.ts').at(-1) ?? '/src/project/datasets/feature-data.ts')
 
-    const { useProjectStore } = await import('/src/session/project.store.ts')
+    const { useProjectStore } = await import('/src/project/project.store.ts')
     const store = useProjectStore.getState(), layer = store.project.content.layers[0]
     const { selectionCommands } = await import('/src/commands/selection.commands.ts')
     selectionCommands.setSelection({ layerId: layer.id, featureIds: featureData.readSnapshot()[layer.datasetId].filter(feature => feature.properties.name !== 'Unselected').map(feature => feature.id) })
   })
   await page.getByRole('button', { name: '修改几何', exact: true }).click()
   await expect.poll(() => page.evaluate(async () => {
-    const { getMapRuntime } = await import('/src/runtime/map-runtime-host.ts')
+    const { getMapRuntime } = await import('/src/engine-host/map-runtime-host.ts')
     const map = getMapRuntime()!.getMap(), size = map.getSize(), viewport = map.getViewport()
     return !map.getView().getAnimating() && size?.[0] === viewport.clientWidth && size?.[1] === viewport.clientHeight
   })).toBe(true)
@@ -122,8 +122,8 @@ test('shared edge vertex insertion and Alt deletion each undo in one step', asyn
   expect(a.geometry.coordinates[0]).toHaveLength(6)
   expect(b.geometry.coordinates[0][0]).toHaveLength(6)
   const point = await page.evaluate(async () => {
-    const { getMapRuntime } = await import('/src/runtime/map-runtime-host.ts')
-    const { useProjectStore } = await import('/src/session/project.store.ts')
+    const { getMapRuntime } = await import('/src/engine-host/map-runtime-host.ts')
+    const { useProjectStore } = await import('/src/project/project.store.ts')
     const runtime = getMapRuntime()!, layer = useProjectStore.getState().project.content.layers[0]
     const geometry = runtime.registry.getVector(layer.id)!.getSource()!.getFeatures().find(feature => feature.get('name') === 'A')!.getGeometry() as unknown as { getCoordinates(): number[][][] }
     return runtime.getMap().getPixelFromCoordinate(geometry.getCoordinates()[0][2])
@@ -140,8 +140,8 @@ test('shared edge vertex insertion and Alt deletion each undo in one step', asyn
 test('invalid shared vertex geometry rolls back the complete gesture and leaves the next edit usable', async ({ page }) => {
   const before = await snapshot(page)
   const targets = await page.evaluate(async () => {
-    const { getMapRuntime } = await import('/src/runtime/map-runtime-host.ts')
-    const { useProjectStore } = await import('/src/session/project.store.ts')
+    const { getMapRuntime } = await import('/src/engine-host/map-runtime-host.ts')
+    const { useProjectStore } = await import('/src/project/project.store.ts')
     const runtime = getMapRuntime()!, map = runtime.getMap(), layer = useProjectStore.getState().project.content.layers[0]
     map.getView().setZoom(map.getView().getZoom()! - 1)
     map.renderSync()

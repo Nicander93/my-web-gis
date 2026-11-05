@@ -42,10 +42,10 @@ async function reachable(locator) {
 
 async function projectHistory(page) {
   return evaluate(page, async () => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
-    const state = (await import('/src/session/project.store.ts')).useProjectStore.getState()
-    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-edits.ts').at(-1) ?? '/src/session/project-edits.ts')
+    const state = (await import('/src/project/project.store.ts')).useProjectStore.getState()
+    const { projectEdits } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-edits.ts').at(-1) ?? '/src/project/project-edits.ts')
     return { snapshot: projectSession.getSnapshot(), dirty: state.dirty, undo: projectEdits.canUndo(), redo: projectEdits.canRedo() }
   }, undefined, 'Project/history read')
 }

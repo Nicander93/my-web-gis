@@ -1,22 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDefaultLayerStyle, createProject, requireMapContent, type MapState } from '@desktop-webgis/project'
 import { createCesiumScene } from '@desktop-webgis/cesium-scene-schema'
-import { useProjectStore } from '@/session/project.store'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
-import { featureData } from '@/data/feature-data'
-import { projectSession } from '@/session/project-session'
-import { projectEdits } from '@/session/project-edits'
-import { createSnapshotFromState } from '@/session/project-io'
-import { layerConfigurationQueries } from '@/session/layer-configuration-query'
-import { projectConfiguration } from '@/session/project-configuration'
+import { useProjectStore } from '@/project/project.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
+import { featureData } from '@/project/datasets/feature-data'
+import { projectSession } from '@/project/project-session'
+import { projectEdits } from '@/project/project-edits'
+import { createSnapshotFromState } from '@/project/project-io'
+import { layerConfigurationQueries } from '@/project/layer-configuration-query'
+import { projectConfiguration } from '@/project/project-configuration'
 import { layerConfigurationCommands } from './layer-configuration.commands'
 import { datasetConfigurationCommands } from './dataset-configuration.commands'
 import { mapCommands } from './map.commands'
 import { layerCommands } from './layer.commands'
 
 const probe = vi.hoisted(() => ({ view: null as MapState | null, camera: vi.fn() }))
-vi.mock('@/runtime/map-runtime-host', () => ({ getLiveMapState: () => probe.view }))
-vi.mock('@/runtime/scene3d-runtime-host', () => ({ getLiveSceneCamera: probe.camera }))
+vi.mock('@/engine-host/map-runtime-host', () => ({ getLiveMapState: () => probe.view }))
+vi.mock('@/engine-host/scene3d-runtime-host', () => ({ getLiveSceneCamera: probe.camera }))
 vi.mock('@/platform/command-status', () => ({ emitCommandStatus: vi.fn() }))
 
 beforeEach(() => {

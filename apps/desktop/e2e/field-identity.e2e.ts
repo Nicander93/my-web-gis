@@ -4,9 +4,9 @@ async function state(page: Page) {
   return page.evaluate(async () => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(active('/src/session/project.store.ts'))
-    const { featureData } = await import(active('/src/data/feature-data.ts'))
-    const { getMapRuntime } = await import(active('/src/runtime/map-runtime-host.ts'))
+    const { useProjectStore } = await import(active('/src/project/project.store.ts'))
+    const { featureData } = await import(active('/src/project/datasets/feature-data.ts'))
+    const { getMapRuntime } = await import(active('/src/engine-host/map-runtime-host.ts'))
     const layer = useProjectStore.getState().project.content.layers[0]
     const feature = getMapRuntime()?.registry.getVector(layer.id)?.getSource()?.getFeatures()[0]
     return {
@@ -33,7 +33,7 @@ test('field identities distinguish a deleted column from another column renamed 
   await page.evaluate(async () => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(active('/src/session/project.store.ts'))
+    const { useProjectStore } = await import(active('/src/project/project.store.ts'))
     const { layerConfigurationCommands } = await import(active('/src/commands/layer-configuration.commands.ts'))
     layerConfigurationCommands.setLayerFilter(useProjectStore.getState().project.content.layers[0].id, [{ field: 'left', op: 'gt', value: 0 }])
   })
@@ -65,9 +65,9 @@ test('field identities distinguish a deleted column from another column renamed 
   const committed = await page.evaluate(async () => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { commitDatasetEdits } = await import(active('/src/session/data-save.ts'))
-    const { featureData } = await import(active('/src/data/feature-data.ts'))
-    const { useProjectStore } = await import(active('/src/session/project.store.ts'))
+    const { commitDatasetEdits } = await import(active('/src/project/data-save.ts'))
+    const { featureData } = await import(active('/src/project/datasets/feature-data.ts'))
+    const { useProjectStore } = await import(active('/src/project/project.store.ts'))
     const datasetId = useProjectStore.getState().project.content.layers[0].datasetId
     let captured: unknown
     const saved = await commitDatasetEdits(datasetId, async (features, _signal, fields) => { captured = structuredClone({ features, fields }) })

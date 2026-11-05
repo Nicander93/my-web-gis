@@ -2,7 +2,7 @@ import { createSelectionController, type FeatureRef, type SelectionTarget } from
 import { getSceneFeatureId, type OlDocumentRuntime } from '@desktop-webgis/ol-scene-runtime'
 import VectorLayer from 'ol/layer/Vector.js'
 
-/** Viewer owns accepted selection; package interaction/highlight never modifies document content. */
+/** 接受后的选择由 Viewer 持有；包的交互和高亮永远不会修改文档内容。 */
 export function createViewerSelection(runtime: OlDocumentRuntime): { refresh(): void; dispose(): void } {
   let accepted: FeatureRef[] = []
   function targets(): SelectionTarget[] {

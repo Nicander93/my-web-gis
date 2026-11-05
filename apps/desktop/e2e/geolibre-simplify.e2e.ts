@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 
 test.use({ actionTimeout: 15_000, screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
 async function snapshot(page: Page) {
-  return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() })
+  return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts'); return projectSession.getSnapshot() })
 }
 async function setup(page: Page) {
   await page.route('**/*tile.openstreetmap.org/**', route => route.abort())
@@ -45,7 +45,7 @@ test('real GeoLibre worker preserves typed data, creates one undoable layer and 
   const rows = after.featuresByDataset[result.datasetId]
   expect(rows).toHaveLength(inputs.length)
   await expect.poll(async () => page.evaluate(async id => {
-    const runtime = (await import('/src/runtime/map-runtime-host.ts')).getMapRuntime()
+    const runtime = (await import('/src/engine-host/map-runtime-host.ts')).getMapRuntime()
     const layer = runtime?.registry.getVector(id)
     return { visible: layer?.getVisible(), geometries: layer?.getSource()?.getFeatures().map(feature => feature.getGeometry()?.getType()) }
   }, result.id)).toEqual({ visible: true, geometries: ['LineString', 'LineString'] })
@@ -96,15 +96,15 @@ for (const action of ['cancel', 'replace'] as const) test(`${action} during real
     await expect.poll(() => requested, { timeout: 30_000 }).toBe(true)
     if (action === 'cancel') await panel.getByRole('button', { name: '取消处理', exact: true }).click()
     else await page.evaluate(async () => {
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
-      const store = (await import('/src/session/project.store.ts')).useProjectStore.getState()
+      const store = (await import('/src/project/project.store.ts')).useProjectStore.getState()
       projectSession.loadSnapshot(projectSession.getSnapshot())
     })
     release()
     if (action === 'cancel') await expect(panel.getByRole('button', { name: '生成结果图层', exact: true })).toBeEnabled()
     else await expect(panel).toBeHidden()
-    await expect.poll(async () => page.evaluate(async () => (await import('/src/view-state/task-log.store.ts')).useTaskLogStore.getState().entries.some(task => task.title === '空间处理' && task.status === 'cancelled'))).toBe(true)
+    await expect.poll(async () => page.evaluate(async () => (await import('/src/stores/task-log.store.ts')).useTaskLogStore.getState().entries.some(task => task.title === '空间处理' && task.status === 'cancelled'))).toBe(true)
     expect(await snapshot(page)).toEqual(before)
   } finally { release() }
 })

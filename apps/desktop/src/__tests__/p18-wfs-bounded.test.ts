@@ -1,7 +1,7 @@
 import { layerContentCommands } from '@/commands/layer-content.commands'
 import { featureCommands } from '@/commands/feature.commands'
-import { projectEdits } from '@/session/project-edits'
-import { featureData } from '@/data/feature-data'
+import { projectEdits } from '@/project/project-edits'
+import { featureData } from '@/project/datasets/feature-data'
 import { requireMapContent } from '@desktop-webgis/project'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -15,8 +15,8 @@ import {
   parseCapabilitiesXml,
   WFS_DEFAULT_MAX_FEATURES
 } from '@desktop-webgis/ogc-io'
-import { useProjectStore } from '@/session/project.store'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { useProjectStore } from '@/project/project.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
 import { getLayerCapabilities, layerCommands } from '@/commands/layer.commands'
 import { _resetCredentialsForTests } from '@/platform/credentials'
 import { startWfsBoundedLoad } from '@/commands/wfs.commands'
@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url'
 
 const fixturesDir = join(
   dirname(fileURLToPath(import.meta.url)),
-  '../../../../packages/ogc-io/fixtures'
+  '../../../../packages/public/ogc-io/fixtures'
 )
 
 function resetStores(): void {
@@ -148,7 +148,7 @@ describe('P18 WFS bounded snapshot', () => {
       shareableUrl: 'https://example.com/geoserver/wfs',
       hint: 'WFS'
     })
-    // Return exactly maxFeatures features so truncatedByLimit=true
+    // 正好返回 maxFeatures 个要素，这样 truncatedByLimit 才是 true。
     const features = Array.from({ length: 3 }, (_, i) => ({
       type: 'Feature',
       id: `p.${i}`,
@@ -289,7 +289,7 @@ describe('P18 WFS bounded snapshot', () => {
     const localDs = requireMapContent(useProjectStore.getState().project).datasets.find((d) => d.id === copied!.datasetId)
     expect(localDs?.kind).toBe('vector')
     expect(capabilitiesForDataset(localDs).editGeometry).toBe(true)
-    // Original WFS remains non-editable
+    // 原始的 WFS 数据仍然不可编辑。
     const wfsDs = requireMapContent(useProjectStore.getState().project).datasets.find((d) => d.id === added.datasetId)
     expect(capabilitiesForDataset(wfsDs).editGeometry).toBe(false)
   })
@@ -340,7 +340,7 @@ describe('P18 WFS bounded snapshot', () => {
       authMode: 'none'
     })
 
-    // Switch project generation mid-flight
+    // 在操作进行中切换项目的代次。
     useLayerViewStore.getState().bumpWfsLoadGeneration()
     pendingFetch.resolve?.(
       new Response(readFileSync(join(fixturesDir, 'wfs-getfeature-geojson.json'), 'utf8'), {
@@ -349,7 +349,7 @@ describe('P18 WFS bounded snapshot', () => {
       })
     )
     await loadPromise
-    // Features must not be applied after generation bump
+    // 代次已经递增之后，不能再应用这些要素。
     expect(featureData.readSnapshot()[added.datasetId] ?? []).toEqual([])
 
     vi.unstubAllGlobals()

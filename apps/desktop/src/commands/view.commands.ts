@@ -1,14 +1,14 @@
-import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
 import { requireMapContent } from '@desktop-webgis/project'
-import { useWorkspaceStore } from '@/view-state/workspace.store'
-import { useDockingStore } from '@/view-state/docking.store'
-import { useWorkbenchStore } from '@/view-state/workbench.store'
-import { useProjectStore } from '@/session/project.store'
+import { useWorkspaceStore } from '@/stores/workspace.store'
+import { useDockingStore } from '@/stores/docking.store'
+import { useWorkbenchStore } from '@/stores/workbench.store'
+import { useProjectStore } from '@/project/project.store'
 import { emitCommandStatus } from '@/platform/command-status'
-import { getMapRuntime } from '@/runtime/map-runtime-host'
-import { projectedMapView } from '@/runtime/map-projections'
-import { projectConfiguration } from '@/session/project-configuration'
-import { openActivityPanel } from '@/view-state/activity-panel.store'
+import { getMapRuntime } from '@/engine-host/map-runtime-host'
+import { projectedMapView } from '@/engine-host/map-projections'
+import { projectConfiguration } from '@/project/project-configuration'
+import { openActivityPanel } from '@/stores/activity-panel.store'
 
 /** 视图命令直接操作 Workspace Store，供 Header、快捷键和菜单复用。 */
 export const viewCommands = {

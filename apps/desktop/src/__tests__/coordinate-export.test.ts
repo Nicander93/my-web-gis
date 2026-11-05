@@ -1,6 +1,6 @@
 import { vi, describe, expect, it } from 'vitest'
-import { serializeVectorExport } from '@/features/export/serializeVectorExport'
-import { importCsvFile } from '@/exchange/import'
+import { serializeVectorExport } from '@/ui/panels/export/serializeVectorExport'
+import { importCsvFile } from '@/io/import'
 import type { GisFeature } from '@desktop-webgis/project'
 
 describe('coordinate export workflow', () => {
@@ -33,9 +33,9 @@ describe('coordinate export workflow', () => {
   })
 })
 
-vi.mock('@/exchange/import-worker', async () => {
-  const parser = await import('@/exchange/import-parser')
-  return { runImportWorker: async (request: import('@/exchange/import-worker').ImportRequest) => {
+vi.mock('@/io/import-worker', async () => {
+  const parser = await import('@/io/import-parser')
+  return { runImportWorker: async (request: import('@/io/import-worker').ImportRequest) => {
     if (request.kind === 'geojson') return parser.importGeoJson(request.source, request.options)
     if (request.kind === 'csv') return parser.importCsvFile(request.source, request.options)
     if (request.kind === 'shapefile') return parser.importShapefileZip(request.source, request.options)

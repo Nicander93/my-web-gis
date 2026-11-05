@@ -2,8 +2,8 @@ import { expect, test, type Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 
 test.use({ actionTimeout: 15_000, screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
-async function snapshot(page: Page) { return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts'); return projectSession.getSnapshot() }) }
-async function native(page: Page, id: string) { return page.evaluate(async id => (await import('/src/runtime/scene3d-runtime-host.ts')).getLiveSceneDiagnostics(id)?.presentation?.graphic, id) }
+async function snapshot(page: Page) { return page.evaluate(async () => { const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts'); return projectSession.getSnapshot() }) }
+async function native(page: Page, id: string) { return page.evaluate(async id => (await import('/src/engine-host/scene3d-runtime-host.ts')).getLiveSceneDiagnostics(id)?.presentation?.graphic, id) }
 
 for (const [type,label] of [['rectangle','矩形'],['ellipse','椭圆']] as const) {
   test(`${type} two-corner draw, fixed controls, cancel, atomic history and file reopen`, async ({ page }, info) => {

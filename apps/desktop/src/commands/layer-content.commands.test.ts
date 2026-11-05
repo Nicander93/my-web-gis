@@ -1,12 +1,12 @@
 import { layerConfigurationCommands } from '@/commands/layer-configuration.commands'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDefaultLayerStyle, createProject, requireMapContent } from '@desktop-webgis/project'
-import { useProjectStore } from '@/session/project.store'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
-import { useWorkbenchStore } from '@/view-state/workbench.store'
-import { featureData } from '@/data/feature-data'
-import { projectSession } from '@/session/project-session'
-import { projectEdits } from '@/session/project-edits'
+import { useProjectStore } from '@/project/project.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
+import { useWorkbenchStore } from '@/stores/workbench.store'
+import { featureData } from '@/project/datasets/feature-data'
+import { projectSession } from '@/project/project-session'
+import { projectEdits } from '@/project/project-edits'
 import { layerContentCommands } from './layer-content.commands'
 
 beforeEach(() => {

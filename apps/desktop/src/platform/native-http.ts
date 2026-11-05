@@ -11,8 +11,8 @@ function isTauri(): boolean {
 }
 
 /**
- * Prefer browser fetch; on CORS / network failure in Tauri, use native channel
- * (TLS verified; no public proxy).
+ * 优先用浏览器的 fetch；在 Tauri 里遇到 CORS 或网络失败时，改用原生通道
+ * （会校验 TLS，不经过公共代理）。
  */
 export async function fetchTextPreferNative(
   url: string,

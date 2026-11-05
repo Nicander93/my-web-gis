@@ -2,12 +2,12 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { projectCommands } from './project.commands'
 
 const probe = vi.hoisted(() => ({ open: vi.fn(), replace: vi.fn(), status: vi.fn() }))
-vi.mock('@/exchange/scene-document-io', () => ({ openSceneDocument: probe.open, saveSceneDocument: vi.fn() }))
+vi.mock('@/io/scene-document-io', () => ({ openSceneDocument: probe.open, saveSceneDocument: vi.fn() }))
 vi.mock('@/commands/scene-document.commands', () => ({ replaceSceneDocumentAsEdit: probe.replace }))
 vi.mock('@/platform/command-status', () => ({ emitCommandStatus: probe.status }))
-vi.mock('@/session/project.store', () => ({ useProjectStore: { getState: () => ({ dirty: false, projectEpoch: 0 }) } }))
-vi.mock('@/session/project-session', () => ({ projectSession: { getSnapshot: () => ({ project: { metadata: { id: 'original' } }, featuresByDataset: {} }) } }))
-vi.mock('@/view-state/layer-view.store', () => ({ useLayerViewStore: { getState: () => ({ sessions: {} }) } }))
+vi.mock('@/project/project.store', () => ({ useProjectStore: { getState: () => ({ dirty: false, projectEpoch: 0 }) } }))
+vi.mock('@/project/project-session', () => ({ projectSession: { getSnapshot: () => ({ project: { metadata: { id: 'original' } }, featuresByDataset: {} }) } }))
+vi.mock('@/stores/layer-view.store', () => ({ useLayerViewStore: { getState: () => ({ sessions: {} }) } }))
 beforeEach(() => { projectCommands.cancelSceneImport(); vi.clearAllMocks() })
 
 it('rejects late results from a cancelled or superseded import', async () => {

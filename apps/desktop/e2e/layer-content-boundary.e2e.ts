@@ -5,9 +5,9 @@ async function contentState(page: Page, firstId: string) {
   return page.evaluate(async firstId => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(active('/src/session/project.store.ts'))
-    const { featureData } = await import(active('/src/data/feature-data.ts'))
-    const { getMapRuntime } = await import(active('/src/runtime/map-runtime-host.ts'))
+    const { useProjectStore } = await import(active('/src/project/project.store.ts'))
+    const { featureData } = await import(active('/src/project/datasets/feature-data.ts'))
+    const { getMapRuntime } = await import(active('/src/engine-host/map-runtime-host.ts'))
     const current = useProjectStore.getState(), runtime = getMapRuntime()
     return { layerIds: current.project.content.layers.map(layer => layer.id), datasetIds: current.project.content.datasets.map(dataset => dataset.id),
       rowIds: featureData.getAll('shared').map(row => row.id), dataRevision: featureData.revision,
@@ -27,7 +27,7 @@ test('UI layer deletion, undo, redo and save retain the dataset used by a siblin
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
     const { layerContentCommands } = await import(active('/src/commands/layer-content.commands.ts'))
-    const { projectSession } = await import(active('/src/session/project-session.ts'))
+    const { projectSession } = await import(active('/src/project/project-session.ts'))
     layerContentCommands.addLayer('shared', 'First', [{ id: 'row', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { value: 7 } }], 'point')
     const snapshot = projectSession.getSnapshot(), first = snapshot.project.content.layers[0]
     snapshot.project.content.layers.push({ ...structuredClone(first), id: 'sibling', name: 'Sibling' })

@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
-  - "packages/*"
+  - "packages/public/*"
+  - "packages/internal/*"
   - "examples/city-3d/consumer"
 allowBuilds:
   esbuild: true

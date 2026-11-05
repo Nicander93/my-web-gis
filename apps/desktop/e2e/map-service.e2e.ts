@@ -13,11 +13,11 @@ for (const mode of ['bearer', 'query-token'] as const) {
     const saved = await page.evaluate(async mode => {
     const { layerContentCommands } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/commands/layer-content.commands.ts').at(-1) ?? '/src/commands/layer-content.commands.ts')
 
-    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/session/project-session.ts').at(-1) ?? '/src/session/project-session.ts')
+    const { projectSession } = await import(performance.getEntriesByType('resource').map(entry => entry.name).filter(name => new URL(name).pathname === '/src/project/project-session.ts').at(-1) ?? '/src/project/project-session.ts')
 
       const { putSessionCredential } = await import('/src/platform/credentials.ts')
-      const { useProjectStore } = await import('/src/session/project.store.ts')
-      const { getMapRuntime } = await import('/src/runtime/map-runtime-host.ts')
+      const { useProjectStore } = await import('/src/project/project.store.ts')
+      const { getMapRuntime } = await import('/src/engine-host/map-runtime-host.ts')
       const key = putSessionCredential({ kind: mode, value: 'fixture-secret', key: 'tile-fixture', param: 'access' })
       const map = getMapRuntime()!.getMap()
       const loaded = new Promise<void>(resolve => {

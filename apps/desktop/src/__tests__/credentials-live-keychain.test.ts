@@ -1,12 +1,12 @@
 /**
- * Opt-in live Scene I credential re-verify against real OS Credential Manager.
+ * 可选运行：针对真实操作系统凭据管理器，重新验证场景 I 的凭据。
  *
- * Gate: DESKTOP_WEBGIS_LIVE_KEYCHAIN=1
- * Probe: DESKTOP_WEBGIS_KEYCHAIN_PROBE = path to secure-credential-probe.exe
- *   (set by run-live-keychain-reverify.mjs after cargo build)
+ * 开关：设置 DESKTOP_WEBGIS_LIVE_KEYCHAIN=1 才会运行。
+ * 探测程序：DESKTOP_WEBGIS_KEYCHAIN_PROBE 指向 secure-credential-probe.exe 的路径。
+ *   （由 run-live-keychain-reverify.mjs 在 cargo build 之后设置）
  *
- * Default `pnpm --filter @desktop-webgis/desktop test` skips this file's live cases.
- * Never logs token/secret values.
+ * 默认的 `pnpm --filter @desktop-webgis/desktop test` 会跳过这个文件里的实连用例。
+ * 永远不记录 token 或密钥的值。
  */
 import { createServer, type IncomingMessage, type Server } from 'node:http'
 import { spawnSync } from 'node:child_process'
@@ -103,7 +103,7 @@ describe.skipIf(!LIVE)('scene I live keychain re-verify (OS Credential Manager)'
       try {
         await backend.delete(key)
       } catch {
-        // best-effort cleanup
+        // 尽力而为 cleanup
       }
     }
     _resetCredentialsForTests()
@@ -122,7 +122,7 @@ describe.skipIf(!LIVE)('scene I live keychain re-verify (OS Credential Manager)'
     const parsed = JSON.parse(raw!) as { kind: string; value: string }
     expect(parsed.kind).toBe('bearer')
     expect(parsed.value).toBe(secret)
-    // Do not log secret
+    // 不要记录密钥。
     expect(parsed.value.length).toBe(secret.length)
 
     await backend.delete(key)
@@ -143,7 +143,7 @@ describe.skipIf(!LIVE)('scene I live keychain re-verify (OS Credential Manager)'
     })
     await expect(persistCredentialSecurely(key)).resolves.toBe(true)
 
-    // App restart: process memory gone; OS CM untouched.
+    // 应用重启：进程内存已经没了，操作系统的凭据存储不受影响。
     wipeSessionMemoryOnly()
     expect(getSessionCredential(key)).toBeUndefined()
 
@@ -171,7 +171,7 @@ describe.skipIf(!LIVE)('scene I live keychain re-verify (OS Credential Manager)'
     wipeSessionMemoryOnly()
     expect(getSessionCredential(key)).toBeUndefined()
 
-    // Simulate project open hydrate + later reconnect path (wfs-load buildAuth).
+    // 模拟打开项目时的凭据补全，以及之后重新连接的路径（wfs-load 的 buildAuth）。
     await hydrateCredentialsFromRefs([key])
     const cred =
       getSessionCredential(key) ?? (await ensureCredentialLoaded(key))
@@ -184,7 +184,7 @@ describe.skipIf(!LIVE)('scene I live keychain re-verify (OS Credential Manager)'
       })
       expect(res.status).toBe(200)
       expect(seenAuth.value).toBe(`Bearer ${secret}`)
-      // Body check without echoing secrets
+      // 检查请求体，但不回显密钥。
       const text = await res.text()
       expect(text).toContain('WMS_Capabilities')
     } finally {

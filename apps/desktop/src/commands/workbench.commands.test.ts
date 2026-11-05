@@ -1,13 +1,13 @@
 import { layerContentCommands } from '@/commands/layer-content.commands'
-import { projectSession } from '@/session/project-session'
+import { projectSession } from '@/project/project-session'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { createProject } from '@desktop-webgis/project'
-import { useProjectStore } from '@/session/project.store'
-import { useWorkbenchStore } from '@/view-state/workbench.store'
-import { useWorkspaceStore } from '@/view-state/workspace.store'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { useProjectStore } from '@/project/project.store'
+import { useWorkbenchStore } from '@/stores/workbench.store'
+import { useWorkspaceStore } from '@/stores/workspace.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
 import { layerCommands } from './layer.commands'
-import { openActivityPanel, useActivityPanelStore } from '@/view-state/activity-panel.store'
+import { openActivityPanel, useActivityPanelStore } from '@/stores/activity-panel.store'
 
 beforeEach(() => {
   vi.stubGlobal('window', new EventTarget())

@@ -1,9 +1,9 @@
-import { getFilteredFeatures } from '@/session/feature-query'
+import { getFilteredFeatures } from '@/project/feature-query'
 import { intersectSelectionIds, type SelectionState } from '@desktop-webgis/project'
-import { useProjectStore } from '@/session/project.store'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { useProjectStore } from '@/project/project.store'
+import { useLayerViewStore } from '@/stores/layer-view.store'
 
-/** Selection uses the same effective filtered rows as tables and map interactions. */
+/** 选择与表格、地图交互使用同一套过滤后的有效行。 */
 export const selectionCommands = {
   setSelection(selection: SelectionState): void {
     const { layerId } = selection

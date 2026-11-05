@@ -25,7 +25,7 @@ test('exported Desktop classification renders unchanged in Viewer with complete 
   await page.getByRole('tab', { name: '地图', exact: true }).click()
   await page.getByRole('button', { name: '定位图层', exact: true }).click()
   await expect.poll(() => page.evaluate(async () => {
-    const { getMapRuntime } = await import('/src/runtime/map-runtime-host.ts')
+    const { getMapRuntime } = await import('/src/engine-host/map-runtime-host.ts')
     return getMapRuntime()!.getMap().getView().getAnimating()
   })).toBe(false)
   await page.getByRole('button', { name: '文件', exact: true }).click()

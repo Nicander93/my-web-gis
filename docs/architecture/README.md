@@ -1,189 +1,62 @@
-# 架构
+# 架构总览
 
-本目录是现行架构说明。数据与编辑的保存语义见 [data-and-editing.md](data-and-editing.md)；目录分层与新代码位置见 [layers.md](layers.md)；目录迁移与执行记录见 [layering-plan.md](layering-plan.md)。
+本目录说明仓库的整体架构。目录职责和依赖规则见 [layers.md](layers.md)，数据与编辑的保存规则见 [data-and-editing.md](data-and-editing.md)。
 
-图中使用现行目录和包名。
+## 1. Desktop 的界面结构
 
-## 系统总览
+Desktop 的界面由三部分组成：顶层统一的应用壳（`ui/workbench/App.tsx`）、按项目类型切换的工作台（`Workspace2D` / `Workspace3D`），以及覆盖在画布上的停靠面板（`LeftPanel` / `RightPanel` / `BottomPanel`）。面板浮在画布之上，打开、关闭或调整面板都不会改变地图和三维视口的中心位置与尺寸。
 
-仓库里有三个应用：Desktop 编辑器、只读 Viewer、以及一个 Cesium 包的消费示例。它们共用部分包，但 Desktop 还依赖工程模型和编辑运行时。
+![Desktop UI 架构图](./desktop-ui.svg)
 
-```mermaid
-flowchart LR
-  desktop["apps/desktop  Tauri + React 编辑器"]
-  viewer["apps/viewer  只读场景查看器"]
-  example["examples/city-3d/consumer  Cesium 包消费示例"]
+界面与下层状态、命令之间的关系是单向的：
 
-  project["project"]
-  olRuntime["ol-runtime"]
-  sceneKit["场景文档套件"]
-  olStyle["ol-style"]
-  vectorIo["vector-io"]
-  ogcIo["ogc-io"]
-  spatial["spatial-analysis"]
-  cesiumKit["Cesium 套件"]
+- `ui/workbench` 和 `ui/panels` 只**读取并订阅** `stores`（临时界面状态）、`project`（项目配置）和 `project/datasets`（要素数据）。
+- 需要修改项目配置或要素数据时，一律经由 **`commands/*`**，由命令写入 `project` / `project/datasets`，或驱动 `engine-host`。
 
-  desktop --> project
-  desktop --> olRuntime
-  desktop --> sceneKit
-  desktop --> olStyle
-  desktop --> vectorIo
-  desktop --> ogcIo
-  desktop --> spatial
-  desktop --> cesiumKit
+---
 
-  viewer --> sceneKit
-  viewer --> olStyle
-  viewer --> cesiumKit
+## 2. 从桌面界面到渲染引擎
 
-  example --> cesiumKit
-```
+下面这张图把 Desktop 内部分层、`packages/internal` 的项目与场景运行时、`packages/public` 的引擎能力包，一直到最底层的 OpenLayers / Cesium 和 Tauri / 浏览器宿主串成一条链路：
 
-场景文档套件包括 `scene-schema`、`scene-core`、`ol-scene-runtime`、`cesium-scene-runtime`、`scene-publisher`、`scene-codegen`。Cesium 套件包括 `cesium-scene-schema`、`cesium-layer`、`cesium-popup`、`cesium-measure`、`cesium-effects`、`cesium-tileset-edit`、`cesium-tileset-effects`。
+![全栈架构图](./fullstack-architecture.svg)
 
-## 包依赖
+---
 
-可发布包只能依赖可发布包。内部包可以依赖任何包，应用不被任何包依赖。
+## 3. Desktop `src/` 的五层依赖
 
-```mermaid
-flowchart TB
-  subgraph publishable [可发布]
-    olStyle["ol-style"]
-    olSelection["ol-selection"]
-    vectorIo["vector-io"]
-    ogcIo["ogc-io"]
-    cesiumSchema["cesium-scene-schema"]
-    cesiumPopup["cesium-popup"]
-    cesiumLayer["cesium-layer"]
-    cesiumMeasure["cesium-measure"]
-    cesiumEffects["cesium-effects"]
-    cesiumTilesetEdit["cesium-tileset-edit"]
-    cesiumTilesetEffects["cesium-tileset-effects"]
-  end
+Desktop 内部并不是一条九层直线，而是自上而下的**五层结构**，其中第 3、4 层各含两块平级模块。这套规则由 `pnpm check:architecture` 和 `dependency-cruiser` 一同检查：
 
-  subgraph internal [内部]
-    project["project"]
-    olRuntime["ol-runtime"]
-    spatial["spatial-analysis"]
-    sceneSchema["scene-schema"]
-    sceneCore["scene-core"]
-    scenePublisher["scene-publisher"]
-    sceneCodegen["scene-codegen"]
-    olSceneRuntime["ol-scene-runtime"]
-    cesiumSceneRuntime["cesium-scene-runtime"]
-  end
+![Desktop 五层目录与依赖图](./desktop-layers.svg)
 
-  ogcIo --> olStyle
-  project --> olStyle
-  project --> cesiumSchema
-  project --> spatial
-  olRuntime --> project
-  olRuntime --> olStyle
-  olRuntime --> olSelection
-  olRuntime --> ogcIo
-  sceneSchema --> olStyle
-  sceneSchema --> cesiumSchema
-  sceneCore --> sceneSchema
-  scenePublisher --> sceneCore
-  scenePublisher --> sceneSchema
-  sceneCodegen --> sceneSchema
-  olSceneRuntime --> sceneSchema
-  olSceneRuntime --> olStyle
-  olRuntime --> olSceneRuntime
-  cesiumSceneRuntime --> sceneSchema
-  cesiumSceneRuntime --> cesiumLayer
-  cesiumSceneRuntime --> cesiumTilesetEdit
-  cesiumSceneRuntime --> cesiumTilesetEffects
-  cesiumSceneRuntime --> cesiumEffects
-  cesiumSceneRuntime --> cesiumSchema
-  cesiumLayer --> cesiumPopup
-  cesiumLayer --> cesiumSchema
-  cesiumEffects --> cesiumLayer
-  cesiumEffects --> cesiumSchema
-  cesiumMeasure --> cesiumSchema
-  cesiumTilesetEdit --> cesiumLayer
-  cesiumTilesetEdit --> cesiumSchema
-  cesiumTilesetEffects --> cesiumSchema
-```
+---
 
-现行包边界：
+## 4. 仓库与 `packages/` 的边界
 
-- `vector-io` 和 `project` 不依赖 `scene-schema`。
-- `ogc-io` 可发布。
-- 场景文档套件为内部包（`private: true`）。
-- `project` 的几何处理实现放在 `spatial-analysis`。
+仓库包含两个应用、一套示例，以及按 `packages/public`（可独立发布）和 `packages/internal`（仓库内部）划分的 20 个包：
 
-## Desktop 分层
+- **`apps/desktop`**：Tauri 加 React 的桌面编辑器，负责二维制图、要素编辑、空间分析和三维场景编辑。
+- **`apps/viewer`**：轻量的只读查看器，不依赖 React 和编辑器代码。它有两个用途：
+  1. **静态发布运行端**：配合 `packages/internal/scene-publisher`，把导出的 `SceneDocument` 打包成可以独立部署的静态网页；
+  2. **跨端渲染验收宿主**：在 E2E 测试中验证编辑器导出的二维、三维场景 JSON 在独立运行时里的实际渲染效果。
+- **`examples/city-3d/consumer`**：一个独立示例，验证外部项目能否直接使用 `packages/public/cesium-*` 套件。
 
-依赖只能往下。`ui` 不在这条链上，`shell` 和 `features` 可以用它。
+| 分组 | 目录 | 依赖规则 | 包含的包 |
+| --- | --- | --- | --- |
+| **可发布的通用包** | `packages/public/*` | 只能依赖 `packages/public/*`，不认识 Desktop 的项目状态 | `ol-style`、`ol-selection`、`vector-io`、`ogc-io`、`cesium-scene-schema`、`cesium-layer`、`cesium-popup`、`cesium-measure`、`cesium-effects`、`cesium-tileset-edit`、`cesium-tileset-effects` |
+| **仓库内部包** | `packages/internal/*` | 可以依赖任意包，但不能反向依赖 `apps/*` | `project`、`ol-runtime`、`spatial-analysis`、`scene-schema`、`scene-core`、`ol-scene-runtime`、`cesium-scene-runtime`、`scene-publisher`、`scene-codegen` |
 
-```mermaid
-flowchart TB
-  shell["shell 外壳与布局"]
-  features["features 功能界面"]
-  commands["commands 用户操作"]
-  runtime["runtime 地图与三维宿主"]
-  exchange["exchange 外部格式与服务"]
-  viewState["view-state 界面状态"]
-  session["session 工程会话"]
-  data["data 要素数据"]
-  platform["platform Tauri 与浏览器"]
-  ui["ui 通用组件"]
+---
 
-  shell --> features
-  features --> commands
-  commands --> runtime
-  runtime --> exchange
-  exchange --> viewState
-  viewState --> session
-  session --> data
-  data --> platform
+## 5. 数据与编辑流程
 
-  shell --> ui
-  features --> ui
-  ui --> viewState
-  ui --> platform
-```
+用户操作先经过 `commands` 进入 `project`。项目配置（`useProjectStore`）和要素数据（`project/datasets` 下的 `RuntimeFeatureData`，每个数据源由 `MemoryFeatureProvider` 和 `FeatureEditBuffer` 组成）分开存放，但共用同一条撤销栈（`project/project-edits.ts`）。保存项目（Ctrl+S）只写配置；数据保存成功之后，才会清空对应数据源的 Buffer。
 
-图层选择、属性表、检查器状态在 `view-state/layer-view.store.ts`，hook 为 `useLayerViewStore`。工程配置在 `session/project.store.ts`。要素运行时在 `data/feature-data.ts`。编辑历史在 `session/project-edits.ts`。
-
-## 数据与编辑流程
-
-用户操作经过 `commands` 进入工程会话。配置和要素数据分开持有：配置在 `ProjectStore`，每个数据源一组 Provider（原始行）加 Buffer（未提交增量），历史只有一份。工程保存只写配置；数据保存成功后才清 Buffer。
-
-```mermaid
-flowchart LR
-  uiNode["shell / features"]
-  commands["commands"]
-  session["session"]
-  data["data"]
-  runtime["runtime"]
-  engines["OpenLayers / Cesium"]
-  files["工程文件 / 数据文件"]
-  exchange["exchange"]
-  sceneDoc["SceneDocument"]
-
-  uiNode --> commands
-  commands --> session
-  commands --> data
-  session --> files
-  data --> files
-  runtime --> engines
-  session -->|"配置"| runtime
-  data -->|"要素"| runtime
-  runtime -.->|"目前仍经过"| exchange
-  exchange -.-> sceneDoc
-  sceneDoc -.-> engines
-```
-
-虚线是待优化路径：编辑器的二维地图现在仍把整个工程（含全部要素）转成 `SceneDocument` 再交给 `ol-runtime`。分层计划不改这条运行路径，只把转换代码放到 `exchange/`，让它在目录上不再混进编辑循环。细节见 [数据与编辑架构](data-and-editing.md)。
-
-## 本目录其它文档
+## 本目录的其它文档
 
 - [分层规则](layers.md)：目录职责、依赖方向、新代码放在哪里
-- [数据与编辑](data-and-editing.md)：两类保存、恢复草稿、性能基线
-- [统一场景文档 v3](scene-document-v3.md)：交换格式，用于导入、导出、查看器
+- [数据与编辑](data-and-editing.md)：两类保存、恢复草稿、性能数据
+- [统一场景文档 v3](scene-document-v3.md)：交换格式，用于导入、导出和查看器
 - [项目恢复草稿](project-recovery.md)
 - [本地场景资源协议](local-resource-protocol.md)
-- [分层与包边界整理计划](layering-plan.md)：已完成的目录迁移与执行记录
-- [2026-11 重构阶段记录](../archive/refactor-2026-11/refactor-handoff-2026-11-02.md)：已完成的数据与编辑重构交接
+- [分层与包边界整理记录](layering-plan.md)：目录迁移过程与执行记录

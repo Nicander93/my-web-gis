@@ -2,14 +2,14 @@ import { expect, test, type Page } from '@playwright/test'
 
 async function transform(page: Page) {
   return page.evaluate(async () => {
-    const node = (await import('/src/session/project.store.ts')).useProjectStore.getState().project.content.scene?.nodes.find(node => node.type === '3dtiles')
+    const node = (await import('/src/project/project.store.ts')).useProjectStore.getState().project.content.scene?.nodes.find(node => node.type === '3dtiles')
     return node?.type === '3dtiles' ? node.transform : null
   })
 }
 
 async function modelTransform(page: Page) {
   return page.evaluate(async () => {
-    const node = (await import('/src/session/project.store.ts')).useProjectStore.getState().project.content.scene?.nodes.find(node => node.type === 'model')
+    const node = (await import('/src/project/project.store.ts')).useProjectStore.getState().project.content.scene?.nodes.find(node => node.type === 'model')
     return node?.type === 'model' ? node.transform : null
   })
 }

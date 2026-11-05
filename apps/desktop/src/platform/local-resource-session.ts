@@ -10,7 +10,7 @@ interface LocalResourceSessionOptions {
   revoke?: (key: string) => Promise<unknown>
 }
 
-/** Owns native directory leases for one mounted project; external roots need explicit authorization. */
+/** 为一个已挂载的项目持有原生目录授权；外部根目录需要显式授权。 */
 export function createLocalResourceSession(options: LocalResourceSessionOptions) {
   const roots = new Set<string>()
   const readProjectPath = () => typeof options.projectPath === 'function' ? options.projectPath() : options.projectPath
@@ -20,7 +20,7 @@ export function createLocalResourceSession(options: LocalResourceSessionOptions)
   const revoke = options.revoke ?? (key => invoke('revoke_local_resource_directory', { key }))
   let destroyed = false
   return {
-    /** Call only for a directory selected or otherwise explicitly authorized by the user. */
+    /** 只在用户选择了某个目录，或以其它方式明确授权时才调用。 */
     authorizeDirectory(directory: string) {
       if (destroyed) throw new Error('资源会话已结束')
       roots.add(normalizeLocalResourcePath(directory))
@@ -47,7 +47,7 @@ export function createLocalResourceSession(options: LocalResourceSessionOptions)
       const path = resourcePathWithinDirectory(resolved.path, directory)!
       return lease.url + path.split('/').map(encodeURIComponent).join('/')
     },
-    /** Pending grants are revoked when they finish, even after the viewer has been disposed. */
+    /** 挂起中的授权在完成时会被撤销，即使 viewer 已经被销毁也一样。 */
     async destroy(): Promise<void> {
       if (destroyed) return
       destroyed = true

@@ -1,4 +1,4 @@
-/** Browser previews use explicit downloads and file selection; desktop IO stays native. */
+/** 浏览器预览走显式下载和文件选择；桌面端的读写仍然是原生的。 */
 export function downloadProject(content: string, name: string): void {
   const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }))
   const link = document.createElement('a')

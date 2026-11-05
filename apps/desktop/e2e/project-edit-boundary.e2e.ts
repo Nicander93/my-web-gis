@@ -5,9 +5,9 @@ async function state(page: Page) {
   return page.evaluate(async () => {
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(active('/src/session/project.store.ts'))
-    const { featureData } = await import(active('/src/data/feature-data.ts'))
-    const { projectEdits } = await import(active('/src/session/project-edits.ts'))
+    const { useProjectStore } = await import(active('/src/project/project.store.ts'))
+    const { featureData } = await import(active('/src/project/datasets/feature-data.ts'))
+    const { projectEdits } = await import(active('/src/project/project-edits.ts'))
     const current = useProjectStore.getState()
     return { opacity: current.project.content.layers[0].opacity, dataRevision: featureData.revision,
       canUndo: projectEdits.canUndo(), canRedo: projectEdits.canRedo() }
@@ -26,7 +26,7 @@ test('opacity keyboard gestures have separate undo steps and repeated keys coale
 
     const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
       .filter(name => new URL(name).pathname === path).at(-1) ?? path
-    const { useProjectStore } = await import(active('/src/session/project.store.ts'))
+    const { useProjectStore } = await import(active('/src/project/project.store.ts'))
     layerContentCommands.addLayer('data', 'Gesture data', [{ id: 'one', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { value: 1 } }], 'point')
   })
   await page.getByRole('button', { name: '图层属性', exact: true }).click()
@@ -63,10 +63,10 @@ test('navigation stays runtime-only until explicitly setting the initial view, w
     return page.evaluate(async () => {
       const active = (path: string) => performance.getEntriesByType('resource').map(entry => entry.name)
         .filter(name => new URL(name).pathname === path).at(-1) ?? path
-      const { useProjectStore } = await import(active('/src/session/project.store.ts'))
-      const { getLiveMapState, getMapRuntime } = await import(active('/src/runtime/map-runtime-host.ts'))
-      const { featureData } = await import(active('/src/data/feature-data.ts'))
-      const { projectEdits } = await import(active('/src/session/project-edits.ts'))
+      const { useProjectStore } = await import(active('/src/project/project.store.ts'))
+      const { getLiveMapState, getMapRuntime } = await import(active('/src/engine-host/map-runtime-host.ts'))
+      const { featureData } = await import(active('/src/project/datasets/feature-data.ts'))
+      const { projectEdits } = await import(active('/src/project/project-edits.ts'))
       const state = useProjectStore.getState()
       return { initial: state.project.content.initialView, live: getLiveMapState(), animating: getMapRuntime()?.getMap().getView().getAnimating() ?? false, dirty: state.dirty,
         epoch: state.projectEpoch, revision: state.configRevision, dataRevision: featureData.revision, canUndo: projectEdits.canUndo() }

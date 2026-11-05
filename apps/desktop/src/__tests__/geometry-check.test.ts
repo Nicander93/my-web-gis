@@ -1,15 +1,15 @@
-import { featureData } from '@/data/feature-data'
-import { useLayerViewStore } from '@/view-state/layer-view.store'
+import { featureData } from '@/project/datasets/feature-data'
+import { useLayerViewStore } from '@/stores/layer-view.store'
 import { requireMapContent } from '@desktop-webgis/project'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { createProject, createDefaultLayerStyle, type GisFeature } from '@desktop-webgis/project'
 import { checkGeometries } from '@desktop-webgis/spatial-analysis'
-import { useProjectStore } from '@/session/project.store'
+import { useProjectStore } from '@/project/project.store'
 import { checkLayerGeometry, selectGeometryIssues } from '@/commands/geometry-check.commands'
 import { runProcessingWorker } from '@/commands/processing-run'
-import { zoomMapToFeature } from '@/runtime/map-runtime-host'
+import { zoomMapToFeature } from '@/engine-host/map-runtime-host'
 
-vi.mock('@/runtime/map-runtime-host', () => ({ zoomMapToFeature: vi.fn(() => true) }))
+vi.mock('@/engine-host/map-runtime-host', () => ({ zoomMapToFeature: vi.fn(() => true) }))
 vi.mock('@/commands/processing-run', async importOriginal => ({ ...await importOriginal<typeof import('@/commands/processing-run')>(), runProcessingWorker: vi.fn() }))
 const features: GisFeature[] = [
   { id: 'bad', geometry: { type: 'Polygon', coordinates: [[[0, 0], [4, 4], [0, 4], [4, 0], [0, 0]]] }, properties: { amount: 1 } },

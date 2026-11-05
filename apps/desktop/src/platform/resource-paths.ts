@@ -28,7 +28,7 @@ export function normalizeLocalResourcePath(path: string): string { return format
 
 export function localProjectDirectory(path: string): string { return format(projectDirectory(path)) }
 
-/** Segment comparison avoids granting siblings whose names merely share a prefix. */
+/** 按路径分段比较，避免把名字只是前缀相同的兄弟目录也一并授权。 */
 export function resourcePathWithinDirectory(path: string, directory: string): string | null {
   const file = absolutePath(path), root = absolutePath(directory)
   if (file.root.toLowerCase() !== root.root.toLowerCase() || file.parts.length <= root.parts.length ||
@@ -36,7 +36,7 @@ export function resourcePathWithinDirectory(path: string, directory: string): st
   return file.parts.slice(root.parts.length).join('/')
 }
 
-/** Resolves against the project file, never document.baseURI. This does not grant filesystem access. */
+/** 以项目文件为基准解析，绝不使用 document.baseURI。这不会授予文件系统访问权限。 */
 export function resolveResourceReference(reference: ResourceReference, projectPath: string | null): ResourceReference {
   if (!validateResourceReference(reference)) throw new Error('资源引用无效')
   if (reference.kind === 'url') return { ...reference }
@@ -46,13 +46,13 @@ export function resolveResourceReference(reference: ResourceReference, projectPa
   return { kind: 'absolute', path: normalizeLocalResourcePath(format(base) + '/' + reference.path) }
 }
 
-/** Prefer relative paths inside the target folder; external/cross-drive files remain external. */
+/** 目标文件夹内优先使用相对路径；外部文件和跨盘文件仍然保持外部引用。 */
 export function referenceForProjectFile(reference: ResourceReference, sourceProjectPath: string | null, targetProjectPath: string): ResourceReference {
   const resolved = resolveResourceReference(reference, sourceProjectPath)
   if (resolved.kind === 'url') return resolved
   if (resolved.kind !== 'absolute') throw new Error('资源路径未解析')
   const source = absolutePath(resolved.path), target = projectDirectory(targetProjectPath)
-  // Folder spelling is kept exact: Windows shares/WSL folders may be case sensitive.
+  // 文件夹名保持原样：Windows 共享目录和 WSL 目录可能区分大小写。
   if (source.root.toLowerCase() === target.root.toLowerCase() && source.parts.length > target.parts.length &&
     target.parts.every((part, index) => part === source.parts[index])) {
     return { kind: 'relative', path: source.parts.slice(target.parts.length).join('/') }

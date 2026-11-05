@@ -59,16 +59,16 @@ async function start(): Promise<void> {
 
     applyTheme(scene)
     const active = scene.views[scene.activeView]
-    const mapView = active.type === '2d' ? scene.activeView : Object.entries(scene.views).find(([, view]) => view.type === '2d')?.[0]
-    const cityView = active.type === '3d' ? scene.activeView : Object.entries(scene.views).find(([, view]) => view.type === '3d')?.[0]
+    const view2D = active.type === '2d' ? scene.activeView : Object.entries(scene.views).find(([, view]) => view.type === '2d')?.[0]
+    const view3D = active.type === '3d' ? scene.activeView : Object.entries(scene.views).find(([, view]) => view.type === '3d')?.[0]
     const mode = new URLSearchParams(window.location.search).get('mode')
-    if (cityView && mode !== '2d' && (mode === '3d' || active.type === '3d')) {
+    if (view3D && mode !== '2d' && (mode === '3d' || active.type === '3d')) {
       requireElement<HTMLSelectElement>('vector-renderer').closest('label')?.setAttribute('hidden', '')
-      const { renderSceneViewer } = await import('./scene3d-viewer')
-      await renderSceneViewer(scene, sceneUrl, cityView)
+      const { renderViewer3D } = await import('./viewer-3d')
+      await renderViewer3D(scene, sceneUrl, view3D)
       return
     }
-    if (!mapView) throw new Error('场景没有二维视图')
+    if (!view2D) throw new Error('场景没有二维视图')
     sceneController = new SceneController(scene)
     const renderer = requireElement<HTMLSelectElement>('vector-renderer')
     renderer.value = new URLSearchParams(location.search).get('renderer') === 'webgl' ? 'webgl' : 'canvas'
@@ -79,7 +79,7 @@ async function start(): Promise<void> {
     })
     const runtime = new OlDocumentRuntime({
       target: mapTarget,
-      viewId: mapView,
+      viewId: view2D,
       vectorRenderer: renderer.value === 'webgl' ? 'webgl' : 'canvas',
       credentials: runtimeConfig.credentials
     })

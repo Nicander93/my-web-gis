@@ -8,9 +8,13 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "tauri": "pnpm --filter @desktop-webgis/desktop tauri",
-    "check:architecture": "node scripts/check-architecture.mjs"
+    "check:architecture": "node scripts/check-architecture.mjs && depcruise apps/desktop/src packages/public packages/internal --config .dependency-cruiser.cjs",
+    "check:deadcode": "knip"
   },
   "devDependencies": {
+    "dependency-cruiser": "^18.7.2",
+    "knip": "^6.44.1",
+    "roughjs": "^4.6.6",
     "typescript": "^5.9.2",
     "vite": "^7.1.1",
     "vitest": "^3.2.4"
