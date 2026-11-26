@@ -44,9 +44,9 @@ abstract class AssetLayer extends BaseLayer implements TransformLayer {
     this.transform = structuredClone(transform)
     this.viewer?.scene.requestRender()
   }
-  async flyTo(): Promise<void> {
+  async flyTo(duration?: number): Promise<void> {
     if (!this.viewer || !this.boundingSphere) return
-    this.viewer.camera.flyToBoundingSphere(this.boundingSphere)
+    this.viewer.camera.flyToBoundingSphere(this.boundingSphere, { duration })
   }
   protected setNativeVisible(value: boolean): void { if (this.native) this.native.show = value }
 }
@@ -323,7 +323,7 @@ export class GeoJsonLayer extends BaseLayer {
   }
   constructor(private readonly options: GeoJsonLayerOptions) { super(options) }
   contains(picked: unknown): boolean { return isPick(picked) && picked.id instanceof Entity && Boolean(this.dataSource?.entities.contains(picked.id)) }
-  async flyTo(): Promise<void> { if (this.viewer && this.dataSource) await this.viewer.flyTo(this.dataSource) }
+  async flyTo(duration?: number): Promise<void> { if (this.viewer && this.dataSource) await this.viewer.flyTo(this.dataSource, { duration }) }
   protected setNativeVisible(value: boolean): void { if (this.dataSource) this.dataSource.show = value }
   protected async createNative(viewer: Viewer, signal: AbortSignal): Promise<() => void> {
     const color = Color.fromCssColorString(this.options.color ?? '#55a6ff')

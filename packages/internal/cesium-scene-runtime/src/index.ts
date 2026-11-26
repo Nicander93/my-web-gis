@@ -421,7 +421,7 @@ export class CesiumSceneRuntime {
   setPreview(enabled: boolean): void { this.stopEditing(); this.cancelDraw(); this.layers.popupsEnabled = enabled; this.layers.layers.forEach(layer => layer.closePopup()) }
   setEditMode(mode: EditMode): void { this.editor.setMode(mode) }
   setRenderQuality(quality: RenderQuality): void { applyRenderQuality(this.viewer, quality) }
-  async flyTo(id: string): Promise<void> { await this.layers.getLayer(id)?.flyTo() }
+  async flyTo(id: string, duration?: number): Promise<void> { await this.layers.getLayer(id)?.flyTo(duration) }
   setCamera(camera: CesiumSceneCamera): void {
     this.viewer.camera.setView({ destination: Cartesian3.fromDegrees(...camera.position), orientation: { heading: CesiumMath.toRadians(camera.heading), pitch: CesiumMath.toRadians(camera.pitch), roll: CesiumMath.toRadians(camera.roll) } })
   }

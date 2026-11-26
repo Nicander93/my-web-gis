@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import { Alert, Button, Form, Menu, Select, Slider } from 'antd'
+import { Button, Form, Menu, Select, Slider } from 'antd'
 import { ModelessWindow } from '@/ui/components/ModelessWindow'
 import { MAX_UI_FONT_SIZE, MIN_UI_FONT_SIZE, usePreferencesStore } from '@/stores/preferences.store'
 import packageInfo from '@/../package.json'
@@ -19,7 +19,7 @@ export function SoftwareSettings() {
   if (!preferences.settingsOpen) return null
   return <ModelessWindow title="软件设置" width={650} height={410} className="software-settings" freezeScale={sliderScale !== null} onClose={() => preferences.setSettingsOpen(false)}>
     <div className="software-settings__layout" style={sliderScale === null ? undefined : { '--ui-scale': sliderScale } as CSSProperties}>
-      <Menu selectedKeys={[section]} onClick={({ key }) => setSection(key)} items={[{ key: 'appearance', label: '外观与界面' }, { key: 'about', label: '关于与更新' }]} />
+      <Menu selectedKeys={[section]} onClick={({ key }) => setSection(key)} items={[{ key: 'appearance', label: '外观与界面' }, { key: 'about', label: '关于' }]} />
       <div className="software-settings__content">
         {section === 'appearance' ? <>
           <h3>外观与界面</h3>
@@ -33,8 +33,6 @@ export function SoftwareSettings() {
         </> : <>
           <h3>my-web-gis</h3>
           <dl><dt>应用版本</dt><dd>{packageInfo.version}</dd><dt>项目</dt><dd>二维地图与三维场景工作台</dd></dl>
-          <Alert type="info" title="当前版本尚未接入自动更新服务。" />
-          <Button disabled title="自动更新服务尚未接入">检查更新</Button>
         </>}
       </div>
     </div>

@@ -1,4 +1,15 @@
 .workspace-panel.dock-window { position: absolute; min-width: 0; max-width: none; min-height: 0; overflow: hidden; border: 1px solid var(--color-border); background: var(--color-surface); box-shadow: 0 2px 12px rgb(36 59 46 / 10%); }
+.workspace-panel.dock-window {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity var(--motion-enter) var(--motion-ease), visibility var(--motion-enter);
+}
+.workspace-panel.dock-window[inert] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition-duration: var(--motion-exit);
+}
 .dock-window .panel-body { display: flex; flex-direction: column; min-height: 0; overflow: auto; }
 .dock-window__title { cursor: grab; touch-action: none; gap: 6px; flex: 0 0 var(--desktop-row-height, 28px); }
 .dock-window__title > h2 { flex: 1; min-width: 35px; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

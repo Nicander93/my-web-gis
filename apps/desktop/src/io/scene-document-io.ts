@@ -18,20 +18,21 @@ export interface OpenedSceneDocument { path: string; document: SceneDocument }
 export type SceneDocumentSaveResult = { kind: 'saved'; path: string } | { kind: 'download-started'; name: string } | { kind: 'cancelled' }
 
 /** 场景读写永远不会改变当前 .webgis.json 的保存目标。 */
-export async function openSceneDocument(signal?: AbortSignal): Promise<OpenedSceneDocument | null> {
+export async function openSceneDocument(signal?: AbortSignal, options?: { source?: File | string; onRead?(): void }): Promise<OpenedSceneDocument | null> {
   let path: string, text: string
-  if (isTauri()) {
-    const selected = await pickFile([filter, archiveFilter])
-    if (!selected) return null
+  const selected = options?.source ?? await (isTauri() ? pickFile([filter, archiveFilter]) : pickBrowserProject('.json,.zip'))
+  if (!selected) return null
+  signal?.throwIfAborted()
+  options?.onRead?.()
+  const local = typeof selected === 'string'
+  if (local) {
     path = selected
     if (/\.zip$/i.test(path)) return openSceneArchiveBytes(await readBinaryFile(path), path, signal)
     text = await readTextFile(path)
   } else {
-    const file = await pickBrowserProject('.json,.zip')
-    if (!file) return null
-    path = file.name
-    if (/\.zip$/i.test(path)) return openSceneArchiveBytes(new Uint8Array(await file.arrayBuffer()), path, signal)
-    text = await file.text()
+    path = selected.name
+    if (/\.zip$/i.test(path)) return openSceneArchiveBytes(new Uint8Array(await selected.arrayBuffer()), path, signal)
+    text = await selected.text()
   }
   signal?.throwIfAborted()
   const input: unknown = JSON.parse(text)
@@ -42,7 +43,7 @@ export async function openSceneDocument(signal?: AbortSignal): Promise<OpenedSce
   document = await prepareSceneGeoJsonResources(document, { resourceIds, signal, loadGeoJson: async (url, context) => {
     if (context.resource.authentication) throw new Error('认证矢量资源需先配置凭据加载适配器')
     if (!/^https?:\/\//i.test(url)) {
-      if (!isTauri()) throw new Error('浏览器导入相对资源需要同时选择资源目录，请先使用内嵌数据或绝对 URL')
+      if (!local) throw new Error('此文件包含相对资源地址。请使用桌面端的文件选择器，或改用包含资源的场景包。')
       const directory = path.replace(/\\/g, '/').replace(/\/[^/]*$/, '/')
       return JSON.parse(await readTextFile(directory + url.replace(/^\.\//, ''))) as unknown
     }

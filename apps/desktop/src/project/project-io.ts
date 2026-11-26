@@ -95,20 +95,23 @@ export async function pickAndSaveSnapshot(snapshot: ProjectSnapshot, suggestedNa
   return path
 }
 
-export async function openSnapshotFromDisk(): Promise<{ path: string; snapshot: ProjectSnapshot; migration?: ProjectFormatMigration } | null> {
+export async function openSnapshotFromDisk(onRead?: () => void, source?: File | string): Promise<{ path: string; snapshot: ProjectSnapshot; migration?: ProjectFormatMigration } | null> {
   let migration: ProjectFormatMigration | undefined
   const options = { onMigration: (value: ProjectFormatMigration) => { migration = value } }
-  if (!isTauri()) {
-    const file = await pickBrowserProject()
+  const browserFile = typeof source === 'string' ? undefined : source
+  if (browserFile || !isTauri()) {
+    const file = browserFile ?? await pickBrowserProject()
     if (!file) return null
+    onRead?.()
     const snapshot = parseProjectFileSnapshot(await file.text(), options)
     if (hasUnloadedDatasetReferences(snapshot)) throw new Error('此工程引用本地数据文件，请使用桌面环境打开')
     await verifyStyleAssets(snapshot.project.content.kind === 'map2d' ? snapshot.project.content.cartography?.assets ?? [] : [])
     assertNoSecretValues(snapshot)
     return { path: file.name, snapshot, migration }
   }
-  const path = await pickFile([PROJECT_FILE_FILTER])
+  const path = typeof source === 'string' ? source : await pickFile([PROJECT_FILE_FILTER])
   if (!path) return null
+  onRead?.()
   return readSnapshotFromPath(path)
 }
 

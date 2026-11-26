@@ -4,6 +4,7 @@ import { useProjectStore } from '@/project/project.store'
 import { getProjectType } from '@/project/project-type'
 import { isTauri } from '@tauri-apps/api/core'
 import { WindowControls } from './header/WindowControls'
+import { RecoveryDraftHost } from '@/ui/panels/project/RecoveryDraftHost'
 
 /** 项目身份与完整菜单常驻，常用命令按任务分组。 */
 export function Header({ showToolbar = true }: { showToolbar?: boolean }) {
@@ -20,7 +21,7 @@ export function Header({ showToolbar = true }: { showToolbar?: boolean }) {
           </span>
           <strong>my-web-gis</strong>
           <span className="window-separator" />
-          <MenuBar />
+          <MenuBar hasProject={showToolbar} />
         </div>
         <div className="window-context" data-tauri-drag-region={native ? '' : undefined}>
           <span
@@ -45,6 +46,7 @@ export function Header({ showToolbar = true }: { showToolbar?: boolean }) {
             </span>
           )}
         </div>
+        <RecoveryDraftHost />
         {native && <WindowControls />}
       </div>
       {type === '2d' && showToolbar && <Toolbar />}

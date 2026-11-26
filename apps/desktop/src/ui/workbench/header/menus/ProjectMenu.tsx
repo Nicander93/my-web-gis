@@ -7,9 +7,10 @@ import { projectCommands } from '@/commands/project.commands'
 
 interface ProjectMenuProps {
   onClose(): void
+  hasProject: boolean
 }
 
-export function ProjectMenu({ onClose }: ProjectMenuProps) {
+export function ProjectMenu({ onClose, hasProject }: ProjectMenuProps) {
   const isScene = useProjectStore(state => state.project.content.kind === 'scene3d')
   function handleAction(action: () => void) {
     action()
@@ -30,24 +31,28 @@ export function ProjectMenu({ onClose }: ProjectMenuProps) {
         shortcut="Ctrl+O"
         onClick={() => handleAction(projectCommands.openProject)}
       />
-      <MenuSeparator />
-      <MenuItem
-        icon={Save}
-        label="保存"
-        shortcut="Ctrl+S"
-        onClick={() => handleAction(projectCommands.saveProject)}
-      />
-      <MenuItem
-        icon={Save}
-        label="另存为"
-        onClick={() => handleAction(projectCommands.saveProjectAs)}
-      />
+      {hasProject && <>
+        <MenuSeparator />
+        <MenuItem
+          icon={Save}
+          label="保存"
+          shortcut="Ctrl+S"
+          onClick={() => handleAction(projectCommands.saveProject)}
+        />
+        <MenuItem
+          icon={Save}
+          label="另存为"
+          onClick={() => handleAction(projectCommands.saveProjectAs)}
+        />
+      </>}
       <MenuSeparator />
       <MenuItem icon={FileInput} label="导入场景" onClick={() => handleAction(projectCommands.importScene)} />
       {projectCommands.isImportingScene() && <MenuItem icon={X} label="取消场景导入" onClick={() => handleAction(projectCommands.cancelSceneImport)} />}
-      <MenuItem icon={Download} label="导出完整场景" onClick={() => handleAction(projectCommands.exportScene)} />
-      {isScene && <MenuItem icon={Code2} label="导出 CesiumJS 代码" onClick={() => handleAction(() => requestSceneAction('export-cesium'))} />}
-      <MenuItem icon={Download} label="导出场景资源包" onClick={() => handleAction(projectCommands.exportSceneArchive)} />
+      {hasProject && <>
+        <MenuItem icon={Download} label="导出完整场景" onClick={() => handleAction(projectCommands.exportScene)} />
+        {isScene && <MenuItem icon={Code2} label="导出 CesiumJS 代码" onClick={() => handleAction(() => requestSceneAction('export-cesium'))} />}
+        <MenuItem icon={Download} label="导出场景资源包" onClick={() => handleAction(projectCommands.exportSceneArchive)} />
+      </>}
     </div>
   )
 }

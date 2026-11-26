@@ -31,27 +31,24 @@ interface Gesture {
 export function DockWindow({ id, title, label, actions, children, footer, onClose, titleContent, reserveBottom = false }: DockWindowProps) {
   const ref = useRef<HTMLElement>(null)
   const gesture = useRef<Gesture | null>(null)
-  const layout = useDockingStore(state => state.layout)
-  const placement = layout[id]
-  const order = useDockingStore(state => state.order)
+  const placement = useDockingStore(state => state.layout[id])
+  const stackIndex = useDockingStore(state => state.order.indexOf(id))
+  const reserveForTable = useDockingStore(state => reserveBottom && state.layout.bottom.dock === 'bottom' && !state.layout.bottom.maximized)
   const panel = useWorkspaceStore(state => state[id])
-  const bottom = useWorkspaceStore(state => state.bottom)
+  const bottomHeight = useWorkspaceStore(state => reserveForTable && state.bottom.open ? state.bottom.height : 0)
   const fontSize = usePreferencesStore(state => state.fontSize)
   const scale = fontSize / 12
   const [draft, setDraft] = useState<WindowPlacement | null>(null)
   const [area, setArea] = useState({ width: 1000, height: 600 })
   const current = draft ?? placement
   const bounds = constrainWindow(current.bounds, area)
-  const bottomDock = layout.bottom
-  const tableHeight = reserveBottom && bottom.open && bottomDock.dock === 'bottom' && !bottomDock.maximized
-    ? Math.min(bottom.height * scale, area.height) : 0
+  const tableHeight = Math.min(bottomHeight * scale, area.height)
   const style: CSSProperties = current.maximized ? { top: 0, left: 0, bottom: 0, right: 'var(--workspace-right-offset, 0px)' } : current.dock === 'floating'
     ? { left: bounds.x, top: bounds.y, width: bounds.width, height: bounds.height }
     : current.dock === 'bottom'
       ? { left: 0, right: 'var(--workspace-right-offset, 0px)', bottom: 0, height: Math.min(!draft ? (current.dock === id && 'height' in panel ? panel.height : current.bounds.height) * scale : bounds.height, area.height) }
       : { top: 0, bottom: tableHeight, [current.dock]: current.dock === 'right' ? 'var(--workspace-right-offset, 0px)' : 0, width: Math.min(!draft ? (current.dock === id && 'width' in panel ? panel.width : current.bounds.width) * scale : bounds.width, area.width) }
-  style.display = panel.open ? undefined : 'none'
-  style.zIndex = 5 + order.indexOf(id)
+  style.zIndex = 5 + stackIndex
 
   useEffect(() => {
     if (panel.open) useDockingStore.getState().activate(id)
@@ -154,7 +151,7 @@ export function DockWindow({ id, title, label, actions, children, footer, onClos
     else store.setBottomOpen(false)
   }
 
-  return <aside ref={ref} className={`workspace-panel dock-window dock-window--${current.dock} panel-${id}`} style={style} aria-label={label} aria-hidden={!panel.open}
+  return <aside ref={ref} className={`workspace-panel dock-window dock-window--${current.dock} panel-${id}`} style={style} aria-label={label} aria-hidden={!panel.open} inert={!panel.open}
     onPointerDownCapture={() => useDockingStore.getState().activate(id)} onFocusCapture={() => useDockingStore.getState().activate(id)}>
     <header className="panel-titlebar dock-window__title" tabIndex={0} aria-label={`移动${title}窗口`}
       onPointerDown={event => begin(event, 'move')} onPointerMove={move} onPointerUp={finish} onPointerCancel={() => stop(false)} onLostPointerCapture={() => stop(false)}

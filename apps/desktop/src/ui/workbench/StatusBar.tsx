@@ -4,10 +4,13 @@ import { MousePointer2 } from 'lucide-react'
 import type { EditTool } from '@desktop-webgis/project'
 import { useWorkbenchStore } from '@/stores/workbench.store'
 import { useProjectStore } from '@/project/project.store'
+import { useFeatureEditState } from '@/project/datasets/feature-data'
 import { MapProjectionControl } from '@/ui/panels/map/MapProjectionControl'
 import { viewCommands } from '@/commands/view.commands'
 import { useTaskLogStore } from '@/stores/task-log.store'
 import { Button } from '@/ui/components/Button'
+import { useSyncExternalStore } from 'react'
+import { getCommandStatus, subscribeCommandStatus } from '@/platform/command-status'
 
 const TOOL_LABELS: Record<EditTool, string> = {
   none: '浏览',
@@ -21,13 +24,15 @@ const TOOL_LABELS: Record<EditTool, string> = {
 }
 
 /** 状态栏集中显示工作目标和地图读数，消息保留完整内容供悬停查看。 */
-export function StatusBar({ message }: { message: string }) {
+export function StatusBar() {
+  const message = useSyncExternalStore(subscribeCommandStatus, getCommandStatus)
   const tool = useWorkbenchStore((state) => state.activeTool)
   const readout = useWorkbenchStore((state) => state.mapReadout)
   const editLayerId = useWorkbenchStore((state) => state.editLayerId)
   const project = useProjectStore((state) => state.project)
   const selection = useLayerViewStore((state) => state.selection)
   const dirty = useProjectStore((state) => state.dirty)
+  const { saving: savingData, unsavedCount } = useFeatureEditState()
   const target = requireMapContent(project).layers.find((layer) => layer.id === editLayerId)
   const epoch = useProjectStore(state => state.projectEpoch)
   const entries = useTaskLogStore(state => state.entries)
@@ -52,7 +57,10 @@ export function StatusBar({ message }: { message: string }) {
       <MapProjectionControl />
       <Button variant="ghost" onClick={viewCommands.openTaskLog} title="打开任务中心">任务{running ? ` ${running}` : ''}</Button>
       <Button variant="ghost" onClick={viewCommands.openDiagnostics} title="打开诊断中心">诊断</Button>
-      <span className="status-item">{dirty ? '未保存' : '已保存'}</span>
+      <span className="status-item">{dirty ? '配置待保存' : '配置已保存'}</span>
+      {(savingData || unsavedCount > 0) && <span className="status-item status-item--pending">
+        {savingData ? '正在保存数据…' : '数据待提交'}
+      </span>}
     </footer>
   )
 }

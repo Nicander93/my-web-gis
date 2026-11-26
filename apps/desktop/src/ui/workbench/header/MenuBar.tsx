@@ -20,8 +20,9 @@ const menus: Array<{ id: MenuId; label: string }> = [
   { id: 'settings', label: '设置' },
   { id: 'help', label: '帮助' }
 ]
+const startMenus = menus.filter(({ id }) => id !== 'operations' && id !== 'view')
 
-const menuComponents: Record<MenuId, ComponentType<{ onClose(): void }>> = {
+const menuComponents: Record<MenuId, ComponentType<{ onClose(): void; hasProject: boolean }>> = {
   project: ProjectMenu,
   view: ViewMenu,
   operations: OperationsMenu,
@@ -60,7 +61,8 @@ function OperationsMenu({ onClose }: { onClose(): void }) {
   </div>
 }
 
-export function MenuBar() {
+export function MenuBar({ hasProject }: { hasProject: boolean }) {
+  const availableMenus = hasProject ? menus : startMenus
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null)
   const openRef = useRef<MenuId | null>(null)
   const triggers = useRef<Partial<Record<MenuId, HTMLButtonElement | null>>>({})
@@ -85,14 +87,14 @@ export function MenuBar() {
 
   useEffect(() => {
     if (!openMenu) return
-    const label = menus.find(item => item.id === openMenu)?.label
+    const label = availableMenus.find(item => item.id === openMenu)?.label
     const frame = requestAnimationFrame(() => { if (label) menuButtons(label)[0]?.focus() })
     return () => cancelAnimationFrame(frame)
-  }, [openMenu])
+  }, [openMenu, availableMenus])
 
   function adjacent(id: MenuId, offset: number): MenuId {
-    const index = menus.findIndex(item => item.id === id)
-    return menus[(index + offset + menus.length) % menus.length].id
+    const index = availableMenus.findIndex(item => item.id === id)
+    return availableMenus[(index + offset + availableMenus.length) % availableMenus.length].id
   }
 
   useEffect(() => {
@@ -106,7 +108,7 @@ export function MenuBar() {
         return
       }
       if (!current) return
-      const label = menus.find(item => item.id === current)?.label ?? ''
+      const label = availableMenus.find(item => item.id === current)?.label ?? ''
       const buttons = menuButtons(label)
       const index = buttons.findIndex(button => button === document.activeElement)
       if (event.key === 'Escape') {
@@ -155,7 +157,7 @@ export function MenuBar() {
       document.removeEventListener('keydown', handleAltDown)
       document.removeEventListener('keyup', handleAltUp)
     }
-  }, [])
+  }, [availableMenus])
 
   function onTriggerKey(event: ReactKeyboardEvent<HTMLButtonElement>, id: MenuId) {
     if (event.nativeEvent.isComposing || event.defaultPrevented) return
@@ -176,7 +178,7 @@ export function MenuBar() {
 
   return (
     <nav className="menu-bar" aria-label="应用程序菜单">
-      {menus.map((menu) => {
+      {availableMenus.map((menu) => {
         if (menu.id === 'settings') return <button key={menu.id} ref={node => { triggers.current.settings = node }} className="menu-trigger" type="button" aria-haspopup="dialog" onClick={() => openAt('settings')} onKeyDown={event => onTriggerKey(event, 'settings')}>设置</button>
         const isOpen = openMenu === menu.id
         const MenuComponent = menuComponents[menu.id]
@@ -191,7 +193,7 @@ export function MenuBar() {
             onOpenChange={(open) => { if (open) openAt(menu.id); else if (openRef.current === menu.id) closeMenu(false) }}
             popupRender={() => (
               <div className="menu-dropdown menu-dropdown--popup" role="menu" aria-label={`${menu.label}菜单`}>
-                <MenuComponent onClose={() => closeMenu(true)} />
+                <MenuComponent hasProject={hasProject} onClose={() => closeMenu(true)} />
               </div>
             )}
           >

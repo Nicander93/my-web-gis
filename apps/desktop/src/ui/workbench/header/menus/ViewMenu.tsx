@@ -7,13 +7,17 @@ import { useProjectStore } from '@/project/project.store'
 import { getProjectType } from '@/project/project-type'
 import { useActivityPanelStore } from '@/stores/activity-panel.store'
 import { useWorkbenchStore } from '@/stores/workbench.store'
+import { requestSceneAction } from '@/ui/panels/scene3d/scene3d-actions'
 
 interface ViewMenuProps {
   onClose(): void
 }
 
 export function ViewMenu({ onClose }: ViewMenuProps) {
-  const layout = useWorkspaceStore()
+  const leftOpen = useWorkspaceStore(state => state.left.open)
+  const rightOpen = useWorkspaceStore(state => state.right.open)
+  const bottomOpen = useWorkspaceStore(state => state.bottom.open)
+  const focusMode = useWorkspaceStore(state => state.focusMode)
   const tasksOpen = useActivityPanelStore(state => state.tasksOpen)
   const diagnosticsOpen = useActivityPanelStore(state => state.diagnosticsOpen)
   const is3D = useProjectStore(state => getProjectType(state.project) === '3d')
@@ -28,29 +32,27 @@ export function ViewMenu({ onClose }: ViewMenuProps) {
       <MenuItem
         icon={Layers2}
         label={is3D ? '场景树' : '图层面板'}
-        checked={layout.left.open}
+        checked={leftOpen}
         onClick={() => handleAction(viewCommands.toggleLayers)}
       />
       <MenuItem
         icon={Eye}
         label="属性"
-        checked={layout.right.open && (is3D || rightTask === 'inspector')}
+        checked={rightOpen && rightTask === 'inspector'}
         onClick={() => handleAction(viewCommands.toggleInspector)}
       />
-      <MenuItem
-        icon={FileText}
-        label="属性表"
-        checked={layout.bottom.open}
-        disabled={is3D}
-        onClick={() => handleAction(viewCommands.toggleAttributeTable)}
-      />
+      {is3D ? <MenuItem icon={Eye} label="场景设置" onClick={() => handleAction(() => requestSceneAction('scene-settings'))} /> : <>
+        <MenuItem icon={Eye} label="要素信息" checked={rightOpen && rightTask === 'information'} onClick={() => handleAction(() => viewCommands.toggleRightPanel('information'))} />
+        <MenuItem icon={FileText} label="空间处理" checked={rightOpen && rightTask === 'processing'} onClick={() => handleAction(() => viewCommands.toggleRightPanel('processing'))} />
+        <MenuItem icon={FileText} label="属性表" checked={bottomOpen} onClick={() => handleAction(viewCommands.toggleAttributeTable)} />
+      </>}
       <MenuItem icon={FileText} label="任务中心" checked={tasksOpen} onClick={() => handleAction(viewCommands.openTaskLog)} />
       <MenuItem icon={Eye} label="诊断中心" checked={diagnosticsOpen} onClick={() => handleAction(viewCommands.openDiagnostics)} />
       <MenuSeparator />
       <MenuItem
         icon={Maximize2}
         label="专注模式"
-        checked={layout.focusMode}
+        checked={focusMode}
         shortcut="Ctrl+Shift+F"
         onClick={() => handleAction(viewCommands.toggleFocusMode)}
       />

@@ -12,6 +12,7 @@ import {
 import Overlay from 'ol/Overlay'
 import { defaults as defaultControls, FullScreen, MousePosition, ScaleLine } from 'ol/control.js'
 import { loadViewerDocument } from './scene-document'
+import { createSceneStatus } from './scene-status'
 import { createViewerSelection } from './selection'
 import 'ol/ol.css'
 import './style.css'
@@ -32,6 +33,7 @@ const popupTitle = requireElement<HTMLElement>('popup-title')
 const popupFields = requireElement<HTMLElement>('popup-fields')
 const popupClose = requireElement<HTMLButtonElement>('popup-close')
 const statusElement = requireElement<HTMLElement>('scene-status')
+const showStatus = createSceneStatus(statusElement)
 
 type MapNode = Extract<SceneNode, { type: 'tile' | 'vector' }>
 type VectorNode = Extract<SceneNode, { type: 'vector' }>
@@ -65,7 +67,7 @@ async function start(): Promise<void> {
     if (view3D && mode !== '2d' && (mode === '3d' || active.type === '3d')) {
       requireElement<HTMLSelectElement>('vector-renderer').closest('label')?.setAttribute('hidden', '')
       const { renderViewer3D } = await import('./viewer-3d')
-      await renderViewer3D(scene, sceneUrl, view3D)
+      await renderViewer3D(scene, sceneUrl, view3D, showStatus)
       return
     }
     if (!view2D) throw new Error('场景没有二维视图')
@@ -123,19 +125,23 @@ async function start(): Promise<void> {
       catch (error) { showError(String(error)); return }
       void binding.settled().then(state => {
         if (state.status === 'error') showError(String(state.error))
-        if (state.status === 'ready') selection?.refresh()
+        if (state.status === 'ready') {
+          selection?.refresh()
+          refreshRuntimeStatus()
+        }
       })
     })
     renderLegend(scene)
     function refreshRuntimeStatus() {
       const issues = runtime.getIssues()
       const text = issues.length ? issues.map(issue => `${issue.path}: ${issue.message}`).join('\n') : renderer.value === 'webgl' ? '场景已加载 · WebGL' : '场景已加载'
-      if (statusElement.textContent !== text) statusElement.textContent = text
-      if (issues.length) statusElement.classList.remove('scene-status--quiet')
+      showStatus(text, issues.length ? 'warning' : 'ready')
     }
     refreshRuntimeStatus()
-    map.on('postrender', refreshRuntimeStatus)
-    window.setTimeout(() => { if (!runtime.getIssues().length) statusElement.classList.add('scene-status--quiet') }, 1800)
+    map.getViewport().addEventListener('webglcontextlost', () => {
+      // 在图层登记回退诊断后更新界面，平移和缩放期间无需逐帧读取诊断。
+      queueMicrotask(() => { if (!startup.signal.aborted) refreshRuntimeStatus() })
+    }, { capture: true, signal: startup.signal })
   } catch (error) {
     showError(error instanceof Error ? error.message : String(error))
   }
@@ -305,7 +311,5 @@ function isSafeHttpUrl(value: string): boolean {
 }
 
 function showError(message: string): void {
-  statusElement.classList.remove('scene-status--quiet')
-  statusElement.classList.add('scene-status--error')
-  statusElement.textContent = message
+  showStatus(message, 'error')
 }

@@ -169,7 +169,8 @@ async function webglRenderer() {
   })
 }
 async function restore() {
-  const dialog = page.getByRole('dialog', { name: '发现恢复草稿', exact: true })
+  await page.getByRole('banner').getByRole('button', { name: '恢复草稿', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '恢复草稿', exact: true })
   await expect(dialog).toBeVisible()
   await dialog.getByRole('button', { name: '恢复草稿', exact: true }).click()
   await expect(dialog).toHaveCount(0)

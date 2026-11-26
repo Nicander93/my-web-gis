@@ -16,7 +16,7 @@ async function presentation(page: Page, id: string) {
   return page.evaluate(async id => (await import('/src/engine-host/scene3d-runtime-host.ts')).getLiveSceneDiagnostics(id)?.presentation, id)
 }
 async function pendingPropertyEdits(page: Page) {
-  return page.evaluate(async () => (await import('/src/ui/components/pending-property-edits.ts')).hasPendingPropertyEdits())
+  return page.evaluate(async () => (await import('/src/stores/workspace-drafts.ts')).hasWorkspaceDrafts())
 }
 test.use({ screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false } })
 test.beforeEach(async ({ page }) => {
@@ -24,13 +24,17 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/')
 })
 
-test('2D live preview stays outside content history and cancel restores the latest applied opacity', async ({ page }) => {
+test('2D live preview stays outside content history and cancel restores the latest applied opacity', async ({ page }, info) => {
   test.setTimeout(90_000)
   await page.getByRole('button', { name: /^二维地图/ }).click()
   await page.getByRole('tab', { name: '数据', exact: true }).click()
   await page.getByRole('region', { name: '二维功能区' }).getByRole('button', { name: '添加数据', exact: true }).click()
   await page.locator('input[type=file]').setInputFiles({ name: 'preview.geojson', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [116.4, 39.9] } }] })) })
   await page.getByRole('button', { name: '确认导入', exact: true }).click()
+  const download = page.waitForEvent('download')
+  await page.getByRole('button', { name: '保存项目', exact: true }).click()
+  const projectPath = info.outputPath('preview.webgis.json')
+  await (await download).saveAs(projectPath)
   await page.locator('.layer-item').filter({ hasText: 'preview' }).click({ button: 'right' })
   await page.getByRole('menuitem', { name: '完整属性', exact: true }).click()
   const dialog = page.locator('.scene-property-window'), before = await content(page), id = before.snapshot.project.content.layers[0].id
@@ -39,6 +43,18 @@ test('2D live preview stays outside content history and cancel restores the late
   await expect.poll(() => pendingPropertyEdits(page)).toBe(true)
   await expect.poll(() => opacity(page, id)).toBe(.35)
   expect(await content(page)).toEqual(before)
+  await page.getByRole('button', { name: '文件', exact: true }).click()
+  await page.getByRole('menuitem', { name: /^新建/ }).click()
+  await expect(page.getByRole('dialog', { name: '新建项目', exact: true })).toHaveCount(0)
+  await expect(page.locator('.status-message')).toContainText('请先应用或取消完整属性窗口中的编辑')
+  await page.getByRole('button', { name: '文件', exact: true }).click()
+  const chooser = page.waitForEvent('filechooser')
+  await page.getByRole('menuitem', { name: /^打开/ }).click()
+  await (await chooser).setFiles(projectPath)
+  await expect(page.locator('.status-message')).toContainText('打开失败：请先应用或取消完整属性窗口中的编辑')
+  await expect(dialog).toBeVisible()
+  expect(await content(page)).toEqual(before)
+  await expect.poll(() => opacity(page, id)).toBe(.35)
   await dialog.getByRole('switch', { name: '实时预览', exact: true }).click()
   await expect.poll(() => opacity(page, id)).toBe(1)
   await dialog.getByRole('switch', { name: '实时预览', exact: true }).click()

@@ -6,13 +6,13 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { EditorDialog } from '@/ui/components/EditorDialog'
 import { Button as DialogButton } from '@/ui/components/Button'
 import { useProjectStore, getProjectContentVersion } from '@/project/project.store'
-import { hasPendingPropertyEdits } from '@/ui/components/pending-property-edits'
+import { assertNoWorkspaceDrafts, hasWorkspaceDrafts } from '@/stores/workspace-drafts'
 import { projectCommands } from '@/commands/project.commands'
-import { resolveSceneDrafts } from '@/project/scene-draft-guard'
 import { finishStyleInteraction } from '@/project/style-interaction'
 import { createSnapshotFromState } from '@/project/project-io'
 import { projectRecovery, recoveryOwner } from '@/project/project-recovery'
 import { hasUnsavedProjectWork } from '@/project/unsaved-work'
+import { UnsavedWorkNotice } from '@/ui/panels/project/UnsavedWorkNotice'
 import { allowWindowClose, createCloseSession, subscribeMaximized, type UnsavedCloseChoice } from './native-window'
 
 /** 原生窗口操作和菜单共用应用的标题栏。 */
@@ -40,10 +40,11 @@ export function WindowControls() {
     const session = createCloseSession(() => allowWindowClose({
       projectEpoch: () => useProjectStore.getState().projectEpoch,
       contentVersion: getProjectContentVersion,
-      hasDirtyDrafts: hasPendingPropertyEdits,
+      hasDirtyDrafts: hasWorkspaceDrafts,
       resolveDrafts: async () => {
-        if (hasPendingPropertyEdits()) throw new Error('请先应用或取消完整属性窗口中的编辑，再关闭项目。')
-        return resolveSceneDrafts()
+        assertNoWorkspaceDrafts()
+        finishStyleInteraction()
+        return true
       },
       isProjectDirty: () => hasUnsavedProjectWork(),
       confirmUnsaved: () => new Promise(resolve => {
@@ -122,12 +123,12 @@ export function WindowControls() {
       <Button type="text" className="window-close" aria-label="关闭窗口" icon={<X size={16} />} onClick={() => execute(() => getCurrentWindow().close())} />
       {unsavedOpen && <EditorDialog title="项目尚未保存" busy={busy} onClose={() => choose('cancel')}>
         <div className="dialog-body">
-          <p>关闭窗口前请保存或明确放弃更改。</p>
+          <UnsavedWorkNotice />
           {error && <p role="alert" className="editor-error">{error}</p>}
         </div>
         <footer className="dialog-footer">
           <DialogButton disabled={busy} onClick={() => choose('cancel')}>取消</DialogButton>
-          <DialogButton disabled={busy} onClick={() => choose('discard')}>放弃更改并关闭</DialogButton>
+          <DialogButton danger disabled={busy} onClick={() => choose('discard')}>放弃更改并关闭</DialogButton>
           <DialogButton variant="primary" disabled={busy} onClick={() => void saveAndClose()}>{busy ? '保存中…' : '保存并关闭'}</DialogButton>
         </footer>
       </EditorDialog>}

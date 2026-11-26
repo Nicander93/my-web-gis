@@ -1,5 +1,4 @@
 import { projectSession } from '@/project/project-session'
-import { requireMapContent } from '@desktop-webgis/project'
 import { useEffect, useState } from 'react'
 import { Alert } from 'antd'
 import { isTauri } from '@tauri-apps/api/core'
@@ -15,18 +14,21 @@ import { resolveProjectResourceReferences } from '@/project/project-resource-ref
 import { collectCredentialRefKeys, hydrateCredentialsFromRefs } from '@/platform/credentials'
 import { emitCommandStatus } from '@/platform/command-status'
 import { hasUnsavedProjectWork } from '@/project/unsaved-work'
+import { assertNoWorkspaceDrafts } from '@/stores/workspace-drafts'
 
 interface Candidate extends RecoveryCandidate { comparison?: string }
 
 export function RecoveryDraftHost() {
   const [entries, setEntries] = useState<Candidate[]>([])
-  const [hidden, setHidden] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [discardKey, setDiscardKey] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [check, setCheck] = useState(0)
+  useEffect(() => startRecoveryTracking(), [])
+
   useEffect(() => {
     let alive = true
-    let stop: (() => void) | undefined
     void (async () => {
       try {
         const candidates: Candidate[] = []
@@ -34,7 +36,8 @@ export function RecoveryDraftHost() {
           if (isTauri() && entry.draft?.sourcePath) {
             try {
               const formal = resolveProjectResourceReferences(parseProjectSnapshot(await readTextFile(entry.draft.sourcePath)), entry.draft.sourcePath)
-              if (serializeProjectSnapshot(formal) === serializeProjectSnapshot(entry.draft.snapshot)) {
+              const hasPendingData = Object.values(entry.draft.dataSessions ?? {}).some(session => session.pending)
+              if (!hasPendingData && serializeProjectSnapshot(formal) === serializeProjectSnapshot(entry.draft.snapshot)) {
                 if (await projectRecovery.discard(entry)) continue
               }
               candidates.push({ ...entry, comparison: '正式文件与草稿内容不同。恢复为未保存副本，保存时重新选择位置。' })
@@ -46,40 +49,50 @@ export function RecoveryDraftHost() {
         const message = `恢复缓存检查失败：${reason instanceof Error ? reason.message : String(reason)}`
         emitCommandStatus(message); if (alive) setError(message)
       }
-      finally { if (alive) stop = startRecoveryTracking() }
     })()
-    return () => { alive = false; stop?.() }
+    return () => { alive = false }
   }, [check])
 
   async function discard(entry: Candidate): Promise<void> {
     setBusy(true); setError('')
     try {
-      if (!await projectRecovery.discard(entry)) throw new Error('草稿已改变，请重启后检查最新草稿；未删除新内容')
+      if (!await projectRecovery.discard(entry)) throw new Error('草稿已改变。请重新检查后再处理。')
       setEntries((current) => current.filter((item) => item.key !== entry.key))
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
-    finally { setBusy(false) }
+    finally { setBusy(false); setDiscardKey(null) }
   }
   async function restore(entry: Candidate): Promise<void> {
     if (!entry.draft) return
     setBusy(true); setError('')
     const epoch = useProjectStore.getState().projectEpoch, version = getProjectContentVersion()
     try {
-      if (hasUnsavedProjectWork()) throw new Error('当前项目已有修改，请先保存，再重启处理恢复草稿')
+      assertNoWorkspaceDrafts()
+      if (hasUnsavedProjectWork()) throw new Error('请先处理当前项目中待保存的配置和待提交的数据，再恢复草稿。')
       await projectRecovery.write(entry.draft.snapshot, entry.draft.sourcePath, recoveryOwner(epoch + 1), entry, entry.draft.dataSessions)
-      if (epoch !== useProjectStore.getState().projectEpoch || version !== getProjectContentVersion() || hasUnsavedProjectWork()) throw new Error('恢复期间工程已改变，当前内容已保留；草稿仍在缓存中')
-      projectSession.loadSnapshot(entry.draft.snapshot, entry.draft.dataSessions)
+      if (epoch !== useProjectStore.getState().projectEpoch || version !== getProjectContentVersion() || hasUnsavedProjectWork()) throw new Error('恢复期间工程已改变。当前项目和恢复草稿均已保留。')
+      assertNoWorkspaceDrafts()
+      const { snapshot, dataSessions } = entry.draft
+      projectSession.loadSnapshot(snapshot, snapshot.project.content.kind === 'map2d' ? dataSessions : undefined)
       setCurrentProjectPath(null)
       if (isTauri()) setProjectResourceBasePath(entry.draft.sourcePath)
       useProjectStore.getState().setDirty(true)
-      setHidden(true)
+      setEntries(current => current.filter(item => item.key !== entry.key))
+      setOpen(false)
       void hydrateCredentialsFromRefs(collectCredentialRefKeys(entry.draft.snapshot.project.content.kind === 'map2d' ? entry.draft.snapshot.project.content.datasets.filter((dataset) => dataset.kind !== 'vector') : []))
         .catch(() => emitCommandStatus('草稿已恢复；部分服务凭据尚未加载，请重新连接服务'))
       emitCommandStatus('已恢复未保存副本，请保存项目；正式文件未覆盖')
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
     finally { setBusy(false) }
   }
-  if (hidden || (!entries.length && !error)) return null
-  return <EditorDialog title="发现恢复草稿" busy={busy} onClose={() => setHidden(true)}>
+  function close(): void {
+    setOpen(false)
+    setDiscardKey(null)
+  }
+
+  if (!entries.length && !error) return null
+  return <>
+    <Button variant="ghost" size="small" onClick={() => setOpen(true)}>恢复草稿</Button>
+    {open && <EditorDialog title="恢复草稿" busy={busy} onClose={close}>
     <div className="dialog-body recovery-drafts">
       <p>以下草稿保存在本机独立缓存。恢复后仍需保存项目；舍弃只删除所选草稿。</p>
       {entries.map((entry) => <section key={entry.key} className="recovery-draft" aria-label={entry.draft?.snapshot.project.metadata.name ?? '无法读取的恢复草稿'}>
@@ -88,11 +101,20 @@ export function RecoveryDraftHost() {
           {entry.draft.sourcePath && <><br /><span>{entry.draft.sourcePath}</span></>}</p>}
         {entry.comparison && <p>{entry.comparison}</p>}
         {entry.error && <Alert type="warning" title={entry.error} />}
-        <div className="recovery-draft-actions"><Button disabled={busy} onClick={() => void discard(entry)}>舍弃草稿</Button>
-          <Button variant="primary" disabled={busy || !entry.draft} onClick={() => void restore(entry)}>恢复草稿</Button></div>
+        {discardKey === entry.key ? <>
+          <p role="status">舍弃后将无法恢复这份草稿。</p>
+          <div className="recovery-draft-actions">
+            <Button disabled={busy} onClick={() => setDiscardKey(null)}>保留草稿</Button>
+            <Button danger disabled={busy} onClick={() => void discard(entry)}>确认舍弃</Button>
+          </div>
+        </> : <div className="recovery-draft-actions">
+          <Button disabled={busy} onClick={() => setDiscardKey(entry.key)}>舍弃草稿</Button>
+          <Button variant="primary" disabled={busy || !entry.draft} onClick={() => void restore(entry)}>恢复草稿</Button>
+        </div>}
       </section>)}
       {error && <Alert type="error" title={error} />}
     </div>
-    <footer className="dialog-footer">{error && <Button disabled={busy} onClick={() => { setError(''); setCheck((value) => value + 1) }}>重新检查</Button>}<Button disabled={busy} onClick={() => setHidden(true)}>暂不处理</Button></footer>
-  </EditorDialog>
+    <footer className="dialog-footer">{error && <Button disabled={busy} onClick={() => { setError(''); setCheck((value) => value + 1) }}>重新检查</Button>}<Button disabled={busy} onClick={close}>暂不处理</Button></footer>
+    </EditorDialog>}
+  </>
 }
