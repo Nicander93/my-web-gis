@@ -14,10 +14,13 @@ import {
   registerProjectReplacementGuard,
   projectCommands,
   registerExportDataCallback,
-  type ExportDialogMode
+  type ExportDialogMode,
+  type ProjectReplacementAction,
+  type ProjectReplacementDecision
 } from '@/commands/project.commands'
 import { useProjectStore } from '@/project/project.store'
 import { hasUnsavedProjectWork } from '@/project/unsaved-work'
+import { assertNoWorkspaceDrafts, hasWorkspaceDrafts } from '@/stores/workspace-drafts'
 import { useWorkbenchStore } from '@/stores/workbench.store'
 import { useWorkspaceStore } from '@/stores/workspace.store'
 import { commitLocalImport } from '@/ui/panels/add-data/local-import-command'
@@ -38,7 +41,6 @@ import { UnsavedProjectDialog } from '@/ui/panels/project/UnsavedProjectDialog'
 import { HelpDialog } from '@/ui/panels/help/HelpDialog'
 import { registerHelpDialog, type HelpDialogPage } from '@/commands/help.commands'
 import { viewCommands } from '@/commands/view.commands'
-import { RecoveryDraftHost } from '@/ui/panels/project/RecoveryDraftHost'
 import { SoftwareSettings } from '@/ui/panels/settings/SoftwareSettings'
 
 const Workspace3D = lazy(() =>
@@ -50,7 +52,7 @@ const Workspace3D = lazy(() =>
 /**
  * Desktop 顶层应用壳：
  * - 根据当前工程类型（2d / 3d）切换 Workspace2D 与 Workspace3D
- * - 统一挂载菜单栏、全局快捷键、导入导出对话框与崩溃恢复草稿宿主
+ * - 统一挂载菜单栏、全局快捷键和导入导出对话框
  */
 export default function App() {
   const project = useProjectStore((state) => state.project)
@@ -64,12 +66,14 @@ export default function App() {
   )
   const [newProjectOpen, setNewProjectOpen] = useState(false)
   const [helpPage, setHelpPage] = useState<HelpDialogPage | null>(null)
-  const [replacementOpen, setReplacementOpen] = useState(false)
-  const replacementResolve = useRef<((allow: boolean) => void) | null>(null)
-  const [status, setStatus] = useState('就绪')
+  const [replacementAction, setReplacementAction] = useState<ProjectReplacementAction | null>(null)
+  const replacementResolve = useRef<((decision: ProjectReplacementDecision) => void) | null>(null)
   const [addDataOpen, setAddDataOpen] = useState(false)
   const [droppedFile, setDroppedFile] = useState<File | string | null>(null)
-  const draggingFile = useWorkspaceFileDrop(hasProject && projectType === '2d' && !addDataOpen, file => {
+  const acceptsDataDrop = hasProject && projectType === '2d'
+  const draggingFile = useWorkspaceFileDrop(acceptsDataDrop, (file, kind) => {
+    if (kind === 'project') { void projectCommands.openProject(file); return }
+    if (kind === 'scene') { void projectCommands.importScene(file); return }
     setDroppedFile(file)
     setAddDataOpen(true)
   })
@@ -88,24 +92,27 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.theme ||= 'light'
 
-    function handleCommandStatus(event: Event): void {
-      setStatus((event as CustomEvent<string>).detail)
-    }
-
-    window.addEventListener(
-      'desktop-webgis:command-status',
-      handleCommandStatus
-    )
     registerProcessingDialog(() => {
       useWorkbenchStore.getState().setRightTask('processing')
       useWorkspaceStore.getState().setRightOpen(true)
     })
-    registerNewProjectDialog(() => setNewProjectOpen(true))
+    registerNewProjectDialog(() => {
+      try {
+        assertNoWorkspaceDrafts()
+        setNewProjectOpen(true)
+      } catch (error) {
+        emitCommandStatus(error instanceof Error ? error.message : '请先完成当前编辑。')
+      }
+    })
     registerProjectReplacementGuard(
-      () =>
-        new Promise<boolean>((resolve) => {
+      (action) =>
+        new Promise<ProjectReplacementDecision>((resolve) => {
+          if (replacementResolve.current) {
+            resolve(null)
+            return
+          }
           replacementResolve.current = resolve
-          setReplacementOpen(true)
+          setReplacementAction(action)
         })
     )
 
@@ -122,14 +129,11 @@ export default function App() {
     })
 
     return () => {
-      window.removeEventListener(
-        'desktop-webgis:command-status',
-        handleCommandStatus
-      )
       registerProcessingDialog(null)
       registerNewProjectDialog(null)
       registerProjectReplacementGuard(null)
-      replacementResolve.current?.(false)
+      replacementResolve.current?.(null)
+      replacementResolve.current = null
     }
   }, [])
 
@@ -150,9 +154,10 @@ export default function App() {
       }
       if (event.key.toLowerCase() === 'n') {
         event.preventDefault()
-        setNewProjectOpen(true)
+        projectCommands.newProject()
       } else if (event.key.toLowerCase() === 's') {
         event.preventDefault()
+        if (!hasProject) return
         void (event.shiftKey
           ? projectCommands.saveProjectAs()
           : projectCommands.saveProject())
@@ -162,7 +167,7 @@ export default function App() {
       }
     }
     function guard(event: BeforeUnloadEvent): void {
-      if (hasUnsavedProjectWork()) {
+      if (hasUnsavedProjectWork() || hasWorkspaceDrafts()) {
         event.preventDefault()
         event.returnValue = ''
       }
@@ -173,7 +178,7 @@ export default function App() {
       window.removeEventListener('keydown', shortcut)
       window.removeEventListener('beforeunload', guard)
     }
-  }, [])
+  }, [hasProject])
 
   function handleImport(result: ImportResult): void {
     commitLocalImport(result)
@@ -224,7 +229,7 @@ export default function App() {
       className={`desktop-app${projectType === '3d' ? ' desktop-app--scene3d' : ''}`}
     >
       <Header showToolbar={hasProject} />
-      {draggingFile && <div className="workspace-file-drop" role="status">松开以添加数据 · 一次一个文件</div>}
+      {draggingFile && <div className="workspace-file-drop" role="status">{acceptsDataDrop ? '松开以打开项目、导入场景或添加数据' : '松开以打开项目或导入场景'} · 一次一个文件</div>}
       {!hasProject ? (
         <ProjectStartScreen />
       ) : projectType === '2d' ? (
@@ -242,24 +247,25 @@ export default function App() {
           onCloseProcessing={closeProcessing}
         />
       ) : (
-        <Suspense fallback={<p role="status">正在加载三维组件…</p>}>
+        <Suspense fallback={<p className="workspace-loading" role="status">正在准备三维场景…</p>}>
           <Workspace3D key={`${project.metadata.id}:${projectEpoch}`} />
         </Suspense>
       )}
-      {hasProject && projectType === '2d' && <StatusBar message={status} />}
+      {hasProject && projectType === '2d' && <StatusBar />}
       {newProjectOpen && (
         <NewProjectDialog onClose={() => setNewProjectOpen(false)} />
       )}
-      {replacementOpen && (
+      {replacementAction && (
         <UnsavedProjectDialog
-          onResolve={(allow) => {
-            setReplacementOpen(false)
-            replacementResolve.current?.(allow)
+          action={replacementAction}
+          onResolve={(decision) => {
+            setReplacementAction(null)
+            const resolve = replacementResolve.current
             replacementResolve.current = null
+            resolve?.(decision)
           }}
         />
       )}
-      <RecoveryDraftHost />
       <SoftwareSettings />
       {helpPage && <HelpDialog page={helpPage} onClose={() => setHelpPage(null)} />}
       <AddDataDialog

@@ -1,8 +1,11 @@
 import { Box, FolderOpen, Map } from 'lucide-react'
 import { projectCommands } from '@/commands/project.commands'
+import { useSyncExternalStore } from 'react'
+import { getCommandStatus, subscribeCommandStatus } from '@/platform/command-status'
 
 /** 无项目时提供直接可用的工作入口，不展示虚构的最近项目。 */
 export function ProjectStartScreen() {
+  const status = useSyncExternalStore(subscribeCommandStatus, getCommandStatus)
   return (
     <main className="project-start" aria-label="项目起始页">
       <section className="project-start__content">
@@ -20,6 +23,7 @@ export function ProjectStartScreen() {
             打开项目…
           </button>
         </div>
+        <div className="project-start__status" role="status">{status}</div>
       </section>
     </main>
   )

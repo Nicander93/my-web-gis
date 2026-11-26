@@ -8,8 +8,11 @@ import { createProject } from '@desktop-webgis/project'
 import { createSceneDocument } from '@desktop-webgis/scene-core'
 import { useProjectStore } from '@/project/project.store'
 import { useLayerViewStore } from '@/stores/layer-view.store'
-import { createProjectSceneDocument } from '@/io/project-scene-document'
-import { replaceSceneDocumentAsEdit } from './scene-document.commands'
+import { createProjectFromSceneDocument, createProjectSceneDocument } from '@/io/project-scene-document'
+
+function replaceSceneDocumentAsEdit(input: unknown): boolean {
+  return projectSession.replaceSnapshotAsEdit(createProjectFromSceneDocument(input), '导入完整场景')
+}
 
 beforeEach(() => projectSession.loadSnapshot({ project: createProject('Old'), featuresByDataset: {} }))
 

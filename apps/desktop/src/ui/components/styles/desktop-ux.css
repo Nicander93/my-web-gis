@@ -65,3 +65,18 @@ body { font-size: var(--font-size-ui); }
   .status-coordinate { display: none; }
   .target-bound-label { display: none; }
 }
+
+@media (max-width: 600px) {
+  .window-bar:not(.window-bar--native) { padding-inline: 8px; }
+  .window-bar:not(.window-bar--native) .brand-lockup > strong,
+  .window-bar:not(.window-bar--native) .window-separator { display: none; }
+  .window-bar:not(.window-bar--native) .menu-trigger { padding-inline: 8px; }
+  .workbench-ribbon-top { gap: 4px; padding-inline: 6px; }
+  .workbench-ribbon-top nav { min-width: 0; flex-shrink: 1; overflow-x: auto; scrollbar-width: none; }
+  .workbench-ribbon-top [role='tab'] { padding-inline: 7px; }
+  .workbench-ribbon-top > span.workbench-context { display: none; }
+  .workbench-context > span:not(.editing-badge) { display: none; }
+  .workbench-quick { margin-left: auto; }
+  .status-bar { padding-inline: 6px; gap: 4px; }
+  .status-message { min-width: 0; }
+}

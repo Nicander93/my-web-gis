@@ -7,6 +7,7 @@ import Overlay from 'ol/Overlay'
 import { useProjectStore } from '@/project/project.store'
 import { useWorkbenchStore } from '@/stores/workbench.store'
 import { getActiveEditTool, getMapRuntime } from '@/engine-host/map-runtime-host'
+import { motionDuration } from '@/platform/motion-preference'
 
 interface PopupTarget { layerId: string; featureId: string; coordinate: number[] }
 
@@ -39,8 +40,7 @@ export function MapPopup() {
     const runtime = getMapRuntime()
     if (!runtime) return
     const map = runtime.getMap()
-    const mounted = new Overlay({ element, positioning: 'bottom-left', offset: [10, -10], stopEvent: true,
-      autoPan: { margin: 12, animation: { duration: 100 } } })
+    const mounted = new Overlay({ element, positioning: 'bottom-left', offset: [10, -10], stopEvent: true })
     overlay.current = mounted
     map.addOverlay(mounted)
     const click = (event: { pixel: number[]; coordinate: number[] }) => {
@@ -75,7 +75,10 @@ export function MapPopup() {
     }
   }, [close, element])
 
-  useEffect(() => { overlay.current?.setPosition(target?.coordinate) }, [target])
+  useEffect(() => {
+    overlay.current?.setPosition(target?.coordinate)
+    if (target) overlay.current?.panIntoView({ margin: 12, animation: { duration: motionDuration(100) } })
+  }, [target])
   useEffect(() => { close() }, [requireMapContent(project).crs, close])
   useEffect(() => {
     if (identifyActive || !feature || !definition?.fields.length || !['select', 'pan'].includes(activeTool)) close()

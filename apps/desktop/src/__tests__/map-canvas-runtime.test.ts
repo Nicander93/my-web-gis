@@ -59,12 +59,15 @@ function createMockRuntime(initialZoom = 2): OlMapRuntime {
 
   const view = {
     getZoom: () => zoom,
+    getState: vi.fn(() => ({ nextResolution: NaN })),
+    getZoomForResolution: vi.fn(() => zoom),
+    cancelAnimations: vi.fn(),
     setZoom: (value: number) => {
       zoom = value
     },
-    animate: (options: { zoom?: number }) => {
+    animate: vi.fn((options: { zoom?: number }) => {
       if (typeof options.zoom === 'number') zoom = options.zoom
-    },
+    }),
     getCenter: () => center,
     setCenter: (value: [number, number]) => {
       center = value
@@ -240,6 +243,25 @@ describe('MapCanvas OlMapRuntime selection tool wiring', () => {
 
     window.removeEventListener('desktop-webgis:command-status', listener)
   })
+  it('uses the in-flight zoom target and applies reduced motion to the next action', () => {
+    const runtime = createMockRuntime(5)
+    _setMapRuntimeForTests(runtime, true)
+    const view = runtime.getMap().getView()
+    vi.mocked(view.getState).mockReturnValue({ ...view.getState(), nextResolution: 200 })
+    vi.mocked(view.getZoomForResolution).mockReturnValue(7)
+    expect(zoomMapBy(1)).toBe(true)
+    expect(view.cancelAnimations).toHaveBeenCalledOnce()
+    expect(view.animate).toHaveBeenLastCalledWith({ zoom: 8, duration: 150 })
+
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })))
+    try {
+      expect(zoomMapBy(-1)).toBe(true)
+      expect(view.animate).toHaveBeenLastCalledWith({ zoom: 6, duration: 0 })
+      expect(zoomMapToAll()).toBe(true)
+      expect(runtime.zoomToAll).toHaveBeenLastCalledWith(0)
+    } finally { vi.unstubAllGlobals() }
+  })
+
 
   it('layer zoom/retry call into the mounted runtime (not status-only placeholders)', () => {
     const runtime = createMockRuntime()
@@ -259,7 +281,7 @@ describe('MapCanvas OlMapRuntime selection tool wiring', () => {
     )
     const layerId = useLayerViewStore.getState().selectedLayerId!
     expect(zoomMapToLayer(layerId)).toBe(true)
-    expect(runtime.zoomToLayer).toHaveBeenCalledWith(layerId)
+    expect(runtime.zoomToLayer).toHaveBeenCalledWith(layerId, 150)
 
     layerCommands.zoomToLayer(layerId)
     expect(runtime.zoomToLayer).toHaveBeenCalledTimes(2)

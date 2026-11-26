@@ -1,6 +1,6 @@
 import { projectSession } from '@/project/project-session'
 import { projectEdits, useEditHistory } from '@/project/project-edits'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Tabs, Tooltip } from 'antd'
 import { BottomPanel } from '@/ui/workbench/BottomPanel'
 import { useSceneTaskLog } from '@/ui/panels/scene3d/useSceneTaskLog'
@@ -62,6 +62,10 @@ import { pickFile } from '@/platform/files'
 import { localProjectDirectory, normalizeLocalResourcePath } from '@/platform/resource-paths'
 import { isTauri } from '@tauri-apps/api/core'
 import type { ResourceReference } from '@desktop-webgis/cesium-scene-schema'
+import { prefersReducedMotion } from '@/platform/motion-preference'
+import { getCommandStatus, subscribeCommandStatus } from '@/platform/command-status'
+import { createStore, useStore, type StoreApi } from 'zustand'
+import { registerWorkspaceDraft } from '@/stores/workspace-drafts'
 
 interface LayerState { state: 'loading' | 'ready' | 'error'; error?: string }
 const drawLabels = { rectangle: '矩形', ellipse: '椭圆', billboard: '图标', point: '点', polyline: '线', polygon: '面', water: '水面边界', clip: '裁剪范围', flatten: '压平范围', 'spatial-distance': '空间距离', 'ground-distance': '贴地距离', area: '面积', 'height-difference': '高度差' }
@@ -72,6 +76,24 @@ function drawInstruction(kind: SceneDrawKind): string {
 }
 const measurementKinds: SceneMeasurementKind[] = ['spatial-distance', 'ground-distance', 'area', 'height-difference']
 const isMeasurementKind = (kind: SceneDrawKind): kind is SceneMeasurementKind => measurementKinds.includes(kind as SceneMeasurementKind)
+
+interface SceneFeedbackState { status: string; command: string; error: string }
+
+function SceneStatusBar({ feedback, instruction, selection }: {
+  feedback: StoreApi<SceneFeedbackState>
+  instruction: string
+  selection: string
+}) {
+  const { status, command, error } = useStore(feedback)
+  const message = error || command || instruction || status
+  return (
+    <footer className="status-bar scene3d-footer">
+      <span className={`scene3d-footer__state${error ? ' scene3d-footer__state--error' : ''}`} role="status" title={message}>{message}</span>
+      <span>{selection}</span>
+      <span>WGS84 · 椭球高度</span>
+    </footer>
+  )
+}
 
 interface MeasurementDraft { graphic: GraphicNode; result: SceneMeasurement }
 
@@ -110,8 +132,7 @@ export function Workspace3D() {
   const handlePick = useRef<(id: string | null, properties?: Record<string, unknown>, mode?: 'toggle' | 'range') => void>(() => {})
   const [pickedProperties, setPickedProperties] = useState<Record<string, unknown>>({})
   const [editing, setEditing] = useState<EditMode | null>(null)
-  const [status, setStatus] = useState('正在启动三维场景…')
-  const [error, setError] = useState('')
+  const [feedback] = useState(() => createStore<SceneFeedbackState>(() => ({ status: '正在启动三维场景…', command: '', error: '' })))
   const [states, setStates] = useState<Record<string, LayerState>>({})
   useSceneTaskLog(states, scene.nodes, projectEpoch)
   const [ready, setReady] = useState(false)
@@ -147,8 +168,10 @@ export function Workspace3D() {
   const canEdit = ready && node?.visible && !node.locked && states[node.id]?.state === 'ready' && (node.type === 'model' || node.type === '3dtiles')
   const { canUndo, canRedo } = useEditHistory()
 
-  function report(reason: unknown): void { setError(reason instanceof Error ? reason.message : '操作失败，请检查输入或资源地址。') }
-  function notify(text: string): void { setError(''); setStatus(text) }
+  function report(reason: unknown): void {
+    feedback.setState({ error: reason instanceof Error ? reason.message : '操作失败，请检查输入或资源地址。' })
+  }
+  function notify(status: string): void { feedback.setState({ status, command: '', error: '' }) }
   const graphicEditing = useSceneGraphicEditing(runtime.current, result => {
     const id = documentSession.current?.getHostNodeId(result.id)
     activeEditId.current = undefined
@@ -194,8 +217,7 @@ export function Workspace3D() {
             }
             const id = pendingFocus.current
             if (id && state.states[id]?.state === 'ready') { pendingFocus.current = undefined; locate(id); notify('资源已加载') }
-            else setStatus('就绪')
-            setError('')
+            else notify('就绪')
           }
         }
       })
@@ -282,6 +304,10 @@ export function Workspace3D() {
 
   useEffect(() => { if (syncStatus === 'ready' && isContinuousDraw(drawing.kind)) drawing.resume() }, [syncStatus, scene.nodes.length])
 
+  const unfinishedWork = graphicEditing.active ? '请先应用或取消当前几何编辑。'
+    : drawing.count > 0 ? '请先完成或取消当前绘制。' : ''
+  useLayoutEffect(() => unfinishedWork ? registerWorkspaceDraft(unfinishedWork) : undefined, [unfinishedWork])
+
   async function completeMeasurement(graphic: GraphicNode, kind: SceneMeasurementKind): Promise<void> {
     const currentRuntime = runtime.current
     if (!currentRuntime) return
@@ -332,7 +358,7 @@ export function Workspace3D() {
   }
   function locate(id: string): void {
     const nativeId = documentSession.current?.getRuntimeNodeId(id)
-    if (nativeId) void runtime.current?.flyTo(nativeId).catch(report)
+    if (nativeId) void runtime.current?.flyTo(nativeId, prefersReducedMotion() ? 0 : undefined).catch(report)
   }
   function select(id: string, mode?: SceneSelectionMode, order = scene.nodes.map(node => node.id)): void {
     endToolSession(); setSelectedGroup(null)
@@ -541,11 +567,10 @@ export function Workspace3D() {
       if (event.key === 'Delete') { event.preventDefault(); handleAction.current('delete') }
     }
     function onResize(): void { useWorkspaceStore.getState().constrainPanelSizes() }
-    function onStatus(event: Event): void { const text = (event as CustomEvent<string>).detail; setStatus(text); setError('') }
     window.addEventListener('desktop-webgis:scene3d-action', onAction); window.addEventListener('keydown', onHistory); window.addEventListener('resize', onResize)
-    window.addEventListener('desktop-webgis:command-status', onStatus)
-    return () => { window.removeEventListener('desktop-webgis:scene3d-action', onAction); window.removeEventListener('keydown', onHistory); window.removeEventListener('resize', onResize); window.removeEventListener('desktop-webgis:command-status', onStatus) }
+    return () => { window.removeEventListener('desktop-webgis:scene3d-action', onAction); window.removeEventListener('keydown', onHistory); window.removeEventListener('resize', onResize) }
   }, [preview])
+  useEffect(() => subscribeCommandStatus(() => feedback.setState({ command: getCommandStatus(), error: '' })), [feedback])
 
   const DrawingIcon = drawing.kind === 'water' ? Waves : drawing.kind === 'clip' ? Scissors : drawing.kind === 'flatten' ? MoveDown : drawing.kind && isMeasurementKind(drawing.kind) ? Ruler : Shapes
   return <main className="scene3d-workspace" aria-label="三维场景编辑器">
@@ -563,7 +588,7 @@ export function Workspace3D() {
         const source = scene.nodes.find(n => n.id === event.dataTransfer.getData('application/x-scene3d-node'))
         if (source?.type !== 'model' || getCesiumSceneNodeState(scene, source).locked || !runtime.current) return
         const rect = runtime.current.viewer.canvas.getBoundingClientRect(), position = pickGround(event.clientX - rect.left, event.clientY - rect.top)
-        if (!position) { setError('请将模型拖到地表上。'); return }
+        if (!position) { report(new Error('请将模型拖到地表上。')); return }
         try { stopEditing(); updateScene('拖动放置模型', scene => ({ ...scene, nodes: scene.nodes.map(item => item.id === source.id ? { ...source, position } : item) })); select(source.id); notify('模型位置已更新，可撤销恢复') } catch (reason) { report(reason) }
       }}>
         <div className="scene3d-canvas__viewport" ref={target} />
@@ -589,7 +614,8 @@ export function Workspace3D() {
       </nav>}
       {!preview && <BottomPanel sceneStates={states} onSelectResource={id => { select(id); showProperties('source') }} />}
     </div>
-    <footer className="status-bar scene3d-footer"><span className={`scene3d-footer__state${error ? ' scene3d-footer__state--error' : ''}`} role="status">{error || (drawing.kind ? drawInstruction(drawing.kind) : status)}</span><span>{group ? group.name : liveIds.length > 1 ? `已选 ${liveIds.length} 个对象` : node?.name ?? '未选择对象'}</span><span>WGS84 · 椭球高度</span></footer>
+    <SceneStatusBar feedback={feedback} instruction={drawing.kind ? drawInstruction(drawing.kind) : ''}
+      selection={group?.name ?? (liveIds.length > 1 ? `已选 ${liveIds.length} 个对象` : node?.name ?? '未选择对象')} />
     {context && <LayerPopupMenu x={context.x} y={context.y} label="对象菜单" onClose={() => setContext(null)}>
       <div className="scene3d-context-title">{group?.name ?? (liveIds.length > 1 ? `${liveIds.length} 个对象` : node?.name)}</div>
       <MenuItem icon={Table2} label="对象属性" onClick={() => { showProperties('object'); setContext(null) }} />

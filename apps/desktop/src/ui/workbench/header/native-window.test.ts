@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest'
 import { allowWindowClose, createCloseSession, subscribeMaximized, type WindowCloseHost } from './native-window'
-import { hasPendingPropertyEdits, registerPendingPropertyEdit } from '@/ui/components/pending-property-edits'
+import { hasWorkspaceDrafts, registerWorkspaceDraft } from '@/stores/workspace-drafts'
 
 function host(overrides: Partial<WindowCloseHost> = {}): WindowCloseHost {
   return {
@@ -174,13 +174,14 @@ it('rejects new drafts even if an asynchronous save reports success', async () =
 })
 
 it('tracks independent modeless form edits until every owner releases them', () => {
-  const first = registerPendingPropertyEdit(), second = registerPendingPropertyEdit()
+  const first = registerWorkspaceDraft('请先应用或取消属性编辑。')
+  const second = registerWorkspaceDraft('请先完成或取消当前绘制。')
   try {
-    expect(hasPendingPropertyEdits()).toBe(true)
+    expect(hasWorkspaceDrafts()).toBe(true)
     first(); first()
-    expect(hasPendingPropertyEdits()).toBe(true)
+    expect(hasWorkspaceDrafts()).toBe(true)
     second()
-    expect(hasPendingPropertyEdits()).toBe(false)
+    expect(hasWorkspaceDrafts()).toBe(false)
   } finally { first(); second() }
 })
 

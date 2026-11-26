@@ -3,10 +3,13 @@ import { projectCommands } from './project.commands'
 
 const probe = vi.hoisted(() => ({ open: vi.fn(), replace: vi.fn(), status: vi.fn() }))
 vi.mock('@/io/scene-document-io', () => ({ openSceneDocument: probe.open, saveSceneDocument: vi.fn() }))
-vi.mock('@/commands/scene-document.commands', () => ({ replaceSceneDocumentAsEdit: probe.replace }))
+vi.mock('@/io/project-scene-document', () => ({
+  createProjectFromSceneDocument: (document: unknown) => ({ project: { content: { kind: 'map2d' } }, document }),
+  createProjectSceneDocument: vi.fn()
+}))
 vi.mock('@/platform/command-status', () => ({ emitCommandStatus: probe.status }))
-vi.mock('@/project/project.store', () => ({ useProjectStore: { getState: () => ({ dirty: false, projectEpoch: 0 }) } }))
-vi.mock('@/project/project-session', () => ({ projectSession: { getSnapshot: () => ({ project: { metadata: { id: 'original' } }, featuresByDataset: {} }) } }))
+vi.mock('@/project/project.store', () => ({ getProjectContentVersion: () => 0, useProjectStore: { getState: () => ({ dirty: false, projectEpoch: 1, project: { content: { kind: 'map2d' } } }) } }))
+vi.mock('@/project/project-session', () => ({ projectSession: { replaceSnapshotAsEdit: probe.replace } }))
 vi.mock('@/stores/layer-view.store', () => ({ useLayerViewStore: { getState: () => ({ sessions: {} }) } }))
 beforeEach(() => { projectCommands.cancelSceneImport(); vi.clearAllMocks() })
 
@@ -21,7 +24,7 @@ it('rejects late results from a cancelled or superseded import', async () => {
   finishFirst({ path: 'old.json', document: { id: 'old' } })
   await first
   expect(probe.replace).toHaveBeenCalledTimes(1)
-  expect(probe.replace).toHaveBeenCalledWith({ id: 'new' })
+  expect(probe.replace).toHaveBeenCalledWith({ project: { content: { kind: 'map2d' } }, document: { id: 'new' } }, '导入完整场景')
   expect(projectCommands.isImportingScene()).toBe(false)
 
   let finishCancelled!: (value: unknown) => void

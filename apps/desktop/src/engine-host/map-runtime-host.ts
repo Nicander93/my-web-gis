@@ -1,3 +1,5 @@
+import { emitCommandStatus } from '@/platform/command-status'
+import { motionDuration } from '@/platform/motion-preference'
 import { projectSession } from '@/project/project-session'
 import { getFilteredFeatures, getLayerFeatures } from '@/project/feature-query'
 import { projectEdits } from '@/project/project-edits'
@@ -279,28 +281,30 @@ export function syncMapFromProject(): void {
     syncSelectionHighlight(useLayerViewStore.getState().selection)
   }).catch(() => {
     if (runtime !== current) return
-    window.dispatchEvent(new CustomEvent('desktop-webgis:command-status', { detail: '地图资源加载失败，已显示的内容保留。' }))
+    emitCommandStatus('地图资源加载失败，已显示的内容保留。')
   })
 }
 
 export function zoomMapBy(delta: number): boolean {
   if (!runtime || !mounted) return false
   const view = runtime.getMap().getView()
-  const zoom = view.getZoom()
+  const destination = view.getState().nextResolution
+  const zoom = destination !== undefined && Number.isFinite(destination) ? view.getZoomForResolution(destination) : view.getZoom()
   if (zoom == null) return false
-  view.animate({ zoom: zoom + delta, duration: 150 })
+  view.cancelAnimations()
+  view.animate({ zoom: zoom + delta, duration: motionDuration(150) })
   return true
 }
 
 export function zoomMapToAll(): boolean {
   if (!runtime || !mounted) return false
-  runtime.zoomToAll()
+  runtime.zoomToAll(motionDuration(150))
   return true
 }
 
 export function zoomMapToLayer(layerId: string): boolean {
   if (!runtime || !mounted) return false
-  runtime.zoomToLayer(layerId)
+  runtime.zoomToLayer(layerId, motionDuration(150))
   return true
 }
 
@@ -321,10 +325,11 @@ export function zoomMapToFeature(
   if (!feature) return false
   const view = runtime.getMap().getView()
   if (location) {
+    view.cancelAnimations()
     view.animate({
       center: transform(location, 'EPSG:4326', view.getProjection()),
       zoom: Math.max(view.getZoom() ?? 0, 16),
-      duration: 150
+      duration: motionDuration(150)
     })
     return true
   }
@@ -365,10 +370,11 @@ export function zoomMapToFeatures(layerId: string, featureIds: readonly string[]
   }
   features.forEach(feature => visit(feature.geometry.coordinates))
   if (!extent.every(Number.isFinite)) return false
+  view.cancelAnimations()
   view.fit(transformExtent(extent, 'EPSG:4326', view.getProjection()), {
     padding: [60, 60, 60, 60],
     maxZoom: 16,
-    duration: 150
+    duration: motionDuration(150)
   })
   return true
 }
@@ -431,7 +437,6 @@ export function setActiveEditTool(tool: EditTool): boolean {
     syncSelectionHighlight(useLayerViewStore.getState().selection)
     return true
   }
-
   // 绘制、修改和删除都要求当前矢量图层支持几何编辑。
   selectionRuntime.deactivate()
   const layerId =
@@ -489,7 +494,7 @@ function createToolCallbacks(): ToolCallbacks {
         assertValidGeometryEdits(features)
         return true
       } catch (error) {
-        window.dispatchEvent(new CustomEvent('desktop-webgis:command-status', { detail: error instanceof Error ? error.message : '几何校验失败，未提交本次修改。' }))
+        emitCommandStatus(error instanceof Error ? error.message : '几何校验失败，未提交本次修改。')
         return false
       }
     },
@@ -499,7 +504,7 @@ function createToolCallbacks(): ToolCallbacks {
         syncMapFromProject()
         return true
       } catch (error) {
-        window.dispatchEvent(new CustomEvent('desktop-webgis:command-status', { detail: error instanceof Error ? error.message : '顶点修改失败，已恢复几何。' }))
+        emitCommandStatus(error instanceof Error ? error.message : '顶点修改失败，已恢复几何。')
         return false
       }
     },

@@ -6,15 +6,16 @@ import { isTauri } from '@tauri-apps/api/core'
 import type { ProjectType } from '@/project/project-type'
 import { openSceneDocument, saveSceneDocument } from '@/io/scene-document-io'
 import { saveSceneArchive } from '@/io/scene-archive-io'
-import { createProjectSceneDocument } from '@/io/project-scene-document'
-import { replaceSceneDocumentAsEdit } from '@/commands/scene-document.commands'
+import { createProjectFromSceneDocument, createProjectSceneDocument } from '@/io/project-scene-document'
 import { getLiveSceneCamera } from '@/engine-host/scene3d-runtime-host'
-import { resolveSceneDrafts } from '@/project/scene-draft-guard'
+import { finishStyleInteraction } from '@/project/style-interaction'
 import { emitCommandStatus } from '@/platform/command-status'
 import { useLayerViewStore } from '@/stores/layer-view.store'
 import { useProjectStore, getProjectContentVersion } from '@/project/project.store'
 import { requestProjectSave } from '@/project/project-save'
 import { hasUnsavedProjectWork, requestUnsavedWorkSave } from '@/project/unsaved-work'
+import { assertNoWorkspaceDrafts } from '@/stores/workspace-drafts'
+import { discardRecoveryOnReplacement } from '@/project/recovery-tracking'
 import {
   createSnapshotFromState,
   openSnapshotFromDisk,
@@ -27,6 +28,8 @@ import {
 } from '@/platform/credentials'
 
 export type ExportDialogMode = 'export' | 'copy'
+export type ProjectReplacementAction = '打开' | '导入'
+export type ProjectReplacementDecision = 'saved' | 'discard' | null
 
 export interface AddDataCallback {
   openDialog: () => void
@@ -39,11 +42,47 @@ export interface ExportDataCallback {
 let addDataCallback: AddDataCallback | null = null
 let exportDataCallback: ExportDataCallback | null = null
 let newProjectCallback: (() => void) | null = null
-let replacementGuard: (() => Promise<boolean>) | null = null
+let replacementGuard: ((action: ProjectReplacementAction) => Promise<ProjectReplacementDecision>) | null = null
 let sceneImport: AbortController | null = null
+let openingProject = false
 
-export function registerProjectReplacementGuard(guard: (() => Promise<boolean>) | null): void {
+export function registerProjectReplacementGuard(guard: ((action: ProjectReplacementAction) => Promise<ProjectReplacementDecision>) | null): void {
   replacementGuard = guard
+}
+
+function captureReplacementState() {
+  return {
+    epoch: useProjectStore.getState().projectEpoch,
+    configuration: getProjectContentVersion(),
+    rows: featureData.readSnapshot(),
+    dataRevision: featureData.getEditState().revision
+  }
+}
+
+function assertReplacementState(before: ReturnType<typeof captureReplacementState>, stage: '读取' | '确认'): void {
+  const current = captureReplacementState()
+  if (before.epoch !== current.epoch || before.configuration !== current.configuration
+    || before.rows !== current.rows || before.dataRevision !== current.dataRevision) {
+    throw new Error(`${stage}期间项目已改变。当前修改已保留，请重试。`)
+  }
+}
+
+async function confirmReplacement(action: ProjectReplacementAction, signal?: AbortSignal) {
+  assertNoWorkspaceDrafts()
+  finishStyleInteraction()
+  const before = captureReplacementState()
+  if (!hasUnsavedProjectWork()) return { state: before, discarded: false }
+  const decision = await replacementGuard?.(action)
+  signal?.throwIfAborted()
+  if (!decision) return null
+  assertNoWorkspaceDrafts()
+  if (before.epoch !== useProjectStore.getState().projectEpoch) throw new Error('项目已切换，请重试。')
+  if (decision === 'saved') {
+    if (hasUnsavedProjectWork()) throw new Error('保存后又有新的修改，请重试。')
+  } else {
+    assertReplacementState(before, '确认')
+  }
+  return { state: captureReplacementState(), discarded: decision === 'discard' }
 }
 
 export function registerNewProjectDialog(callback: (() => void) | null): void {
@@ -70,22 +109,38 @@ export const projectCommands = {
     sceneImport = null
     emitCommandStatus('已取消场景导入，原项目保持不变')
   },
-  async importScene(): Promise<void> {
+  async importScene(source?: File | string): Promise<void> {
     sceneImport?.abort()
     const operation = new AbortController()
     sceneImport = operation
     try {
-      if (!await resolveSceneDrafts()) return
-      operation.signal.throwIfAborted()
-      if (hasUnsavedProjectWork() && replacementGuard && !await replacementGuard()) return
-      operation.signal.throwIfAborted()
-      const before = JSON.stringify(projectSession.getSnapshot())
-      const epoch = useProjectStore.getState().projectEpoch
-      const opened = await openSceneDocument(operation.signal)
+      const before = captureReplacementState()
+      const opened = await openSceneDocument(operation.signal, {
+        source,
+        onRead: () => emitCommandStatus('正在读取场景…')
+      })
       operation.signal.throwIfAborted()
       if (!opened) { emitCommandStatus('已取消导入场景'); return }
-      if (useProjectStore.getState().projectEpoch !== epoch || JSON.stringify(projectSession.getSnapshot()) !== before) throw new Error('选择文件期间项目已改变，请重新导入')
-      replaceSceneDocumentAsEdit(opened.document)
+      assertReplacementState(before, '读取')
+      const snapshot = createProjectFromSceneDocument(opened.document)
+      const kind = snapshot.project.content.kind
+      if (before.epoch > 0 && kind !== useProjectStore.getState().project.content.kind) {
+        throw new Error(kind === 'scene3d' ? '这是三维场景。请在三维项目中导入。' : '这是二维场景。请在二维项目中导入。')
+      }
+      const confirmed = await confirmReplacement('导入', operation.signal)
+      if (!confirmed) { emitCommandStatus('已取消导入场景'); return }
+      operation.signal.throwIfAborted()
+      assertReplacementState(confirmed.state, '确认')
+      assertNoWorkspaceDrafts()
+      if (before.epoch === 0) {
+        bumpProjectGeneration()
+        projectSession.loadSnapshot(snapshot)
+        setCurrentProjectPath(null)
+        useProjectStore.getState().setDirty(true)
+        emitCommandStatus(`已打开场景：${opened.path}，请保存为项目`)
+        return
+      }
+      projectSession.replaceSnapshotAsEdit(snapshot, '导入完整场景')
       emitCommandStatus(`已导入完整场景：${opened.path}，可撤销恢复`)
     } catch (error) {
       if (operation.signal.aborted) return
@@ -127,23 +182,29 @@ export const projectCommands = {
     emitCommandStatus(type === '3d' ? '已创建三维场景' : '已创建二维地图')
   },
 
-  async openProject(): Promise<void> {
+  async openProject(source?: File | string): Promise<void> {
+    if (openingProject) return
+    openingProject = true
     try {
-      const epoch = useProjectStore.getState().projectEpoch
-      if (!await resolveSceneDrafts()) return
-      if (hasUnsavedProjectWork() && replacementGuard && !await replacementGuard()) return
-      if (epoch !== useProjectStore.getState().projectEpoch) throw new Error('工程已切换，请重新打开文件')
-      const version = getProjectContentVersion()
-      const opened = await openSnapshotFromDisk()
+      const before = captureReplacementState()
+      const opened = await openSnapshotFromDisk(() => emitCommandStatus('正在读取项目…'), source)
       if (!opened) {
         emitCommandStatus('已取消打开')
         return
       }
-      if (epoch !== useProjectStore.getState().projectEpoch || version !== getProjectContentVersion()) throw new Error('选择或读取文件期间工程已改变，原内容保留')
+      assertReplacementState(before, '读取')
+      const confirmed = await confirmReplacement('打开')
+      if (!confirmed) {
+        emitCommandStatus('已取消打开，当前项目保持原样')
+        return
+      }
+      assertReplacementState(confirmed.state, '确认')
+      assertNoWorkspaceDrafts()
+      if (confirmed.discarded) discardRecoveryOnReplacement()
       bumpProjectGeneration()
       // credentialRef keys only in file — hydrate secrets from OS secure store when available.
       projectSession.loadSnapshot(opened.snapshot)
-      setCurrentProjectPath(isTauri() ? opened.path : null)
+      setCurrentProjectPath(isTauri() && (source === undefined || typeof source === 'string') ? opened.path : null)
       const installedEpoch = useProjectStore.getState().projectEpoch
       await hydrateCredentialsFromRefs(
         collectCredentialRefKeys(opened.snapshot.project.content.kind === 'map2d' ? opened.snapshot.project.content.datasets.filter(dataset => dataset.kind !== 'vector') : [])
@@ -151,6 +212,8 @@ export const projectCommands = {
       if (installedEpoch === useProjectStore.getState().projectEpoch) emitCommandStatus(`已打开项目：${opened.path}${opened.migration ? '；旧工程已兼容读入，保存时将写入新版工程格式' : ''}`)
     } catch (error) {
       emitCommandStatus(error instanceof Error ? `打开失败：${error.message}` : '打开失败')
+    } finally {
+      openingProject = false
     }
   },
 

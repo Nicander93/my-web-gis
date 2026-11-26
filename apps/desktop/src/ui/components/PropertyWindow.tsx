@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { registerPendingPropertyEdit } from '@/ui/components/pending-property-edits'
+import { registerWorkspaceDraft } from '@/stores/workspace-drafts'
 import type { ReactNode } from 'react'
 import { Button, Input, Menu } from 'antd'
 import { X } from 'lucide-react'
@@ -21,7 +21,7 @@ interface Props {
 
 /** 非模态窗框；草稿和项目归属仍然由具体功能负责。 */
 export function PropertyWindow({ title, subtitle, dirty, categories, section, onSection, query, onQuery, onClose, children, footer }: Props) {
-  useLayoutEffect(() => dirty ? registerPendingPropertyEdit() : undefined, [dirty])
+  useLayoutEffect(() => dirty ? registerWorkspaceDraft('请先应用或取消完整属性窗口中的编辑。') : undefined, [dirty])
   const frame = useRef<HTMLElement>(null)
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const drag = useRef<{ x: number; y: number; offset: typeof offset } | null>(null)

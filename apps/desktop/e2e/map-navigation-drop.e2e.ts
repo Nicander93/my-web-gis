@@ -1,4 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
+import { readFile } from 'node:fs/promises'
+import { createCesiumScene } from '@desktop-webgis/cesium-scene-schema'
 
 test.use({ screenshot: 'off', trace: { mode: 'retain-on-failure', screenshots: false }, actionTimeout: 15_000 })
 const data = JSON.stringify({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: { name: '拖入道路', value: 42 }, geometry: { type: 'LineString', coordinates: [[116, 39], [116.01, 39.01]] } }] })
@@ -8,12 +10,12 @@ async function setup(page: Page) {
   await page.getByRole('button', { name: /^二维地图/ }).click()
   await expect(page.getByTestId('map-runtime-viewport')).toBeVisible()
 }
-async function drop(page: Page, target: string, names = ['roads.geojson']) {
+async function drop(page: Page, target: string, names = ['roads.geojson'], content = data) {
   const files = await page.evaluateHandle(({ data, names }) => {
     const transfer = new DataTransfer()
     names.forEach(name => transfer.items.add(new File([data], name, { type: 'application/json' })))
     return transfer
-  }, { data, names })
+  }, { data: content, names })
   await page.locator(target).dispatchEvent('dragover', { dataTransfer: files })
   await page.locator(target).dispatchEvent('drop', { dataTransfer: files })
   await files.dispose()
@@ -79,6 +81,36 @@ test('file drop on an existing layer row adds data without reordering the layer'
   expect((await state(page)).snapshot).toEqual(before.snapshot)
 })
 
+test('dragging project and scene files uses their own validated entry points', async ({ page, context }, info) => {
+  await setup(page)
+  const download = page.waitForEvent('download')
+  await page.getByRole('button', { name: '保存项目', exact: true }).click()
+  const path = info.outputPath('drop.webgis.json')
+  await (await download).saveAs(path)
+  await page.reload()
+  await expect(page.getByRole('main', { name: '项目起始页' })).toBeVisible()
+  await drop(page, '.project-start', ['map.WEBGIS.JSON'], await readFile(path, 'utf8'))
+  await expect(page.locator('.status-message')).toContainText('已打开项目：map.WEBGIS.JSON')
+  await expect(page.getByRole('dialog', { name: '添加数据' })).toHaveCount(0)
+
+  await drop(page, '[data-testid=map-runtime-viewport]', ['roads.geojson'])
+  await page.getByRole('button', { name: '确认导入', exact: true }).click()
+  const layer = page.locator('.layer-name-button').filter({ hasText: 'roads' })
+  await expect(layer).toBeVisible()
+  const scene = JSON.stringify(createCesiumScene())
+  await drop(page, '[data-testid=map-runtime-viewport]', ['city.scene.json'], scene)
+  await expect(page.locator('.status-message')).toContainText('请在三维项目中导入')
+  await expect(page.getByRole('dialog', { name: '保存当前项目？' })).toHaveCount(0)
+  await expect(layer).toBeVisible()
+
+  const home = await context.newPage()
+  await home.goto('/')
+  await drop(home, '.project-start', ['city.scene.json'], scene)
+  await expect(home.getByRole('main', { name: '三维场景编辑器' })).toBeVisible({ timeout: 30_000 })
+  await expect(home.getByRole('dialog', { name: '添加数据' })).toHaveCount(0)
+  await expect(home.locator('.project-dirty')).toHaveText('未保存')
+})
+
 test('middle and space-left pan preserve selection and an unfinished drawing', async ({ page }) => {
   await setup(page)
   await drop(page, '[data-testid=map-runtime-viewport]')
@@ -124,9 +156,11 @@ test('middle and space-left pan preserve selection and an unfinished drawing', a
 test('compact ribbon leaves map space and keeps commands reachable', async ({ page }) => {
   await setup(page)
   const ribbon = page.getByRole('region', { name: '二维功能区' })
-  // The visual specification replaces the previous compressed 70px ceiling.
-  expect((await ribbon.boundingBox())!.height).toBeGreaterThanOrEqual(74)
-  expect((await ribbon.boundingBox())!.height).toBeLessThanOrEqual(76)
+  const expectedHeight = await page.evaluate(() => {
+    const css = getComputedStyle(document.documentElement)
+    return parseFloat(css.getPropertyValue('--tab-height')) + parseFloat(css.getPropertyValue('--ribbon-tool-height')) + 8
+  })
+  expect((await ribbon.boundingBox())!.height).toBe(expectedHeight)
   for (const name of ['数据', '编辑', '分析']) {
     await page.getByRole('tab', { name, exact: true }).click()
     await expect(page.getByTestId('map-runtime-viewport')).toBeVisible()

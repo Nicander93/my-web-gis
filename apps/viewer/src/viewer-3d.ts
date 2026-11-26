@@ -1,10 +1,11 @@
 import { createCesiumDocumentRuntime, type CesiumDocumentRuntime } from '@desktop-webgis/cesium-scene-runtime'
 import { bindSceneRuntime, SceneController, type SceneRuntimeBinding } from '@desktop-webgis/scene-core'
 import type { SceneDocument } from '@desktop-webgis/scene-schema'
+import type { createSceneStatus } from './scene-status'
 import 'cesium/Build/Cesium/Widgets/widgets.css'
 
 /** 只读三维场景查看器（Cesium），不依赖 Desktop 编辑器或 React。 */
-export async function renderViewer3D(scene: SceneDocument, sceneUrl: string, viewId: string): Promise<void> {
+export async function renderViewer3D(scene: SceneDocument, sceneUrl: string, viewId: string, showStatus: ReturnType<typeof createSceneStatus>): Promise<void> {
   const target = document.getElementById('map')
   if (!target) throw new Error('Viewer 缺少地图容器')
   target.setAttribute('aria-label', '城市三维场景')
@@ -29,13 +30,13 @@ export async function renderViewer3D(scene: SceneDocument, sceneUrl: string, vie
       const label = document.createElement('label'); label.className = 'layer-row'
       const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = node.visible ?? true
       checkbox.addEventListener('change', () => {
-        const report = (error: unknown): void => {
-          const status = document.getElementById('scene-status')
-          if (status) { status.classList.remove('scene-status--quiet'); status.textContent = String(error) }
-        }
+        const report = (error: unknown): void => showStatus(String(error), 'error')
         try { controller.setNodeVisible(node.id, checkbox.checked) }
         catch (error) { report(error); return }
-        void binding!.settled().then(state => { if (state.status === 'error') report(state.error) })
+        void binding!.settled().then(state => {
+          if (state.status === 'error') report(state.error)
+          if (state.status === 'ready') reportReady()
+        })
       })
       const name = document.createElement('span'); name.textContent = node.name
       label.append(checkbox,name); return label
@@ -46,9 +47,9 @@ export async function renderViewer3D(scene: SceneDocument, sceneUrl: string, vie
   switchView.href = url.href; switchView.textContent = '查看二维地图'
   switchView.style.cssText = 'position:absolute;right:16px;top:16px;z-index:20;padding:8px 12px;background:white;border-radius:5px;color:#245487'
   if (Object.values(scene.views).some(view => view.type === '2d')) target.append(switchView)
-  const status = document.getElementById('scene-status')
-  if (status) {
-    status.textContent = loaded.issues.length ? loaded.issues.map(issue => `${issue.path}: ${issue.message}`).join('\n') : '三维场景已加载'
-    if (!loaded.issues.length) setTimeout(() => status.classList.add('scene-status--quiet'),1800)
+  function reportReady(): void {
+    showStatus(loaded.issues.length ? loaded.issues.map(issue => `${issue.path}: ${issue.message}`).join('\n') : '三维场景已加载',
+      loaded.issues.length ? 'warning' : 'ready')
   }
+  reportReady()
 }

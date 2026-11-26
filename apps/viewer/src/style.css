@@ -1,6 +1,9 @@
 :root {
   --scene-accent: #2563eb;
   --scene-font-family: Inter, "SF Pro Display", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --motion-enter: 160ms;
+  --motion-exit: 110ms;
+  --motion-ease: cubic-bezier(0.2, 0.75, 0.25, 1);
 
   color: #172033;
   font-family: var(--scene-font-family);
@@ -256,12 +259,30 @@ body {
   border-radius: 10px;
   color: #42516a;
   font-size: 12px;
-  transition: opacity 240ms ease;
+  opacity: 1;
+  transition: opacity var(--motion-enter) var(--motion-ease);
 }
 
 .scene-status--quiet {
   opacity: 0;
   pointer-events: none;
+  transition-duration: var(--motion-exit);
+}
+
+.feature-popup:not([hidden]) {
+  animation: popup-appear var(--motion-enter) var(--motion-ease) backwards;
+}
+
+@keyframes popup-appear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-enter: 0ms;
+    --motion-exit: 0ms;
+  }
 }
 
 .scene-status--error {

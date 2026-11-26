@@ -422,7 +422,7 @@ export class OlMapRuntime {
     return true
   }
 
-  zoomToLayer(layerId: string): void {
+  zoomToLayer(layerId: string, duration = 120): void {
     const layer = this.registry.get(layerId)
     if (!layer) return
 
@@ -430,7 +430,7 @@ export class OlMapRuntime {
     if (vector) {
       const extent = vector.getSource()?.getExtent()
       if (!extent || isEmpty(extent)) return
-      this.fitExtent(extent)
+      this.fitExtent(extent, duration)
       return
     }
 
@@ -441,10 +441,10 @@ export class OlMapRuntime {
     const viewProj = this.getMap().getView().getProjection()
     const extent = transformExtent(bboxWgs84, 'EPSG:4326', viewProj)
     if (isEmpty(extent)) return
-    this.fitExtent(extent)
+    this.fitExtent(extent, duration)
   }
 
-  zoomToAll(): void {
+  zoomToAll(duration = 120): void {
     const extents: Array<[number, number, number, number]> = []
     for (const [layerId, layer] of this.registry.entries()) {
       const vector = this.registry.getVector(layerId)
@@ -473,13 +473,15 @@ export class OlMapRuntime {
         [item[2], item[3]]
       ])
     )
-    this.fitExtent(extent)
+    this.fitExtent(extent, duration)
   }
 
-  private fitExtent(extent: number[]): void {
-    this.getMap().getView().fit(extent, {
+  private fitExtent(extent: number[], duration: number): void {
+    const view = this.getMap().getView()
+    view.cancelAnimations()
+    view.fit(extent, {
       padding: [48, 48, 48, 48],
-      duration: 120,
+      duration,
       maxZoom: 18
     })
   }

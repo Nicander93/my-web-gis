@@ -18,6 +18,13 @@ async function waitForDraft(page: Page) {
   await expect.poll(async () => (await drafts(page)).length, { timeout: 15_000 }).toBe(1)
   return (await drafts(page))[0]
 }
+function recoveryDialog(page: Page) {
+  return page.getByRole('dialog', { name: '恢复草稿', exact: true })
+}
+async function openRecovery(page: Page) {
+  await page.getByRole('banner').getByRole('button', { name: '恢复草稿', exact: true }).click()
+  return recoveryDialog(page)
+}
 async function importPoints(page: Page) {
   await page.getByRole('tab', { name: '数据', exact: true }).click()
   await page.getByRole('region', { name: '二维功能区' }).getByRole('button', { name: '添加数据', exact: true }).click()
@@ -27,7 +34,7 @@ async function importPoints(page: Page) {
   await page.getByRole('button', { name: '确认导入', exact: true }).click()
 }
 
-test('applied table edits survive abrupt page closure, restore as dirty and clear only after successful save', async ({ page, context }, info) => {
+test('applied table edits survive abrupt page closure and a configuration-only save', async ({ page, context }, info) => {
   await context.route('**/*tile.openstreetmap.org/**', (route) => route.abort())
   await page.goto('/')
   await page.getByRole('button', { name: /^二维地图/ }).click()
@@ -52,8 +59,7 @@ test('applied table edits survive abrupt page closure, restore as dirty and clea
   expect(draft.snapshot.featuresByDataset[datasetId][0].properties).toEqual({ code: '001', value: 42 })
   await page.close({ runBeforeUnload: false })
   const reopened = await context.newPage(); await reopened.goto('/')
-  const dialog = reopened.getByRole('dialog', { name: '发现恢复草稿', exact: true })
-  await expect(dialog).toBeVisible()
+  const dialog = await openRecovery(reopened)
   await dialog.getByRole('button', { name: '恢复草稿', exact: true }).click()
   await expect(dialog).toHaveCount(0)
   await expect(reopened.locator('.project-dirty')).toContainText('未保存')
@@ -67,12 +73,14 @@ test('applied table edits survive abrupt page closure, restore as dirty and clea
   expect(saved.project.metadata.id).toBe(draft.projectId)
   expect(saved.project.content.layers).toEqual(draft.snapshot.project.content.layers)
   expect(saved.project.content.datasets).toEqual(draft.snapshot.project.content.datasets)
-  expect(saved.featuresByDataset).toEqual(draft.snapshot.featuresByDataset)
-  await expect.poll(() => drafts(reopened)).toEqual([])
+  expect(saved.featuresByDataset[datasetId][0].properties).toEqual({ code: '001', value: 2 })
+  await expect.poll(async () => (await drafts(reopened))[0]?.dataSessions?.[datasetId]?.pending?.updates[0]?.properties.value).toBe(42)
   await reopened.close({ runBeforeUnload: false })
   const again = await context.newPage(); await again.goto('/')
-  await expect(again.getByRole('button', { name: /^二维地图/ })).toBeVisible()
-  await expect(again.getByRole('dialog', { name: '发现恢复草稿' })).toHaveCount(0)
+  await (await openRecovery(again)).getByRole('button', { name: '恢复草稿', exact: true }).click()
+  await again.locator('.layer-name-button').filter({ hasText: 'recovery' }).click()
+  await again.getByRole('button', { name: '属性表', exact: true }).click()
+  await expect(again.locator('.attribute-table-tab-panel:visible tbody')).toContainText('42')
 })
 
 test('damaged cache disables restore and explicit discard leaves another project intact', async ({ page, context }) => {
@@ -92,13 +100,24 @@ test('damaged cache disables restore and explicit discard leaves another project
   }))
   await page.close({ runBeforeUnload: false })
   const reopened = await context.newPage(); await reopened.goto('/')
-  const dialog = reopened.getByRole('dialog', { name: '发现恢复草稿', exact: true })
+  await expect(reopened.getByRole('banner').getByRole('button', { name: '恢复草稿', exact: true })).toBeVisible()
+  await expect(recoveryDialog(reopened)).toHaveCount(0)
+  await reopened.getByRole('button', { name: /^二维地图/ }).click()
+  const dialog = await openRecovery(reopened)
+  await dialog.getByRole('button', { name: '暂不处理', exact: true }).click()
+  await expect(recoveryDialog(reopened)).toHaveCount(0)
+  await openRecovery(reopened)
   const corrupt = dialog.getByRole('region', { name: '无法读取的恢复草稿', exact: true })
   await expect(corrupt.getByRole('button', { name: '恢复草稿', exact: true })).toBeDisabled()
   await corrupt.getByRole('button', { name: '舍弃草稿', exact: true }).click()
+  await corrupt.getByRole('button', { name: '保留草稿', exact: true }).click()
+  await expect(corrupt).toBeVisible()
+  await corrupt.getByRole('button', { name: '舍弃草稿', exact: true }).click()
+  await corrupt.getByRole('button', { name: '确认舍弃', exact: true }).click()
   expect((await drafts(reopened))[0].projectId).toBe(draft.projectId)
   await expect(dialog.getByRole('region', { name: draft.snapshot.project.metadata.name, exact: true })).toBeVisible()
   await dialog.getByRole('button', { name: '舍弃草稿', exact: true }).click()
+  await dialog.getByRole('button', { name: '确认舍弃', exact: true }).click()
   await expect(dialog).toHaveCount(0)
   expect(await drafts(reopened)).toEqual([])
 })
@@ -123,7 +142,7 @@ test('3D folder IDs and applied scene settings recover through the real Cesium w
   const draft = await waitForDraft(page)
   await page.close({ runBeforeUnload: false })
   const reopened = await context.newPage(); await reopened.goto('/')
-  await reopened.getByRole('dialog', { name: '发现恢复草稿', exact: true }).getByRole('button', { name: '恢复草稿', exact: true }).click()
+  await (await openRecovery(reopened)).getByRole('button', { name: '恢复草稿', exact: true }).click()
   await expect(reopened.locator('.scene3d-footer__state')).toHaveText('就绪', { timeout: 30_000 })
   await expect(reopened.locator('.scene3d-scene-group__name').filter({ hasText: 'Recovered group' })).toBeVisible()
   await reopened.getByRole('tablist', { name: '三维工作任务', exact: true }).getByRole('tab', { name: '场景', exact: true }).click()

@@ -89,7 +89,7 @@ export abstract class BaseLayer {
   }
   protected getPopupContent(_event: LayerClickEvent): PopupContent | undefined { return this.popupContent }
   abstract contains(picked: unknown): boolean
-  abstract flyTo(): Promise<void>
+  abstract flyTo(duration?: number): Promise<void>
   protected abstract createNative(viewer: Viewer, signal: AbortSignal): Promise<() => void>
   protected abstract setNativeVisible(value: boolean): void
 }

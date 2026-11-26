@@ -1,0 +1,67 @@
+:root {
+  --motion-feedback: 90ms;
+  --motion-enter: 160ms;
+  --motion-exit: 110ms;
+  --motion-ease: cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+/* 工作台留在原位，让项目切换和叠层出现各自有清楚的反馈。 */
+.project-start__content,
+.workspace-loading,
+.modeless-window,
+.desktop-editor-modal .ant-modal-container,
+.workspace-file-drop {
+  animation: workbench-appear var(--motion-enter) var(--motion-ease) backwards;
+}
+
+@keyframes workbench-appear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.ui-button,
+.toolbar-button,
+.project-start__actions button,
+.desktop-editor-modal .ant-modal-close {
+  transition: background-color var(--motion-feedback) var(--motion-ease),
+    border-color var(--motion-feedback) var(--motion-ease),
+    color var(--motion-feedback) var(--motion-ease);
+}
+
+.project-start__actions button:active,
+.toolbar-button:active:not(:disabled) {
+  background-color: var(--color-active);
+}
+
+.project-start__status {
+  min-height: 2.6em;
+  margin-top: var(--space-group);
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.workspace-loading {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.status-item--pending {
+  color: var(--color-warning);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-feedback: 0ms;
+    --motion-enter: 0ms;
+    --motion-exit: 0ms;
+  }
+
+  .layer-loading-icon,
+  .spin {
+    animation: none;
+  }
+}

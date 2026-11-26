@@ -118,10 +118,10 @@ export class GraphicLayer extends BaseLayer {
     return editing
   }
   contains(picked: unknown): boolean { return Boolean(picked && typeof picked === 'object' && 'id' in picked && picked.id instanceof Entity && [...this.nativeIds.values()].includes(picked.id.id)) }
-  async flyTo(): Promise<void> {
+  async flyTo(duration?: number): Promise<void> {
     if (!this.viewer || !this.source || !this.graphics.size) return
     const entities = [...this.nativeIds.values()].flatMap(id => this.source?.entities.getById(id) ?? [])
-    if (entities.length) await this.viewer.flyTo(entities.length === 1 ? entities[0] : entities)
+    if (entities.length) await this.viewer.flyTo(entities.length === 1 ? entities[0] : entities, { duration })
   }
   protected getPopupContent(event: LayerClickEvent): PopupContent | undefined {
     const picked = event.picked
