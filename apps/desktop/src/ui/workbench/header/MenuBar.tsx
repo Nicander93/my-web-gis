@@ -70,8 +70,8 @@ export function MenuBar({ hasProject }: { hasProject: boolean }) {
   function closeMenu(restore: boolean) {
     const id = openRef.current
     openRef.current = null
+    if (restore && id) triggers.current[id]?.focus({ preventScroll: true })
     setOpenMenu(null)
-    if (restore && id) queueMicrotask(() => triggers.current[id]?.focus())
   }
 
   function openAt(id: MenuId) {
@@ -202,6 +202,7 @@ export function MenuBar({ hasProject }: { hasProject: boolean }) {
               onMouseEnter={() => { if (openRef.current && openRef.current !== menu.id) openAt(menu.id) }}
             >
               <button
+                id={`workbench-menu-${menu.id}`}
                 ref={(node) => { triggers.current[menu.id] = node }}
                 className={`menu-trigger ${isOpen ? 'is-open' : ''}`}
                 type="button"

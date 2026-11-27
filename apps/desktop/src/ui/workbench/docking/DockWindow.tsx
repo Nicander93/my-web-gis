@@ -3,6 +3,7 @@ import { Maximize2, Minimize2, PanelsTopLeft, X } from 'lucide-react'
 import { useDockingStore } from '@/stores/docking.store'
 import { useWorkspaceStore } from '@/stores/workspace.store'
 import { usePreferencesStore } from '@/stores/preferences.store'
+import { emitCommandStatus } from '@/platform/command-status'
 import { constrainWindow, panelDefinitions, type DockPanelId, type DockPosition, type WindowBounds, type WindowPlacement } from '@/stores/docking-layout'
 import './docking.css'
 
@@ -144,11 +145,15 @@ export function DockWindow({ id, title, label, actions, children, footer, onClos
   }
 
   function close(): void {
+    if (ref.current?.contains(document.activeElement)) {
+      document.getElementById('workbench-menu-view')?.focus({ preventScroll: true })
+    }
     onClose?.()
     const store = useWorkspaceStore.getState()
     if (id === 'left') store.setLeftOpen(false)
     else if (id === 'right') store.setRightOpen(false)
     else store.setBottomOpen(false)
+    emitCommandStatus(`${title}已收起`)
   }
 
   return <aside ref={ref} className={`workspace-panel dock-window dock-window--${current.dock} panel-${id}`} style={style} aria-label={label} aria-hidden={!panel.open} inert={!panel.open}
