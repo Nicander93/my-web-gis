@@ -10,6 +10,13 @@
   pointer-events: none;
   transition-duration: var(--motion-exit);
 }
+/* 属性表保留表格与滚动状态，外框即时切换，标题提供轻量的出现反馈。 */
+.workspace-panel.dock-window.panel-bottom {
+  transition-duration: 0s, 0s;
+}
+.panel-bottom:not([inert]) > .dock-window__title {
+  animation: workbench-appear var(--motion-enter) var(--motion-ease) backwards;
+}
 .dock-window .panel-body { display: flex; flex-direction: column; min-height: 0; overflow: auto; }
 .dock-window__title { cursor: grab; touch-action: none; gap: 6px; flex: 0 0 var(--desktop-row-height, 28px); }
 .dock-window__title > h2 { flex: 1; min-width: 35px; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

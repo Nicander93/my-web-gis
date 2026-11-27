@@ -150,12 +150,16 @@ test('停靠窗快速收起和展开时，画布保持原位，减少动态效�
   const original = await canvas.boundingBox()
   const panel = page.locator('.dock-window.panel-bottom')
   await toggleWindow(page, '属性表')
+  await expect(page.getByRole('button', { name: '窗口', exact: true })).toBeFocused()
   await expect(panel).not.toHaveAttribute('inert')
   await page.getByRole('button', { name: '关闭属性表窗口', exact: true }).click()
+  await expect(page.getByRole('button', { name: '窗口', exact: true })).toBeFocused()
+  await expect(page.locator('.status-message')).toHaveText('属性表已收起')
   await expect(panel).toHaveAttribute('inert', '')
   await expect(page.getByRole('complementary', { name: '属性表面板' })).toHaveCount(0)
   await toggleWindow(page, '属性表')
   await expect(panel).not.toHaveAttribute('inert')
+  await expect(panel).toHaveCSS('transition-duration', '0s, 0s')
   await expect(panel).toHaveCSS('opacity', '1')
   expect(await canvas.boundingBox()).toEqual(original)
 
@@ -174,22 +178,30 @@ test('记录长属性表的窗口过渡帧间隔，深色模式下不移动地�
   await page.reload()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'system')
   await page.getByRole('button', { name: '二维地图', exact: true }).click()
-  await page.evaluate(async () => {
-    const path = '/src/commands/layer-content.commands.ts'
-    const url = performance.getEntriesByType('resource').map(entry => entry.name).findLast(name => new URL(name).pathname === path)
-    const { layerContentCommands } = await import(url ?? path)
-    layerContentCommands.addLayer('motion-data', '帧率测试', Array.from({ length: 5000 }, (_, index) => ({
-      id: `row-${index}`, geometry: { type: 'Point', coordinates: [116 + index / 100000, 40] }, properties: { index }
-    })), 'point')
+  const source = await page.evaluateHandle(() => {
+    const features = Array.from({ length: 5000 }, (_, index) => ({
+      type: 'Feature', id: `row-${index}`,
+      geometry: { type: 'Point', coordinates: [116 + index / 100000, 40] }, properties: { index }
+    }))
+    const data = new DataTransfer()
+    data.items.add(new File([JSON.stringify({ type: 'FeatureCollection', features })], '帧率测试.geojson'))
+    return data
   })
+  const canvas = page.locator('.map-canvas__viewport')
+  await canvas.dispatchEvent('drop', { dataTransfer: source })
+  await source.dispose()
+  await page.getByRole('button', { name: '确认导入', exact: true }).click()
   await page.locator('.layer-name-button').filter({ hasText: '帧率测试' }).click()
   await page.getByRole('button', { name: '属性表', exact: true }).click()
-  const canvas = page.locator('.map-canvas__viewport')
   const bounds = await canvas.boundingBox()
   expect(bounds?.x).toBe(0)
   expect(bounds?.width).toBe(page.viewportSize()?.width)
   const panel = page.locator('.dock-window.panel-bottom')
   await expect(panel).toHaveCSS('opacity', '1')
+  await expect(panel).toContainText('5000')
+  await panel.evaluate(element => Promise.allSettled(element.getAnimations({ subtree: true })
+    .filter(animation => Number.isFinite(animation.effect?.getTiming().iterations))
+    .map(animation => animation.finished)))
   await page.getByRole('button', { name: '窗口', exact: true }).click()
 
   const { frames, longFrames } = await page.getByRole('menuitemcheckbox', { name: '属性表', exact: true }).evaluate(button => {
@@ -236,5 +248,13 @@ test('记录长属性表的窗口过渡帧间隔，深色模式下不移动地�
   await info.attach('属性表收起帧间隔', { body: JSON.stringify(metrics), contentType: 'application/json' })
   console.log('属性表收起帧间隔', JSON.stringify(metrics))
   await expect(panel).toHaveCSS('visibility', 'hidden')
+  expect(await canvas.boundingBox()).toEqual(bounds)
+
+  await toggleWindow(page, '属性表')
+  const search = panel.getByRole('searchbox', { name: '表内搜索', exact: true })
+  await search.fill('123')
+  await panel.getByRole('button', { name: '关闭属性表窗口', exact: true }).click()
+  await toggleWindow(page, '属性表')
+  await expect(search).toHaveValue('123')
   expect(await canvas.boundingBox()).toEqual(bounds)
 })

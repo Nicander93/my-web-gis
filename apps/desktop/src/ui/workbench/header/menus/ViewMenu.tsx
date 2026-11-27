@@ -23,8 +23,8 @@ export function ViewMenu({ onClose }: ViewMenuProps) {
   const is3D = useProjectStore(state => getProjectType(state.project) === '3d')
   const rightTask = useWorkbenchStore(state => state.rightTask)
   function handleAction(action: () => void) {
-    action()
     onClose()
+    action()
   }
 
   return (

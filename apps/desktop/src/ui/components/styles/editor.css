@@ -41,7 +41,11 @@ button.button-danger { padding: 6px 14px; color: white; background: var(--color-
 .scene-resource-dialog .ant-form-item { margin-bottom: 14px; }
 .scene-resource-dialog__file { display: flex; align-items: center; gap: 8px; }
 .scene-resource-dialog__file .ant-input { min-width: 0; }
-button, input, select, textarea { transition: background-color 120ms ease, border-color 120ms ease; }
+button, input, select, textarea {
+  transition: background-color var(--motion-feedback) var(--motion-ease),
+    border-color var(--motion-feedback) var(--motion-ease);
+}
+/* 菜单高亮立即跟随指针和键盘，避免开合时反复重绘窗口栏。 */
+.window-bar .menu-trigger, .window-menu-overlay button { transition: none; }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 input[type="checkbox"], input[type="radio"] { accent-color: var(--color-accent); }
-@media (prefers-reduced-motion: reduce) { button, input, select, textarea { transition: none; } }
