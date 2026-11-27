@@ -173,13 +173,19 @@ it('rejects new drafts even if an asynchronous save reports success', async () =
   }))).toBe(false)
 })
 
-it('tracks independent modeless form edits until every owner releases them', () => {
+it('tracks independent drafts and checks the current gesture before closing', () => {
+  let drawing = false
   const first = registerWorkspaceDraft('请先应用或取消属性编辑。')
-  const second = registerWorkspaceDraft('请先完成或取消当前绘制。')
+  const second = registerWorkspaceDraft('请先完成或取消当前绘制。', () => drawing)
   try {
     expect(hasWorkspaceDrafts()).toBe(true)
     first(); first()
+    expect(hasWorkspaceDrafts()).toBe(false)
+    drawing = true
     expect(hasWorkspaceDrafts()).toBe(true)
+    drawing = false
+    expect(hasWorkspaceDrafts()).toBe(false)
+    drawing = true
     second()
     expect(hasWorkspaceDrafts()).toBe(false)
   } finally { first(); second() }

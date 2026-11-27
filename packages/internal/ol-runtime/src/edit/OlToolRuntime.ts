@@ -167,6 +167,11 @@ export class OlToolRuntime {
     this.refreshSnapping()
   }
 
+  /** 读取仍留在地图交互层的几何草稿，供项目切换和窗口关闭前检查。 */
+  hasGeometryDraft(): boolean {
+    return this.drawing || this.modifyOriginals.size > 0
+  }
+
   /** 只取消正在进行的草图或顶点手势，已提交的历史保持不变。 */
   cancelSketch(): boolean {
     if (this.cancelModification()) return true
