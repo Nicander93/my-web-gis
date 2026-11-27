@@ -213,10 +213,13 @@ describe('editing capture', () => {
       (item): item is Draw => item instanceof Draw
     )!
     expect(f.tool.cancelSketch()).toBe(false)
+    expect(f.tool.hasGeometryDraft()).toBe(false)
     draw.dispatchEvent({ type: 'drawstart' } as never)
+    expect(f.tool.hasGeometryDraft()).toBe(true)
     const abort = vi.spyOn(draw, 'abortDrawing')
     expect(f.tool.cancelSketch()).toBe(true)
     expect(abort).toHaveBeenCalledOnce()
+    expect(f.tool.hasGeometryDraft()).toBe(false)
     expect(f.tool.cancelSketch()).toBe(false)
     expect(f.callbacks.onAddFeature).not.toHaveBeenCalled()
     expect(f.source.getFeatures()).toHaveLength(1)

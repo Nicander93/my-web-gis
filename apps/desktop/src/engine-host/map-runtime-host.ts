@@ -1,4 +1,5 @@
 import { emitCommandStatus } from '@/platform/command-status'
+import { registerWorkspaceDraft } from '@/stores/workspace-drafts'
 import { motionDuration } from '@/platform/motion-preference'
 import { projectSession } from '@/project/project-session'
 import { getFilteredFeatures, getLayerFeatures } from '@/project/feature-query'
@@ -62,6 +63,7 @@ let moveEndKey: (() => void) | null = null
 let storeUnsub: (() => void) | null = null
 let sessionUnsub: (() => void) | null = null
 let snappingUnsub: (() => void) | null = null
+let removeGeometryDraftCheck: (() => void) | null = null
 /** 防止地图的选择和 Store 里的选择相互触发，形成死循环。 */
 let applyingStoreSelection = false
 let viewOwner: { epoch: number; id: string; preset: string } | null = null
@@ -166,7 +168,9 @@ export function mountMapRuntime(
   const owner = useProjectStore.getState()
   viewOwner = { epoch: owner.projectEpoch, id: owner.project.metadata.id, preset: JSON.stringify(mapState) }
   selectionRuntime = new OlSelectionRuntime(runtime)
-  toolRuntime = new OlToolRuntime(runtime)
+  const tool = new OlToolRuntime(runtime)
+  toolRuntime = tool
+  removeGeometryDraftCheck = registerWorkspaceDraft('请先完成当前几何编辑，或按 Esc 取消。', () => tool.hasGeometryDraft())
   toolRuntime.setSnapping(useSnappingStore.getState().options, (snapped) =>
     useSnappingStore.getState().setSnapped(snapped)
   )
@@ -231,6 +235,8 @@ export function unmountMapRuntime(): void {
   viewOwner = null
   snappingUnsub?.()
   snappingUnsub = null
+  removeGeometryDraftCheck?.()
+  removeGeometryDraftCheck = null
   storeUnsub?.()
   storeUnsub = null
   sessionUnsub?.()
@@ -596,6 +602,8 @@ export function _setMapRuntimeForTests(
 ): void {
   snappingUnsub?.()
   snappingUnsub = null
+  removeGeometryDraftCheck?.()
+  removeGeometryDraftCheck = null
   storeUnsub?.()
   storeUnsub = null
   sessionUnsub?.()
